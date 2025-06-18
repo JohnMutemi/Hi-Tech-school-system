@@ -8,14 +8,17 @@ export default function AddSchoolPage() {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    const authStatus = localStorage.getItem("superadmin-auth")
-    if (authStatus === "true") {
-      setIsAuthenticated(true)
-    } else {
-      window.location.href = "/superadmin/login"
-    }
-    setIsLoading(false)
-  }, [])
+    const checkAuth = async () => {
+      const response = await fetch('/api/superadmin/check-auth');
+      if (response.ok) {
+        setIsAuthenticated(true);
+      } else {
+        window.location.href = "/superadmin/login";
+      }
+      setIsLoading(false);
+    };
+    checkAuth();
+  }, []);
 
   if (isLoading) {
     return (

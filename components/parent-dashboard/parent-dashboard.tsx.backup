@@ -1,0 +1,508 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { 
+  Users, 
+  CreditCard, 
+  FileText, 
+  Calendar, 
+  DollarSign, 
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  Download,
+  Eye,
+  Baby
+} from "lucide-react"
+import { getSchool, db } from "@/lib/db"
+import type { Student } from "@/lib/school-storage"
+import type { StudentFee, Payment, Receipt, FeeStatement } from "@/lib/types/fees"
+import { ReceiptGenerator } from "@/components/fees/receipt-generator"
+
+interface ParentDashboardProps {
+  schoolCode: string
+  parentId: string
+}
+
+export function ParentDashboard({ schoolCode, parentId }: ParentDashboardProps) {
+  const [schoolData, setSchoolData] = useState<any>(null)
+  const [children, setChildren] = useState<Student[]>([])
+  const [selectedChild, setSelectedChild] = useState<string>("")
+  const [feesSummary, setFeesSummary] = useState<any>(null)
+  const [studentFees, setStudentFees] = useState<StudentFee[]>([])
+  const [payments, setPayments] = useState<Payment[]>([])
+  const [receipts, setReceipts] = useState<Receipt[]>([])
+  const [feeStatements, setFeeStatements] = useState<FeeStatement[]>([])
+  const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null)
+  const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null)
+  const [showReceipt, setShowReceipt] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        // Load school data from database
+        const school = getSchool(schoolCode)
+        if (!school) {
+          console.error("School not found")
+          return
+        }
+        setSchoolData(school)
+
+        // Find children of this parent from database
+        const allStudents = await db.getStudents()
+        const childrenData = allStudents.filter((s: any) => 
+          s.parentName.toLowerCase().includes(parentId.toLowerCase()) ||
+          s.parentEmail === parentId ||
+          s.parentPhone === parentId
+        )
+        
+        setChildren(childrenData)
+
+        if (childrenData.length > 0) {
+          setSelectedChild(childrenData[0].id)
+        }
+
+      } catch (error) {
+        console.error("Error loading parent dashboard:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadData()
+  }, [schoolCode, parentId])
+
+  useEffect(() => {
+    if (selectedChild) {
+      loadChildData(selectedChild)
+    }
+  }, [selectedChild, schoolCode])
+
+  const loadChildData = async (childId: string) => {
+    try {
+      // Load fees data from database
+      const allStudentFees = await db.getStudentFees()
+      const allPayments = await db.getPayments()
+      const allReceipts = await db.getReceipts()
+      
+      const fees = allStudentFees.filter((fee: any) => fee.studentId === childId)
+      const paymentsData = allPayments.filter((payment: any) => payment.studentId === childId)
+      const receiptsData = allReceipts.filter((receipt: any) => receipt.studentId === childId)
+      
+      setStudentFees(fees)
+      setPayments(paymentsData)
+      setReceipts(receiptsData)
+      setFeeStatements([]) // Not implemented in database yet
+
+      // Calculate summary
+      const totalFees = fees.reduce((sum: number, fee: any) => sum + fee.amount, 0)
+      const totalPaid = fees.reduce((sum: number, fee: any) => sum + (fee.amount - fee.balance), 0)
+      const totalBalance = fees.reduce((sum: number, fee: any) => sum + fee.balance, 0)
+      
+      setFeesSummary({
+        totalFees,
+        totalPaid,
+        totalBalance,
+        pendingFees: fees.filter((f: any) => f.status === 'pending').length,
+        overdueFees: fees.filter((f: any) => f.status === 'overdue').length,
+        paidFees: fees.filter((f: any) => f.status === 'paid').length
+      })
+    } catch (error) {
+      console.error("Error loading child data:", error)
+    }
+  }
+
+  const handleViewReceipt = (receipt: Receipt) => {
+    const payment = payments.find(p => p.id === receipt.paymentId)
+    if (payment) {
+      setSelectedReceipt(receipt)
+      setSelectedPayment(payment)
+      setShowReceipt(true)
+    }
+  }
+
+  const handleDownloadReceipt = (format: 'A3' | 'A4' | 'A5') => {
+    if (selectedReceipt && selectedPayment) {
+      console.log(`Downloading receipt in ${format} format`)
+    }
+  }
+
+  const handlePrintReceipt = (format: 'A3' | 'A4' | 'A5') => {
+    if (selectedReceipt && selectedPayment) {
+      console.log(`Printing receipt in ${format} format`)
+      window.print()
+    }
+  }
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'paid':
+        return <CheckCircle className="w-4 h-4 text-green-600" />
+      case 'overdue':
+        return <AlertCircle className="w-4 h-4 text-red-600" />
+      case 'pending':
+        return <Clock className="w-4 h-4 text-yellow-600" />
+      default:
+        return <Clock className="w-4 h-4 text-gray-600" />
+    }
+  }
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'paid':
+        return <Badge variant="default" className="bg-green-100 text-green-800">Paid</Badge>
+      case 'overdue':
+        return <Badge variant="destructive">Overdue</Badge>
+      case 'pending':
+        return <Badge variant="secondary">Pending</Badge>
+      case 'partial':
+        return <Badge variant="outline">Partial</Badge>
+      default:
+        return <Badge variant="outline">Unknown</Badge>
+    }
+  }
+
+  const selectedChildData = children.find(c => c.id === selectedChild)
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading parent dashboard...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!schoolData || children.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Card className="max-w-md">
+          <CardContent className="pt-6 text-center">
+            <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-gray-900 mb-2">No Children Found</h2>
+            <p className="text-gray-600">
+              No children found for this parent account.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              {schoolData.logoUrl ? (
+                <img
+                  src={schoolData.logoUrl}
+                  alt={`${schoolData.name} logo`}
+                  className="w-12 h-12 object-cover rounded-lg border-2"
+                  style={{ borderColor: schoolData.colorTheme }}
+                />
+              ) : (
+                <div
+                  className="w-12 h-12 rounded-lg flex items-center justify-center border-2"
+                  style={{
+                    backgroundColor: schoolData.colorTheme + "20",
+                    borderColor: schoolData.colorTheme,
+                  }}
+                >
+                  <Users className="w-6 h-6" style={{ color: schoolData.colorTheme }} />
+                </div>
+              )}
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">{schoolData.name}</h1>
+                <p className="text-gray-600">Parent Dashboard</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-gray-600">Parent ID</p>
+              <p className="font-mono font-bold">{parentId}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Children Selection */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Baby className="w-5 h-5" />
+              <span>Select Child</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Select value={selectedChild} onValueChange={setSelectedChild}>
+              <SelectTrigger className="w-full md:w-80">
+                <SelectValue placeholder="Select a child" />
+              </SelectTrigger>
+              <SelectContent>
+                {children.map((child) => (
+                  <SelectItem key={child.id} value={child.id}>
+                    {child.name} - {child.admissionNumber}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
+
+        {selectedChildData && (
+          <>
+            {/* Child Info */}
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Baby className="w-5 h-5" />
+                  <span>Child Information</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Name</p>
+                    <p className="font-semibold">{selectedChildData.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Admission Number</p>
+                    <p className="font-mono font-semibold">{selectedChildData.admissionNumber}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Class</p>
+                    <p className="font-semibold">{selectedChildData.className}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Parent Name</p>
+                    <p className="font-semibold">{selectedChildData.parentName}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Parent Phone</p>
+                    <p className="font-semibold">{selectedChildData.parentPhone}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Status</p>
+                    <Badge variant={selectedChildData.isActive ? "default" : "secondary"}>
+                      {selectedChildData.isActive ? "Active" : "Inactive"}
+                    </Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Fees Summary */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-2">
+                    <DollarSign className="w-5 h-5 text-blue-600" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Total Fees</p>
+                      <p className="text-2xl font-bold">${feesSummary?.totalFees?.toFixed(2) || '0.00'}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-2">
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Total Paid</p>
+                      <p className="text-2xl font-bold text-green-600">${feesSummary?.totalPaid?.toFixed(2) || '0.00'}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-2">
+                    <AlertCircle className="w-5 h-5 text-red-600" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Balance</p>
+                      <p className="text-2xl font-bold text-red-600">${feesSummary?.totalBalance?.toFixed(2) || '0.00'}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-2">
+                    <Clock className="w-5 h-5 text-yellow-600" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Pending</p>
+                      <p className="text-2xl font-bold text-yellow-600">{feesSummary?.pendingFees || 0}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Tabs */}
+            <Tabs defaultValue="fees" className="space-y-4">
+              <TabsList>
+                <TabsTrigger value="fees">Fees</TabsTrigger>
+                <TabsTrigger value="payments">Payments</TabsTrigger>
+                <TabsTrigger value="receipts">Receipts</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="fees" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <CreditCard className="w-5 h-5" />
+                      <span>Fee Structure</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Fee Type</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Balance</TableHead>
+                          <TableHead>Due Date</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {studentFees.map((fee) => (
+                          <TableRow key={fee.id}>
+                            <TableCell className="font-medium">{fee.name}</TableCell>
+                            <TableCell>${fee.amount.toFixed(2)}</TableCell>
+                            <TableCell>${fee.balance.toFixed(2)}</TableCell>
+                            <TableCell>{new Date(fee.dueDate).toLocaleDateString()}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center space-x-2">
+                                {getStatusIcon(fee.status)}
+                                {getStatusBadge(fee.status)}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="payments" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <CreditCard className="w-5 h-5" />
+                      <span>Payment History</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Method</TableHead>
+                          <TableHead>Reference</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {payments.map((payment) => (
+                          <TableRow key={payment.id}>
+                            <TableCell>{new Date(payment.paymentDate).toLocaleDateString()}</TableCell>
+                            <TableCell>${payment.amount.toFixed(2)}</TableCell>
+                            <TableCell className="capitalize">{payment.paymentMethod}</TableCell>
+                            <TableCell className="font-mono text-sm">{payment.referenceNumber}</TableCell>
+                            <TableCell>
+                              <Badge variant={payment.status === 'completed' ? 'default' : 'secondary'}>
+                                {payment.status}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="receipts" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <FileText className="w-5 h-5" />
+                      <span>Receipts</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Receipt #</TableHead>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {receipts.map((receipt) => (
+                          <TableRow key={receipt.id}>
+                            <TableCell className="font-mono font-medium">{receipt.receiptNumber}</TableCell>
+                            <TableCell>{new Date(receipt.generatedAt).toLocaleDateString()}</TableCell>
+                            <TableCell>${receipt.amount.toFixed(2)}</TableCell>
+                            <TableCell>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleViewReceipt(receipt)}
+                              >
+                                <Eye className="w-4 h-4 mr-1" />
+                                View
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </>
+        )}
+      </div>
+
+      {/* Receipt Dialog */}
+      <Dialog open={showReceipt} onOpenChange={setShowReceipt}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Receipt</DialogTitle>
+          </DialogHeader>
+          {selectedReceipt && selectedPayment && selectedChildData && (
+            <ReceiptGenerator
+              receipt={selectedReceipt}
+              payment={selectedPayment}
+              student={selectedChildData}
+              school={schoolData}
+              onDownload={handleDownloadReceipt}
+              onPrint={handlePrintReceipt}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+} 

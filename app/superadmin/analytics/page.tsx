@@ -9,38 +9,94 @@ import {
   TrendingUp, 
   TrendingDown, 
   Users, 
-  School, 
   GraduationCap, 
+  School, 
   Calendar,
-  ArrowLeft,
   BarChart3,
+  PieChart,
   Activity,
-  Globe
+  Globe,
+  Settings,
+  LogOut,
+  ArrowLeft
 } from "lucide-react"
 import Link from "next/link"
-import { getAllSchools } from "@/lib/school-storage"
-import type { SchoolData } from "@/lib/school-storage"
+import { getSchools } from "@/lib/db"
+
+// Define the SchoolData interface locally since we're not using school-storage
+interface SchoolData {
+  id: string
+  schoolCode: string
+  name: string
+  logo?: string
+  logoUrl?: string
+  colorTheme: string
+  portalUrl: string
+  description?: string
+  adminEmail: string
+  adminPassword: string
+  adminFirstName: string
+  adminLastName: string
+  createdAt: string
+  status: "active" | "setup" | "suspended"
+  profile?: {
+    address: string
+    phone: string
+    website?: string
+    principalName: string
+    establishedYear: string
+    description: string
+    email: string
+    motto?: string
+    type: "primary" | "secondary" | "mixed" | "college"
+  }
+  teachers?: any[]
+  students?: any[]
+  subjects?: any[]
+  classes?: any[]
+}
 
 export default function AnalyticsPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [schools, setSchools] = useState<SchoolData[]>([])
-  const [timeRange, setTimeRange] = useState("30d")
+  const [analytics, setAnalytics] = useState({
+    totalSchools: 0,
+    activeSchools: 0,
+    totalStudents: 0,
+    totalTeachers: 0,
+    growthRate: 0,
+    averageStudentsPerSchool: 0,
+    topPerformingSchools: [] as SchoolData[],
+    recentActivity: [] as any[]
+  })
 
   useEffect(() => {
-    const authStatus = localStorage.getItem("superadmin-auth")
-    if (authStatus === "true") {
-      setIsAuthenticated(true)
-      loadAnalytics()
-    } else {
-      window.location.href = "/superadmin/login"
-    }
-    setIsLoading(false)
-  }, [])
+    const checkAuth = async () => {
+      const response = await fetch('/api/superadmin/check-auth');
+      if (response.ok) {
+        setIsAuthenticated(true);
+        loadAnalytics();
+      } else {
+        window.location.href = "/superadmin/login";
+      }
+      setIsLoading(false);
+    };
+    checkAuth();
+  }, []);
 
-  const loadAnalytics = () => {
-    const allSchools = getAllSchools()
-    setSchools(allSchools)
+  const loadAnalytics = async () => {
+    try {
+      const response = await fetch('/api/superadmin/analytics');
+      if (response.ok) {
+        const data = await response.json();
+        setAnalytics(data);
+      } else {
+        console.error('Failed to load analytics data');
+      }
+    } catch (error) {
+      console.error('Error loading analytics data:', error);
+    }
   }
 
   // Calculate analytics data
@@ -76,7 +132,7 @@ export default function AnalyticsPage() {
     }
   }
 
-  const analytics = calculateAnalytics()
+  const analyticsData = calculateAnalytics()
 
   if (isLoading) {
     return (
@@ -111,22 +167,6 @@ export default function AnalyticsPage() {
                 </div>
               </div>
             </div>
-            <div className="flex items-center space-x-2">
-              <Button
-                variant={timeRange === "30d" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setTimeRange("30d")}
-              >
-                30 Days
-              </Button>
-              <Button
-                variant={timeRange === "90d" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setTimeRange("90d")}
-              >
-                90 Days
-              </Button>
-            </div>
           </div>
         </div>
       </div>
@@ -140,18 +180,18 @@ export default function AnalyticsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">Total Schools</p>
-                  <p className="text-2xl font-bold">{analytics.totalSchools}</p>
+                  <p className="text-2xl font-bold">{analyticsData.totalSchools}</p>
                 </div>
                 <School className="w-8 h-8 text-blue-500" />
               </div>
               <div className="flex items-center mt-2">
-                {analytics.growthRate >= 0 ? (
+                {analyticsData.growthRate >= 0 ? (
                   <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
                 ) : (
                   <TrendingDown className="w-4 h-4 text-red-500 mr-1" />
                 )}
-                <span className={`text-sm ${analytics.growthRate >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {analytics.growthRate >= 0 ? '+' : ''}{analytics.growthRate.toFixed(1)}%
+                <span className={`text-sm ${analyticsData.growthRate >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {analyticsData.growthRate >= 0 ? '+' : ''}{analyticsData.growthRate.toFixed(1)}%
                 </span>
               </div>
             </CardContent>
@@ -162,13 +202,13 @@ export default function AnalyticsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">Total Students</p>
-                  <p className="text-2xl font-bold">{analytics.totalStudents}</p>
+                  <p className="text-2xl font-bold">{analyticsData.totalStudents}</p>
                 </div>
                 <Users className="w-8 h-8 text-green-500" />
               </div>
               <div className="mt-2">
                 <span className="text-sm text-gray-600">
-                  Avg: {analytics.avgStudentsPerSchool} per school
+                  Avg: {analyticsData.avgStudentsPerSchool} per school
                 </span>
               </div>
             </CardContent>
@@ -179,13 +219,13 @@ export default function AnalyticsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">Total Teachers</p>
-                  <p className="text-2xl font-bold">{analytics.totalTeachers}</p>
+                  <p className="text-2xl font-bold">{analyticsData.totalTeachers}</p>
                 </div>
                 <GraduationCap className="w-8 h-8 text-purple-500" />
               </div>
               <div className="mt-2">
                 <span className="text-sm text-gray-600">
-                  Avg: {analytics.avgTeachersPerSchool} per school
+                  Avg: {analyticsData.avgTeachersPerSchool} per school
                 </span>
               </div>
             </CardContent>
@@ -196,7 +236,7 @@ export default function AnalyticsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">New Schools</p>
-                  <p className="text-2xl font-bold">{analytics.recentSchools}</p>
+                  <p className="text-2xl font-bold">{analyticsData.recentSchools}</p>
                 </div>
                 <Calendar className="w-8 h-8 text-orange-500" />
               </div>
@@ -226,9 +266,9 @@ export default function AnalyticsPage() {
                     <span className="text-sm">Active Schools</span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <span className="font-medium">{analytics.activeSchools}</span>
+                    <span className="font-medium">{analyticsData.activeSchools}</span>
                     <span className="text-sm text-gray-500">
-                      ({analytics.totalSchools > 0 ? Math.round((analytics.activeSchools / analytics.totalSchools) * 100) : 0}%)
+                      ({analyticsData.totalSchools > 0 ? Math.round((analyticsData.activeSchools / analyticsData.totalSchools) * 100) : 0}%)
                     </span>
                   </div>
                 </div>
@@ -238,9 +278,9 @@ export default function AnalyticsPage() {
                     <span className="text-sm">Setup Required</span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <span className="font-medium">{analytics.setupSchools}</span>
+                    <span className="font-medium">{analyticsData.totalSchools - analyticsData.activeSchools}</span>
                     <span className="text-sm text-gray-500">
-                      ({analytics.totalSchools > 0 ? Math.round((analytics.setupSchools / analytics.totalSchools) * 100) : 0}%)
+                      ({analyticsData.totalSchools > 0 ? Math.round(((analyticsData.totalSchools - analyticsData.activeSchools) / analyticsData.totalSchools) * 100) : 0}%)
                     </span>
                   </div>
                 </div>
@@ -250,9 +290,9 @@ export default function AnalyticsPage() {
                     <span className="text-sm">Suspended</span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <span className="font-medium">{analytics.totalSchools - analytics.activeSchools - analytics.setupSchools}</span>
+                    <span className="font-medium">{analyticsData.totalSchools - analyticsData.activeSchools}</span>
                     <span className="text-sm text-gray-500">
-                      ({analytics.totalSchools > 0 ? Math.round(((analytics.totalSchools - analytics.activeSchools - analytics.setupSchools) / analytics.totalSchools) * 100) : 0}%)
+                      ({analyticsData.totalSchools > 0 ? Math.round(((analyticsData.totalSchools - analyticsData.activeSchools) / analyticsData.totalSchools) * 100) : 0}%)
                     </span>
                   </div>
                 </div>
@@ -279,7 +319,7 @@ export default function AnalyticsPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-600">Data Storage Used</span>
-                  <span className="font-medium">~{Math.round((analytics.totalSchools * 2.5) * 10) / 10}MB</span>
+                  <span className="font-medium">~{Math.round((analyticsData.totalSchools * 2.5) * 10) / 10}MB</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-600">Average Response Time</span>

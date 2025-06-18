@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test-db": "tsx scripts/test-db-connection.ts"
   },
   "dependencies": {
     "@aws-sdk/client-rds-data": "latest",
@@ -55,6 +56,7 @@
     "@vercel/postgres": "latest",
     "@xata.io/client": "latest",
     "autoprefixer": "^10.4.20",
+    "bcrypt": "^6.0.0",
     "bcryptjs": "latest",
     "better-sqlite3": "latest",
     "bun-types": "latest",
@@ -96,6 +98,7 @@
     "@types/react-dom": "^18",
     "postcss": "^8.5",
     "tailwindcss": "^3.4.17",
+    "tsx": "^4.20.3",
     "typescript": "^5"
   }
 }

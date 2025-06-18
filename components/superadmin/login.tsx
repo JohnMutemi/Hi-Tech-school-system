@@ -1,17 +1,20 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Eye, EyeOff } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { useToast } from "@/hooks/use-toast"
 
 export function SuperAdminLogin() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const router = useRouter()
+  const { toast } = useToast()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -22,21 +25,42 @@ export function SuperAdminLogin() {
       const email = formData.get("email") as string
       const password = formData.get("password") as string
 
-      // Simple client-side authentication for demo
-      if (email === "admin@hitechsms.co.ke" && password === "admin123") {
-        // Set a simple localStorage token
-        localStorage.setItem("superadmin-auth", "true")
-        localStorage.setItem("superadmin-email", email)
+      // Call the API endpoint for authentication
+      const response = await fetch('/api/superadmin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        // Store auth state in localStorage
+        localStorage.setItem('superadmin-auth', JSON.stringify(data.user));
+        
+        // Show success toast
+        toast({
+          title: "Welcome back!",
+          description: "Successfully logged in as Super Admin",
+        });
 
         // Redirect to dashboard
-        window.location.href = "/superadmin"
+        router.push("/superadmin");
       } else {
-        alert("Invalid credentials. Please use:\nEmail: admin@hitechsms.co.ke\nPassword: admin123")
+        toast({
+          title: "Login failed",
+          description: data.error || "Invalid credentials",
+          variant: "destructive",
+        });
       }
     } catch (error) {
-      alert("Login failed. Please try again.")
+      toast({
+        title: "Error",
+        description: "An error occurred during login",
+        variant: "destructive",
+      });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
   }
 
@@ -64,7 +88,14 @@ export function SuperAdminLogin() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email Address</Label>
-            <Input id="email" name="email" type="email" placeholder="admin@hitechsms.co.ke" required />
+            <Input 
+              id="email" 
+              name="email" 
+              type="email" 
+              placeholder="admin@hitechsms.co.ke" 
+              defaultValue="admin@hitechsms.co.ke"
+              required 
+            />
           </div>
 
           <div className="space-y-2">
@@ -75,6 +106,7 @@ export function SuperAdminLogin() {
                 name="password"
                 type={showPassword ? "text" : "password"}
                 placeholder="Enter your password"
+                defaultValue="admin123"
                 required
               />
               <Button
@@ -94,7 +126,7 @@ export function SuperAdminLogin() {
             className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
             disabled={isLoading}
           >
-            {isLoading ? "Authenticating..." : "Sign In"}
+            {isLoading ? "Signing in..." : "Sign In"}
           </Button>
         </form>
 

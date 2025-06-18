@@ -7,6 +7,14 @@ async function addMockData() {
     console.log('Connecting to database...');
     const sql = neon(process.env.DATABASE_URL);
     
+    // Add super-admin user
+    const superAdminPassword = await bcrypt.hash('admin123', 12);
+    await sql`
+      INSERT INTO users (name, email, password, role, is_active, created_at, updated_at)
+      VALUES ('Super Admin', 'admin@hitechsms.co.ke', ${superAdminPassword}, 'super_admin', true, NOW(), NOW());
+    `;
+    console.log('✅ Added super-admin user');
+    
     console.log('Adding mock schools...');
     
     const mockSchools = [
@@ -48,6 +56,7 @@ async function addMockData() {
       }
     ];
     
+    // Add mock schools
     for (const school of mockSchools) {
       console.log(`Adding ${school.name}...`);
       

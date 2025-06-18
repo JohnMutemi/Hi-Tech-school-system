@@ -20,8 +20,40 @@ import {
   ExternalLink
 } from "lucide-react"
 import Link from "next/link"
-import { getAllSchools } from "@/lib/school-storage"
-import type { SchoolData } from "@/lib/school-storage"
+import { getSchools } from "@/lib/db"
+
+// Define the SchoolData interface locally since we're not using school-storage
+interface SchoolData {
+  id: string
+  schoolCode: string
+  name: string
+  logo?: string
+  logoUrl?: string
+  colorTheme: string
+  portalUrl: string
+  description?: string
+  adminEmail: string
+  adminPassword: string
+  adminFirstName: string
+  adminLastName: string
+  createdAt: string
+  status: "active" | "setup" | "suspended"
+  profile?: {
+    address: string
+    phone: string
+    website?: string
+    principalName: string
+    establishedYear: string
+    description: string
+    email: string
+    motto?: string
+    type: "primary" | "secondary" | "mixed" | "college"
+  }
+  teachers?: any[]
+  students?: any[]
+  subjects?: any[]
+  classes?: any[]
+}
 
 export function SuperAdminDashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -37,31 +69,41 @@ export function SuperAdminDashboard() {
   })
 
   useEffect(() => {
-    const authStatus = localStorage.getItem("superadmin-auth")
-    if (authStatus === "true") {
-      setIsAuthenticated(true)
-      loadDashboardData()
-    } else {
-      window.location.href = "/superadmin/login"
-    }
-    setIsLoading(false)
-  }, [])
+    const checkAuth = async () => {
+      const response = await fetch('/api/superadmin/check-auth');
+      if (response.ok) {
+        setIsAuthenticated(true);
+        loadDashboardData();
+      } else {
+        window.location.href = "/superadmin/login";
+      }
+      setIsLoading(false);
+    };
+    checkAuth();
+  }, []);
 
-  const loadDashboardData = () => {
-    const allSchools = getAllSchools()
-    setSchools(allSchools)
-    
-    const now = new Date()
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-    
-    setStats({
-      totalSchools: allSchools.length,
-      activeSchools: allSchools.filter(school => school.status === "active").length,
-      totalStudents: allSchools.reduce((sum, school) => sum + (school.students?.length || 0), 0),
-      totalTeachers: allSchools.reduce((sum, school) => sum + (school.teachers?.length || 0), 0),
-      recentSchools: allSchools.filter(school => new Date(school.createdAt) > thirtyDaysAgo).length,
-      platformHealth: allSchools.length > 0 ? "excellent" : "good"
-    })
+  const loadDashboardData = async () => {
+    try {
+      const response = await fetch('/api/superadmin/schools');
+      if (response.ok) {
+        const allSchools = await response.json();
+        setSchools(allSchools);
+        const now = new Date();
+        const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        setStats({
+          totalSchools: allSchools.length,
+          activeSchools: allSchools.filter(school => school.status === "active").length,
+          totalStudents: allSchools.reduce((sum, school) => sum + (school.students?.length || 0), 0),
+          totalTeachers: allSchools.reduce((sum, school) => sum + (school.teachers?.length || 0), 0),
+          recentSchools: allSchools.filter(school => new Date(school.createdAt) > thirtyDaysAgo).length,
+          platformHealth: allSchools.length > 0 ? "excellent" : "good"
+        });
+      } else {
+        console.error('Failed to load schools data');
+      }
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+    }
   }
 
   const handleLogout = () => {

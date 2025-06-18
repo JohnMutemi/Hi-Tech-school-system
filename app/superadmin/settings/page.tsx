@@ -45,30 +45,51 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
-    const authStatus = localStorage.getItem("superadmin-auth")
-    if (authStatus === "true") {
-      setIsAuthenticated(true)
-      loadSettings()
-    } else {
-      window.location.href = "/superadmin/login"
-    }
-    setIsLoading(false)
-  }, [])
+    const checkAuth = async () => {
+      const response = await fetch('/api/superadmin/check-auth');
+      if (response.ok) {
+        setIsAuthenticated(true);
+        loadSettings();
+      } else {
+        window.location.href = "/superadmin/login";
+      }
+      setIsLoading(false);
+    };
+    checkAuth();
+  }, []);
 
-  const loadSettings = () => {
-    const savedSettings = localStorage.getItem("superadmin-settings")
-    if (savedSettings) {
-      setSettings(JSON.parse(savedSettings))
+  const loadSettings = async () => {
+    try {
+      const response = await fetch('/api/superadmin/settings');
+      if (response.ok) {
+        const data = await response.json();
+        setSettings(data);
+      } else {
+        console.error('Failed to load settings');
+      }
+    } catch (error) {
+      console.error('Error loading settings:', error);
     }
   }
 
-  const saveSettings = () => {
-    setIsSaving(true)
-    localStorage.setItem("superadmin-settings", JSON.stringify(settings))
-    setTimeout(() => {
-      setIsSaving(false)
-      // You could add a toast notification here
-    }, 1000)
+  const saveSettings = async () => {
+    setIsSaving(true);
+    try {
+      const response = await fetch('/api/superadmin/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings)
+      });
+      if (response.ok) {
+        // You could add a toast notification here
+      } else {
+        console.error('Failed to save settings');
+      }
+    } catch (error) {
+      console.error('Error saving settings:', error);
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   const handleSettingChange = (category: string, key: string, value: any) => {

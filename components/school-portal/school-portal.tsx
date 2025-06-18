@@ -9,8 +9,41 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { School, User, Eye, EyeOff } from "lucide-react"
-import type { SchoolData } from "@/lib/school-storage"
-import { getSchool } from "@/lib/school-storage"
+import { getSchool } from "@/lib/db"
+
+// Define the SchoolData interface locally since we're not using school-storage
+interface SchoolData {
+  id: string
+  schoolCode: string
+  name: string
+  logo?: string
+  logoUrl?: string
+  colorTheme: string
+  portalUrl: string
+  description?: string
+  adminEmail: string
+  adminPassword: string
+  adminFirstName: string
+  adminLastName: string
+  createdAt: string
+  status: "active" | "setup" | "suspended"
+  profile?: {
+    address: string
+    phone: string
+    website?: string
+    principalName: string
+    establishedYear: string
+    description: string
+    email: string
+    motto?: string
+    type: "primary" | "secondary" | "mixed" | "college"
+  }
+  teachers?: any[]
+  students?: any[]
+  subjects?: any[]
+  classes?: any[]
+}
+
 import { SchoolSetupDashboard } from "./school-setup-dashboard"
 
 interface SchoolPortalProps {
@@ -29,10 +62,10 @@ export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
   const [loginError, setLoginError] = useState("")
 
   useEffect(() => {
-    const fetchSchool = () => {
+    const fetchSchool = async () => {
       try {
-        // Use client-side data fetching instead of API call
-        const school = getSchool(schoolCode)
+        // Use database function instead of localStorage
+        const school = await getSchool(schoolCode)
         if (school) {
           setSchoolData(school)
         }
@@ -50,8 +83,8 @@ export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
     setLoginError("")
 
     try {
-      // Use client-side authentication instead of API call
-      const school = getSchool(schoolCode)
+      // Use database function instead of localStorage
+      const school = await getSchool(schoolCode)
       if (!school) {
         setLoginError("School not found")
         return
@@ -94,7 +127,7 @@ export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
             <School className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h2 className="text-xl font-bold text-gray-900 mb-2">School Not Found</h2>
             <p className="text-gray-600">
-              The school with code "{schoolCode.toUpperCase()}" could not be found or may have been deactivated.
+              The school with code "{schoolCode?.toUpperCase() || 'UNKNOWN'}" could not be found or may have been deactivated.
             </p>
             <Button className="mt-4" onClick={() => (window.location.href = "/")}>
               Return to Home
@@ -136,7 +169,7 @@ export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
             </div>
             <CardTitle className="text-2xl font-bold">{schoolData.name}</CardTitle>
             <CardDescription>
-              School Code: <span className="font-mono font-bold">{schoolData.schoolCode.toUpperCase()}</span>
+              School Code: <span className="font-mono font-bold">{schoolData.schoolCode?.toUpperCase() || 'UNKNOWN'}</span>
             </CardDescription>
             <Badge variant={schoolData.status === "active" ? "default" : "secondary"} className="mt-2">
               {schoolData.status === "setup" ? "Setup Required" : schoolData.status}

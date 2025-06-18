@@ -8,8 +8,40 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { School, Plus, Search, Eye, Edit, Trash2, Users, GraduationCap, Calendar } from "lucide-react"
 import Link from "next/link"
-import { getAllSchools } from "@/lib/school-storage"
-import type { SchoolData } from "@/lib/school-storage"
+import { getSchools } from "@/lib/db"
+
+// Define the SchoolData interface locally since we're not using school-storage
+interface SchoolData {
+  id: string
+  schoolCode: string
+  name: string
+  logo?: string
+  logoUrl?: string
+  colorTheme: string
+  portalUrl: string
+  description?: string
+  adminEmail: string
+  adminPassword: string
+  adminFirstName: string
+  adminLastName: string
+  createdAt: string
+  status: "active" | "setup" | "suspended"
+  profile?: {
+    address: string
+    phone: string
+    website?: string
+    principalName: string
+    establishedYear: string
+    description: string
+    email: string
+    motto?: string
+    type: "primary" | "secondary" | "mixed" | "college"
+  }
+  teachers?: any[]
+  students?: any[]
+  subjects?: any[]
+  classes?: any[]
+}
 
 export default function SchoolsManagementPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -18,19 +50,31 @@ export default function SchoolsManagementPage() {
   const [searchTerm, setSearchTerm] = useState("")
 
   useEffect(() => {
-    const authStatus = localStorage.getItem("superadmin-auth")
-    if (authStatus === "true") {
-      setIsAuthenticated(true)
-      loadSchools()
-    } else {
-      window.location.href = "/superadmin/login"
-    }
-    setIsLoading(false)
-  }, [])
+    const checkAuth = async () => {
+      const response = await fetch('/api/superadmin/check-auth');
+      if (response.ok) {
+        setIsAuthenticated(true);
+        loadSchools();
+      } else {
+        window.location.href = "/superadmin/login";
+      }
+      setIsLoading(false);
+    };
+    checkAuth();
+  }, []);
 
-  const loadSchools = () => {
-    const allSchools = getAllSchools()
-    setSchools(allSchools)
+  const loadSchools = async () => {
+    try {
+      const response = await fetch('/api/superadmin/schools');
+      if (response.ok) {
+        const allSchools = await response.json();
+        setSchools(allSchools);
+      } else {
+        console.error('Failed to load schools data');
+      }
+    } catch (error) {
+      console.error('Error loading schools:', error);
+    }
   }
 
   const filteredSchools = schools.filter(
