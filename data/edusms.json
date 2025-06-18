@@ -53,6 +53,42 @@
       "isActive": true,
       "createdAt": "2025-06-17T13:50:12.346Z",
       "updatedAt": "2025-06-17T13:50:12.346Z"
+    },
+    {
+      "id": "school-1750249765910",
+      "name": "Veronica Norman",
+      "code": "Accusantium fuga Pe",
+      "address": "Ut explicabo Facili",
+      "phone": "+1 (744) 919-7508",
+      "email": "cahyjuqaze@mailinator.com",
+      "adminEmail": "cahyjuqaze@mailinator.com",
+      "adminPassword": "eowz1o",
+      "adminFirstName": "Cole",
+      "adminLastName": "Pace",
+      "status": "setup",
+      "colorTheme": "#f59e0b",
+      "description": "Cillum unde laboris ",
+      "isActive": true,
+      "createdAt": "2025-06-18T12:29:25.910Z",
+      "updatedAt": "2025-06-18T12:29:25.910Z"
+    },
+    {
+      "id": "school-1750249864376",
+      "name": "Sloane Nichols",
+      "code": "sloaneni",
+      "address": "Illum qui corporis ",
+      "phone": "+1 (564) 114-6154",
+      "email": "gyvu@mailinator.com",
+      "adminEmail": "gyvu@mailinator.com",
+      "adminPassword": "5y23uq",
+      "adminFirstName": "Kalia",
+      "adminLastName": "Alexander",
+      "status": "setup",
+      "colorTheme": "#f59e0b",
+      "description": "Aperiam duis est rer",
+      "isActive": true,
+      "createdAt": "2025-06-18T12:31:04.376Z",
+      "updatedAt": "2025-06-18T12:31:04.376Z"
     }
   ],
   "users": [

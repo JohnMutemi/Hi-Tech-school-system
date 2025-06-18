@@ -1,150 +1,167 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { 
-  Plus, 
-  CreditCard, 
-  FileText, 
-  DollarSign, 
-  Users, 
+import { useState, useEffect } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Plus,
+  CreditCard,
+  FileText,
+  DollarSign,
+  Users,
   TrendingUp,
   Download,
   Eye,
   Edit,
   Trash2,
   Calendar,
-  AlertCircle
-} from "lucide-react"
-import { getSchool } from "@/lib/school-storage"
-import { 
-  getFeeStructures, 
-  saveFeeStructure, 
-  deleteFeeStructure,
-  getStudentFees,
-  getPayments,
-  getReceipts,
-  calculateStudentFeesSummary
-} from "@/lib/fees-storage"
-import { useToast } from "@/hooks/use-toast"
-import type { FeeStructure } from "@/lib/types/fees"
+  AlertCircle,
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import type { FeeStructure } from "@/lib/types/fees";
 
 interface FeesPageProps {
   params: {
-    schoolCode: string
-  }
+    schoolCode: string;
+  };
 }
 
 export default function FeesPage({ params }: FeesPageProps) {
-  const { schoolCode } = params
-  const { toast } = useToast()
-  const [schoolData, setSchoolData] = useState<any>(null)
-  const [feeStructures, setFeeStructures] = useState<FeeStructure[]>([])
-  const [studentFees, setStudentFees] = useState<any[]>([])
-  const [payments, setPayments] = useState<any[]>([])
-  const [receipts, setReceipts] = useState<any[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [showAddFeeDialog, setShowAddFeeDialog] = useState(false)
-  const [editingFee, setEditingFee] = useState<FeeStructure | null>(null)
+  const { schoolCode } = params;
+  const { toast } = useToast();
+  const [schoolData, setSchoolData] = useState<any>(null);
+  const [feeStructures, setFeeStructures] = useState<FeeStructure[]>([]);
+  const [studentFees, setStudentFees] = useState<any[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
+  const [receipts, setReceipts] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [showAddFeeDialog, setShowAddFeeDialog] = useState(false);
+  const [editingFee, setEditingFee] = useState<FeeStructure | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     amount: "",
     frequency: "monthly",
-    dueDate: ""
-  })
+    dueDate: "",
+  });
 
   useEffect(() => {
-    loadData()
-  }, [schoolCode])
+    loadData();
+  }, [schoolCode]);
 
-  const loadData = () => {
+  const loadData = async () => {
     try {
-      const school = getSchool(schoolCode)
-      if (!school) {
+      const response = await fetch(`/api/schools/${schoolCode}`);
+      if (!response.ok) {
         toast({
           title: "Error",
           description: "School not found",
-          variant: "destructive"
-        })
-        return
+          variant: "destructive",
+        });
+        return;
       }
-      setSchoolData(school)
+      const school = await response.json();
+      setSchoolData(school);
 
-      const fees = getFeeStructures(schoolCode)
-      const feesData = getStudentFees(schoolCode)
-      const paymentsData = getPayments(schoolCode)
-      const receiptsData = getReceipts(schoolCode)
+      const fees = await fetch(`/api/fees/${schoolCode}`);
+      const feesData = await fees.json();
+      const paymentsData = await fetch(`/api/payments/${schoolCode}`);
+      const receiptsData = await fetch(`/api/receipts/${schoolCode}`);
 
-      setFeeStructures(fees)
-      setStudentFees(feesData)
-      setPayments(paymentsData)
-      setReceipts(receiptsData)
-
+      setFeeStructures(feesData);
+      setStudentFees(feesData);
+      setPayments(paymentsData);
+      setReceipts(receiptsData);
     } catch (error) {
-      console.error("Error loading fees data:", error)
+      console.error("Error loading fees data:", error);
       toast({
         title: "Error",
         description: "Failed to load fees data",
-        variant: "destructive"
-      })
+        variant: "destructive",
+      });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleAddFee = () => {
-    setEditingFee(null)
+    setEditingFee(null);
     setFormData({
       name: "",
       description: "",
       amount: "",
       frequency: "monthly",
-      dueDate: ""
-    })
-    setShowAddFeeDialog(true)
-  }
+      dueDate: "",
+    });
+    setShowAddFeeDialog(true);
+  };
 
   const handleEditFee = (fee: FeeStructure) => {
-    setEditingFee(fee)
+    setEditingFee(fee);
     setFormData({
       name: fee.name,
       description: fee.description,
       amount: fee.amount.toString(),
       frequency: fee.frequency,
-      dueDate: fee.dueDate
-    })
-    setShowAddFeeDialog(true)
-  }
+      dueDate: fee.dueDate,
+    });
+    setShowAddFeeDialog(true);
+  };
 
   const handleDeleteFee = (feeId: string) => {
     if (confirm("Are you sure you want to delete this fee structure?")) {
       try {
-        deleteFeeStructure(schoolCode, feeId)
-        loadData()
+        fetch(`/api/fees/${schoolCode}/${feeId}`, {
+          method: "DELETE",
+        });
+        loadData();
         toast({
           title: "Success",
-          description: "Fee structure deleted successfully"
-        })
+          description: "Fee structure deleted successfully",
+        });
       } catch (error) {
-        console.error("Error deleting fee structure:", error)
+        console.error("Error deleting fee structure:", error);
         toast({
           title: "Error",
           description: "Failed to delete fee structure",
-          variant: "destructive"
-        })
+          variant: "destructive",
+        });
       }
     }
-  }
+  };
 
   const handleSaveFee = () => {
     try {
@@ -157,35 +174,49 @@ export default function FeesPage({ params }: FeesPageProps) {
         dueDate: formData.dueDate,
         isActive: true,
         createdAt: editingFee?.createdAt || new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      }
+        updatedAt: new Date().toISOString(),
+      };
 
-      saveFeeStructure(schoolCode, feeData)
-      loadData()
-      setShowAddFeeDialog(false)
-      
+      fetch(`/api/fees/${schoolCode}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(feeData),
+      });
+      loadData();
+      setShowAddFeeDialog(false);
+
       toast({
         title: "Success",
-        description: editingFee ? "Fee structure updated successfully" : "Fee structure added successfully"
-      })
+        description: editingFee
+          ? "Fee structure updated successfully"
+          : "Fee structure added successfully",
+      });
     } catch (error) {
-      console.error("Error saving fee structure:", error)
+      console.error("Error saving fee structure:", error);
       toast({
         title: "Error",
         description: "Failed to save fee structure",
-        variant: "destructive"
-      })
+        variant: "destructive",
+      });
     }
-  }
+  };
 
   const calculateSummary = () => {
-    const totalFees = studentFees.reduce((sum, fee) => sum + fee.amount, 0)
-    const totalPaid = payments.reduce((sum, payment) => sum + payment.amount, 0)
-    const totalBalance = totalFees - totalPaid
-    const overdueFees = studentFees.filter(fee => 
-      fee.status === 'overdue' && new Date(fee.dueDate) < new Date()
-    )
-    const overdueAmount = overdueFees.reduce((sum, fee) => sum + fee.balance, 0)
+    const totalFees = studentFees.reduce((sum, fee) => sum + fee.amount, 0);
+    const totalPaid = payments.reduce(
+      (sum, payment) => sum + payment.amount,
+      0
+    );
+    const totalBalance = totalFees - totalPaid;
+    const overdueFees = studentFees.filter(
+      (fee) => fee.status === "overdue" && new Date(fee.dueDate) < new Date()
+    );
+    const overdueAmount = overdueFees.reduce(
+      (sum, fee) => sum + fee.balance,
+      0
+    );
 
     return {
       totalFees,
@@ -194,11 +225,11 @@ export default function FeesPage({ params }: FeesPageProps) {
       overdueAmount,
       totalStudents: schoolData?.students?.length || 0,
       totalPayments: payments.length,
-      totalReceipts: receipts.length
-    }
-  }
+      totalReceipts: receipts.length,
+    };
+  };
 
-  const summary = calculateSummary()
+  const summary = calculateSummary();
 
   if (isLoading) {
     return (
@@ -208,7 +239,7 @@ export default function FeesPage({ params }: FeesPageProps) {
           <p className="text-gray-600">Loading fees management...</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -233,11 +264,16 @@ export default function FeesPage({ params }: FeesPageProps) {
                     borderColor: schoolData?.colorTheme,
                   }}
                 >
-                  <DollarSign className="w-6 h-6" style={{ color: schoolData?.colorTheme }} />
+                  <DollarSign
+                    className="w-6 h-6"
+                    style={{ color: schoolData?.colorTheme }}
+                  />
                 </div>
               )}
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Fees Management</h1>
+                <h1 className="text-2xl font-bold text-gray-900">
+                  Fees Management
+                </h1>
                 <p className="text-gray-600">{schoolData?.name}</p>
               </div>
             </div>
@@ -257,7 +293,9 @@ export default function FeesPage({ params }: FeesPageProps) {
               <div className="flex items-center">
                 <DollarSign className="w-8 h-8 text-blue-600 mr-3" />
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Total Fees</p>
+                  <p className="text-sm font-medium text-gray-600">
+                    Total Fees
+                  </p>
                   <p className="text-lg font-semibold">
                     KES {summary.totalFees.toLocaleString()}
                   </p>
@@ -271,7 +309,9 @@ export default function FeesPage({ params }: FeesPageProps) {
               <div className="flex items-center">
                 <CreditCard className="w-8 h-8 text-green-600 mr-3" />
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Total Paid</p>
+                  <p className="text-sm font-medium text-gray-600">
+                    Total Paid
+                  </p>
                   <p className="text-lg font-semibold text-green-600">
                     KES {summary.totalPaid.toLocaleString()}
                   </p>
@@ -300,7 +340,9 @@ export default function FeesPage({ params }: FeesPageProps) {
                 <Users className="w-8 h-8 text-purple-600 mr-3" />
                 <div>
                   <p className="text-sm font-medium text-gray-600">Students</p>
-                  <p className="text-lg font-semibold">{summary.totalStudents}</p>
+                  <p className="text-lg font-semibold">
+                    {summary.totalStudents}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -321,13 +363,17 @@ export default function FeesPage({ params }: FeesPageProps) {
             <Card>
               <CardHeader>
                 <CardTitle>Fee Structures</CardTitle>
-                <CardDescription>Manage fee structures for different classes and terms</CardDescription>
+                <CardDescription>
+                  Manage fee structures for different classes and terms
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 {feeStructures.length === 0 ? (
                   <div className="text-center py-8">
                     <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-600">No fee structures created yet.</p>
+                    <p className="text-gray-600">
+                      No fee structures created yet.
+                    </p>
                     <Button onClick={handleAddFee} className="mt-4">
                       <Plus className="w-4 h-4 mr-2" />
                       Create First Fee Structure
@@ -349,15 +395,23 @@ export default function FeesPage({ params }: FeesPageProps) {
                     <TableBody>
                       {feeStructures.map((fee) => (
                         <TableRow key={fee.id}>
-                          <TableCell className="font-medium">{fee.name}</TableCell>
+                          <TableCell className="font-medium">
+                            {fee.name}
+                          </TableCell>
                           <TableCell>{fee.description}</TableCell>
-                          <TableCell>KES {fee.amount.toLocaleString()}</TableCell>
-                          <TableCell className="capitalize">{fee.frequency}</TableCell>
+                          <TableCell>
+                            KES {fee.amount.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="capitalize">
+                            {fee.frequency}
+                          </TableCell>
                           <TableCell>
                             {new Date(fee.dueDate).toLocaleDateString()}
                           </TableCell>
                           <TableCell>
-                            <Badge variant={fee.isActive ? "default" : "secondary"}>
+                            <Badge
+                              variant={fee.isActive ? "default" : "secondary"}
+                            >
                               {fee.isActive ? "Active" : "Inactive"}
                             </Badge>
                           </TableCell>
@@ -393,7 +447,9 @@ export default function FeesPage({ params }: FeesPageProps) {
             <Card>
               <CardHeader>
                 <CardTitle>Payment History</CardTitle>
-                <CardDescription>All payment transactions across the school</CardDescription>
+                <CardDescription>
+                  All payment transactions across the school
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 {payments.length === 0 ? (
@@ -420,15 +476,19 @@ export default function FeesPage({ params }: FeesPageProps) {
                             {new Date(payment.paymentDate).toLocaleDateString()}
                           </TableCell>
                           <TableCell className="font-medium">
-                            {schoolData?.students?.find(s => s.id === payment.studentId)?.name || 'Unknown'}
+                            {schoolData?.students?.find(
+                              (s) => s.id === payment.studentId
+                            )?.name || "Unknown"}
                           </TableCell>
                           <TableCell className="font-semibold text-green-600">
                             KES {payment.amount.toLocaleString()}
                           </TableCell>
                           <TableCell className="capitalize">
-                            {payment.paymentMethod.replace('_', ' ')}
+                            {payment.paymentMethod.replace("_", " ")}
                           </TableCell>
-                          <TableCell>{payment.referenceNumber || '-'}</TableCell>
+                          <TableCell>
+                            {payment.referenceNumber || "-"}
+                          </TableCell>
                           <TableCell>{payment.description}</TableCell>
                         </TableRow>
                       ))}
@@ -444,7 +504,9 @@ export default function FeesPage({ params }: FeesPageProps) {
             <Card>
               <CardHeader>
                 <CardTitle>Receipts</CardTitle>
-                <CardDescription>All generated payment receipts</CardDescription>
+                <CardDescription>
+                  All generated payment receipts
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 {receipts.length === 0 ? (
@@ -471,7 +533,9 @@ export default function FeesPage({ params }: FeesPageProps) {
                             {receipt.receiptNumber}
                           </TableCell>
                           <TableCell>
-                            {schoolData?.students?.find(s => s.id === receipt.studentId)?.name || 'Unknown'}
+                            {schoolData?.students?.find(
+                              (s) => s.id === receipt.studentId
+                            )?.name || "Unknown"}
                           </TableCell>
                           <TableCell>
                             {new Date(receipt.paymentDate).toLocaleDateString()}
@@ -502,7 +566,9 @@ export default function FeesPage({ params }: FeesPageProps) {
             <Card>
               <CardHeader>
                 <CardTitle>Financial Reports</CardTitle>
-                <CardDescription>Generate and download financial reports</CardDescription>
+                <CardDescription>
+                  Generate and download financial reports
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -562,7 +628,9 @@ export default function FeesPage({ params }: FeesPageProps) {
               <Input
                 id="name"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
                 placeholder="e.g., Tuition Fee"
               />
             </div>
@@ -571,7 +639,9 @@ export default function FeesPage({ params }: FeesPageProps) {
               <Textarea
                 id="description"
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
                 placeholder="Brief description of the fee"
               />
             </div>
@@ -581,13 +651,20 @@ export default function FeesPage({ params }: FeesPageProps) {
                 id="amount"
                 type="number"
                 value={formData.amount}
-                onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, amount: e.target.value })
+                }
                 placeholder="0"
               />
             </div>
             <div>
               <Label htmlFor="frequency">Frequency</Label>
-              <Select value={formData.frequency} onValueChange={(value) => setFormData({ ...formData, frequency: value })}>
+              <Select
+                value={formData.frequency}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, frequency: value })
+                }
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -605,11 +682,16 @@ export default function FeesPage({ params }: FeesPageProps) {
                 id="dueDate"
                 type="date"
                 value={formData.dueDate}
-                onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, dueDate: e.target.value })
+                }
               />
             </div>
             <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setShowAddFeeDialog(false)}>
+              <Button
+                variant="outline"
+                onClick={() => setShowAddFeeDialog(false)}
+              >
                 Cancel
               </Button>
               <Button onClick={handleSaveFee}>
@@ -620,5 +702,5 @@ export default function FeesPage({ params }: FeesPageProps) {
         </DialogContent>
       </Dialog>
     </div>
-  )
-} 
+  );
+}

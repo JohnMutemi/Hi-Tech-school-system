@@ -1,24 +1,33 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import AddSchoolForm from "@/components/superadmin/add-school-form"
+import { useEffect, useState } from "react";
+import AddSchoolForm from "@/components/superadmin/add-school-form";
+import { useRouter } from "next/navigation";
 
 export default function AddSchoolPage() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const response = await fetch('/api/superadmin/check-auth');
-      if (response.ok) {
-        setIsAuthenticated(true);
-      } else {
-        window.location.href = "/superadmin/login";
+    async function checkAuth() {
+      try {
+        const res = await fetch("/api/superadmin/check-auth", {
+          credentials: "include",
+        });
+        if (res.ok) {
+          setIsAuthenticated(true);
+        } else {
+          router.push("/superadmin/login");
+        }
+      } catch {
+        router.push("/superadmin/login");
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
-    };
+    }
     checkAuth();
-  }, []);
+  }, [router]);
 
   if (isLoading) {
     return (
@@ -28,11 +37,11 @@ export default function AddSchoolPage() {
           <p className="text-gray-600">Loading...</p>
         </div>
       </div>
-    )
+    );
   }
 
   if (!isAuthenticated) {
-    return null
+    return null;
   }
 
   return (
@@ -40,10 +49,12 @@ export default function AddSchoolPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Add New School</h1>
-          <p className="text-gray-600 mt-2">Create a new school portal with unique branding and admin access.</p>
+          <p className="text-gray-600 mt-2">
+            Create a new school portal with unique branding and admin access.
+          </p>
         </div>
         <AddSchoolForm />
       </div>
     </div>
-  )
+  );
 }

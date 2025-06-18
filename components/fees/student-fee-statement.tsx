@@ -1,133 +1,164 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { 
-  DollarSign, 
-  CreditCard, 
-  AlertCircle, 
-  CheckCircle, 
-  Clock, 
+import { useState, useEffect } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  DollarSign,
+  CreditCard,
+  AlertCircle,
+  CheckCircle,
+  Clock,
   Calendar,
   TrendingUp,
   TrendingDown,
   FileText,
   Download,
-  Eye
-} from "lucide-react"
-import { 
-  getStudentFees, 
-  getPayments, 
-  getReceipts, 
-  calculateStudentFeesSummary 
-} from "@/lib/fees-storage"
-import type { StudentFee, Payment, Receipt, StudentFeesSummary } from "@/lib/types/fees"
-import type { Student } from "@/lib/school-storage"
+  Eye,
+} from "lucide-react";
+import {
+  getStudentFees,
+  getPayments,
+  getReceipts,
+  calculateStudentFeesSummary,
+} from "@/lib/fees-storage";
+import type {
+  StudentFee,
+  Payment,
+  Receipt,
+  StudentFeesSummary,
+} from "@/lib/types/fees";
+import type { Student } from "@/lib/school-storage";
 
 interface StudentFeeStatementProps {
-  schoolCode: string
-  student: Student
-  onMakePayment?: () => void
-  onViewReceipt?: (receipt: Receipt) => void
+  schoolCode: string;
+  student: Student;
+  onMakePayment?: () => void;
+  onViewReceipt?: (receipt: Receipt) => void;
 }
 
-export function StudentFeeStatement({ 
-  schoolCode, 
-  student, 
-  onMakePayment, 
-  onViewReceipt 
+export function StudentFeeStatement({
+  schoolCode,
+  student,
+  onMakePayment,
+  onViewReceipt,
 }: StudentFeeStatementProps) {
-  const [studentFees, setStudentFees] = useState<StudentFee[]>([])
-  const [payments, setPayments] = useState<Payment[]>([])
-  const [receipts, setReceipts] = useState<Receipt[]>([])
-  const [feesSummary, setFeesSummary] = useState<StudentFeesSummary | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [studentFees, setStudentFees] = useState<StudentFee[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [receipts, setReceipts] = useState<Receipt[]>([]);
+  const [feesSummary, setFeesSummary] = useState<StudentFeesSummary | null>(
+    null
+  );
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    loadFeeData()
-  }, [schoolCode, student.id])
+    loadFeeData();
+  }, [schoolCode, student.id]);
 
   const loadFeeData = () => {
     try {
-      const fees = getStudentFees(schoolCode, student.id)
-      const paymentsData = getPayments(schoolCode, student.id)
-      const receiptsData = getReceipts(schoolCode, student.id)
-      const summary = calculateStudentFeesSummary(schoolCode, student.id)
+      const fees = getStudentFees(schoolCode, student.id);
+      const paymentsData = getPayments(schoolCode, student.id);
+      const receiptsData = getReceipts(schoolCode, student.id);
+      const summary = calculateStudentFeesSummary(schoolCode, student.id);
 
-      setStudentFees(fees)
-      setPayments(paymentsData)
-      setReceipts(receiptsData)
-      setFeesSummary(summary)
+      setStudentFees(fees);
+      setPayments(paymentsData);
+      setReceipts(receiptsData);
+      setFeesSummary(summary);
     } catch (error) {
-      console.error("Error loading fee data:", error)
+      console.error("Error loading fee data:", error);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'paid':
-        return <CheckCircle className="w-4 h-4 text-green-600" />
-      case 'overdue':
-        return <AlertCircle className="w-4 h-4 text-red-600" />
-      case 'partial':
-        return <Clock className="w-4 h-4 text-yellow-600" />
+      case "paid":
+        return <CheckCircle className="w-4 h-4 text-green-600" />;
+      case "overdue":
+        return <AlertCircle className="w-4 h-4 text-red-600" />;
+      case "partial":
+        return <Clock className="w-4 h-4 text-yellow-600" />;
       default:
-        return <Clock className="w-4 h-4 text-gray-600" />
+        return <Clock className="w-4 h-4 text-gray-600" />;
     }
-  }
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'paid':
-        return <Badge variant="default" className="bg-green-100 text-green-800">Paid</Badge>
-      case 'overdue':
-        return <Badge variant="destructive">Overdue</Badge>
-      case 'partial':
-        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">Partial</Badge>
+      case "paid":
+        return (
+          <Badge variant="default" className="bg-green-100 text-green-800">
+            Paid
+          </Badge>
+        );
+      case "overdue":
+        return <Badge variant="destructive">Overdue</Badge>;
+      case "partial":
+        return (
+          <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+            Partial
+          </Badge>
+        );
       default:
-        return <Badge variant="outline">Pending</Badge>
+        return <Badge variant="outline">Pending</Badge>;
     }
-  }
+  };
 
   const getPaymentMethodIcon = (method: string) => {
     switch (method) {
-      case 'mobile_money':
-        return <TrendingUp className="w-4 h-4 text-green-600" />
-      case 'bank_transfer':
-        return <TrendingDown className="w-4 h-4 text-blue-600" />
-      case 'cash':
-        return <DollarSign className="w-4 h-4 text-green-600" />
-      case 'check':
-        return <FileText className="w-4 h-4 text-purple-600" />
+      case "mobile_money":
+        return <TrendingUp className="w-4 h-4 text-green-600" />;
+      case "bank_transfer":
+        return <TrendingDown className="w-4 h-4 text-blue-600" />;
+      case "cash":
+        return <DollarSign className="w-4 h-4 text-green-600" />;
+      case "check":
+        return <FileText className="w-4 h-4 text-purple-600" />;
       default:
-        return <CreditCard className="w-4 h-4 text-gray-600" />
+        return <CreditCard className="w-4 h-4 text-gray-600" />;
     }
-  }
+  };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    })
-  }
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
 
   // New function to generate fee statement HTML
   const generateStatementHTML = () => {
     // Placeholder for current class, year, term - replace with actual data if available
-    const currentClass = "GRADE 1"; 
+    const currentClass = "GRADE 1";
     const currentYear = "2024";
     const currentTerm = "1";
 
     // Calculate total debit and credit amounts
     const totalDebit = studentFees.reduce((sum, fee) => sum + fee.amount, 0);
-    const totalCredit = payments.reduce((sum, payment) => sum + payment.amount, 0);
+    const totalCredit = payments.reduce(
+      (sum, payment) => sum + payment.amount,
+      0
+    );
     const feesBalance = feesSummary ? feesSummary.totalBalance : 0;
 
     return `
@@ -267,10 +298,14 @@ export function StudentFeeStatement({
                   <td></td>
                   <td></td>
                   <td>Fees Balance B/F</td>
-                  <td>${(feesSummary?.openingBalance || 0).toLocaleString()}</td>
+                  <td>${(
+                    feesSummary?.openingBalance || 0
+                  ).toLocaleString()}</td>
                   <td>0.00</td>
                 </tr>
-                ${studentFees.map(fee => `
+                ${studentFees
+                  .map(
+                    (fee) => `
                   <tr>
                     <td>${formatDate(fee.dueDate)}</td>
                     <td>N/A</td> <!-- Assuming no REF No for fee assignments -->
@@ -278,8 +313,12 @@ export function StudentFeeStatement({
                     <td>${fee.amount.toLocaleString()}</td>
                     <td>0.00</td>
                   </tr>
-                `).join('')}
-                ${payments.map(payment => `
+                `
+                  )
+                  .join("")}
+                ${payments
+                  .map(
+                    (payment) => `
                   <tr>
                     <td>${formatDate(payment.date)}</td>
                     <td>${payment.receiptNumber}</td>
@@ -287,7 +326,9 @@ export function StudentFeeStatement({
                     <td>0.00</td>
                     <td>${payment.amount.toLocaleString()}</td>
                   </tr>
-                `).join('')}
+                `
+                  )
+                  .join("")}
               </tbody>
             </table>
 
@@ -313,16 +354,16 @@ export function StudentFeeStatement({
 
   const downloadStatement = () => {
     const htmlContent = generateStatementHTML();
-    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const blob = new Blob([htmlContent], { type: "text/html" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
     a.download = `fee-statement-${student.admissionNumber}.html`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    
+
     // Optionally, show a toast notification
     // toast({
     //   title: "Statement Downloaded",
@@ -335,7 +376,7 @@ export function StudentFeeStatement({
       <div className="flex items-center justify-center py-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
-    )
+    );
   }
 
   return (
@@ -348,7 +389,9 @@ export function StudentFeeStatement({
               <div className="flex items-center">
                 <DollarSign className="w-6 h-6 text-blue-600 mr-3" />
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Total Fees</p>
+                  <p className="text-sm font-medium text-gray-600">
+                    Total Fees
+                  </p>
                   <p className="text-lg font-semibold">
                     KES {feesSummary.totalFees.toLocaleString()}
                   </p>
@@ -362,7 +405,9 @@ export function StudentFeeStatement({
               <div className="flex items-center">
                 <CreditCard className="w-6 h-6 text-green-600 mr-3" />
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Total Paid</p>
+                  <p className="text-sm font-medium text-gray-600">
+                    Total Paid
+                  </p>
                   <p className="text-lg font-semibold text-green-600">
                     KES {feesSummary.totalPaid.toLocaleString()}
                   </p>
@@ -405,7 +450,9 @@ export function StudentFeeStatement({
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-xl font-bold text-gray-900">Fee Statement</h2>
-          <p className="text-gray-600">Student: {student.name} ({student.admissionNumber})</p>
+          <p className="text-gray-600">
+            Student: {student.name} ({student.admissionNumber})
+          </p>
         </div>
         <div className="flex space-x-2">
           <Button onClick={downloadStatement} variant="outline" size="sm">
@@ -434,13 +481,17 @@ export function StudentFeeStatement({
           <Card>
             <CardHeader>
               <CardTitle>Fee Breakdown</CardTitle>
-              <CardDescription>Detailed breakdown of all fees assigned to this student</CardDescription>
+              <CardDescription>
+                Detailed breakdown of all fees assigned to this student
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {studentFees.length === 0 ? (
                 <div className="text-center py-8">
                   <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600">No fees assigned to this student yet.</p>
+                  <p className="text-gray-600">
+                    No fees assigned to this student yet.
+                  </p>
                 </div>
               ) : (
                 <Table>
@@ -469,9 +520,7 @@ export function StudentFeeStatement({
                             {formatDate(fee.dueDate)}
                           </div>
                         </TableCell>
-                        <TableCell>
-                          {getStatusBadge(fee.status)}
-                        </TableCell>
+                        <TableCell>{getStatusBadge(fee.status)}</TableCell>
                         <TableCell className="font-semibold">
                           KES {fee.balance.toLocaleString()}
                         </TableCell>
@@ -489,7 +538,9 @@ export function StudentFeeStatement({
           <Card>
             <CardHeader>
               <CardTitle>Payment History</CardTitle>
-              <CardDescription>All payment transactions for this student</CardDescription>
+              <CardDescription>
+                All payment transactions for this student
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {payments.length === 0 ? (
@@ -528,11 +579,11 @@ export function StudentFeeStatement({
                           <div className="flex items-center gap-1">
                             {getPaymentMethodIcon(payment.paymentMethod)}
                             <span className="capitalize">
-                              {payment.paymentMethod.replace('_', ' ')}
+                              {payment.paymentMethod.replace("_", " ")}
                             </span>
                           </div>
                         </TableCell>
-                        <TableCell>{payment.referenceNumber || '-'}</TableCell>
+                        <TableCell>{payment.referenceNumber || "-"}</TableCell>
                         <TableCell className="max-w-xs truncate">
                           {payment.description}
                         </TableCell>
@@ -589,8 +640,8 @@ export function StudentFeeStatement({
                         </TableCell>
                         <TableCell>
                           <div className="flex space-x-2">
-                            <Button 
-                              variant="outline" 
+                            <Button
+                              variant="outline"
                               size="sm"
                               onClick={() => onViewReceipt?.(receipt)}
                             >
@@ -623,19 +674,17 @@ export function StudentFeeStatement({
               <div>
                 <p className="font-medium text-gray-600">Last Payment Date:</p>
                 <p className="text-gray-900">
-                  {feesSummary.lastPaymentDate 
+                  {feesSummary.lastPaymentDate
                     ? formatDate(feesSummary.lastPaymentDate)
-                    : "No payments yet"
-                  }
+                    : "No payments yet"}
                 </p>
               </div>
               <div>
                 <p className="font-medium text-gray-600">Next Due Date:</p>
                 <p className="text-gray-900">
-                  {feesSummary.nextDueDate 
+                  {feesSummary.nextDueDate
                     ? formatDate(feesSummary.nextDueDate)
-                    : "No upcoming dues"
-                  }
+                    : "No upcoming dues"}
                 </p>
               </div>
             </div>
@@ -643,5 +692,5 @@ export function StudentFeeStatement({
         </Card>
       )}
     </div>
-  )
-} 
+  );
+}

@@ -1,112 +1,121 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
-import { School, User, Eye, EyeOff } from "lucide-react"
-import { getSchool } from "@/lib/db"
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { School, User, Eye, EyeOff } from "lucide-react";
 
 // Define the SchoolData interface locally since we're not using school-storage
 interface SchoolData {
-  id: string
-  schoolCode: string
-  name: string
-  logo?: string
-  logoUrl?: string
-  colorTheme: string
-  portalUrl: string
-  description?: string
-  adminEmail: string
-  adminPassword: string
-  adminFirstName: string
-  adminLastName: string
-  createdAt: string
-  status: "active" | "setup" | "suspended"
+  id: string;
+  schoolCode: string;
+  name: string;
+  logo?: string;
+  logoUrl?: string;
+  colorTheme: string;
+  portalUrl: string;
+  description?: string;
+  adminEmail: string;
+  adminPassword: string;
+  adminFirstName: string;
+  adminLastName: string;
+  createdAt: string;
+  status: "active" | "setup" | "suspended";
   profile?: {
-    address: string
-    phone: string
-    website?: string
-    principalName: string
-    establishedYear: string
-    description: string
-    email: string
-    motto?: string
-    type: "primary" | "secondary" | "mixed" | "college"
-  }
-  teachers?: any[]
-  students?: any[]
-  subjects?: any[]
-  classes?: any[]
+    address: string;
+    phone: string;
+    website?: string;
+    principalName: string;
+    establishedYear: string;
+    description: string;
+    email: string;
+    motto?: string;
+    type: "primary" | "secondary" | "mixed" | "college";
+  };
+  teachers?: any[];
+  students?: any[];
+  subjects?: any[];
+  classes?: any[];
 }
 
-import { SchoolSetupDashboard } from "./school-setup-dashboard"
+import { SchoolSetupDashboard } from "./school-setup-dashboard";
 
 interface SchoolPortalProps {
-  schoolCode: string
+  schoolCode: string;
 }
 
 export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
-  const [schoolData, setSchoolData] = useState<SchoolData | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [showPassword, setShowPassword] = useState(false)
+  const [schoolData, setSchoolData] = useState<SchoolData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
   const [loginData, setLoginData] = useState({
     email: "",
     password: "",
-  })
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [loginError, setLoginError] = useState("")
+  });
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loginError, setLoginError] = useState("");
 
   useEffect(() => {
     const fetchSchool = async () => {
       try {
-        // Use database function instead of localStorage
-        const school = await getSchool(schoolCode)
-        if (school) {
-          setSchoolData(school)
+        const response = await fetch(`/api/schools/${schoolCode}`);
+        if (response.ok) {
+          const school = await response.json();
+          setSchoolData(school);
+        } else {
+          setSchoolData(null);
         }
       } catch (error) {
-        console.error("Error fetching school:", error)
+        console.error("Error fetching school:", error);
+        setSchoolData(null);
       }
-      setIsLoading(false)
-    }
-
-    fetchSchool()
-  }, [schoolCode])
+      setIsLoading(false);
+    };
+    fetchSchool();
+  }, [schoolCode]);
 
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoginError("")
-
+    e.preventDefault();
+    setLoginError("");
     try {
-      // Use database function instead of localStorage
-      const school = await getSchool(schoolCode)
-      if (!school) {
-        setLoginError("School not found")
-        return
+      const response = await fetch(`/api/schools/${schoolCode}`);
+      if (!response.ok) {
+        setLoginError("School not found");
+        return;
       }
-
-      if (loginData.email === school.adminEmail && loginData.password === school.adminPassword) {
-        setIsLoggedIn(true)
-        // Store session in localStorage for client-side state
-        localStorage.setItem(`school_session_${schoolCode}`, loginData.email)
+      const school = await response.json();
+      if (
+        loginData.email === school.adminEmail &&
+        loginData.password === school.adminPassword
+      ) {
+        setIsLoggedIn(true);
+        localStorage.setItem(`school_session_${schoolCode}`, loginData.email);
       } else {
-        setLoginError("Invalid email or password. Please check your credentials.")
+        setLoginError(
+          "Invalid email or password. Please check your credentials."
+        );
       }
     } catch (error) {
-      setLoginError("Login failed. Please try again.")
+      setLoginError("Login failed. Please try again.");
     }
-  }
+  };
 
   const handleLogout = () => {
-    localStorage.removeItem(`school_session_${schoolCode}`)
-    setIsLoggedIn(false)
-    setLoginData({ email: "", password: "" })
-  }
+    localStorage.removeItem(`school_session_${schoolCode}`);
+    setIsLoggedIn(false);
+    setLoginData({ email: "", password: "" });
+  };
 
   if (isLoading) {
     return (
@@ -116,7 +125,7 @@ export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
           <p className="text-gray-600">Loading school portal...</p>
         </div>
       </div>
-    )
+    );
   }
 
   if (!schoolData) {
@@ -125,21 +134,29 @@ export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
         <Card className="max-w-md">
           <CardContent className="pt-6 text-center">
             <School className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-gray-900 mb-2">School Not Found</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">
+              School Not Found
+            </h2>
             <p className="text-gray-600">
-              The school with code "{schoolCode?.toUpperCase() || 'UNKNOWN'}" could not be found or may have been deactivated.
+              The school with code "{schoolCode?.toUpperCase() || "UNKNOWN"}"
+              could not be found or may have been deactivated.
             </p>
-            <Button className="mt-4" onClick={() => (window.location.href = "/")}>
+            <Button
+              className="mt-4"
+              onClick={() => (window.location.href = "/")}
+            >
               Return to Home
             </Button>
           </CardContent>
         </Card>
       </div>
-    )
+    );
   }
 
   if (isLoggedIn) {
-    return <SchoolSetupDashboard schoolData={schoolData} onLogout={handleLogout} />
+    return (
+      <SchoolSetupDashboard schoolData={schoolData} onLogout={handleLogout} />
+    );
   }
 
   return (
@@ -163,16 +180,29 @@ export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
                     borderColor: schoolData.colorTheme,
                   }}
                 >
-                  <School className="w-8 h-8" style={{ color: schoolData.colorTheme }} />
+                  <School
+                    className="w-8 h-8"
+                    style={{ color: schoolData.colorTheme }}
+                  />
                 </div>
               )}
             </div>
-            <CardTitle className="text-2xl font-bold">{schoolData.name}</CardTitle>
+            <CardTitle className="text-2xl font-bold">
+              {schoolData.name}
+            </CardTitle>
             <CardDescription>
-              School Code: <span className="font-mono font-bold">{schoolData.schoolCode?.toUpperCase() || 'UNKNOWN'}</span>
+              School Code:{" "}
+              <span className="font-mono font-bold">
+                {schoolData.schoolCode?.toUpperCase() || "UNKNOWN"}
+              </span>
             </CardDescription>
-            <Badge variant={schoolData.status === "active" ? "default" : "secondary"} className="mt-2">
-              {schoolData.status === "setup" ? "Setup Required" : schoolData.status}
+            <Badge
+              variant={schoolData.status === "active" ? "default" : "secondary"}
+              className="mt-2"
+            >
+              {schoolData.status === "setup"
+                ? "Setup Required"
+                : schoolData.status}
             </Badge>
           </CardHeader>
           <CardContent>
@@ -183,7 +213,9 @@ export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
                   id="email"
                   type="email"
                   value={loginData.email}
-                  onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
+                  onChange={(e) =>
+                    setLoginData({ ...loginData, email: e.target.value })
+                  }
                   placeholder="Enter your email"
                   required
                 />
@@ -196,7 +228,9 @@ export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
                     id="password"
                     type={showPassword ? "text" : "password"}
                     value={loginData.password}
-                    onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
+                    onChange={(e) =>
+                      setLoginData({ ...loginData, password: e.target.value })
+                    }
                     placeholder="Enter your password"
                     required
                   />
@@ -207,7 +241,11 @@ export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
                     className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 w-8"
                     onClick={() => setShowPassword(!showPassword)}
                   >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
                   </Button>
                 </div>
               </div>
@@ -218,7 +256,11 @@ export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
                 </div>
               )}
 
-              <Button type="submit" className="w-full" style={{ backgroundColor: schoolData.colorTheme }}>
+              <Button
+                type="submit"
+                className="w-full"
+                style={{ backgroundColor: schoolData.colorTheme }}
+              >
                 <User className="w-4 h-4 mr-2" />
                 Sign In to {schoolData.name}
               </Button>
@@ -228,7 +270,8 @@ export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
               <p>Use the credentials provided by your system administrator.</p>
               <div className="mt-2 p-2 bg-blue-50 rounded text-xs">
                 <p>
-                  <strong>Admin:</strong> {schoolData.adminFirstName} {schoolData.adminLastName}
+                  <strong>Admin:</strong> {schoolData.adminFirstName}{" "}
+                  {schoolData.adminLastName}
                 </p>
                 <p>
                   <strong>Email:</strong> {schoolData.adminEmail}
@@ -239,5 +282,5 @@ export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
         </Card>
       </div>
     </div>
-  )
+  );
 }
