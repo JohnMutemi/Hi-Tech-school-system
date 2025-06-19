@@ -49,6 +49,8 @@ import {
   updateSchoolClasses,
   getSchool,
 } from "@/lib/school-storage"
+import Link from "next/link"
+import { generateTempPassword } from "@/lib/utils/school-generator"
 
 interface SchoolSetupDashboardProps {
   schoolData: SchoolData
@@ -135,6 +137,14 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
   const [newSubject, setNewSubject] = useState<Partial<Subject>>({})
   const [newClass, setNewClass] = useState<Partial<SchoolClass>>({})
 
+  // Add state for showing credentials
+  const [showTeacherCredentials, setShowTeacherCredentials] = useState(false)
+  const [lastTeacherCredentials, setLastTeacherCredentials] = useState<{ email: string; tempPassword: string } | null>(null)
+  const [showStudentCredentials, setShowStudentCredentials] = useState(false)
+  const [lastStudentCredentials, setLastStudentCredentials] = useState<{ admissionNumber: string; email: string; tempPassword: string } | null>(null)
+  const [lastParentCredentials, setLastParentCredentials] = useState<any>(null)
+  const [showParentCredentials, setShowParentCredentials] = useState(false)
+
   // Refresh school data when localStorage changes
   useEffect(() => {
     const refreshedData = getSchool(schoolData.schoolCode)
@@ -176,6 +186,7 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
       return false
     }
 
+    const tempPassword = generateTempPassword()
     const teacher: Teacher = {
       id: crypto.randomUUID(),
       name: teacherData.name || "",
@@ -187,6 +198,8 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
       qualification: teacherData.qualification || "",
       dateJoined: teacherData.dateJoined || new Date().toISOString().split("T")[0],
       status: "active",
+      // @ts-ignore
+      tempPassword,
     }
 
     const updatedTeachers = [...teachers, teacher]
@@ -195,6 +208,8 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
     setNewTeacher({})
     setViewMode((prev) => ({ ...prev, staff: "list" }))
     handleStepComplete("staff")
+    setLastTeacherCredentials({ email: teacher.email, tempPassword })
+    setShowTeacherCredentials(true)
     toast({
       title: "Success!",
       description: "Teacher added successfully!",
@@ -235,6 +250,7 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
       return false
     }
 
+    const tempPassword = generateTempPassword()
     const student: Student = {
       id: crypto.randomUUID(),
       name: studentData.name || "",
@@ -250,6 +266,7 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
       address: studentData.address || "",
       dateAdmitted: studentData.dateAdmitted || new Date().toISOString().split("T")[0],
       status: "active",
+      tempPassword,
     }
 
     const updatedStudents = [...students, student]
@@ -258,6 +275,19 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
     setNewStudent({})
     setViewMode((prev) => ({ ...prev, students: "list" }))
     handleStepComplete("students")
+    setLastStudentCredentials({
+      admissionNumber: student.admissionNumber,
+      email: student.email,
+      tempPassword,
+    })
+    setShowStudentCredentials(true)
+    setLastParentCredentials({
+      admissionNumber: student.admissionNumber,
+      parentPhone: student.parentPhone,
+      parentEmail: student.parentEmail,
+      tempPassword,
+    })
+    setShowParentCredentials(true)
     toast({
       title: "Success!",
       description: "Student added successfully!",
@@ -1133,6 +1163,9 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                                   <Button variant="outline" size="sm" onClick={() => setEditingItem(teacher)}>
                                     <Edit className="w-4 h-4" />
                                   </Button>
+                                  <Button asChild variant="outline" size="sm">
+                                    <Link href={`/schools/${schoolData.schoolCode}/teacher/${teacher.id}`}>View</Link>
+                                  </Button>
                                   <AlertDialog>
                                     <AlertDialogTrigger asChild>
                                       <Button variant="outline" size="sm" className="text-red-600">
@@ -1283,8 +1316,15 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                               </TableCell>
                               <TableCell>
                                 <div className="flex space-x-2">
-                                  <Button variant="outline" size="sm" onClick={() => setViewingItem(student)}>
-                                    <Eye className="w-4 h-4" />
+                                  <Button variant="outline" size="sm" onClick={() => {
+                                    setLastStudentCredentials({
+                                      admissionNumber: student.admissionNumber,
+                                      email: student.email,
+                                      tempPassword: student.tempPassword || "N/A",
+                                    });
+                                    setShowStudentCredentials(true);
+                                  }}>
+                                    View
                                   </Button>
                                   <Button variant="outline" size="sm" onClick={() => setEditingItem(student)}>
                                     <Edit className="w-4 h-4" />
@@ -1393,6 +1433,14 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                         {viewingItem.status}
                       </Badge>
                     </div>
+                    <div className="pt-4 flex flex-col items-center">
+                      <a
+                        href={`/schools/${schoolData.schoolCode}/parent/login`}
+                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+                      >
+                        Go to Parent Login
+                      </a>
+                    </div>
                   </div>
                 )}
               </DialogContent>
@@ -1488,7 +1536,9 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                         <div key={subject.id} className="flex items-center justify-between p-3 border rounded-lg">
                           <div>
                             <h5 className="font-medium">{subject.name}</h5>
-                            <p className="text-sm text-gray-600">{subject.code}</p>
+                            <p className="text-sm text-gray-600">
+                              {subject.code}
+                            </p>
                             {subject.teacherId && (
                               <p className="text-xs text-gray-500">
                                 Teacher: {teachers.find((t) => t.id === subject.teacherId)?.name}
@@ -1812,6 +1862,89 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Add a modal/dialog to show credentials after adding a teacher */}
+      <Dialog open={showTeacherCredentials} onOpenChange={setShowTeacherCredentials}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Teacher Credentials</DialogTitle>
+            <DialogDescription>
+              Share these credentials with the teacher. They will use them to log in for the first time.
+            </DialogDescription>
+          </DialogHeader>
+          {lastTeacherCredentials && (
+            <div className="space-y-2">
+              <div><strong>Email:</strong> {lastTeacherCredentials.email}</div>
+              <div><strong>Temporary Password:</strong> {lastTeacherCredentials.tempPassword}</div>
+            </div>
+          )}
+          <Button onClick={() => setShowTeacherCredentials(false)} className="mt-4">Close</Button>
+        </DialogContent>
+      </Dialog>
+
+      {/* Student Credentials Modal */}
+      <Dialog open={showStudentCredentials} onOpenChange={setShowStudentCredentials}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Student Login Credentials</DialogTitle>
+            <DialogDescription>
+              Share these credentials with the student for their first login.
+            </DialogDescription>
+          </DialogHeader>
+          {lastStudentCredentials && (
+            <div className="space-y-2">
+              <div><strong>Admission Number:</strong> {lastStudentCredentials.admissionNumber}</div>
+              {lastStudentCredentials.email && <div><strong>Email:</strong> {lastStudentCredentials.email}</div>}
+              <div><strong>Temporary Password:</strong> {lastStudentCredentials.tempPassword}</div>
+            </div>
+          )}
+          <Button asChild className="mt-4 w-full">
+            <Link href={`/schools/${schoolData.schoolCode}/students/login`}>Go to Student Login</Link>
+          </Button>
+        </DialogContent>
+      </Dialog>
+
+      {/* Parent Credentials Modal */}
+      {showParentCredentials && lastParentCredentials && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
+            <h2 className="text-2xl font-bold text-blue-700 mb-4">Parent Login Credentials</h2>
+            <div className="mb-4 text-gray-700 text-sm">
+              Share these credentials with the parent for their first login.<br />
+              (Simulated for now. In the future, this can be sent via SMS/email.)
+            </div>
+            <div className="bg-gray-100 rounded p-4 text-left text-xs mb-4">
+              <div><b>Admission Number:</b> {lastParentCredentials.admissionNumber}</div>
+              <div><b>Parent Phone:</b> {lastParentCredentials.parentPhone}</div>
+              {lastParentCredentials.parentEmail && (
+                <div><b>Parent Email:</b> {lastParentCredentials.parentEmail}</div>
+              )}
+              <div><b>Temporary Password:</b> {lastParentCredentials.tempPassword}</div>
+            </div>
+            <div className="flex flex-col gap-2 mb-4">
+              <Link href={`/schools/${schoolData.schoolCode}/parent/login`} legacyBehavior>
+                <a className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition">Go to Parent Login</a>
+              </Link>
+              <Link href={`/schools/${schoolData.schoolCode}/students/login`} legacyBehavior>
+                <a className="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition">Go to Student Login</a>
+              </Link>
+            </div>
+            <a
+              href="#"
+              className="text-blue-600 underline mb-4 block"
+              onClick={e => { e.preventDefault(); /* future: trigger SMS/email */ }}
+            >
+              Parent Access (future: send via SMS/email)
+            </a>
+            <button
+              className="mt-2 px-4 py-2 bg-gray-300 text-gray-800 rounded"
+              onClick={() => setShowParentCredentials(false)}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

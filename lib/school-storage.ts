@@ -43,6 +43,7 @@ export interface Teacher {
   qualification: string
   dateJoined: string
   status: "active" | "inactive"
+  tempPassword?: string // For development/testing only
 }
 
 export interface Student {
@@ -125,7 +126,7 @@ export function saveSchool(schoolData: SchoolData): void {
     }
 
     console.log("School data saved successfully")
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error in saveSchool:", error)
 
     // If quota exceeded, try to clean up and save without optional data
@@ -161,7 +162,7 @@ export function saveSchool(schoolData: SchoolData): void {
         throw new Error("Storage quota exceeded. Please clear some data and try again.")
       }
     } else {
-      throw error
+      throw error as any
     }
   }
 }
@@ -189,7 +190,7 @@ export function getSchools(): Record<string, SchoolData> {
     const parsed = JSON.parse(data)
     console.log("Parsed schools data:", Object.keys(parsed).length, "schools")
     return parsed
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error in getSchools:", error)
     return {}
   }
@@ -315,7 +316,7 @@ export function getSchoolLogo(schoolCode: string): string | null {
   try {
     const logoKey = `school-logo-${schoolCode.toLowerCase()}`
     return localStorage.getItem(logoKey)
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error getting school logo:", error)
     return null
   }
@@ -325,7 +326,7 @@ export function deleteSchoolLogo(schoolCode: string): void {
   try {
     const logoKey = `school-logo-${schoolCode.toLowerCase()}`
     localStorage.removeItem(logoKey)
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error deleting school logo:", error)
   }
 }
@@ -345,7 +346,7 @@ export function clearAllSchoolData(): void {
     })
 
     console.log("All school data cleared")
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error clearing school data:", error)
   }
 }
@@ -364,8 +365,14 @@ export function getStorageInfo(): { used: number; total: number; percentage: num
     const percentage = (used / total) * 100
 
     return { used, total, percentage }
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error getting storage info:", error)
     return { used: 0, total: 5000000, percentage: 0 }
   }
+}
+
+export function getTeacher(schoolCode: string, teacherId: string): Teacher | null {
+  const school = getSchool(schoolCode)
+  if (!school || !school.teachers) return null
+  return school.teachers.find((t) => t.id === teacherId) || null
 }
