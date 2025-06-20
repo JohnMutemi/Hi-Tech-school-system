@@ -1,0 +1,92 @@
+import { type NextRequest, NextResponse } from "next/server";
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
+
+// GET: List all classes for a school
+export async function GET(request: NextRequest, { params }: { params: { schoolCode: string } }) {
+  try {
+    const school = await prisma.school.findUnique({ where: { code: params.schoolCode.toLowerCase() } });
+    if (!school) {
+      return NextResponse.json({ error: "School not found" }, { status: 404 });
+    }
+    const classes = await prisma.class.findMany({ where: { schoolId: school.id } });
+    return NextResponse.json(classes);
+  } catch (error) {
+    return NextResponse.json({ error: "Failed to fetch classes" }, { status: 500 });
+  }
+}
+
+// POST: Create a new class
+export async function POST(request: NextRequest, { params }: { params: { schoolCode: string } }) {
+  try {
+    const school = await prisma.school.findUnique({ where: { code: params.schoolCode.toLowerCase() } });
+    if (!school) {
+      return NextResponse.json({ error: "School not found" }, { status: 404 });
+    }
+    const body = await request.json();
+    const { name, level, capacity, currentStudents, classTeacherId } = body;
+    if (!name || !level) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+    const newClass = await prisma.class.create({
+      data: {
+        name,
+        level,
+        capacity: capacity || 30,
+        currentStudents: currentStudents || 0,
+        classTeacherId: classTeacherId || null,
+        schoolId: school.id,
+      },
+    });
+    return NextResponse.json(newClass, { status: 201 });
+  } catch (error) {
+    return NextResponse.json({ error: "Failed to create class" }, { status: 500 });
+  }
+}
+
+// PUT: Update a class
+export async function PUT(request: NextRequest, { params }: { params: { schoolCode: string } }) {
+  try {
+    const school = await prisma.school.findUnique({ where: { code: params.schoolCode.toLowerCase() } });
+    if (!school) {
+      return NextResponse.json({ error: "School not found" }, { status: 404 });
+    }
+    const body = await request.json();
+    const { id, name, level, capacity, currentStudents, classTeacherId } = body;
+    if (!id) {
+      return NextResponse.json({ error: "Class ID is required" }, { status: 400 });
+    }
+    const updatedClass = await prisma.class.update({
+      where: { id },
+      data: {
+        name,
+        level,
+        capacity,
+        currentStudents,
+        classTeacherId: classTeacherId || null,
+      },
+    });
+    return NextResponse.json(updatedClass);
+  } catch (error) {
+    return NextResponse.json({ error: "Failed to update class" }, { status: 500 });
+  }
+}
+
+// DELETE: Delete a class
+export async function DELETE(request: NextRequest, { params }: { params: { schoolCode: string } }) {
+  try {
+    const school = await prisma.school.findUnique({ where: { code: params.schoolCode.toLowerCase() } });
+    if (!school) {
+      return NextResponse.json({ error: "School not found" }, { status: 404 });
+    }
+    const { id } = await request.json();
+    if (!id) {
+      return NextResponse.json({ error: "Class ID is required" }, { status: 400 });
+    }
+    await prisma.class.delete({ where: { id } });
+    return NextResponse.json({ message: "Class deleted successfully" });
+  } catch (error) {
+    return NextResponse.json({ error: "Failed to delete class" }, { status: 500 });
+  }
+} 

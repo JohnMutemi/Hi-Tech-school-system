@@ -18,24 +18,6 @@ const sidebarNav = [
   { label: "Settings", icon: Settings, section: "settings" },
 ]
 
-function getStudent(schoolCode: string, studentId: string) {
-  const schools = JSON.parse(localStorage.getItem("schools-data") || "{}")
-  const school = schools[schoolCode.toLowerCase()]
-  if (!school || !school.students) return null
-  return school.students.find((s: any) => s.id === studentId) || null
-}
-
-function updateStudentProfile(schoolCode: string, studentId: string, updates: any) {
-  const schools = JSON.parse(localStorage.getItem("schools-data") || "{}")
-  const school = schools[schoolCode.toLowerCase()]
-  if (!school || !school.students) return
-  const idx = school.students.findIndex((s: any) => s.id === studentId)
-  if (idx === -1) return
-  school.students[idx] = { ...school.students[idx], ...updates }
-  schools[schoolCode.toLowerCase()] = school
-  localStorage.setItem("schools-data", JSON.stringify(schools))
-}
-
 // Simple fade/slide animation utility
 function SectionBlock({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -99,16 +81,24 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
       return
     }
     const { studentId } = JSON.parse(session)
-    const s = getStudent(schoolCode, studentId)
-    if (!s) {
-      router.replace(`/schools/${schoolCode}/students/login`)
-      return
+    async function fetchStudent() {
+      try {
+        const res = await fetch(`/api/schools/${schoolCode}/students`)
+        if (!res.ok) throw new Error("Failed to fetch students")
+        const students = await res.json()
+        const s = students.find((stu: any) => stu.id === studentId)
+        if (!s) {
+          router.replace(`/schools/${schoolCode}/students/login`)
+          return
+        }
+        setStudent(s)
+        setEditData({ ...s })
+        // TODO: Fetch payment history from API
+      } catch (err) {
+        router.replace(`/schools/${schoolCode}/students/login`)
+      }
     }
-    setStudent(s)
-    setEditData({ ...s })
-    // Load payment history
-    const paymentHistory = PaymentService.getPaymentHistory(schoolCode, studentId)
-    setPayments(paymentHistory)
+    fetchStudent()
   }, [schoolCode, router])
 
   const handleLogout = () => {
@@ -131,7 +121,7 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
     }
     setAvatarUploading(true)
     const reader = new FileReader()
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       const avatarUrl = ev.target?.result as string
       const session = localStorage.getItem("student-auth")
       if (!session) {
@@ -140,7 +130,11 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
         return
       }
       const { studentId } = JSON.parse(session)
-      updateStudentProfile(schoolCode, studentId, { avatarUrl })
+      await fetch(`/api/schools/${schoolCode}/students`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ studentId, avatarUrl }),
+      })
       setStudent((prev: any) => ({ ...prev, avatarUrl }))
       setEditData((prev: any) => ({ ...prev, avatarUrl }))
       setAvatarUploading(false)
@@ -187,19 +181,23 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
     }
     reader.readAsDataURL(file)
   }
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault()
     const session = localStorage.getItem("student-auth")
     if (!session) return
     const { studentId } = JSON.parse(session)
-    updateStudentProfile(schoolCode, studentId, { ...editData })
+    await fetch(`/api/schools/${schoolCode}/students`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ studentId, ...editData }),
+    })
     setStudent((prev: any) => ({ ...prev, ...editData }))
     setEditProfile(false)
     setLastParentCredentials({
       admissionNumber: student.admissionNumber,
       parentPhone: student.parentPhone,
       parentEmail: student.parentEmail,
-      tempPassword,
+      tempPassword: student.tempPassword,
     })
     setShowParentCredentials(true)
   }
@@ -209,7 +207,7 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
   }
 
   // Change password logic
-  const handleChangePassword = (e: React.FormEvent) => {
+  const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault()
     setPasswordMsg("")
     if (!oldPassword || !newPassword || !confirmPassword) {
@@ -224,11 +222,14 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
       setPasswordMsg("Old password is incorrect.")
       return
     }
-    // Update password
     const session = localStorage.getItem("student-auth")
     if (!session) return
     const { studentId } = JSON.parse(session)
-    updateStudentProfile(schoolCode, studentId, { tempPassword: newPassword })
+    await fetch(`/api/schools/${schoolCode}/students`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ studentId, tempPassword: newPassword }),
+    })
     setStudent((prev: any) => ({ ...prev, tempPassword: newPassword }))
     setPasswordMsg("Password changed successfully!")
     setOldPassword("")

@@ -24,8 +24,6 @@ import { getAllSchools } from "@/lib/school-storage"
 import type { SchoolData } from "@/lib/school-storage"
 
 export function SuperAdminDashboard() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
   const [schools, setSchools] = useState<SchoolData[]>([])
   const [stats, setStats] = useState({
     totalSchools: 0,
@@ -37,22 +35,17 @@ export function SuperAdminDashboard() {
   })
 
   useEffect(() => {
-    const authStatus = localStorage.getItem("superadmin-auth")
-    if (authStatus === "true") {
-      setIsAuthenticated(true)
-      loadDashboardData()
-    } else {
-      window.location.href = "/superadmin/login"
-    }
-    setIsLoading(false)
-  }, [])
+    (async () => {
+      await loadDashboardData();
+    })();
+  }, []);
 
-  const loadDashboardData = () => {
-    const allSchools = getAllSchools()
-    setSchools(allSchools)
+  const loadDashboardData = async () => {
+    const allSchools = await getAllSchools();
+    setSchools(allSchools);
     
-    const now = new Date()
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     
     setStats({
       totalSchools: allSchools.length,
@@ -61,32 +54,12 @@ export function SuperAdminDashboard() {
       totalTeachers: allSchools.reduce((sum, school) => sum + (school.teachers?.length || 0), 0),
       recentSchools: allSchools.filter(school => new Date(school.createdAt) > thirtyDaysAgo).length,
       platformHealth: allSchools.length > 0 ? "excellent" : "good"
-    })
-  }
-
-  const handleLogout = () => {
-    localStorage.removeItem("superadmin-auth")
-    window.location.href = "/superadmin/login"
-  }
+    });
+  };
 
   const recentSchools = schools
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 5)
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading dashboard...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (!isAuthenticated) {
-    return null
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -107,10 +80,6 @@ export function SuperAdminDashboard() {
               <Button variant="outline" size="sm">
                 <Settings className="w-4 h-4 mr-2" />
                 Settings
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleLogout}>
-                <LogOut className="w-4 h-4 mr-2" />
-                Logout
               </Button>
             </div>
           </div>

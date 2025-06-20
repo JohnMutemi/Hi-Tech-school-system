@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,9 +14,25 @@ export default function ParentLoginPage() {
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState("");
   const [step, setStep] = useState("login");
+  const [parents, setParents] = useState<any[]>([]);
   const router = useRouter();
   const params = useParams();
   const schoolCode = params.schoolCode as string;
+
+  // Fetch parents from API
+  useEffect(() => {
+    async function fetchParents() {
+      try {
+        const res = await fetch(`/api/schools/${schoolCode}/parents`);
+        if (!res.ok) throw new Error("Failed to fetch parents");
+        const data = await res.json();
+        setParents(data);
+      } catch (err) {
+        setParents([]);
+      }
+    }
+    fetchParents();
+  }, [schoolCode]);
 
   // Simulate sending OTP
   const handleSendOtp = () => {
@@ -44,8 +60,16 @@ export default function ParentLoginPage() {
       toast({ title: "Invalid OTP", description: "Please enter the correct OTP (try 123456 for demo)." });
       return;
     }
-    // Simulate successful login and redirect to parent dashboard
-    router.push(`/schools/${schoolCode}/parent/${parentContact}`);
+    // Check parent credentials from API data
+    const parent = parents.find(
+      (p) => (p.admissionNumber === admissionNumber || p.parentPhone === parentContact || p.parentEmail === parentContact) && p.tempPassword === password
+    );
+    if (parent) {
+      localStorage.setItem("parent-auth", JSON.stringify({ schoolCode, parentId: parentContact }));
+      router.push(`/schools/${schoolCode}/parent/${parentContact}`);
+    } else {
+      toast({ title: "Invalid Credentials", description: "No matching parent found or wrong password." });
+    }
   };
 
   return (

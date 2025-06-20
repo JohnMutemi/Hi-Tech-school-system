@@ -11,25 +11,17 @@ export default function ParentsListPage({ params }: { params: { schoolCode: stri
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    // Simulate fetching parents from students in localStorage
-    const schools = JSON.parse(localStorage.getItem("schools-data") || "{}");
-    const school = schools[schoolCode?.toLowerCase()];
-    if (!school || !school.students) return;
-    // Group by parent phone/email
-    const parentMap: Record<string, any> = {};
-    school.students.forEach((student: any) => {
-      const key = student.parentPhone + (student.parentEmail || "");
-      if (!parentMap[key]) {
-        parentMap[key] = {
-          parentName: student.parentName,
-          parentPhone: student.parentPhone,
-          parentEmail: student.parentEmail,
-          students: [],
-        };
+    async function fetchParents() {
+      try {
+        const res = await fetch(`/api/schools/${schoolCode}/parents`);
+        if (!res.ok) throw new Error("Failed to fetch parents");
+        const data = await res.json();
+        setParents(data);
+      } catch (err) {
+        setParents([]);
       }
-      parentMap[key].students.push({ name: student.name, admissionNumber: student.admissionNumber });
-    });
-    setParents(Object.values(parentMap));
+    }
+    fetchParents();
   }, [schoolCode]);
 
   const filteredParents = parents.filter((p) =>

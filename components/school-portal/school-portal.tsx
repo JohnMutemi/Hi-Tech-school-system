@@ -12,6 +12,9 @@ import { School, User, Eye, EyeOff } from "lucide-react"
 import type { SchoolData } from "@/lib/school-storage"
 import { getSchool } from "@/lib/school-storage"
 import { SchoolSetupDashboard } from "./school-setup-dashboard"
+import { useRouter, useSearchParams } from "next/navigation"
+import { Select } from "@/components/ui/select"
+import { toast } from "@/components/ui/use-toast"
 
 interface SchoolPortalProps {
   schoolCode: string
@@ -27,47 +30,89 @@ export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
   })
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [loginError, setLoginError] = useState("")
+  const searchParams = useSearchParams();
+  const [students, setStudents] = useState([]);
 
   useEffect(() => {
-    const fetchSchool = () => {
+    const autoEmail = searchParams.get("email") || "";
+    const autoPassword = searchParams.get("password") || "";
+    if ((autoEmail && !loginData.email) || (autoPassword && !loginData.password)) {
+      setLoginData({
+        email: autoEmail || loginData.email,
+        password: autoPassword || loginData.password,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+  const autoSchoolName = searchParams.get("schoolName") || "";
+
+  useEffect(() => {
+    const fetchSchool = async () => {
       try {
-        // Use client-side data fetching instead of API call
-        const school = getSchool(schoolCode)
+        const school = await getSchool(schoolCode);
         if (school) {
-          setSchoolData(school)
+          setSchoolData(school);
         }
       } catch (error) {
-        console.error("Error fetching school:", error)
+        console.error("Error fetching school:", error);
       }
-      setIsLoading(false)
-    }
+      setIsLoading(false);
+    };
 
-    fetchSchool()
-  }, [schoolCode])
+    fetchSchool();
+  }, [schoolCode]);
+
+  // Fetch students from API on component mount
+  useEffect(() => {
+    async function fetchStudents() {
+      if (!schoolData) return;
+      try {
+        const res = await fetch(`/api/schools/${schoolData.schoolCode}/students`);
+        if (res.ok) {
+          const data = await res.json();
+          setStudents(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch students", error);
+        toast({ title: "Error", description: "Could not load student data.", variant: "destructive" });
+      }
+    }
+    if (schoolData && schoolData.schoolCode) {
+        fetchStudents();
+    }
+  }, [schoolData, toast]);
 
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoginError("")
+    e.preventDefault();
+    setLoginError("");
 
     try {
-      // Use client-side authentication instead of API call
-      const school = getSchool(schoolCode)
-      if (!school) {
-        setLoginError("School not found")
-        return
-      }
+      const res = await fetch(`/api/schools/${schoolCode}/auth`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: loginData.email,
+          password: loginData.password,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setIsLoggedIn(true);
+        localStorage.setItem(`school_session_${schoolCode}`, loginData.email);
 
-      if (loginData.email === school.adminEmail && loginData.password === school.adminPassword) {
-        setIsLoggedIn(true)
-        // Store session in localStorage for client-side state
-        localStorage.setItem(`school_session_${schoolCode}`, loginData.email)
+        // Fetch school data from API after login
+        const schoolRes = await fetch(`/api/schools/${schoolCode}`);
+        if (schoolRes.ok) {
+          const school = await schoolRes.json();
+          setSchoolData(school);
+        }
       } else {
-        setLoginError("Invalid email or password. Please check your credentials.")
+        setLoginError(data.error || "Invalid email or password. Please check your credentials.");
       }
     } catch (error) {
-      setLoginError("Login failed. Please try again.")
+      setLoginError("Login failed. Please try again.");
     }
-  }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem(`school_session_${schoolCode}`)
@@ -94,7 +139,7 @@ export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
             <School className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h2 className="text-xl font-bold text-gray-900 mb-2">School Not Found</h2>
             <p className="text-gray-600">
-              The school with code "{schoolCode.toUpperCase()}" could not be found or may have been deactivated.
+              The school with code "{schoolCode ? schoolCode.toUpperCase() : ""}" could not be found or may have been deactivated.
             </p>
             <Button className="mt-4" onClick={() => (window.location.href = "/")}>
               Return to Home
@@ -135,8 +180,11 @@ export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
               )}
             </div>
             <CardTitle className="text-2xl font-bold">{schoolData.name}</CardTitle>
+            <div className="text-lg font-semibold text-blue-700 mb-2">
+              Welcome to {autoSchoolName || schoolData?.name}!
+            </div>
             <CardDescription>
-              School Code: <span className="font-mono font-bold">{schoolData.schoolCode.toUpperCase()}</span>
+              School Code: <span className="font-mono font-bold">{schoolData.schoolCode ? schoolData.schoolCode.toUpperCase() : ""}</span>
             </CardDescription>
             <Badge variant={schoolData.status === "active" ? "default" : "secondary"} className="mt-2">
               {schoolData.status === "setup" ? "Setup Required" : schoolData.status}
@@ -144,6 +192,15 @@ export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="schoolCode">School Code</Label>
+                <Input
+                  id="schoolCode"
+                  value={schoolCode}
+                  readOnly
+                  required
+                />
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Email Address</Label>
                 <Input

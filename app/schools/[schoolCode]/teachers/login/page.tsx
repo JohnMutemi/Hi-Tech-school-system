@@ -1,11 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getSchool } from "@/lib/school-storage"
+import Link from "next/link"
 
 export default function TeacherLoginPage({ params }: { params: { schoolCode: string } }) {
   const { schoolCode } = params
@@ -14,20 +15,47 @@ export default function TeacherLoginPage({ params }: { params: { schoolCode: str
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [teachers, setTeachers] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const searchParams = useSearchParams();
 
-  useState(() => {
-    const school = getSchool(schoolCode)
-    setTeachers(school?.teachers || [])
-  })
-
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault()
-    const school = getSchool(schoolCode)
-    if (!school || !school.teachers) {
-      setError("School or teachers not found.")
-      return
+  // Check for existing session
+  useEffect(() => {
+    const session = localStorage.getItem("teacher-auth")
+    if (session) {
+      const { teacherId } = JSON.parse(session)
+      if (teacherId) {
+        router.replace(`/schools/${schoolCode}/teacher/${teacherId}`)
+        return
+      }
     }
-    const teacher = school.teachers.find((t) => t.email === email && t.tempPassword === password)
+    setLoading(false)
+  }, [router, schoolCode])
+
+  useEffect(() => {
+    async function fetchTeachers() {
+      try {
+        const res = await fetch(`/api/schools/${schoolCode}/teachers`)
+        if (!res.ok) throw new Error("Failed to fetch teachers")
+        const data = await res.json()
+        setTeachers(data)
+      } catch (err) {
+        setError("Could not load teachers. Please try again later.")
+      }
+    }
+    fetchTeachers()
+  }, [schoolCode])
+
+  useEffect(() => {
+    // Auto-fill credentials from query params if present
+    const emailParam = searchParams.get("email");
+    const passwordParam = searchParams.get("password");
+    if (emailParam) setEmail(emailParam);
+    if (passwordParam) setPassword(passwordParam);
+  }, [searchParams]);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const teacher = teachers.find((t) => t.email === email && t.teacherProfile?.tempPassword === password)
     if (teacher) {
       localStorage.setItem("teacher-auth", JSON.stringify({ schoolCode, teacherId: teacher.id }))
       router.replace(`/schools/${schoolCode}/teacher`)
@@ -35,6 +63,8 @@ export default function TeacherLoginPage({ params }: { params: { schoolCode: str
       setError("Invalid email or password.")
     }
   }
+
+  if (loading) return <div>Loading...</div>;
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 px-2">

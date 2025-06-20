@@ -5,27 +5,14 @@ import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar } from "@/components/ui/avatar"
-import { getTeacher, getSchool, getSchools } from "@/lib/school-storage"
 import { LogOut, User, BookOpen, Users, Settings, Key } from "lucide-react"
 
 const sidebarNav = [
-  { label: "Profile", icon: User, section: "profile" },
   { label: "My Classes", icon: BookOpen, section: "classes" },
   { label: "My Students", icon: Users, section: "students" },
   { label: "Settings", icon: Settings, section: "settings" },
+  { label: "Profile", icon: User, section: "profile" },
 ]
-
-function updateTeacherProfile(schoolCode: string, teacherId: string, updates: any) {
-  const school = getSchool(schoolCode)
-  if (!school || !school.teachers) return
-  const idx = school.teachers.findIndex((t: any) => t.id === teacherId)
-  if (idx === -1) return
-  school.teachers[idx] = { ...school.teachers[idx], ...updates }
-  localStorage.setItem(
-    "schools-data",
-    JSON.stringify({ ...getSchools(), [schoolCode.toLowerCase()]: school })
-  )
-}
 
 export default function TeacherDashboardPage({ params }: { params: { schoolCode: string } }) {
   const { schoolCode } = params
@@ -43,22 +30,35 @@ export default function TeacherDashboardPage({ params }: { params: { schoolCode:
   const [editData, setEditData] = useState<any>({})
 
   useEffect(() => {
-    const session = localStorage.getItem("teacher-auth")
-    if (!session) {
-      router.replace(`/schools/${schoolCode}/teachers/login`)
-      return
+    async function fetchTeacher() {
+      try {
+        const sessionRes = await fetch(`/api/schools/${schoolCode}/teachers/session`)
+        if (!sessionRes.ok) {
+          router.replace(`/schools/${schoolCode}/teachers/login`)
+          return
+        }
+        const session = await sessionRes.json()
+        const teacherId = session.teacherId
+        if (!teacherId) {
+          router.replace(`/schools/${schoolCode}/teachers/login`)
+          return
+        }
+        const res = await fetch(`/api/schools/${schoolCode}/teachers/${teacherId}`)
+        if (!res.ok) {
+          router.replace(`/schools/${schoolCode}/teachers/login`)
+          return
+        }
+        const teacherData = await res.json()
+        setTeacher(teacherData)
+      } catch (err) {
+        router.replace(`/schools/${schoolCode}/teachers/login`)
+      }
     }
-    const { teacherId } = JSON.parse(session)
-    const t = getTeacher(schoolCode, teacherId)
-    if (!t) {
-      router.replace(`/schools/${schoolCode}/teachers/login`)
-      return
-    }
-    setTeacher(t)
+    fetchTeacher()
   }, [schoolCode, router])
 
-  const handleLogout = () => {
-    localStorage.removeItem("teacher-auth")
+  const handleLogout = async () => {
+    await fetch(`/api/schools/${schoolCode}/teachers/logout`, { method: "POST" })
     router.replace(`/schools/${schoolCode}/teachers/login`)
   }
 
@@ -76,16 +76,13 @@ export default function TeacherDashboardPage({ params }: { params: { schoolCode:
     }
     setAvatarUploading(true)
     const reader = new FileReader()
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       const avatarUrl = ev.target?.result as string
-      const session = localStorage.getItem("teacher-auth")
-      if (!session) {
-        setAvatarUploading(false)
-        setAvatarError("Session expired. Please log in again.")
-        return
-      }
-      const { teacherId } = JSON.parse(session)
-      updateTeacherProfile(schoolCode, teacherId, { avatarUrl })
+      await fetch(`/api/schools/${schoolCode}/teachers`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teacherId: teacher.id, avatarUrl }),
+      })
       setTeacher((prev: any) => ({ ...prev, avatarUrl }))
       setAvatarUploading(false)
     }
@@ -96,7 +93,7 @@ export default function TeacherDashboardPage({ params }: { params: { schoolCode:
     reader.readAsDataURL(file)
   }
 
-  const handleChangePassword = (e: React.FormEvent) => {
+  const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault()
     setPasswordMsg("")
     if (!oldPassword || !newPassword || !confirmPassword) {
@@ -111,11 +108,13 @@ export default function TeacherDashboardPage({ params }: { params: { schoolCode:
       setPasswordMsg("Old password is incorrect.")
       return
     }
-    // Update password
-    const session = localStorage.getItem("teacher-auth")
-    if (!session) return
-    const { teacherId } = JSON.parse(session)
-    updateTeacherProfile(schoolCode, teacherId, { tempPassword: newPassword })
+    if (!teacher?.id) return
+    const teacherId = teacher.id
+    await fetch(`/api/schools/${schoolCode}/teachers`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ teacherId: teacherId, tempPassword: newPassword }),
+    })
     setTeacher((prev: any) => ({ ...prev, tempPassword: newPassword }))
     setPasswordMsg("Password changed successfully!")
     setOldPassword("")
@@ -164,16 +163,14 @@ export default function TeacherDashboardPage({ params }: { params: { schoolCode:
     reader.readAsDataURL(file)
   }
 
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault()
-    const session = localStorage.getItem("teacher-auth")
-    if (!session) return
-    const { teacherId } = JSON.parse(session)
-    updateTeacherProfile(schoolCode, teacherId, {
-      name: editData.name,
-      phone: editData.phone,
-      qualification: editData.qualification,
-      avatarUrl: editData.avatarUrl,
+    if (!teacher?.id) return
+    const teacherId = teacher.id
+    await fetch(`/api/schools/${schoolCode}/teachers`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ teacherId: teacherId, ...editData }),
     })
     setTeacher((prev: any) => ({ ...prev, ...editData }))
     setEditProfile(false)
@@ -226,6 +223,10 @@ export default function TeacherDashboardPage({ params }: { params: { schoolCode:
       </aside>
       {/* Main Content */}
       <main className="flex-1 flex flex-col items-center justify-start py-16 px-8">
+        {/* Welcome message at the top */}
+        <div className="w-full max-w-4xl mx-auto mb-8">
+          <h1 className="text-3xl font-extrabold text-blue-700">Welcome, {teacher?.name?.split(" ")[0] || "Teacher"}!</h1>
+        </div>
         {!activeSection && (
           <div className="flex flex-col items-center justify-center h-full w-full">
             <h1 className="text-4xl font-extrabold text-blue-700 mb-4">Welcome, {teacher?.name?.split(" ")[0] || "Teacher"}!</h1>
@@ -270,8 +271,14 @@ export default function TeacherDashboardPage({ params }: { params: { schoolCode:
                   <span className="font-semibold text-gray-700">Status:</span> <span className="text-gray-600 capitalize">{teacher.status}</span>
                 </div>
               </div>
-              <div className="flex justify-end mt-8">
+              <div className="flex flex-col md:flex-row justify-end mt-8 gap-4">
                 <Button onClick={handleEditProfile} variant="outline">Edit Profile</Button>
+                <Button onClick={() => router.push(`/schools/${schoolCode}/teacher/dashboard`)} variant="default">Go to Teacher Dashboard</Button>
+                <Button onClick={async () => {
+                  if (!teacher?.id) return;
+                  await fetch(`/api/schools/${schoolCode}/teachers/${teacher.id}/send-credentials`, { method: "POST" });
+                  alert("Credentials sent (simulated)");
+                }} variant="secondary">Simulate Send Credentials</Button>
               </div>
             </CardContent>
           </Card>

@@ -91,288 +91,334 @@ export interface SchoolAdmin {
   schoolCode: string
 }
 
-// School storage functions
-export function saveSchool(schoolData: SchoolData): void {
+// API-based school storage functions
+export async function saveSchool(schoolData: SchoolData): Promise<SchoolData> {
   try {
-    if (typeof window === "undefined") {
-      throw new Error("Cannot save school data on server side")
+    console.log("Saving school data via API:", schoolData.name)
+
+    const response = await fetch(`/api/schools/${schoolData.schoolCode}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(schoolData),
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
     }
 
-    console.log("Saving school data:", schoolData)
-
-    const schools = getSchools()
-
-    // Create a copy without the logoUrl to save space
-    const schoolDataToSave = { ...schoolData }
-    delete schoolDataToSave.logoUrl // Don't store logo URLs in localStorage
-
-    schools[schoolData.schoolCode.toLowerCase()] = schoolDataToSave
-
-    const dataToSave = JSON.stringify(schools)
-    console.log("Data size:", dataToSave.length, "characters")
-
-    // Check if data is too large (localStorage limit is usually 5-10MB)
-    if (dataToSave.length > 4000000) {
-      // 4MB limit to be safe
-      throw new Error("Data too large for localStorage. Consider removing some data.")
-    }
-
-    localStorage.setItem("schools-data", dataToSave)
-
-    // Verify the data was saved
-    const savedData = localStorage.getItem("schools-data")
-    if (!savedData) {
-      throw new Error("Failed to save data to localStorage")
-    }
-
-    console.log("School data saved successfully")
-  } catch (error: any) {
+    const savedSchool = await response.json()
+    console.log("School data saved successfully via API")
+    return savedSchool
+  } catch (error) {
     console.error("Error in saveSchool:", error)
-
-    // If quota exceeded, try to clean up and save without optional data
-    if (error.name === "QuotaExceededError") {
-      try {
-        console.log("Quota exceeded, trying to save minimal data...")
-        const schools = getSchools()
-
-        // Save minimal data without logos, descriptions, etc.
-        const minimalSchoolData = {
-          id: schoolData.id,
-          schoolCode: schoolData.schoolCode,
-          name: schoolData.name,
-          colorTheme: schoolData.colorTheme,
-          portalUrl: schoolData.portalUrl,
-          adminEmail: schoolData.adminEmail,
-          adminPassword: schoolData.adminPassword,
-          adminFirstName: schoolData.adminFirstName,
-          adminLastName: schoolData.adminLastName,
-          createdAt: schoolData.createdAt,
-          status: schoolData.status,
-          teachers: schoolData.teachers || [],
-          students: schoolData.students || [],
-          subjects: schoolData.subjects || [],
-          classes: schoolData.classes || [],
-        }
-
-        schools[schoolData.schoolCode.toLowerCase()] = minimalSchoolData
-        localStorage.setItem("schools-data", JSON.stringify(schools))
-        console.log("Minimal school data saved successfully")
-      } catch (secondError) {
-        console.error("Failed to save even minimal data:", secondError)
-        throw new Error("Storage quota exceeded. Please clear some data and try again.")
-      }
-    } else {
-      throw error as any
-    }
+    throw new Error("Failed to save school data")
   }
 }
 
-export function getSchool(schoolCode: string): SchoolData | null {
-  const schools = getSchools()
-  return schools[schoolCode.toLowerCase()] || null
-}
-
-export function getSchools(): Record<string, SchoolData> {
+export async function createSchool(schoolData: Omit<SchoolData, "id" | "createdAt">): Promise<SchoolData> {
   try {
-    if (typeof window === "undefined") {
-      console.log("Running on server side, returning empty object")
-      return {}
+    console.log("Creating school via API:", schoolData.name)
+
+    const response = await fetch('/api/schools', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(schoolData),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.error || `HTTP error! status: ${response.status}`)
     }
 
-    const data = localStorage.getItem("schools-data")
-    console.log("Retrieved schools data from localStorage, size:", data?.length || 0, "characters")
-
-    if (!data) {
-      console.log("No schools data found, returning empty object")
-      return {}
-    }
-
-    const parsed = JSON.parse(data)
-    console.log("Parsed schools data:", Object.keys(parsed).length, "schools")
-    return parsed
-  } catch (error: any) {
-    console.error("Error in getSchools:", error)
-    return {}
+    const createdSchool = await response.json()
+    console.log("School created successfully via API")
+    return createdSchool
+  } catch (error) {
+    console.error("Error in createSchool:", error)
+    throw error
   }
 }
 
-export function getAllSchools(): SchoolData[] {
-  const schools = getSchools()
-  return Object.values(schools)
+export async function getSchool(schoolCode: string): Promise<SchoolData | null> {
+  try {
+    console.log("Fetching school via API:", schoolCode)
+
+    const response = await fetch(`/api/schools/${schoolCode}`)
+    
+    if (response.status === 404) {
+      console.log("School not found:", schoolCode)
+      return null
+    }
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const school = await response.json()
+    console.log("School retrieved successfully via API:", school.name)
+    return school
+  } catch (error) {
+    console.error("Error fetching school from API:", error)
+    return null
+  }
+}
+
+export async function getAllSchools(): Promise<SchoolData[]> {
+  try {
+    console.log("Fetching all schools via API")
+
+    const response = await fetch('/api/schools')
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const schools = await response.json()
+    console.log("Retrieved schools from API:", schools.length, "schools")
+    return schools
+  } catch (error) {
+    console.error("Error fetching schools from API:", error)
+    return []
+  }
+}
+
+export async function deleteSchool(schoolCode: string): Promise<boolean> {
+  try {
+    console.log("Deleting school via API:", schoolCode)
+
+    const response = await fetch(`/api/schools/${schoolCode}`, {
+      method: 'DELETE',
+    })
+
+    if (response.status === 404) {
+      console.log("School not found for deletion:", schoolCode)
+      return false
+    }
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    console.log("School deleted successfully via API")
+    return true
+  } catch (error) {
+    console.error("Error deleting school from API:", error)
+    return false
+  }
 }
 
 // Update specific school data
-export function updateSchoolProfile(schoolCode: string, profile: SchoolProfile): void {
-  const school = getSchool(schoolCode)
-  if (school) {
-    school.profile = profile
-    saveSchool(school)
+export async function updateSchoolProfile(schoolCode: string, profile: SchoolProfile): Promise<void> {
+  try {
+    const school = await getSchool(schoolCode)
+    if (school) {
+      school.profile = profile
+      await saveSchool(school)
+    }
+  } catch (error) {
+    console.error("Error updating school profile:", error)
+    throw error
   }
 }
 
-export function updateSchoolTeachers(schoolCode: string, teachers: Teacher[]): void {
-  const school = getSchool(schoolCode)
-  if (school) {
-    school.teachers = teachers
-    saveSchool(school)
+export async function updateSchoolTeachers(schoolCode: string, teachers: Teacher[]): Promise<void> {
+  try {
+    const school = await getSchool(schoolCode)
+    if (school) {
+      school.teachers = teachers
+      await saveSchool(school)
+    }
+  } catch (error) {
+    console.error("Error updating school teachers:", error)
+    throw error
   }
 }
 
-export function updateSchoolStudents(schoolCode: string, students: Student[]): void {
-  const school = getSchool(schoolCode)
-  if (school) {
-    school.students = students
-    saveSchool(school)
+export async function updateSchoolStudents(schoolCode: string, students: Student[]): Promise<void> {
+  try {
+    const school = await getSchool(schoolCode)
+    if (school) {
+      school.students = students
+      await saveSchool(school)
+    }
+  } catch (error) {
+    console.error("Error updating school students:", error)
+    throw error
   }
 }
 
-export function updateSchoolSubjects(schoolCode: string, subjects: Subject[]): void {
-  const school = getSchool(schoolCode)
-  if (school) {
-    school.subjects = subjects
-    saveSchool(school)
+export async function updateSchoolSubjects(schoolCode: string, subjects: Subject[]): Promise<void> {
+  try {
+    const school = await getSchool(schoolCode)
+    if (school) {
+      school.subjects = subjects
+      await saveSchool(school)
+    }
+  } catch (error) {
+    console.error("Error updating school subjects:", error)
+    throw error
   }
 }
 
-export function updateSchoolClasses(schoolCode: string, classes: SchoolClass[]): void {
-  const school = getSchool(schoolCode)
-  if (school) {
-    school.classes = classes
-    saveSchool(school)
+export async function updateSchoolClasses(schoolCode: string, classes: SchoolClass[]): Promise<void> {
+  try {
+    const school = await getSchool(schoolCode)
+    if (school) {
+      school.classes = classes
+      await saveSchool(school)
+    }
+  } catch (error) {
+    console.error("Error updating school classes:", error)
+    throw error
   }
 }
 
 // School admin authentication
-export function authenticateSchoolAdmin(schoolCode: string, email: string, password: string): boolean {
-  const school = getSchool(schoolCode)
-  if (!school) return false
+export async function authenticateSchoolAdmin(schoolCode: string, email: string, password: string): Promise<boolean> {
+  try {
+    const school = await getSchool(schoolCode)
+    if (!school) return false
 
-  return school.adminEmail === email && school.adminPassword === password
+    return school.adminEmail === email && school.adminPassword === password
+  } catch (error) {
+    console.error("Error authenticating school admin:", error)
+    return false
+  }
 }
 
+// Session management (using sessionStorage instead of localStorage for better security)
 export function setSchoolAdminSession(schoolCode: string, email: string): void {
-  localStorage.setItem(
-    `school-admin-${schoolCode}`,
-    JSON.stringify({
-      email,
-      loginTime: Date.now(),
-      schoolCode,
-    }),
-  )
+  try {
+    if (typeof window === "undefined") return
+
+    sessionStorage.setItem(
+      `school-admin-${schoolCode}`,
+      JSON.stringify({
+        email,
+        loginTime: Date.now(),
+        schoolCode,
+      }),
+    )
+  } catch (error) {
+    console.error("Error setting school admin session:", error)
+  }
 }
 
 export function getSchoolAdminSession(schoolCode: string): any {
-  const data = localStorage.getItem(`school-admin-${schoolCode}`)
-  return data ? JSON.parse(data) : null
+  try {
+    if (typeof window === "undefined") return null
+
+    const data = sessionStorage.getItem(`school-admin-${schoolCode}`)
+    return data ? JSON.parse(data) : null
+  } catch (error) {
+    console.error("Error getting school admin session:", error)
+    return null
+  }
 }
 
 export function clearSchoolAdminSession(schoolCode: string): void {
-  localStorage.removeItem(`school-admin-${schoolCode}`)
+  try {
+    if (typeof window === "undefined") return
+
+    sessionStorage.removeItem(`school-admin-${schoolCode}`)
+  } catch (error) {
+    console.error("Error clearing school admin session:", error)
+  }
 }
 
-// Logo handling - Store logos separately in a more efficient way
-export function saveSchoolLogo(schoolCode: string, logoFile: File): Promise<string> {
-  return new Promise((resolve, reject) => {
+// Logo handling - Store logos in the database via API
+export async function saveSchoolLogo(schoolCode: string, logoFile: File): Promise<string> {
+  try {
     // Check file size (limit to 500KB)
     if (logoFile.size > 500000) {
-      reject(new Error("Logo file too large. Please use an image smaller than 500KB."))
-      return
+      throw new Error("Logo file too large. Please use an image smaller than 500KB.")
     }
 
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      try {
-        const logoUrl = e.target?.result as string
-
-        // Store logo separately to avoid quota issues
-        const logoKey = `school-logo-${schoolCode.toLowerCase()}`
-
-        try {
-          localStorage.setItem(logoKey, logoUrl)
-          console.log("Logo saved successfully for school:", schoolCode)
-          resolve(logoUrl)
-        } catch (error) {
-          if (error.name === "QuotaExceededError") {
-            console.warn("Cannot save logo due to storage quota. Proceeding without logo.")
-            resolve("") // Return empty string instead of failing
-          } else {
-            reject(error)
-          }
+    // Convert file to base64
+    const logoUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const result = e.target?.result as string
+        if (result) {
+          resolve(result)
+        } else {
+          reject(new Error("Failed to read logo file"))
         }
-      } catch (error) {
-        reject(error)
       }
-    }
+      reader.onerror = () => reject(new Error("Failed to read logo file"))
+      reader.readAsDataURL(logoFile)
+    })
 
-    reader.onerror = () => {
-      reject(new Error("Failed to read logo file"))
+    // Save logo to school via API
+    const school = await getSchool(schoolCode)
+    if (school) {
+      school.logo = logoUrl
+      await saveSchool(school)
+      console.log("Logo saved successfully for school:", schoolCode)
+      return logoUrl
+    } else {
+      throw new Error("School not found")
     }
-
-    reader.readAsDataURL(logoFile)
-  })
+  } catch (error) {
+    console.error("Error saving school logo:", error)
+    throw error
+  }
 }
 
-export function getSchoolLogo(schoolCode: string): string | null {
+export async function getSchoolLogo(schoolCode: string): Promise<string | null> {
   try {
-    const logoKey = `school-logo-${schoolCode.toLowerCase()}`
-    return localStorage.getItem(logoKey)
-  } catch (error: any) {
+    const school = await getSchool(schoolCode)
+    return school?.logo || null
+  } catch (error) {
     console.error("Error getting school logo:", error)
     return null
   }
 }
 
-export function deleteSchoolLogo(schoolCode: string): void {
+export async function deleteSchoolLogo(schoolCode: string): Promise<void> {
   try {
-    const logoKey = `school-logo-${schoolCode.toLowerCase()}`
-    localStorage.removeItem(logoKey)
-  } catch (error: any) {
+    const school = await getSchool(schoolCode)
+    if (school) {
+      school.logo = undefined
+      await saveSchool(school)
+      console.log("Logo deleted successfully for school:", schoolCode)
+    }
+  } catch (error) {
     console.error("Error deleting school logo:", error)
+    throw error
   }
 }
 
-// Utility function to clear all data (for testing/debugging)
-export function clearAllSchoolData(): void {
+// Utility function to clear all session data (for testing/debugging)
+export function clearAllSessionData(): void {
   try {
-    // Clear main schools data
-    localStorage.removeItem("schools-data")
+    if (typeof window === "undefined") return
 
-    // Clear all school logos
-    const keys = Object.keys(localStorage)
+    // Clear all school admin sessions
+    const keys = Object.keys(sessionStorage)
     keys.forEach((key) => {
-      if (key.startsWith("school-logo-") || key.startsWith("school-admin-")) {
-        localStorage.removeItem(key)
+      if (key.startsWith("school-admin-")) {
+        sessionStorage.removeItem(key)
       }
     })
 
-    console.log("All school data cleared")
-  } catch (error: any) {
-    console.error("Error clearing school data:", error)
+    console.log("All session data cleared")
+  } catch (error) {
+    console.error("Error clearing session data:", error)
   }
 }
 
-// Function to get storage usage info
-export function getStorageInfo(): { used: number; total: number; percentage: number } {
+export async function getTeacher(schoolCode: string, teacherId: string): Promise<Teacher | null> {
   try {
-    let used = 0
-    for (const key in localStorage) {
-      if (localStorage.hasOwnProperty(key)) {
-        used += localStorage[key].length + key.length
-      }
-    }
-
-    const total = 5000000 // Approximate 5MB limit
-    const percentage = (used / total) * 100
-
-    return { used, total, percentage }
-  } catch (error: any) {
-    console.error("Error getting storage info:", error)
-    return { used: 0, total: 5000000, percentage: 0 }
+    const school = await getSchool(schoolCode)
+    if (!school || !school.teachers) return null
+    return school.teachers.find((t) => t.id === teacherId) || null
+  } catch (error) {
+    console.error("Error getting teacher:", error)
+    return null
   }
-}
-
-export function getTeacher(schoolCode: string, teacherId: string): Teacher | null {
-  const school = getSchool(schoolCode)
-  if (!school || !school.teachers) return null
-  return school.teachers.find((t) => t.id === teacherId) || null
 }

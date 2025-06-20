@@ -140,7 +140,7 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
       }
 
       // Create school using client-side function
-      const result = createSchoolClient({
+      const result = await createSchoolClient({
         name,
         address,
         phone,

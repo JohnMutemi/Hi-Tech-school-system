@@ -8,29 +8,33 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { School, Plus, Search, Eye, Edit, Trash2, Users, GraduationCap, Calendar } from "lucide-react"
 import Link from "next/link"
-import { getAllSchools } from "@/lib/school-storage"
-import type { SchoolData } from "@/lib/school-storage"
+import { useUser } from "@/hooks/use-user"
+import { useRouter } from "next/navigation"
 
 export default function SchoolsManagementPage() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
-  const [schools, setSchools] = useState<SchoolData[]>([])
+  const router = useRouter()
+  const { user } = useUser()
+  const [schools, setSchools] = useState<any[]>([])
   const [searchTerm, setSearchTerm] = useState("")
 
   useEffect(() => {
-    const authStatus = localStorage.getItem("superadmin-auth")
-    if (authStatus === "true") {
-      setIsAuthenticated(true)
-      loadSchools()
+    if (!user || (user && (!user.isLoggedIn || user.role !== 'super_admin'))) {
+      if (typeof window !== 'undefined') {
+        router.replace('/superadmin/login')
+      }
     } else {
-      window.location.href = "/superadmin/login"
+      loadSchools()
     }
-    setIsLoading(false)
-  }, [])
+  }, [user, router])
 
-  const loadSchools = () => {
-    const allSchools = getAllSchools()
-    setSchools(allSchools)
+  const loadSchools = async () => {
+    try {
+      const res = await fetch("/api/schools")
+      const data = await res.json()
+      setSchools(data)
+    } catch (err) {
+      setSchools([])
+    }
   }
 
   const filteredSchools = schools.filter(
@@ -39,7 +43,7 @@ export default function SchoolsManagementPage() {
       school.schoolCode.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
-  if (isLoading) {
+  if (!user || (user && (!user.isLoggedIn || user.role !== 'super_admin'))) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -48,10 +52,6 @@ export default function SchoolsManagementPage() {
         </div>
       </div>
     )
-  }
-
-  if (!isAuthenticated) {
-    return null
   }
 
   return (

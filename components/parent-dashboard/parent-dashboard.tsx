@@ -8,7 +8,6 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Camera, Users, DollarSign, Receipt, BarChart2, Key, LogOut } from "lucide-react";
 import { ReceiptView } from "@/components/ui/receipt-view";
-import { PaymentService } from "@/lib/services/payment-service";
 import { useRouter } from "next/navigation";
 
 export function ParentDashboard({ schoolCode, parentId }: { schoolCode: string; parentId: string }) {
@@ -30,41 +29,25 @@ export function ParentDashboard({ schoolCode, parentId }: { schoolCode: string; 
   const [passwordMsg, setPasswordMsg] = useState("");
 
   useEffect(() => {
-    // Simulate fetching parent and students from localStorage
-    const schools = JSON.parse(localStorage.getItem("schools-data") || "{}");
-    const school = schools[schoolCode?.toLowerCase()];
-    if (!school || !school.students) return;
-    const normParentIdDigits = parentId ? parentId.replace(/\D/g, "") : "";
-    let foundParent = null;
-    const linkedStudents: any[] = [];
-    school.students.forEach((student: any) => {
-      const normPhone = (student.parentPhone || "").replace(/\D/g, "");
-      if (normPhone && normPhone === normParentIdDigits) {
-        foundParent = {
-          parentName: student.parentName,
-          parentPhone: student.parentPhone,
-          parentEmail: student.parentEmail,
-          avatarUrl: student.parentAvatarUrl || null,
-        };
-        linkedStudents.push(student);
+    async function fetchParentAndStudents() {
+      try {
+        // Fetch parent by parentId (phone/email) and schoolCode
+        const res = await fetch(`/api/schools/${schoolCode}/parents?parentId=${parentId}`);
+        if (!res.ok) throw new Error("Failed to fetch parent");
+        const parentData = await res.json();
+        setParent(parentData.parent);
+        setAvatarUrl(parentData.parent?.avatarUrl || null);
+        setStudents(parentData.students || []);
+        // Fetch all receipts for all children (if you have a payments API, use it here)
+        // setReceipts(await fetchPaymentsForChildren(...))
+      } catch (err) {
+        setParent(null);
+        setStudents([]);
+        setAvatarUrl(null);
       }
-    });
-    setParent(foundParent);
-    setStudents(linkedStudents);
-    setAvatarUrl(foundParent?.avatarUrl || null);
-
-    // Fetch all receipts for all children
-    if (linkedStudents.length > 0) {
-      let allReceipts: any[] = [];
-      linkedStudents.forEach((student: any) => {
-        const payments = PaymentService.getPaymentHistory(schoolCode, student.id);
-        payments.forEach((p: any) => allReceipts.push({ ...p, student }));
-      });
-      setReceipts(allReceipts);
-    } else {
-      setReceipts([]);
     }
-  }, [schoolCode, parentId, students.length]);
+    fetchParentAndStudents();
+  }, [schoolCode, parentId]);
 
   const handlePayFees = (admissionNumber: string) => {
     setShowPay(admissionNumber);
@@ -92,10 +75,16 @@ export function ParentDashboard({ schoolCode, parentId }: { schoolCode: string; 
     }
     setAvatarUploading(true);
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       const url = ev.target?.result as string;
       setAvatarUrl(url);
       setAvatarUploading(false);
+      // Update parent avatar via API
+      await fetch(`/api/schools/${schoolCode}/parents`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ parentId, avatarUrl: url }),
+      });
     };
     reader.onerror = () => {
       setAvatarUploading(false);
@@ -111,7 +100,7 @@ export function ParentDashboard({ schoolCode, parentId }: { schoolCode: string; 
   };
 
   // Change password logic
-  const handleChangePassword = (e: React.FormEvent) => {
+  const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setPasswordMsg("");
     if (!oldPassword || !newPassword || !confirmPassword) {
@@ -122,35 +111,20 @@ export function ParentDashboard({ schoolCode, parentId }: { schoolCode: string; 
       setPasswordMsg("New passwords do not match.");
       return;
     }
-    // Find parent in localStorage
-    const schools = JSON.parse(localStorage.getItem("schools-data") || "{}");
-    const school = schools[schoolCode?.toLowerCase()];
-    if (!school || !school.students) {
-      setPasswordMsg("School or students not found.");
-      return;
-    }
-    let updated = false;
-    school.students = school.students.map((student: any) => {
-      const normPhone = (student.parentPhone || "").replace(/\D/g, "");
-      if (normPhone && normPhone === parentId.replace(/\D/g, "")) {
-        if (oldPassword !== student.parentTempPassword) {
-          setPasswordMsg("Old password is incorrect.");
-          return student;
-        }
-        updated = true;
-        return { ...student, parentTempPassword: newPassword };
-      }
-      return student;
+    // Update parent password via API
+    const res = await fetch(`/api/schools/${schoolCode}/parents`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ parentId, oldPassword, newPassword }),
     });
-    if (updated) {
-      schools[schoolCode.toLowerCase()] = school;
-      localStorage.setItem("schools-data", JSON.stringify(schools));
+    if (res.ok) {
       setPasswordMsg("Password changed successfully!");
       setOldPassword("");
       setNewPassword("");
       setConfirmPassword("");
-    } else if (!passwordMsg) {
-      setPasswordMsg("Parent not found or old password incorrect.");
+    } else {
+      const data = await res.json();
+      setPasswordMsg(data.error || "Failed to change password");
     }
   };
 
