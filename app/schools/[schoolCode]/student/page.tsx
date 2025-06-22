@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar } from "@/components/ui/avatar"
-import { LogOut, User, BookOpen, FileText, DollarSign, Settings, Receipt, Key, Camera } from "lucide-react"
+import { LogOut, User, BookOpen, FileText, DollarSign, Settings, Receipt, Key, Camera, Eye } from "lucide-react"
 import { ReceiptGenerator } from "@/components/ui/receipt-generator"
 import { ReceiptView } from "@/components/ui/receipt-view"
 import { PaymentService } from "@/lib/services/payment-service"
@@ -73,26 +73,38 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
   const [passwordMsg, setPasswordMsg] = useState("")
   const [lastParentCredentials, setLastParentCredentials] = useState<any>(null)
   const [showParentCredentials, setShowParentCredentials] = useState(false)
+  const [feeStructure, setFeeStructure] = useState<any>(null)
+  const [loadingFees, setLoadingFees] = useState(true)
+  const [selectedTerm, setSelectedTerm] = useState<string>("")
 
   useEffect(() => {
-    const session = localStorage.getItem("student-auth")
-    if (!session) {
-      router.replace(`/schools/${schoolCode}/students/login`)
-      return
-    }
-    const { studentId } = JSON.parse(session)
     async function fetchStudent() {
       try {
-        const res = await fetch(`/api/schools/${schoolCode}/students`)
-        if (!res.ok) throw new Error("Failed to fetch students")
-        const students = await res.json()
-        const s = students.find((stu: any) => stu.id === studentId)
-        if (!s) {
+        // Check session via API
+        const sessionRes = await fetch(`/api/schools/${schoolCode}/students/session`)
+        if (!sessionRes.ok) {
           router.replace(`/schools/${schoolCode}/students/login`)
           return
         }
+        const session = await sessionRes.json()
+        const studentId = session.studentId
+        if (!studentId) {
+          router.replace(`/schools/${schoolCode}/students/login`)
+          return
+        }
+        // Fetch student data by ID
+        const res = await fetch(`/api/schools/${schoolCode}/students/${studentId}`)
+        if (!res.ok) {
+          router.replace(`/schools/${schoolCode}/students/login`)
+          return
+        }
+        const s = await res.json()
         setStudent(s)
         setEditData({ ...s })
+        
+        // Fetch fee structure for the student's class
+        await fetchFeeStructure(s.className || s.classLevel)
+        
         // TODO: Fetch payment history from API
       } catch (err) {
         router.replace(`/schools/${schoolCode}/students/login`)
@@ -101,8 +113,71 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
     fetchStudent()
   }, [schoolCode, router])
 
-  const handleLogout = () => {
-    localStorage.removeItem("student-auth")
+  // Listen for fee structure updates from admin panel
+  useEffect(() => {
+    const handleFeeStructureUpdate = (event: CustomEvent) => {
+      if (event.detail.schoolCode === schoolCode && student) {
+        console.log('Fee structure updated, refreshing student data...')
+        fetchFeeStructure(student.className || student.classLevel)
+      }
+    }
+
+    window.addEventListener('feeStructureUpdated', handleFeeStructureUpdate as EventListener)
+    
+    return () => {
+      window.removeEventListener('feeStructureUpdated', handleFeeStructureUpdate as EventListener)
+    }
+  }, [schoolCode, student])
+
+  // Fetch fee structure for student's class
+  const fetchFeeStructure = async (studentClass: string, selectedTerm?: string) => {
+    try {
+      setLoadingFees(true)
+      
+      // Get current term if no specific term is selected
+      const currentDate = new Date()
+      const currentYear = currentDate.getFullYear()
+      const currentMonth = currentDate.getMonth()
+      
+      let currentTerm = "Term 1"
+      if (currentMonth >= 4 && currentMonth <= 7) currentTerm = "Term 2"
+      else if (currentMonth >= 8) currentTerm = "Term 3"
+
+      // Use selected term or default to current term
+      const termToFetch = selectedTerm || currentTerm
+
+      console.log(`Fetching fee structure for: ${studentClass}, Term: ${termToFetch}, Year: ${currentYear}`)
+
+      // Fetch fee structure for the student's class and specific term
+      const response = await fetch(
+        `/api/schools/${schoolCode}/fee-structure?term=${termToFetch}&year=${currentYear}&classLevel=${encodeURIComponent(studentClass)}`
+      )
+      
+      if (response.ok) {
+        const feeStructures = await response.json()
+        console.log('Fee structures received:', feeStructures)
+        
+        const activeFeeStructure = feeStructures.find((fee: any) => fee.isActive)
+        console.log('Active fee structure:', activeFeeStructure)
+        
+        setFeeStructure(activeFeeStructure || null)
+      } else {
+        console.error('Failed to fetch fee structure:', response.status, response.statusText)
+        const errorData = await response.json().catch(() => ({}))
+        console.error('Error details:', errorData)
+        setFeeStructure(null)
+      }
+    } catch (error) {
+      console.error("Failed to fetch fee structure:", error)
+      setFeeStructure(null)
+    } finally {
+      setLoadingFees(false)
+    }
+  }
+
+  const handleLogout = async () => {
+    // Optionally, call a logout API to clear the cookie
+    await fetch(`/api/schools/${schoolCode}/students/logout`, { method: "POST" })
     router.replace(`/schools/${schoolCode}/students/login`)
   }
 
@@ -259,7 +334,7 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
             {avatarError && <div className="absolute left-0 right-0 -bottom-8 text-xs text-red-600 text-center">{avatarError}</div>}
           </Avatar>
           <div className="text-xl font-bold text-gray-900">{student.name}</div>
-          <div className="text-blue-700 font-semibold text-sm">{student.class}</div>
+          <div className="text-blue-700 font-semibold text-sm">{student.className || student.classLevel}</div>
         </div>
         {/* Navigation */}
         <nav className="flex flex-col w-full gap-2 mb-10">
@@ -311,7 +386,7 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
                         {avatarError && <div className="absolute left-0 right-0 -bottom-8 text-xs text-red-600 text-center">{avatarError}</div>}
                       </Avatar>
                       <div className="text-xl font-bold text-gray-900">{student.name}</div>
-                      <div className="text-blue-700 font-semibold text-sm">{student.class}</div>
+                      <div className="text-blue-700 font-semibold text-sm">{student.className || student.classLevel}</div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-10 text-xl py-8 w-full max-w-5xl">
                       <div>
@@ -320,7 +395,7 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
                       </div>
                       <div>
                         <div className="font-semibold text-gray-700">Class:</div>
-                        <div>{student.class}</div>
+                        <div>{student.className || student.classLevel}</div>
                       </div>
                       <div>
                         <div className="font-semibold text-gray-700">Phone:</div>
@@ -426,9 +501,9 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
                         <label className="font-semibold text-gray-700">Class</label>
                         <input
                           type="text"
-                          name="class"
+                          name="className"
                           className="border rounded px-3 py-2"
-                          value={editData.class}
+                          value={editData.className || editData.classLevel || ""}
                           onChange={handleEditChange}
                           required
                         />
@@ -478,8 +553,169 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
             <SectionBlock>
               <div className="w-full min-h-[75vh] flex items-center justify-center bg-gradient-to-br from-green-50 via-white to-blue-50 py-12">
                 <Card className="w-[90vw] max-w-5xl min-h-[60vh] rounded-2xl shadow-2xl bg-white/95 p-12 flex flex-col items-center justify-center">
-                  <h2 className="text-4xl font-extrabold text-green-800 mb-8 text-center">Payment History</h2>
+                  <h2 className="text-4xl font-extrabold text-green-800 mb-8 text-center">Finance & Fees</h2>
+                  
+                  {/* Term Fee Structures */}
+                  <div className="w-full mb-8">
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="text-2xl font-bold text-gray-800">Term Fee Structures</h3>
+                      <Button 
+                        variant="outline"
+                        onClick={() => {
+                          // Download all terms as PDF
+                          alert('Download all terms feature will be implemented soon!');
+                        }}
+                      >
+                        <FileText className="w-4 h-4 mr-2" />
+                        Download All Terms
+                      </Button>
+                    </div>
+                    
+                    {/* Term Selection Tabs */}
+                    <div className="flex space-x-1 mb-6 bg-gray-100 p-1 rounded-lg">
+                      {['Term 1', 'Term 2', 'Term 3'].map((term) => {
+                        const currentDate = new Date();
+                        const currentYear = currentDate.getFullYear();
+                        const currentMonth = currentDate.getMonth();
+                        
+                        let currentTerm = "Term 1";
+                        if (currentMonth >= 4 && currentMonth <= 7) currentTerm = "Term 2";
+                        else if (currentMonth >= 8) currentTerm = "Term 3";
+                        
+                        const isCurrentTerm = term === currentTerm;
+                        const isSelected = term === (feeStructure?.term || currentTerm);
+                        
+                        return (
+                          <button
+                            key={term}
+                            onClick={() => fetchFeeStructure(student?.className || student?.classLevel, term)}
+                            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all duration-200 ${
+                              isSelected 
+                                ? 'bg-white text-green-700 shadow-sm' 
+                                : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+                            } ${isCurrentTerm ? 'ring-2 ring-green-200' : ''}`}
+                          >
+                            <div className="flex items-center justify-center space-x-2">
+                              <span>{term}</span>
+                              {isCurrentTerm && (
+                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    
+                    {loadingFees ? (
+                      <div className="text-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto mb-4"></div>
+                        <p className="text-gray-600">Loading fee structure...</p>
+                      </div>
+                    ) : feeStructure ? (
+                      <div className="bg-green-50 rounded-lg p-6 border border-green-200">
+                        <div className="grid md:grid-cols-2 gap-6">
+                          <div>
+                            <div className="text-center mb-4">
+                              <div className="text-3xl font-bold text-green-600">
+                                KES {feeStructure.totalAmount?.toLocaleString() || '0'}
+                              </div>
+                              <div className="text-sm text-gray-600">Total Term Fees</div>
+                              <div className="text-xs text-gray-500 mt-1">
+                                {feeStructure.term} {feeStructure.year} - {feeStructure.classLevel}
+                              </div>
+                            </div>
+                            
+                            <div className="bg-white rounded-lg p-4 space-y-2">
+                              <div className="font-semibold text-gray-700 mb-3">Fee Breakdown:</div>
+                              {Object.entries(feeStructure.breakdown || {}).map(([key, value]) => (
+                                <div key={key} className="flex justify-between text-sm">
+                                  <span className="capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                                  <span className="font-medium">KES {value?.toLocaleString() || '0'}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          
+                          <div className="flex flex-col justify-center">
+                            <div className="text-center">
+                              <div className="text-sm text-gray-600 mb-2">Released on</div>
+                              <div className="font-medium">{new Date(feeStructure.createdAt).toLocaleDateString()}</div>
+                            </div>
+                            
+                            <div className="mt-6 text-center">
+                              <div className="text-sm text-gray-600 mb-2">Status</div>
+                              <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                                <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                                Active
+                              </div>
+                            </div>
+                            
+                            <div className="mt-6 text-center space-y-2">
+                              <Button 
+                                variant="outline"
+                                className="w-full"
+                                onClick={() => {
+                                  // Download fee structure as PDF
+                                  const feeStructureData = {
+                                    term: feeStructure.term,
+                                    year: feeStructure.year,
+                                    classLevel: feeStructure.classLevel,
+                                    totalAmount: feeStructure.totalAmount,
+                                    breakdown: feeStructure.breakdown,
+                                    studentName: student.name,
+                                    admissionNumber: student.admissionNumber
+                                  };
+                                  // For now, just show an alert. In production, this would generate and download a PDF
+                                  alert(`Downloading ${feeStructure.term} ${feeStructure.year} fee structure as PDF...`);
+                                }}
+                              >
+                                <FileText className="w-4 h-4 mr-2" />
+                                Download PDF
+                              </Button>
+                              <Button 
+                                variant="outline"
+                                className="w-full"
+                                onClick={() => {
+                                  // View detailed fee structure
+                                  alert(`Viewing detailed ${feeStructure.term} ${feeStructure.year} fee structure...`);
+                                }}
+                              >
+                                <Eye className="w-4 h-4 mr-2" />
+                                View Details
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <svg className="w-8 h-8 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                          </svg>
+                        </div>
+                        <p className="text-orange-600 font-medium">No fee structure available</p>
+                        <p className="text-sm text-gray-500 mt-1">
+                          Fee structure for this term has not been released yet.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Payment History */}
                   <div className="w-full">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-2xl font-bold text-gray-800">Payment History</h3>
+                      {payments.length > 0 && (
+                        <Button 
+                          onClick={() => setShowReceiptGenerator(true)}
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          <Receipt className="w-4 h-4 mr-2" />
+                          Generate Receipt
+                        </Button>
+                      )}
+                    </div>
                     <table className="min-w-full text-sm border">
                       <thead>
                         <tr className="bg-gray-100">
@@ -494,8 +730,14 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
                       <tbody>
                         {payments.length === 0 ? (
                           <tr>
-                            <td colSpan={6} className="text-center py-4 text-gray-500">
-                              No payment history found
+                            <td colSpan={6} className="text-center py-8 text-gray-500">
+                              <div className="flex flex-col items-center">
+                                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-2">
+                                  <Receipt className="w-6 h-6 text-gray-400" />
+                                </div>
+                                <p className="text-sm">No payment history found</p>
+                                <p className="text-xs text-gray-400 mt-1">Receipts will appear here once payments are made</p>
+                              </div>
                             </td>
                           </tr>
                         ) : (
@@ -510,7 +752,10 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => setSelectedReceipt(payment) || setShowReceiptView(true)}
+                                  onClick={() => {
+                                    setSelectedReceipt(payment);
+                                    setShowReceiptView(true);
+                                  }}
                                   className="flex items-center gap-1"
                                 >
                                   <Receipt className="w-4 h-4" /> View
@@ -534,7 +779,7 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
                   <h2 className="text-4xl font-extrabold text-yellow-700 mb-8 text-center">Class Information</h2>
                   <div className="w-full flex flex-col items-center">
                     <div className="mb-6 text-2xl font-semibold">
-                      Class: <span className="text-blue-700">{student.class}</span>
+                      Class: <span className="text-blue-700">{student.className || student.classLevel}</span>
                     </div>
                     <div className="font-semibold mb-4 text-lg">Subjects Taking</div>
                     <ul className="list-disc ml-8 text-gray-700 text-lg grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-2 w-full max-w-2xl">
@@ -656,7 +901,7 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
         <ReceiptView
           receipt={selectedReceipt}
           studentName={student.name}
-          studentClass={student.class}
+          studentClass={student.className || student.classLevel}
           admissionNumber={student.admissionNumber}
           onClose={() => setShowReceiptView(false)}
         />

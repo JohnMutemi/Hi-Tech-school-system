@@ -3,6 +3,7 @@ export interface SchoolData {
   schoolCode: string
   name: string
   logoFilename?: string
+  logoUrl?: string
   colorTheme: string
   portalUrl: string
   description?: string
@@ -30,6 +31,7 @@ export interface SchoolProfile {
   establishedYear: string
   email: string
   motto?: string
+  description?: string
   schoolType: "primary" | "secondary" | "mixed" | "college"
   createdAt?: string
   updatedAt?: string
@@ -42,13 +44,16 @@ export interface Teacher {
   email: string
   phone: string
   employeeId: string
-  qualification: string
-  dateJoined: string
   status: "active" | "inactive"
   subjects?: string[]
   classes?: string[]
   createdAt?: string
   updatedAt?: string
+  teacherProfile?: {
+    qualification: string
+    dateJoined: string
+    tempPassword?: string
+  }
 }
 
 export interface Student {
@@ -61,7 +66,8 @@ export interface Student {
   parentPhone: string
   parentEmail?: string
   admissionNumber: string
-  class: string
+  className?: string
+  classLevel?: string
   dateOfBirth: string
   gender: "male" | "female"
   address: string
@@ -69,6 +75,12 @@ export interface Student {
   status: "active" | "inactive" | "graduated"
   createdAt?: string
   updatedAt?: string
+  tempPassword?: string
+  user?: { email: string }
+  parent?: {
+    email: string
+    tempPassword?: string
+  }
 }
 
 export interface Subject {

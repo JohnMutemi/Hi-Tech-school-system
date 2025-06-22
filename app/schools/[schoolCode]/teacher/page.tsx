@@ -183,6 +183,14 @@ export default function TeacherDashboardPage({ params }: { params: { schoolCode:
 
   return (
     <div className="min-h-screen flex bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      {/* Welcome Message */}
+      <div className="absolute top-8 left-1/2 transform -translate-x-1/2 z-20">
+        {teacher?.name && (
+          <h1 className="text-2xl font-bold text-center text-blue-800 shadow-md bg-white/80 px-6 py-2 rounded-xl">
+            Welcome Teacher, {teacher.name}
+          </h1>
+        )}
+      </div>
       {/* Sidebar */}
       <aside className="w-72 bg-white/90 shadow-xl flex flex-col items-center py-10 px-6 border-r rounded-r-3xl min-h-screen sticky top-0 z-10">
         <Avatar className="w-28 h-28 mb-5 ring-4 ring-blue-200 shadow-lg relative group">

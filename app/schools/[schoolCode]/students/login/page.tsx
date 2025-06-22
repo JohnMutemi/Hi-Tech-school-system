@@ -1,39 +1,52 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
-function getAllStudents(schoolCode: string) {
-  const schools = JSON.parse(localStorage.getItem("schools-data") || "{}")
-  const school = schools[schoolCode.toLowerCase()]
-  return school?.students || []
-}
-
 export default function StudentLoginPage({ params }: { params: { schoolCode: string } }) {
   const { schoolCode } = params
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [admissionNumber, setAdmissionNumber] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
-  const [students, setStudents] = useState<any[]>(getAllStudents(schoolCode))
+  const [loading, setLoading] = useState(false)
 
-  const handleLogin = (e: React.FormEvent) => {
+  useEffect(() => {
+    // Auto-fill credentials from query params if present
+    const admParam = searchParams.get("admissionNumber");
+    const emailParam = searchParams.get("email");
+    const passParam = searchParams.get("password");
+    if (admParam) setAdmissionNumber(admParam);
+    if (emailParam) setEmail(emailParam);
+    if (passParam) setPassword(passParam);
+  }, [searchParams]);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    const students = getAllStudents(schoolCode)
-    const student = students.find(
-      (s) =>
-        (s.admissionNumber === admissionNumber || (email && s.email === email)) &&
-        s.tempPassword === password
-    )
-    if (student) {
-      localStorage.setItem("student-auth", JSON.stringify({ schoolCode, studentId: student.id }))
-      router.replace(`/schools/${schoolCode}/student`)
-    } else {
-      setError("Invalid credentials. Please check your admission number/email and password.")
+    setError("")
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/schools/${schoolCode}/students/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ admissionNumber, email, password }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        router.replace(`/schools/${schoolCode}/student`)
+      } else {
+        const data = await res.json()
+        setError(data.error || "Invalid credentials. Please check your admission number/email and password.")
+      }
+    } catch (err) {
+      setError("An unexpected error occurred. Please try again.")
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -65,7 +78,9 @@ export default function StudentLoginPage({ params }: { params: { schoolCode: str
               required
             />
             {error && <div className="text-red-500 text-sm">{error}</div>}
-            <Button type="submit" className="w-full">Login</Button>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Logging in..." : "Login"}
+            </Button>
           </form>
         </CardContent>
       </Card>

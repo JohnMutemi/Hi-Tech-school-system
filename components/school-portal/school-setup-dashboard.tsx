@@ -39,6 +39,7 @@ import {
   Edit,
   Eye,
   ArrowLeft,
+  DollarSign,
 } from "lucide-react"
 import type { SchoolData, SchoolProfile, Teacher, Student, Subject, SchoolClass } from "@/lib/types"
 import {
@@ -47,10 +48,7 @@ import {
 } from "@/lib/school-storage"
 import Link from "next/link"
 import { generateTempPassword } from "@/lib/utils/school-generator"
-import { useRouter } from 'next/router'
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { FeeManagement } from "./fee-management"
 
 interface SchoolSetupDashboardProps {
   schoolData: SchoolData
@@ -110,6 +108,13 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
       completed: (schoolData.subjects?.length || 0) > 0 && (schoolData.classes?.length || 0) > 0,
       icon: BookOpen,
     },
+    {
+      id: "fees",
+      title: "Fee Management",
+      description: "Configure fee structures and payment settings",
+      completed: false, // Will be updated based on fee structures
+      icon: DollarSign,
+    },
   ])
 
   const [schoolProfile, setSchoolProfile] = useState<SchoolProfile>(
@@ -130,6 +135,7 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
   const [students, setStudents] = useState<Student[]>(schoolData.students || [])
   const [subjects, setSubjects] = useState<Subject[]>(schoolData.subjects || [])
   const [classes, setClasses] = useState<SchoolClass[]>(schoolData.classes || [])
+  const [feeStructures, setFeeStructures] = useState<any[]>([])
 
   // Form states for new items
   const [newTeacher, setNewTeacher] = useState<Partial<Teacher>>({})
@@ -144,8 +150,6 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
   const [lastStudentCredentials, setLastStudentCredentials] = useState<{ admissionNumber: string; email: string; tempPassword: string } | null>(null)
   const [lastParentCredentials, setLastParentCredentials] = useState<any>(null)
   const [showParentCredentials, setShowParentCredentials] = useState(false)
-
-  const router = useRouter()
 
   // Fetch teachers from API on component mount
   useEffect(() => {
@@ -201,6 +205,29 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
         fetchSubjects();
     }
   }, [schoolData.schoolCode, toast]);
+
+  // Fetch fee structures from API on component mount
+  useEffect(() => {
+    async function fetchFeeStructures() {
+      try {
+        const res = await fetch(`/api/schools/${schoolData.schoolCode}/fee-structure`);
+        if (res.ok) {
+          const data = await res.json();
+          setFeeStructures(data);
+          // Update fee management step completion status
+          setSetupSteps(prev => prev.map(step => 
+            step.id === "fees" ? { ...step, completed: data.length > 0 } : step
+          ));
+        }
+      } catch (error) {
+        console.error("Failed to fetch fee structures", error);
+        // Don't show error toast for fee structures as it might not be set up yet
+      }
+    }
+    if (schoolData.schoolCode) {
+        fetchFeeStructures();
+    }
+  }, [schoolData.schoolCode]);
 
   // Refresh school data when localStorage changes
   useEffect(() => {
@@ -340,13 +367,15 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
 
   // Student CRUD operations
   const createStudent = async (studentData: Partial<Student>) => {
-    if (!studentData.name || !studentData.parentName || !studentData.parentPhone) {
-      toast({ title: "Validation Error", description: "Student Name, Parent Name, and Parent Phone are required.", variant: "destructive" });
+    if (!studentData.name || !studentData.parentName || !studentData.parentPhone || !studentData.email || !studentData.className) {
+      toast({ title: "Validation Error", description: "Student Name, Email, Class, Parent Name, and Parent Phone are required.", variant: "destructive" });
       return false;
     }
 
     const tempPassword = generateTempPassword();
     const admissionNumber = studentData.admissionNumber || `ADM${Date.now()}`;
+    
+    console.log('Creating student with data:', { ...studentData, tempPassword, admissionNumber });
     
     try {
       const response = await fetch(`/api/schools/${schoolData.schoolCode}/students`, {
@@ -361,7 +390,10 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
       }
 
       const newStudent = await response.json();
+      console.log('API response for new student:', newStudent);
+      
       setStudents([...students, newStudent]);
+      console.log('Updated students state:', [...students, newStudent]);
       
       setNewStudent({});
       setViewMode((prev) => ({ ...prev, students: "list" }));
@@ -371,6 +403,7 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
       toast({ title: "Success!", description: "Student added successfully!" });
       return true;
     } catch (error: any) {
+      console.error('Error creating student:', error);
       toast({ title: "Error", description: error.message || "Failed to create student.", variant: "destructive" });
       return false;
     }
@@ -683,13 +716,24 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
   }: { student?: Student; onSave: (student: Student) => void; onCancel: () => void }) => {
     const [formData, setFormData] = useState<Partial<Student>>(student || newStudent)
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault()
+      
+      // Additional validation for required fields
+      if (!formData.name || !formData.email || !formData.className || !formData.parentName || !formData.parentPhone) {
+        toast({ 
+          title: "Validation Error", 
+          description: "Please fill in all required fields: Student Name, Email, Class, Parent Name, and Parent Phone.", 
+          variant: "destructive" 
+        });
+        return;
+      }
+      
       if (student) {
         onSave(formData as Student)
       } else {
         // Directly create student without setting state first
-        const success = createStudent(formData)
+        const success = await createStudent(formData)
         if (success) {
           // Reset form data after successful creation
           setFormData({})
@@ -729,10 +773,11 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                 />
               </div>
               <div className="space-y-2">
-                <Label>Class/Grade</Label>
+                <Label>Class/Grade *</Label>
                 <Select
-                  value={formData.class || ""}
-                  onValueChange={(value) => setFormData({ ...formData, class: value })}
+                  value={formData.className || ""}
+                  onValueChange={(value) => setFormData({ ...formData, className: value })}
+                  required
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select class" />
@@ -784,12 +829,13 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Student Email</Label>
+                <Label>Student Email *</Label>
                 <Input
                   type="email"
                   value={formData.email || ""}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   placeholder="student@email.com"
+                  required
                 />
               </div>
               <div className="space-y-2">
@@ -904,12 +950,13 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="profile">School Profile</TabsTrigger>
             <TabsTrigger value="staff">Staff & Teachers</TabsTrigger>
             <TabsTrigger value="students">Students</TabsTrigger>
             <TabsTrigger value="subjects">Subjects & Classes</TabsTrigger>
+            <TabsTrigger value="fees">Fee Management</TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -985,7 +1032,7 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
             </div>
 
             {/* Quick Stats */}
-            <div className="grid md:grid-cols-4 gap-6">
+            <div className="grid md:grid-cols-5 gap-6">
               <Card>
                 <CardContent className="p-6">
                   <div className="flex items-center space-x-2">
@@ -1026,6 +1073,17 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                     <div>
                       <p className="text-2xl font-bold">{classes.length}</p>
                       <p className="text-sm text-gray-600">Classes</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center space-x-2">
+                    <DollarSign className="w-8 h-8 text-emerald-500" />
+                    <div>
+                      <p className="text-2xl font-bold">{feeStructures.length}</p>
+                      <p className="text-sm text-gray-600">Fee Structures</p>
                     </div>
                   </div>
                 </CardContent>
@@ -1477,7 +1535,7 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                             <TableRow key={student.id}>
                               <TableCell className="font-medium">{student.name}</TableCell>
                               <TableCell>{student.admissionNumber}</TableCell>
-                              <TableCell>{student.class}</TableCell>
+                              <TableCell>{student.className}</TableCell>
                               <TableCell>{student.parentName}</TableCell>
                               <TableCell>{student.parentPhone}</TableCell>
                               <TableCell>
@@ -1553,7 +1611,7 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                       </div>
                       <div>
                         <Label className="text-sm font-medium text-gray-600">Class</Label>
-                        <p className="text-sm">{viewingItem.class}</p>
+                        <p className="text-sm">{viewingItem.className}</p>
                       </div>
                     </div>
                     <div className="grid md:grid-cols-3 gap-4">
@@ -2039,6 +2097,21 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
               </Card>
             </div>
           </TabsContent>
+
+          {/* Fee Management Tab */}
+          <TabsContent value="fees" className="space-y-6">
+            <FeeManagement 
+              schoolCode={schoolData.schoolCode}
+              colorTheme={schoolData.colorTheme}
+              onGoBack={() => setActiveTab("overview")}
+              onFeeStructureCreated={() => {
+                // Update the fee management step as completed
+                setSetupSteps(prev => prev.map(step => 
+                  step.id === "fees" ? { ...step, completed: true } : step
+                ));
+              }}
+            />
+          </TabsContent>
         </Tabs>
       </div>
 
@@ -2071,15 +2144,55 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
             </DialogDescription>
           </DialogHeader>
           {lastStudentCredentials && (
-            <div className="space-y-2">
-              <div><strong>Admission Number:</strong> {lastStudentCredentials.admissionNumber}</div>
-              {lastStudentCredentials.email && <div><strong>Email:</strong> {lastStudentCredentials.email}</div>}
-              <div><strong>Temporary Password:</strong> {lastStudentCredentials.tempPassword}</div>
+            <div className="space-y-4">
+              <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                <div className="flex justify-between items-center">
+                  <strong>Admission Number:</strong>
+                  <span className="font-mono">{lastStudentCredentials.admissionNumber}</span>
+                </div>
+                {lastStudentCredentials.email && (
+                  <div className="flex justify-between items-center">
+                    <strong>Email:</strong>
+                    <span className="font-mono">{lastStudentCredentials.email}</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center">
+                  <strong>Temporary Password:</strong>
+                  <span className="font-mono">{lastStudentCredentials.tempPassword}</span>
+                </div>
+              </div>
+              
+              <div className="flex flex-col gap-2">
+                <Button asChild className="w-full bg-green-600 hover:bg-green-700">
+                  <Link 
+                    href={`/schools/${schoolData.schoolCode}/students/login?admissionNumber=${encodeURIComponent(lastStudentCredentials.admissionNumber)}&email=${encodeURIComponent(lastStudentCredentials.email || '')}&password=${encodeURIComponent(lastStudentCredentials.tempPassword)}`}
+                  >
+                    🚀 Quick Login (Auto-fill)
+                  </Link>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => {
+                    const credentials = `Admission Number: ${lastStudentCredentials.admissionNumber}\nEmail: ${lastStudentCredentials.email || 'N/A'}\nPassword: ${lastStudentCredentials.tempPassword}`;
+                    navigator.clipboard.writeText(credentials);
+                    toast({ title: "Copied!", description: "Credentials copied to clipboard", variant: "default" });
+                  }}
+                >
+                  📋 Copy Credentials
+                </Button>
+                <Button asChild variant="outline" className="w-full">
+                  <Link href={`/schools/${schoolData.schoolCode}/students/login`}>
+                    📝 Manual Login
+                  </Link>
+                </Button>
+              </div>
+              
+              <div className="text-xs text-gray-500 text-center">
+                💡 Tip: Use "Quick Login" to automatically fill the login form with these credentials
+              </div>
             </div>
           )}
-          <Button asChild className="mt-4 w-full">
-            <Link href={`/schools/${schoolData.schoolCode}/students/login`}>Go to Student Login</Link>
-          </Button>
         </DialogContent>
       </Dialog>
 
@@ -2092,21 +2205,54 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
               Share these credentials with the parent for their first login.<br />
               (Simulated for now. In the future, this can be sent via SMS/email.)
             </div>
-            <div className="bg-gray-100 rounded p-4 text-left text-xs mb-4">
-              <div><b>Admission Number:</b> {lastParentCredentials.admissionNumber}</div>
-              <div><b>Parent Phone:</b> {lastParentCredentials.parentPhone}</div>
+            <div className="bg-gray-100 rounded p-4 text-left text-xs mb-4 space-y-2">
+              <div className="flex justify-between">
+                <b>Admission Number:</b>
+                <span className="font-mono">{lastParentCredentials.admissionNumber}</span>
+              </div>
+              <div className="flex justify-between">
+                <b>Parent Phone:</b>
+                <span className="font-mono">{lastParentCredentials.parentPhone}</span>
+              </div>
               {lastParentCredentials.parentEmail && (
-                <div><b>Parent Email:</b> {lastParentCredentials.parentEmail}</div>
+                <div className="flex justify-between">
+                  <b>Parent Email:</b>
+                  <span className="font-mono">{lastParentCredentials.parentEmail}</span>
+                </div>
               )}
-              <div><b>Temporary Password:</b> {lastParentCredentials.tempPassword}</div>
+              <div className="flex justify-between">
+                <b>Temporary Password:</b>
+                <span className="font-mono">{lastParentCredentials.tempPassword}</span>
+              </div>
             </div>
             <div className="flex flex-col gap-2 mb-4">
+              <Button asChild className="w-full bg-green-600 hover:bg-green-700">
+                <Link 
+                  href={`/schools/${schoolData.schoolCode}/parent/login?phone=${encodeURIComponent(lastParentCredentials.parentPhone)}&password=${encodeURIComponent(lastParentCredentials.tempPassword)}`}
+                >
+                  🚀 Quick Parent Login (Auto-fill)
+                </Link>
+              </Button>
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => {
+                  const credentials = `Admission Number: ${lastParentCredentials.admissionNumber}\nParent Phone: ${lastParentCredentials.parentPhone}\nParent Email: ${lastParentCredentials.parentEmail || 'N/A'}\nPassword: ${lastParentCredentials.tempPassword}`;
+                  navigator.clipboard.writeText(credentials);
+                  toast({ title: "Copied!", description: "Parent credentials copied to clipboard", variant: "default" });
+                }}
+              >
+                📋 Copy Parent Credentials
+              </Button>
               <Link href={`/schools/${schoolData.schoolCode}/parent/login`} legacyBehavior>
-                <a className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition">Go to Parent Login</a>
+                <a className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition">📝 Manual Parent Login</a>
               </Link>
               <Link href={`/schools/${schoolData.schoolCode}/students/login`} legacyBehavior>
-                <a className="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition">Go to Student Login</a>
+                <a className="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition">📚 Go to Student Login</a>
               </Link>
+            </div>
+            <div className="text-xs text-gray-500 mb-4">
+              💡 Tip: Use "Quick Parent Login" to automatically fill the parent login form
             </div>
             <a
               href="#"
@@ -2127,4 +2273,3 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
     </div>
   )
 }
-

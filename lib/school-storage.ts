@@ -55,7 +55,8 @@ export interface Student {
   parentPhone: string
   parentEmail?: string
   admissionNumber: string
-  class: string
+  className?: string
+  classLevel?: string
   dateOfBirth: string
   gender: "male" | "female"
   address: string
