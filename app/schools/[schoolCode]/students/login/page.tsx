@@ -17,6 +17,11 @@ export default function StudentLoginPage({ params }: { params: { schoolCode: str
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
+    // Debug logging
+    console.log('Student login page params:', params)
+    console.log('School code:', schoolCode)
+    console.log('Search params:', Object.fromEntries(searchParams.entries()))
+    
     // Auto-fill credentials from query params if present
     const admParam = searchParams.get("admissionNumber");
     const emailParam = searchParams.get("email");
@@ -24,7 +29,7 @@ export default function StudentLoginPage({ params }: { params: { schoolCode: str
     if (admParam) setAdmissionNumber(admParam);
     if (emailParam) setEmail(emailParam);
     if (passParam) setPassword(passParam);
-  }, [searchParams]);
+  }, [searchParams, params, schoolCode]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()

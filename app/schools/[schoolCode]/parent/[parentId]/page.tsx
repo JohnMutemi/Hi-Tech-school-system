@@ -6,7 +6,7 @@ import { ParentDashboard } from "@/components/parent-dashboard/parent-dashboard"
 export default function ParentDashboardPage() {
   const params = useParams()
   const schoolCode = params.schoolCode as string
+  const parentId = params.parentId as string
 
-  // This page will use session-based authentication (no parentId in URL)
-  return <ParentDashboard schoolCode={schoolCode} />
+  return <ParentDashboard schoolCode={schoolCode} parentId={parentId} />
 } 

@@ -1,6 +1,8 @@
 import { PrismaClient } from '@prisma/client';
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import { cookies } from "next/headers";
 
 const prisma = new PrismaClient();
 
@@ -45,7 +47,33 @@ export async function POST(
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
-    return NextResponse.json({ parentId: parent.id });
+    // Create JWT token for session management
+    const token = jwt.sign(
+      {
+        userId: parent.id,
+        role: "parent",
+        schoolCode: school.code.toLowerCase(),
+        schoolId: school.id
+      },
+      process.env.JWT_SECRET!,
+      { expiresIn: "24h" }
+    );
+
+    // Set the token in a cookie
+    const response = NextResponse.json({ 
+      parentId: parent.id,
+      parentName: parent.name,
+      schoolCode: school.code
+    });
+
+    response.cookies.set("parent_auth_token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 24 * 60 * 60 // 24 hours
+    });
+
+    return response;
   } catch (error) {
     console.error("Parent login error:", error);
     return NextResponse.json(

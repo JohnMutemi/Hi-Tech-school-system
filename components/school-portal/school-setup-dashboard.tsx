@@ -398,8 +398,22 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
       setNewStudent({});
       setViewMode((prev) => ({ ...prev, students: "list" }));
       handleStepComplete("students");
-      setLastStudentCredentials({ admissionNumber, email: newStudent.email, tempPassword });
+      
+      // Set student credentials
+      setLastStudentCredentials({ admissionNumber, email: newStudent.email, tempPassword: newStudent.tempPassword });
       setShowStudentCredentials(true);
+      
+      // Set parent credentials if parent was created
+      if (newStudent.parent && newStudent.parent.tempPassword) {
+        setLastParentCredentials({
+          admissionNumber: newStudent.admissionNumber,
+          parentPhone: newStudent.parentPhone,
+          parentEmail: newStudent.parentEmail,
+          tempPassword: newStudent.parent.tempPassword,
+        });
+        setShowParentCredentials(true);
+      }
+      
       toast({ title: "Success!", description: "Student added successfully!" });
       return true;
     } catch (error: any) {
@@ -1545,15 +1559,8 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                               </TableCell>
                               <TableCell>
                                 <div className="flex space-x-2">
-                                  <Button variant="outline" size="sm" onClick={() => {
-                                    setLastStudentCredentials({
-                                      admissionNumber: student.admissionNumber,
-                                      email: student.email || "",
-                                      tempPassword: student.tempPassword || "N/A",
-                                    });
-                                    setShowStudentCredentials(true);
-                                  }}>
-                                    View
+                                  <Button variant="outline" size="sm" onClick={() => setViewingItem(student)}>
+                                    View Details
                                   </Button>
                                   <Button variant="outline" size="sm" onClick={() => setEditingItem(student)}>
                                     <Edit className="w-4 h-4" />
@@ -2165,7 +2172,7 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
               <div className="flex flex-col gap-2">
                 <Button asChild className="w-full bg-green-600 hover:bg-green-700">
                   <Link 
-                    href={`/schools/${schoolData.schoolCode}/students/login?admissionNumber=${encodeURIComponent(lastStudentCredentials.admissionNumber)}&email=${encodeURIComponent(lastStudentCredentials.email || '')}&password=${encodeURIComponent(lastStudentCredentials.tempPassword)}`}
+                    href={`/schools/${encodeURIComponent(schoolData.schoolCode)}/students/login?admissionNumber=${encodeURIComponent(lastStudentCredentials.admissionNumber)}&email=${encodeURIComponent(lastStudentCredentials.email || '')}&password=${encodeURIComponent(lastStudentCredentials.tempPassword)}`}
                   >
                     🚀 Quick Login (Auto-fill)
                   </Link>
@@ -2189,7 +2196,8 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
               </div>
               
               <div className="text-xs text-gray-500 text-center">
-                💡 Tip: Use "Quick Login" to automatically fill the login form with these credentials
+                💡 Tip: Use "Quick Login" to automatically fill the login form with these credentials<br />
+                <span className="text-orange-600">⚠️ Note: Credentials are only shown immediately after creation for security reasons</span>
               </div>
             </div>
           )}
@@ -2226,6 +2234,19 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
               </div>
             </div>
             <div className="flex flex-col gap-2 mb-4">
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => {
+                  console.log('Parent credentials debug:', lastParentCredentials);
+                  const url = `/schools/${schoolData.schoolCode}/parent/login?phone=${encodeURIComponent(lastParentCredentials.parentPhone)}&password=${encodeURIComponent(lastParentCredentials.tempPassword)}`;
+                  console.log('Generated URL:', url);
+                  console.log('Phone value:', lastParentCredentials.parentPhone);
+                  console.log('Password value:', lastParentCredentials.tempPassword);
+                }}
+              >
+                🔍 Debug Parent Credentials
+              </Button>
               <Button asChild className="w-full bg-green-600 hover:bg-green-700">
                 <Link 
                   href={`/schools/${schoolData.schoolCode}/parent/login?phone=${encodeURIComponent(lastParentCredentials.parentPhone)}&password=${encodeURIComponent(lastParentCredentials.tempPassword)}`}
@@ -2237,6 +2258,7 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                 variant="outline" 
                 className="w-full"
                 onClick={() => {
+                  console.log('Parent credentials for copy:', lastParentCredentials);
                   const credentials = `Admission Number: ${lastParentCredentials.admissionNumber}\nParent Phone: ${lastParentCredentials.parentPhone}\nParent Email: ${lastParentCredentials.parentEmail || 'N/A'}\nPassword: ${lastParentCredentials.tempPassword}`;
                   navigator.clipboard.writeText(credentials);
                   toast({ title: "Copied!", description: "Parent credentials copied to clipboard", variant: "default" });

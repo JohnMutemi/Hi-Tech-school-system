@@ -12,6 +12,7 @@ export default function ParentLoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [autoFilled, setAutoFilled] = useState(false);
   
   const router = useRouter();
   const params = useParams();
@@ -22,12 +23,23 @@ export default function ParentLoginPage() {
     // Auto-fill credentials from query params if present
     const phoneParam = searchParams.get("phone");
     const passwordParam = searchParams.get("password");
+    const emailParam = searchParams.get("email"); // Check if email is being passed instead
+    
+    console.log('Parent login auto-fill params:', { phoneParam, passwordParam, emailParam });
+    console.log('All search params:', Object.fromEntries(searchParams.entries()));
     
     if (phoneParam) {
+      console.log('Auto-filling phone number:', phoneParam);
       setPhone(phoneParam);
+      setAutoFilled(true);
+    } else if (emailParam) {
+      console.log('WARNING: Email parameter found instead of phone:', emailParam);
+      // Don't auto-fill email into phone field
     }
     if (passwordParam) {
+      console.log('Auto-filling password');
       setPassword(passwordParam);
+      setAutoFilled(true);
     }
   }, [searchParams]);
 
@@ -35,6 +47,8 @@ export default function ParentLoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
+
+    console.log('Parent login attempt:', { schoolCode, phone });
 
     try {
       const res = await fetch(`/api/schools/${schoolCode}/parents/login`, {
@@ -44,8 +58,10 @@ export default function ParentLoginPage() {
       });
 
       const data = await res.json();
+      console.log('Parent login response:', { status: res.status, data });
 
       if (res.ok) {
+        console.log('Parent login successful, redirecting to:', `/schools/${schoolCode}/parent/${data.parentId}`);
         // On successful login, redirect to the parent's specific dashboard page
         router.replace(`/schools/${schoolCode}/parent/${data.parentId}`);
       } else {
@@ -53,6 +69,7 @@ export default function ParentLoginPage() {
         toast({ title: "Login Failed", description: data.error || "Invalid credentials.", variant: "destructive" });
       }
     } catch (err) {
+      console.error('Parent login error:', err);
       const errorMessage = "An unexpected error occurred. Please try again.";
       setError(errorMessage);
       toast({ title: "Error", description: errorMessage, variant: "destructive" });
@@ -68,6 +85,14 @@ export default function ParentLoginPage() {
           <CardTitle className="text-2xl font-extrabold text-blue-800 mb-2 text-center">Parent Login</CardTitle>
         </CardHeader>
         <CardContent className="w-full">
+          {autoFilled && (
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-center gap-2 text-green-700 text-sm">
+                <span className="text-green-600">✓</span>
+                <span>Credentials auto-filled for quick login</span>
+              </div>
+            </div>
+          )}
           <form onSubmit={handleLogin} className="space-y-4">
             <Input
               type="tel"

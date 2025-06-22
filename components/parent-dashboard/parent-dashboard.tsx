@@ -29,7 +29,7 @@ interface FeeStructure {
   };
 }
 
-export function ParentDashboard({ schoolCode }: { schoolCode: string }) {
+export function ParentDashboard({ schoolCode, parentId }: { schoolCode: string; parentId?: string }) {
   const [parent, setParent] = useState<any>(null);
   const [students, setStudents] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -49,31 +49,56 @@ export function ParentDashboard({ schoolCode }: { schoolCode: string }) {
   const [passwordMsg, setPasswordMsg] = useState("");
   const [feeStructures, setFeeStructures] = useState<FeeStructure[]>([]);
   const [loadingFees, setLoadingFees] = useState(true);
-  const [pendingParentCredentials, setPendingParentCredentials] = useState<{ email: string; phone: string; tempPassword: string } | null>(null);
+  const [pendingParentCredentials, setPendingParentCredentials] = useState<{ phone: string; tempPassword: string } | null>(null);
 
   useEffect(() => {
     async function fetchSession() {
       try {
-        const res = await fetch(`/api/schools/${schoolCode}/parents/session`);
-        if (!res.ok) {
-          router.replace(`/schools/${schoolCode}/parent/login`);
-          return;
+        console.log('ParentDashboard: Starting fetchSession', { schoolCode, parentId });
+        
+        // If parentId is provided, fetch specific parent data
+        if (parentId) {
+          console.log('ParentDashboard: Fetching parent by ID:', parentId);
+          const res = await fetch(`/api/schools/${schoolCode}/parents/${parentId}`);
+          console.log('ParentDashboard: Parent by ID response status:', res.status);
+          
+          if (!res.ok) {
+            console.log('ParentDashboard: Parent by ID failed, redirecting to login');
+            router.replace(`/schools/${schoolCode}/parent/login`);
+            return;
+          }
+          const data = await res.json();
+          console.log('ParentDashboard: Parent data received:', { parent: data.parent, studentsCount: data.students?.length });
+          setParent(data.parent);
+          setStudents(data.students);
+        } else {
+          console.log('ParentDashboard: Using session-based authentication');
+          // Fallback to session-based authentication
+          const res = await fetch(`/api/schools/${schoolCode}/parents/session`);
+          console.log('ParentDashboard: Session response status:', res.status);
+          
+          if (!res.ok) {
+            console.log('ParentDashboard: Session failed, redirecting to login');
+            router.replace(`/schools/${schoolCode}/parent/login`);
+            return;
+          }
+          const data = await res.json();
+          console.log('ParentDashboard: Session data received:', { parent: data.parent, studentsCount: data.students?.length });
+          setParent(data.parent);
+          setStudents(data.students);
         }
-        const data = await res.json();
-        setParent(data.parent);
-        setStudents(data.students);
         
         // Fetch fee structures for all students
-        await fetchFeeStructures(data.students);
+        await fetchFeeStructures(students);
       } catch (error) {
-        console.error("Failed to fetch session:", error);
+        console.error("ParentDashboard: Failed to fetch session:", error);
         router.replace(`/schools/${schoolCode}/parent/login`);
       } finally {
         setIsLoading(false);
       }
     }
     fetchSession();
-  }, [schoolCode]);
+  }, [schoolCode, parentId]);
 
   // Listen for fee structure updates from admin panel
   useEffect(() => {
@@ -573,7 +598,32 @@ export function ParentDashboard({ schoolCode }: { schoolCode: string }) {
                   <CardTitle>Account Settings</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-gray-500 mb-6">(Settings and preferences will appear here.)</div>
+                  {/* Contact Information Section */}
+                  {parent && (
+                    <div className="mb-8 bg-blue-50 p-6 rounded-xl shadow">
+                      <div className="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <Users className="w-5 h-5" /> Contact Information
+                      </div>
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-3">
+                          <div className="font-medium text-gray-700">Name:</div>
+                          <div className="text-gray-900">{parent.name}</div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="font-medium text-gray-700">Phone:</div>
+                          <div className="text-blue-600 font-semibold">{parent.phone || 'Not provided'}</div>
+                        </div>
+                        {parent.email && (
+                          <div className="flex items-center gap-3">
+                            <div className="font-medium text-gray-700">Email:</div>
+                            <div className="text-gray-600">{parent.email}</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="text-gray-500 mb-6">(Additional settings and preferences will appear here.)</div>
                   <form onSubmit={handleChangePassword} className="space-y-4 max-w-md mx-auto bg-blue-50 p-6 rounded-xl shadow">
                     <div className="text-lg font-semibold mb-2 flex items-center gap-2"><Key className="w-5 h-5" /> Change Password</div>
                     <Input
