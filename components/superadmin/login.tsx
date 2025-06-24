@@ -1,43 +1,56 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Eye, EyeOff } from "lucide-react"
+import { useUser } from "@/hooks/use-user"
 
 export function SuperAdminLogin() {
+  const router = useRouter()
+  const { user } = useUser({ redirectTo: '/superadmin', redirectIfFound: true })
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    setError(null)
 
     try {
       const formData = new FormData(e.target as HTMLFormElement)
       const email = formData.get("email") as string
       const password = formData.get("password") as string
 
-      // Simple client-side authentication for demo
-      if (email === "admin@hitechsms.co.ke" && password === "admin123") {
-        // Set a simple localStorage token
-        localStorage.setItem("superadmin-auth", "true")
-        localStorage.setItem("superadmin-email", email)
+      const res = await fetch("/api/superadmin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      })
 
-        // Redirect to dashboard
-        window.location.href = "/superadmin"
+      if (res.ok) {
+        router.push('/superadmin')
       } else {
-        alert("Invalid credentials. Please use:\nEmail: admin@hitechsms.co.ke\nPassword: admin123")
+        setError("Invalid credentials. Please try again.")
       }
     } catch (error) {
-      alert("Login failed. Please try again.")
+      setError("Login failed. Please try again.")
     } finally {
       setIsLoading(false)
     }
+  }
+
+  if (user?.isLoggedIn) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p>Redirecting...</p>
+      </div>
+    )
   }
 
   return (
@@ -61,6 +74,7 @@ export function SuperAdminLogin() {
         <CardDescription>Secure access to system administration</CardDescription>
       </CardHeader>
       <CardContent>
+        {error && <p className="text-red-500 text-center mb-4">{error}</p>}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email Address</Label>

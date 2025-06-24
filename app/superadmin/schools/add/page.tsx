@@ -2,22 +2,15 @@
 
 import { useEffect, useState } from "react"
 import AddSchoolForm from "@/components/superadmin/add-school-form"
+import { useUser } from "@/hooks/use-user"
+import { useRouter } from "next/navigation"
 
 export default function AddSchoolPage() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
+  const router = useRouter()
+  const { user } = useUser()
 
-  useEffect(() => {
-    const authStatus = localStorage.getItem("superadmin-auth")
-    if (authStatus === "true") {
-      setIsAuthenticated(true)
-    } else {
-      window.location.href = "/superadmin/login"
-    }
-    setIsLoading(false)
-  }, [])
-
-  if (isLoading) {
+  if (user === undefined) {
+    // Still loading user info
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -28,7 +21,10 @@ export default function AddSchoolPage() {
     )
   }
 
-  if (!isAuthenticated) {
+  if (!user.isLoggedIn || user.role !== 'super_admin') {
+    if (typeof window !== 'undefined') {
+      router.replace('/superadmin/login')
+    }
     return null
   }
 

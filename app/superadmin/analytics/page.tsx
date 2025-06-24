@@ -20,23 +20,27 @@ import {
 import Link from "next/link"
 import { getAllSchools } from "@/lib/school-storage"
 import type { SchoolData } from "@/lib/school-storage"
+import { useUser } from "@/hooks/use-user"
+import { useRouter } from "next/navigation"
 
 export default function AnalyticsPage() {
+  const router = useRouter()
+  const { user } = useUser()
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [schools, setSchools] = useState<SchoolData[]>([])
   const [timeRange, setTimeRange] = useState("30d")
 
   useEffect(() => {
-    const authStatus = localStorage.getItem("superadmin-auth")
-    if (authStatus === "true") {
-      setIsAuthenticated(true)
-      loadAnalytics()
+    if (!user || (user && (!user.isLoggedIn || user.role !== 'super_admin'))) {
+      if (typeof window !== 'undefined') {
+        router.replace('/superadmin/login')
+      }
     } else {
-      window.location.href = "/superadmin/login"
+      loadAnalytics()
     }
     setIsLoading(false)
-  }, [])
+  }, [user, router])
 
   const loadAnalytics = () => {
     const allSchools = getAllSchools()

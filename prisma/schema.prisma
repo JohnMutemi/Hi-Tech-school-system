@@ -1,0 +1,255 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model School {
+  id        String   @id @default(uuid())
+  name      String
+  code      String   @unique
+  address   String
+  phone     String
+  email     String
+  logo      String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users           User[]
+  students        Student[]
+  classes         Class[]
+  termlyFees      TermlyFeeStructure[]
+  feeStructures   FeeStructure[]
+  paymentRequests PaymentRequest[]
+}
+
+model User {
+  id                String          @id @default(uuid())
+  name              String
+  email             String          @unique
+  password          String
+  role              String // 'super_admin', 'admin', 'teacher', 'student', 'parent'
+  phone             String?
+  employeeId        String?
+  school            School?         @relation(fields: [schoolId], references: [id])
+  schoolId          String?
+  teacherProfile    TeacherProfile?
+  isActive          Boolean         @default(true)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  students          Student[]         @relation("ParentStudents")
+  teachingClasses   Class[]           @relation("TeacherClasses")
+  studentProfile    Student?
+  feeStructureLogs  FeeStructureLog[]
+  createdTermlyFees TermlyFeeStructure[] @relation("UserCreatedTermlyFees")
+}
+
+model TeacherProfile {
+  id             String   @id @default(uuid())
+  qualification  String?
+  dateJoined     DateTime?
+  tempPassword   String?
+  user           User     @relation(fields: [userId], references: [id])
+  userId         String   @unique
+}
+
+model Class {
+  id           String   @id @default(uuid())
+  name         String
+  schoolId     String
+  teacherId    String?
+  academicYear String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  school   School    @relation(fields: [schoolId], references: [id])
+  teacher  User?     @relation("TeacherClasses", fields: [teacherId], references: [id])
+  students Student[]
+}
+
+model Student {
+  id              String    @id @default(uuid())
+  userId          String    @unique
+  schoolId        String
+  classId         String?
+  admissionNumber String
+  dateOfBirth     DateTime?
+  dateAdmitted    DateTime?
+  parentId        String?
+  isActive        Boolean   @default(true)
+  status          String    @default("active")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  tempPassword    String?
+  parentName      String?
+  parentPhone     String?
+  parentEmail     String?
+  address         String?
+  gender          String?
+  
+  className       String?
+  classLevel      String?
+  classSection    String?
+  academicYear    String?
+  
+  avatarUrl       String?
+  emergencyContact String?
+  medicalInfo     String?
+  notes           String?
+
+  user          User           @relation(fields: [userId], references: [id])
+  school        School         @relation(fields: [schoolId], references: [id])
+  class         Class?         @relation(fields: [classId], references: [id])
+  parent        User?          @relation("ParentStudents", fields: [parentId], references: [id])
+  payments      Payment[]
+  paymentRequests PaymentRequest[]
+  studentFees   StudentFee[]
+  receipts      Receipt[]
+  feeStatements FeeStatement[]
+}
+
+model Payment {
+  id              String   @id @default(uuid())
+  studentId       String
+  amount          Float
+  paymentDate     DateTime
+  paymentMethod   String // 'cash', 'bank_transfer', 'mobile_money', 'check'
+  referenceNumber String?
+  receiptNumber   String
+  description     String
+  receivedBy      String
+  createdAt       DateTime @default(now())
+
+  student Student  @relation(fields: [studentId], references: [id])
+  receipt Receipt?
+}
+
+model Receipt {
+  id                    String   @id @default(uuid())
+  paymentId             String   @unique
+  studentId             String
+  receiptNumber         String
+  amount                Float
+  balance               Float
+  balanceCarriedForward Float
+  paymentDate           DateTime
+  format                String // 'A3', 'A4', 'A5'
+  createdAt             DateTime @default(now())
+
+  payment Payment @relation(fields: [paymentId], references: [id])
+  student Student @relation(fields: [studentId], references: [id])
+}
+
+// Enhanced Fee Structure for termly fee management
+model FeeStructure {
+  id          String    @id @default(uuid())
+  name        String
+  description String
+  amount      Float
+  frequency   String // 'monthly', 'quarterly', 'annually', 'one-time'
+  dueDate     DateTime?
+  isActive    Boolean   @default(true)
+  schoolId    String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  school      School?     @relation(fields: [schoolId], references: [id])
+  studentFees StudentFee[]
+}
+
+// New model for termly fee structures
+model TermlyFeeStructure {
+  id          String   @id @default(uuid())
+  term        String   // 'Term 1', 'Term 2', 'Term 3'
+  year        Int
+  classLevel  String   // 'Grade 1', 'Grade 2', etc.
+  className   String?  // Specific class name if applicable (e.g., "Grade 5A")
+  totalAmount Decimal  @db.Decimal(10, 2)
+  breakdown   Json     // {"tuition": 20000, "books": 5000, "lunch": 10000}
+  isActive    Boolean  @default(true)
+  isReleased  Boolean  @default(false) // Whether fee structure is released to students/parents
+  dueDate     DateTime? // Due date for the term fees
+  createdBy   String
+  schoolId    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  school  School @relation(fields: [schoolId], references: [id])
+  creator User   @relation("UserCreatedTermlyFees", fields: [createdBy], references: [id])
+  logs    FeeStructureLog[]
+}
+
+// Audit trail for fee structure changes
+model FeeStructureLog {
+  id                String   @id @default(uuid())
+  feeStructureId    String
+  action            String   // 'created', 'updated', 'deleted', 'released'
+  performedBy       String
+  timestamp         DateTime @default(now())
+  details           Json?    // Additional details about the change
+
+  feeStructure TermlyFeeStructure @relation(fields: [feeStructureId], references: [id])
+  user         User               @relation(fields: [performedBy], references: [id])
+}
+
+model StudentFee {
+  id             String   @id @default(uuid())
+  studentId      String
+  feeStructureId String
+  amount         Float
+  dueDate        DateTime
+  status         String // 'pending', 'paid', 'overdue', 'partial'
+  balance        Float
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  student      Student      @relation(fields: [studentId], references: [id])
+  feeStructure FeeStructure @relation(fields: [feeStructureId], references: [id])
+}
+
+model FeeStatement {
+  id             String   @id @default(uuid())
+  studentId      String
+  period         String
+  openingBalance Float
+  totalCharged   Float
+  totalPaid      Float
+  closingBalance Float
+  transactions   Json
+  generatedAt    DateTime
+
+  student Student @relation(fields: [studentId], references: [id])
+}
+
+// New model for payment requests (API integration)
+model PaymentRequest {
+  id              String   @id @default(uuid())
+  studentId       String
+  schoolId        String
+  amount          Float
+  currency        String   @default("KES")
+  paymentMethod   String
+  description     String
+  referenceNumber String
+  callbackUrl     String?
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  expiresAt       DateTime
+  status          String   // 'pending', 'processing', 'completed', 'failed', 'cancelled', 'expired'
+
+  student Student @relation(fields: [studentId], references: [id])
+  school   School @relation(fields: [schoolId], references: [id])
+}

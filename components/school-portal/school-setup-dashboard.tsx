@@ -39,16 +39,16 @@ import {
   Edit,
   Eye,
   ArrowLeft,
+  DollarSign,
 } from "lucide-react"
-import type { SchoolData, SchoolProfile, Teacher, Student, Subject, SchoolClass } from "@/lib/school-storage"
+import type { SchoolData, SchoolProfile, Teacher, Student, Subject, SchoolClass } from "@/lib/types"
 import {
-  updateSchoolProfile,
-  updateSchoolTeachers,
-  updateSchoolStudents,
-  updateSchoolSubjects,
   updateSchoolClasses,
   getSchool,
 } from "@/lib/school-storage"
+import Link from "next/link"
+import { generateTempPassword } from "@/lib/utils/school-generator"
+import { FeeManagement } from "./fee-management"
 
 interface SchoolSetupDashboardProps {
   schoolData: SchoolData
@@ -108,6 +108,13 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
       completed: (schoolData.subjects?.length || 0) > 0 && (schoolData.classes?.length || 0) > 0,
       icon: BookOpen,
     },
+    {
+      id: "fees",
+      title: "Fee Management",
+      description: "Configure fee structures and payment settings",
+      completed: false, // Will be updated based on fee structures
+      icon: DollarSign,
+    },
   ])
 
   const [schoolProfile, setSchoolProfile] = useState<SchoolProfile>(
@@ -124,10 +131,11 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
     },
   )
 
-  const [teachers, setTeachers] = useState<Teacher[]>(schoolData.teachers || [])
+  const [teachers, setTeachers] = useState<Teacher[]>([])
   const [students, setStudents] = useState<Student[]>(schoolData.students || [])
   const [subjects, setSubjects] = useState<Subject[]>(schoolData.subjects || [])
   const [classes, setClasses] = useState<SchoolClass[]>(schoolData.classes || [])
+  const [feeStructures, setFeeStructures] = useState<any[]>([])
 
   // Form states for new items
   const [newTeacher, setNewTeacher] = useState<Partial<Teacher>>({})
@@ -135,16 +143,105 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
   const [newSubject, setNewSubject] = useState<Partial<Subject>>({})
   const [newClass, setNewClass] = useState<Partial<SchoolClass>>({})
 
+  // Add state for showing credentials
+  const [showTeacherCredentials, setShowTeacherCredentials] = useState(false)
+  const [lastTeacherCredentials, setLastTeacherCredentials] = useState<{ email: string; tempPassword: string } | null>(null)
+  const [showStudentCredentials, setShowStudentCredentials] = useState(false)
+  const [lastStudentCredentials, setLastStudentCredentials] = useState<{ admissionNumber: string; email: string; tempPassword: string } | null>(null)
+  const [lastParentCredentials, setLastParentCredentials] = useState<any>(null)
+  const [showParentCredentials, setShowParentCredentials] = useState(false)
+
+  // Fetch teachers from API on component mount
+  useEffect(() => {
+    async function fetchTeachers() {
+      try {
+        const res = await fetch(`/api/schools/${schoolData.schoolCode}/teachers`);
+        if (res.ok) {
+          const data = await res.json();
+          setTeachers(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch teachers", error);
+        toast({ title: "Error", description: "Could not load teacher data.", variant: "destructive" });
+      }
+    }
+    fetchTeachers();
+  }, [schoolData.schoolCode, toast]);
+
+  // Fetch students from API on component mount
+  useEffect(() => {
+    async function fetchStudents() {
+      try {
+        const res = await fetch(`/api/schools/${schoolData.schoolCode}/students`);
+        if (res.ok) {
+          const data = await res.json();
+          setStudents(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch students", error);
+        toast({ title: "Error", description: "Could not load student data.", variant: "destructive" });
+      }
+    }
+    if (schoolData.schoolCode) {
+        fetchStudents();
+    }
+  }, [schoolData.schoolCode, toast]);
+
+  // Fetch subjects from API on component mount
+  useEffect(() => {
+    async function fetchSubjects() {
+      try {
+        const res = await fetch(`/api/schools/${schoolData.schoolCode}/subjects`);
+        if (res.ok) {
+          const data = await res.json();
+          setSubjects(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch subjects", error);
+        toast({ title: "Error", description: "Could not load subject data.", variant: "destructive" });
+      }
+    }
+    if (schoolData.schoolCode) {
+        fetchSubjects();
+    }
+  }, [schoolData.schoolCode, toast]);
+
+  // Fetch fee structures from API on component mount
+  useEffect(() => {
+    async function fetchFeeStructures() {
+      try {
+        const res = await fetch(`/api/schools/${schoolData.schoolCode}/fee-structure`);
+        if (res.ok) {
+          const data = await res.json();
+          setFeeStructures(data);
+          // Update fee management step completion status
+          setSetupSteps(prev => prev.map(step => 
+            step.id === "fees" ? { ...step, completed: data.length > 0 } : step
+          ));
+        }
+      } catch (error) {
+        console.error("Failed to fetch fee structures", error);
+        // Don't show error toast for fee structures as it might not be set up yet
+      }
+    }
+    if (schoolData.schoolCode) {
+        fetchFeeStructures();
+    }
+  }, [schoolData.schoolCode]);
+
   // Refresh school data when localStorage changes
   useEffect(() => {
-    const refreshedData = getSchool(schoolData.schoolCode)
-    if (refreshedData) {
-      setSchoolData(refreshedData)
-      setTeachers(refreshedData.teachers || [])
-      setStudents(refreshedData.students || [])
-      setSubjects(refreshedData.subjects || [])
-      setClasses(refreshedData.classes || [])
+    async function fetchSchool() {
+      const refreshedData = await getSchool(schoolData.schoolCode)
+      if (refreshedData) {
+        setSchoolData(refreshedData)
+        setTeachers(refreshedData.teachers || [])
+        setStudents(refreshedData.students || [])
+        setSubjects(refreshedData.subjects || [])
+        setClasses(refreshedData.classes || [])
+      }
     }
+    fetchSchool()
   }, [schoolData.schoolCode])
 
   const completedSteps = setupSteps.filter((step) => step.completed).length
@@ -154,192 +251,294 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
     setSetupSteps((prev) => prev.map((step) => (step.id === stepId ? { ...step, completed: true } : step)))
   }
 
-  const saveSchoolProfile = () => {
-    updateSchoolProfile(schoolData.schoolCode, schoolProfile)
-    handleStepComplete("profile")
-    setProfileSaved(true)
-    setIsEditingProfile(false)
-    toast({
-      title: "Success!",
-      description: "School profile saved successfully!",
-    })
+  const saveSchoolProfile = async () => {
+    try {
+      const res = await fetch(`/api/schools/${schoolData.schoolCode}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: schoolData.name,
+          address: schoolProfile.address,
+          phone: schoolProfile.phone,
+          email: schoolProfile.email,
+          adminEmail: schoolData.adminEmail,
+          adminFirstName: schoolData.adminFirstName,
+          adminLastName: schoolData.adminLastName,
+          description: schoolProfile.description,
+          colorTheme: schoolData.colorTheme,
+          status: schoolData.status,
+          profile: schoolProfile,
+        }),
+      })
+      if (!res.ok) throw new Error("Failed to update school profile")
+      handleStepComplete("profile")
+      setProfileSaved(true)
+      setIsEditingProfile(false)
+      toast({
+        title: "Success!",
+        description: "School profile saved successfully!",
+      })
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to save school profile.",
+        variant: "destructive",
+      })
+    }
   }
 
   // Teacher CRUD operations
-  const createTeacher = (teacherData: Partial<Teacher>) => {
+  const createTeacher = async (teacherData: Partial<Teacher>) => {
     if (!teacherData.name || !teacherData.email) {
-      toast({
-        title: "Validation Error",
-        description: "Please fill in required fields (Name and Email)",
-        variant: "destructive",
-      })
-      return false
+      toast({ title: "Validation Error", description: "Name and Email are required.", variant: "destructive" });
+      return false;
     }
 
-    const teacher: Teacher = {
-      id: crypto.randomUUID(),
-      name: teacherData.name || "",
-      email: teacherData.email || "",
-      phone: teacherData.phone || "",
-      subjects: [],
-      classes: [],
-      employeeId: `EMP${Date.now()}`,
-      qualification: teacherData.qualification || "",
-      dateJoined: teacherData.dateJoined || new Date().toISOString().split("T")[0],
-      status: "active",
+    const tempPassword = generateTempPassword();
+    try {
+      const response = await fetch(`/api/schools/${schoolData.schoolCode}/teachers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...teacherData, tempPassword }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create teacher');
+      }
+
+      const newTeacher = await response.json();
+      setTeachers([...teachers, newTeacher]);
+      
+      setNewTeacher({});
+      setViewMode((prev) => ({ ...prev, staff: "list" }));
+      handleStepComplete("staff");
+      setLastTeacherCredentials({ email: newTeacher.email, tempPassword });
+      setShowTeacherCredentials(true);
+      toast({ title: "Success!", description: "Teacher added successfully!" });
+      return true;
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to create teacher.", variant: "destructive" });
+      return false;
     }
+  };
 
-    const updatedTeachers = [...teachers, teacher]
-    setTeachers(updatedTeachers)
-    updateSchoolTeachers(schoolData.schoolCode, updatedTeachers)
-    setNewTeacher({})
-    setViewMode((prev) => ({ ...prev, staff: "list" }))
-    handleStepComplete("staff")
-    toast({
-      title: "Success!",
-      description: "Teacher added successfully!",
-    })
-    return true
-  }
+  const updateTeacher = async (updatedTeacher: Teacher) => {
+    try {
+      const response = await fetch(`/api/schools/${schoolData.schoolCode}/teachers`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedTeacher),
+      });
 
-  const updateTeacher = (updatedTeacher: Teacher) => {
-    const updatedTeachers = teachers.map((t) => (t.id === updatedTeacher.id ? updatedTeacher : t))
-    setTeachers(updatedTeachers)
-    updateSchoolTeachers(schoolData.schoolCode, updatedTeachers)
-    setEditingItem(null)
-    setViewMode((prev) => ({ ...prev, staff: "list" }))
-    toast({
-      title: "Success!",
-      description: "Teacher updated successfully!",
-    })
-  }
+      if (!response.ok) {
+        throw new Error('Failed to update teacher');
+      }
 
-  const deleteTeacher = (id: string) => {
-    const updatedTeachers = teachers.filter((t) => t.id !== id)
-    setTeachers(updatedTeachers)
-    updateSchoolTeachers(schoolData.schoolCode, updatedTeachers)
-    toast({
-      title: "Success!",
-      description: "Teacher deleted successfully!",
-    })
-  }
+      const returnedTeacher = await response.json();
+      setTeachers(teachers.map((t) => (t.id === returnedTeacher.id ? returnedTeacher : t)));
+      
+      setEditingItem(null);
+      setViewMode((prev) => ({ ...prev, staff: "list" }));
+      toast({ title: "Success!", description: "Teacher updated successfully!" });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to update teacher.", variant: "destructive" });
+    }
+  };
+
+  const deleteTeacher = async (id: string) => {
+    try {
+      const response = await fetch(`/api/schools/${schoolData.schoolCode}/teachers`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete teacher');
+      }
+
+      setTeachers(teachers.filter((t) => t.id !== id));
+      toast({ title: "Success!", description: "Teacher deleted successfully!" });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to delete teacher.", variant: "destructive" });
+    }
+  };
 
   // Student CRUD operations
-  const createStudent = (studentData: Partial<Student>) => {
-    if (!studentData.name || !studentData.parentName || !studentData.parentPhone) {
-      toast({
-        title: "Validation Error",
-        description: "Please fill in required fields (Student Name, Parent Name, and Parent Phone)",
-        variant: "destructive",
-      })
-      return false
+  const createStudent = async (studentData: Partial<Student>) => {
+    if (!studentData.name || !studentData.parentName || !studentData.parentPhone || !studentData.email || !studentData.className) {
+      toast({ title: "Validation Error", description: "Student Name, Email, Class, Parent Name, and Parent Phone are required.", variant: "destructive" });
+      return false;
     }
 
-    const student: Student = {
-      id: crypto.randomUUID(),
-      name: studentData.name || "",
-      email: studentData.email || "",
-      phone: studentData.phone || "",
-      parentName: studentData.parentName || "",
-      parentPhone: studentData.parentPhone || "",
-      parentEmail: studentData.parentEmail || "",
-      admissionNumber: studentData.admissionNumber || `ADM${Date.now()}`,
-      class: studentData.class || "",
-      dateOfBirth: studentData.dateOfBirth || "",
-      gender: studentData.gender || "male",
-      address: studentData.address || "",
-      dateAdmitted: studentData.dateAdmitted || new Date().toISOString().split("T")[0],
-      status: "active",
+    const tempPassword = generateTempPassword();
+    const admissionNumber = studentData.admissionNumber || `ADM${Date.now()}`;
+    
+    console.log('Creating student with data:', { ...studentData, tempPassword, admissionNumber });
+    
+    try {
+      const response = await fetch(`/api/schools/${schoolData.schoolCode}/students`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...studentData, tempPassword, admissionNumber }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create student');
+      }
+
+      const newStudent = await response.json();
+      console.log('API response for new student:', newStudent);
+      
+      setStudents([...students, newStudent]);
+      console.log('Updated students state:', [...students, newStudent]);
+      
+      setNewStudent({});
+      setViewMode((prev) => ({ ...prev, students: "list" }));
+      handleStepComplete("students");
+      
+      // Set student credentials
+      setLastStudentCredentials({ admissionNumber, email: newStudent.email, tempPassword: newStudent.tempPassword });
+      setShowStudentCredentials(true);
+      
+      // Set parent credentials if parent was created
+      if (newStudent.parent && newStudent.parent.tempPassword) {
+        setLastParentCredentials({
+          admissionNumber: newStudent.admissionNumber,
+          parentPhone: newStudent.parentPhone,
+          parentEmail: newStudent.parentEmail,
+          tempPassword: newStudent.parent.tempPassword,
+        });
+        setShowParentCredentials(true);
+      }
+      
+      toast({ title: "Success!", description: "Student added successfully!" });
+      return true;
+    } catch (error: any) {
+      console.error('Error creating student:', error);
+      toast({ title: "Error", description: error.message || "Failed to create student.", variant: "destructive" });
+      return false;
     }
+  };
 
-    const updatedStudents = [...students, student]
-    setStudents(updatedStudents)
-    updateSchoolStudents(schoolData.schoolCode, updatedStudents)
-    setNewStudent({})
-    setViewMode((prev) => ({ ...prev, students: "list" }))
-    handleStepComplete("students")
-    toast({
-      title: "Success!",
-      description: "Student added successfully!",
-    })
-    return true
-  }
+  const updateStudent = async (updatedStudent: Student) => {
+    try {
+      const response = await fetch(`/api/schools/${schoolData.schoolCode}/students`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedStudent),
+      });
 
-  const updateStudent = (updatedStudent: Student) => {
-    const updatedStudents = students.map((s) => (s.id === updatedStudent.id ? updatedStudent : s))
-    setStudents(updatedStudents)
-    updateSchoolStudents(schoolData.schoolCode, updatedStudents)
-    setEditingItem(null)
-    setViewMode((prev) => ({ ...prev, students: "list" }))
-    toast({
-      title: "Success!",
-      description: "Student updated successfully!",
-    })
-  }
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update student');
+      }
 
-  const deleteStudent = (id: string) => {
-    const updatedStudents = students.filter((s) => s.id !== id)
-    setStudents(updatedStudents)
-    updateSchoolStudents(schoolData.schoolCode, updatedStudents)
-    toast({
-      title: "Success!",
-      description: "Student deleted successfully!",
-    })
-  }
+      const returnedStudent = await response.json();
+      setStudents(students.map((s) => (s.id === returnedStudent.id ? returnedStudent : s)));
+      
+      setEditingItem(null);
+      setViewMode((prev) => ({ ...prev, students: "list" }));
+      toast({ title: "Success!", description: "Student updated successfully!" });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to update student.", variant: "destructive" });
+    }
+  };
+
+  const deleteStudent = async (id: string) => {
+    try {
+      const response = await fetch(`/api/schools/${schoolData.schoolCode}/students`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete student');
+      }
+
+      setStudents(students.filter((s) => s.id !== id));
+      toast({ title: "Success!", description: "Student deleted successfully!" });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to delete student.", variant: "destructive" });
+    }
+  };
 
   // Subject CRUD operations
-  const createSubject = () => {
+  const createSubject = async () => {
     if (!newSubject.name || !newSubject.code) {
-      toast({
-        title: "Validation Error",
-        description: "Please fill in required fields (Subject Name and Code)",
-        variant: "destructive",
-      })
-      return
+      toast({ title: "Validation Error", description: "Subject Name and Code are required.", variant: "destructive" });
+      return;
     }
 
-    const subject: Subject = {
-      id: crypto.randomUUID(),
-      name: newSubject.name || "",
-      code: newSubject.code || "",
-      description: newSubject.description || "",
-      teacherId: newSubject.teacherId || "",
-      classes: [],
+    try {
+      const response = await fetch(`/api/schools/${schoolData.schoolCode}/subjects`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newSubject),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create subject');
+      }
+
+      const createdSubject = await response.json();
+      setSubjects([...subjects, createdSubject]);
+      setNewSubject({});
+      toast({ title: "Success!", description: "Subject added successfully!" });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to create subject.", variant: "destructive" });
     }
+  };
 
-    const updatedSubjects = [...subjects, subject]
-    setSubjects(updatedSubjects)
-    updateSchoolSubjects(schoolData.schoolCode, updatedSubjects)
-    setNewSubject({})
-    toast({
-      title: "Success!",
-      description: "Subject added successfully!",
-    })
-  }
+  const updateSubject = async (updatedSubject: Subject) => {
+    try {
+      const response = await fetch(`/api/schools/${schoolData.schoolCode}/subjects`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedSubject),
+      });
 
-  const updateSubject = (updatedSubject: Subject) => {
-    const updatedSubjects = subjects.map((s) => (s.id === updatedSubject.id ? updatedSubject : s))
-    setSubjects(updatedSubjects)
-    updateSchoolSubjects(schoolData.schoolCode, updatedSubjects)
-    setEditingItem(null)
-    toast({
-      title: "Success!",
-      description: "Subject updated successfully!",
-    })
-  }
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update subject');
+      }
 
-  const deleteSubject = (id: string) => {
-    const updatedSubjects = subjects.filter((s) => s.id !== id)
-    setSubjects(updatedSubjects)
-    updateSchoolSubjects(schoolData.schoolCode, updatedSubjects)
-    toast({
-      title: "Success!",
-      description: "Subject deleted successfully!",
-    })
-  }
+      const returnedSubject = await response.json();
+      setSubjects(subjects.map((s) => (s.id === returnedSubject.id ? returnedSubject : s)));
+      setEditingItem(null);
+      toast({ title: "Success!", description: "Subject updated successfully!" });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to update subject.", variant: "destructive" });
+    }
+  };
+
+  const deleteSubject = async (id: string) => {
+    try {
+      const response = await fetch(`/api/schools/${schoolData.schoolCode}/subjects`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete subject');
+      }
+
+      setSubjects(subjects.filter((s) => s.id !== id));
+      toast({ title: "Success!", description: "Subject deleted successfully!" });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to delete subject.", variant: "destructive" });
+    }
+  };
 
   // Class CRUD operations
-  const createClass = () => {
+  const createClass = async () => {
     if (!newClass.name || !newClass.level) {
       toast({
         title: "Validation Error",
@@ -348,47 +547,83 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
       })
       return
     }
-
-    const schoolClass: SchoolClass = {
-      id: crypto.randomUUID(),
-      name: newClass.name || "",
-      level: newClass.level || "",
-      capacity: newClass.capacity || 30,
-      currentStudents: 0,
-      classTeacherId: newClass.classTeacherId || "",
-      subjects: [],
+    try {
+      const response = await fetch(`/api/schools/${schoolData.schoolCode}/classes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newClass),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create class');
+      }
+      const createdClass = await response.json();
+      setClasses([...classes, createdClass]);
+      setNewClass({});
+      handleStepComplete("subjects");
+      toast({
+        title: "Success!",
+        description: "Class added successfully!",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create class.",
+        variant: "destructive",
+      });
     }
-
-    const updatedClasses = [...classes, schoolClass]
-    setClasses(updatedClasses)
-    updateSchoolClasses(schoolData.schoolCode, updatedClasses)
-    setNewClass({})
-    handleStepComplete("subjects")
-    toast({
-      title: "Success!",
-      description: "Class added successfully!",
-    })
   }
 
-  const updateClass = (updatedClass: SchoolClass) => {
-    const updatedClasses = classes.map((c) => (c.id === updatedClass.id ? updatedClass : c))
-    setClasses(updatedClasses)
-    updateSchoolClasses(schoolData.schoolCode, updatedClasses)
-    setEditingItem(null)
-    toast({
-      title: "Success!",
-      description: "Class updated successfully!",
-    })
+  const updateClass = async (updatedClass: SchoolClass) => {
+    try {
+      const response = await fetch(`/api/schools/${schoolData.schoolCode}/classes`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedClass),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update class');
+      }
+      const returnedClass = await response.json();
+      setClasses(classes.map((c) => (c.id === returnedClass.id ? returnedClass : c)));
+      setEditingItem(null);
+      toast({
+        title: "Success!",
+        description: "Class updated successfully!",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update class.",
+        variant: "destructive",
+      });
+    }
   }
 
-  const deleteClass = (id: string) => {
-    const updatedClasses = classes.filter((c) => c.id !== id)
-    setClasses(updatedClasses)
-    updateSchoolClasses(schoolData.schoolCode, updatedClasses)
-    toast({
-      title: "Success!",
-      description: "Class deleted successfully!",
-    })
+  const deleteClass = async (id: string) => {
+    try {
+      const response = await fetch(`/api/schools/${schoolData.schoolCode}/classes`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete class');
+      }
+      setClasses(classes.filter((c) => c.id !== id));
+      toast({
+        title: "Success!",
+        description: "Class deleted successfully!",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete class.",
+        variant: "destructive",
+      });
+    }
   }
 
   // Teacher Form Component
@@ -495,13 +730,24 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
   }: { student?: Student; onSave: (student: Student) => void; onCancel: () => void }) => {
     const [formData, setFormData] = useState<Partial<Student>>(student || newStudent)
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault()
+      
+      // Additional validation for required fields
+      if (!formData.name || !formData.email || !formData.className || !formData.parentName || !formData.parentPhone) {
+        toast({ 
+          title: "Validation Error", 
+          description: "Please fill in all required fields: Student Name, Email, Class, Parent Name, and Parent Phone.", 
+          variant: "destructive" 
+        });
+        return;
+      }
+      
       if (student) {
         onSave(formData as Student)
       } else {
         // Directly create student without setting state first
-        const success = createStudent(formData)
+        const success = await createStudent(formData)
         if (success) {
           // Reset form data after successful creation
           setFormData({})
@@ -541,10 +787,11 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                 />
               </div>
               <div className="space-y-2">
-                <Label>Class/Grade</Label>
+                <Label>Class/Grade *</Label>
                 <Select
-                  value={formData.class || ""}
-                  onValueChange={(value) => setFormData({ ...formData, class: value })}
+                  value={formData.className || ""}
+                  onValueChange={(value) => setFormData({ ...formData, className: value })}
+                  required
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select class" />
@@ -596,12 +843,13 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Student Email</Label>
+                <Label>Student Email *</Label>
                 <Input
                   type="email"
                   value={formData.email || ""}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   placeholder="student@email.com"
+                  required
                 />
               </div>
               <div className="space-y-2">
@@ -716,12 +964,13 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="profile">School Profile</TabsTrigger>
             <TabsTrigger value="staff">Staff & Teachers</TabsTrigger>
             <TabsTrigger value="students">Students</TabsTrigger>
             <TabsTrigger value="subjects">Subjects & Classes</TabsTrigger>
+            <TabsTrigger value="fees">Fee Management</TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -797,7 +1046,7 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
             </div>
 
             {/* Quick Stats */}
-            <div className="grid md:grid-cols-4 gap-6">
+            <div className="grid md:grid-cols-5 gap-6">
               <Card>
                 <CardContent className="p-6">
                   <div className="flex items-center space-x-2">
@@ -838,6 +1087,17 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                     <div>
                       <p className="text-2xl font-bold">{classes.length}</p>
                       <p className="text-sm text-gray-600">Classes</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center space-x-2">
+                    <DollarSign className="w-8 h-8 text-emerald-500" />
+                    <div>
+                      <p className="text-2xl font-bold">{feeStructures.length}</p>
+                      <p className="text-sm text-gray-600">Fee Structures</p>
                     </div>
                   </div>
                 </CardContent>
@@ -1118,8 +1378,8 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                               <TableCell className="font-medium">{teacher.name}</TableCell>
                               <TableCell>{teacher.email}</TableCell>
                               <TableCell>{teacher.phone}</TableCell>
-                              <TableCell>{teacher.qualification}</TableCell>
-                              <TableCell>{teacher.dateJoined}</TableCell>
+                              <TableCell>{teacher.teacherProfile?.qualification || "-"}</TableCell>
+                              <TableCell>{teacher.teacherProfile?.dateJoined ? new Date(teacher.teacherProfile.dateJoined).toLocaleDateString() : "-"}</TableCell>
                               <TableCell>
                                 <Badge variant={teacher.status === "active" ? "default" : "secondary"}>
                                   {teacher.status}
@@ -1198,11 +1458,11 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                     <div className="grid md:grid-cols-2 gap-4">
                       <div>
                         <Label className="text-sm font-medium text-gray-600">Qualification</Label>
-                        <p className="text-sm">{viewingItem.qualification}</p>
+                        <p className="text-sm">{viewingItem.teacherProfile?.qualification || "-"}</p>
                       </div>
                       <div>
                         <Label className="text-sm font-medium text-gray-600">Date Joined</Label>
-                        <p className="text-sm">{viewingItem.dateJoined}</p>
+                        <p className="text-sm">{viewingItem.teacherProfile?.dateJoined ? new Date(viewingItem.teacherProfile.dateJoined).toLocaleDateString() : "-"}</p>
                       </div>
                     </div>
                     <div>
@@ -1210,6 +1470,22 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                       <Badge variant={viewingItem.status === "active" ? "default" : "secondary"}>
                         {viewingItem.status}
                       </Badge>
+                    </div>
+                    <div className="flex flex-col md:flex-row gap-4 mt-6 justify-end">
+                      <Button asChild variant="default">
+                        <Link href={`/schools/${schoolData.schoolCode}/teachers/login?email=${encodeURIComponent(viewingItem.email)}&password=${encodeURIComponent(viewingItem.teacherProfile?.tempPassword || "")}`}>
+                          Go to Teacher Dashboard
+                        </Link>
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        onClick={async () => {
+                          await fetch(`/api/schools/${schoolData.schoolCode}/teachers/${viewingItem.id}/send-credentials`, { method: "POST" });
+                          toast({ title: "Credentials sent (simulated)", description: `Credentials sent to ${viewingItem.email}` });
+                        }}
+                      >
+                        Simulate Send Credentials
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -1273,7 +1549,7 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                             <TableRow key={student.id}>
                               <TableCell className="font-medium">{student.name}</TableCell>
                               <TableCell>{student.admissionNumber}</TableCell>
-                              <TableCell>{student.class}</TableCell>
+                              <TableCell>{student.className}</TableCell>
                               <TableCell>{student.parentName}</TableCell>
                               <TableCell>{student.parentPhone}</TableCell>
                               <TableCell>
@@ -1284,7 +1560,7 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                               <TableCell>
                                 <div className="flex space-x-2">
                                   <Button variant="outline" size="sm" onClick={() => setViewingItem(student)}>
-                                    <Eye className="w-4 h-4" />
+                                    View Details
                                   </Button>
                                   <Button variant="outline" size="sm" onClick={() => setEditingItem(student)}>
                                     <Edit className="w-4 h-4" />
@@ -1342,7 +1618,7 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                       </div>
                       <div>
                         <Label className="text-sm font-medium text-gray-600">Class</Label>
-                        <p className="text-sm">{viewingItem.class}</p>
+                        <p className="text-sm">{viewingItem.className}</p>
                       </div>
                     </div>
                     <div className="grid md:grid-cols-3 gap-4">
@@ -1383,6 +1659,14 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                         <p className="text-sm">{viewingItem.parentEmail || "Not provided"}</p>
                       </div>
                     </div>
+                    {/* Parent credentials from API */}
+                    {viewingItem.parent && (
+                      <div className="space-y-2 mt-4">
+                        <div className="font-bold">Parent Login Credentials</div>
+                        <div><strong>Email:</strong> {viewingItem.parent.email}</div>
+                        <div><strong>Temporary Password:</strong> {viewingItem.parent.tempPassword || "N/A"}</div>
+                      </div>
+                    )}
                     <div>
                       <Label className="text-sm font-medium text-gray-600">Home Address</Label>
                       <p className="text-sm">{viewingItem.address || "Not provided"}</p>
@@ -1392,6 +1676,14 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                       <Badge variant={viewingItem.status === "active" ? "default" : "secondary"}>
                         {viewingItem.status}
                       </Badge>
+                    </div>
+                    <div className="pt-4 flex flex-col items-center">
+                      <a
+                        href={`/schools/${schoolData.schoolCode}/parent/login`}
+                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+                      >
+                        Go to Parent Login
+                      </a>
                     </div>
                   </div>
                 )}
@@ -1488,7 +1780,9 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                         <div key={subject.id} className="flex items-center justify-between p-3 border rounded-lg">
                           <div>
                             <h5 className="font-medium">{subject.name}</h5>
-                            <p className="text-sm text-gray-600">{subject.code}</p>
+                            <p className="text-sm text-gray-600">
+                              {subject.code}
+                            </p>
                             {subject.teacherId && (
                               <p className="text-xs text-gray-500">
                                 Teacher: {teachers.find((t) => t.id === subject.teacherId)?.name}
@@ -1810,8 +2104,194 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
               </Card>
             </div>
           </TabsContent>
+
+          {/* Fee Management Tab */}
+          <TabsContent value="fees" className="space-y-6">
+            <FeeManagement 
+              schoolCode={schoolData.schoolCode}
+              colorTheme={schoolData.colorTheme}
+              onGoBack={() => setActiveTab("overview")}
+              onFeeStructureCreated={() => {
+                // Update the fee management step as completed
+                setSetupSteps(prev => prev.map(step => 
+                  step.id === "fees" ? { ...step, completed: true } : step
+                ));
+              }}
+            />
+          </TabsContent>
         </Tabs>
       </div>
+
+      {/* Add a modal/dialog to show credentials after adding a teacher */}
+      <Dialog open={showTeacherCredentials} onOpenChange={setShowTeacherCredentials}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Teacher Credentials</DialogTitle>
+            <DialogDescription>
+              Share these credentials with the teacher. They will use them to log in for the first time.
+            </DialogDescription>
+          </DialogHeader>
+          {lastTeacherCredentials && (
+            <div className="space-y-2">
+              <div><strong>Email:</strong> {lastTeacherCredentials.email}</div>
+              <div><strong>Temporary Password:</strong> {lastTeacherCredentials.tempPassword}</div>
+            </div>
+          )}
+          <Button onClick={() => setShowTeacherCredentials(false)} className="mt-4">Close</Button>
+        </DialogContent>
+      </Dialog>
+
+      {/* Student Credentials Modal */}
+      <Dialog open={showStudentCredentials} onOpenChange={setShowStudentCredentials}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Student Login Credentials</DialogTitle>
+            <DialogDescription>
+              Share these credentials with the student for their first login.
+            </DialogDescription>
+          </DialogHeader>
+          {lastStudentCredentials && (
+            <div className="space-y-4">
+              <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                <div className="flex justify-between items-center">
+                  <strong>Admission Number:</strong>
+                  <span className="font-mono">{lastStudentCredentials.admissionNumber}</span>
+                </div>
+                {lastStudentCredentials.email && (
+                  <div className="flex justify-between items-center">
+                    <strong>Email:</strong>
+                    <span className="font-mono">{lastStudentCredentials.email}</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center">
+                  <strong>Temporary Password:</strong>
+                  <span className="font-mono">{lastStudentCredentials.tempPassword}</span>
+                </div>
+              </div>
+              
+              <div className="flex flex-col gap-2">
+                <Button asChild className="w-full bg-green-600 hover:bg-green-700">
+                  <Link 
+                    href={`/schools/${encodeURIComponent(schoolData.schoolCode)}/students/login?admissionNumber=${encodeURIComponent(lastStudentCredentials.admissionNumber)}&email=${encodeURIComponent(lastStudentCredentials.email || '')}&password=${encodeURIComponent(lastStudentCredentials.tempPassword)}`}
+                  >
+                    🚀 Quick Login (Auto-fill)
+                  </Link>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => {
+                    const credentials = `Admission Number: ${lastStudentCredentials.admissionNumber}\nEmail: ${lastStudentCredentials.email || 'N/A'}\nPassword: ${lastStudentCredentials.tempPassword}`;
+                    navigator.clipboard.writeText(credentials);
+                    toast({ title: "Copied!", description: "Credentials copied to clipboard", variant: "default" });
+                  }}
+                >
+                  📋 Copy Credentials
+                </Button>
+                <Button asChild variant="outline" className="w-full">
+                  <Link href={`/schools/${schoolData.schoolCode}/students/login`}>
+                    📝 Manual Login
+                  </Link>
+                </Button>
+              </div>
+              
+              <div className="text-xs text-gray-500 text-center">
+                💡 Tip: Use "Quick Login" to automatically fill the login form with these credentials<br />
+                <span className="text-orange-600">⚠️ Note: Credentials are only shown immediately after creation for security reasons</span>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Parent Credentials Modal */}
+      {showParentCredentials && lastParentCredentials && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
+            <h2 className="text-2xl font-bold text-blue-700 mb-4">Parent Login Credentials</h2>
+            <div className="mb-4 text-gray-700 text-sm">
+              Share these credentials with the parent for their first login.<br />
+              (Simulated for now. In the future, this can be sent via SMS/email.)
+            </div>
+            <div className="bg-gray-100 rounded p-4 text-left text-xs mb-4 space-y-2">
+              <div className="flex justify-between">
+                <b>Admission Number:</b>
+                <span className="font-mono">{lastParentCredentials.admissionNumber}</span>
+              </div>
+              <div className="flex justify-between">
+                <b>Parent Phone:</b>
+                <span className="font-mono">{lastParentCredentials.parentPhone}</span>
+              </div>
+              {lastParentCredentials.parentEmail && (
+                <div className="flex justify-between">
+                  <b>Parent Email:</b>
+                  <span className="font-mono">{lastParentCredentials.parentEmail}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <b>Temporary Password:</b>
+                <span className="font-mono">{lastParentCredentials.tempPassword}</span>
+              </div>
+            </div>
+            <div className="flex flex-col gap-2 mb-4">
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => {
+                  console.log('Parent credentials debug:', lastParentCredentials);
+                  const url = `/schools/${schoolData.schoolCode}/parent/login?phone=${encodeURIComponent(lastParentCredentials.parentPhone)}&password=${encodeURIComponent(lastParentCredentials.tempPassword)}`;
+                  console.log('Generated URL:', url);
+                  console.log('Phone value:', lastParentCredentials.parentPhone);
+                  console.log('Password value:', lastParentCredentials.tempPassword);
+                }}
+              >
+                🔍 Debug Parent Credentials
+              </Button>
+              <Button asChild className="w-full bg-green-600 hover:bg-green-700">
+                <Link 
+                  href={`/schools/${schoolData.schoolCode}/parent/login?phone=${encodeURIComponent(lastParentCredentials.parentPhone)}&password=${encodeURIComponent(lastParentCredentials.tempPassword)}`}
+                >
+                  🚀 Quick Parent Login (Auto-fill)
+                </Link>
+              </Button>
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => {
+                  console.log('Parent credentials for copy:', lastParentCredentials);
+                  const credentials = `Admission Number: ${lastParentCredentials.admissionNumber}\nParent Phone: ${lastParentCredentials.parentPhone}\nParent Email: ${lastParentCredentials.parentEmail || 'N/A'}\nPassword: ${lastParentCredentials.tempPassword}`;
+                  navigator.clipboard.writeText(credentials);
+                  toast({ title: "Copied!", description: "Parent credentials copied to clipboard", variant: "default" });
+                }}
+              >
+                📋 Copy Parent Credentials
+              </Button>
+              <Link href={`/schools/${schoolData.schoolCode}/parent/login`} legacyBehavior>
+                <a className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition">📝 Manual Parent Login</a>
+              </Link>
+              <Link href={`/schools/${schoolData.schoolCode}/students/login`} legacyBehavior>
+                <a className="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition">📚 Go to Student Login</a>
+              </Link>
+            </div>
+            <div className="text-xs text-gray-500 mb-4">
+              💡 Tip: Use "Quick Parent Login" to automatically fill the parent login form
+            </div>
+            <a
+              href="#"
+              className="text-blue-600 underline mb-4 block"
+              onClick={e => { e.preventDefault(); /* future: trigger SMS/email */ }}
+            >
+              Parent Access (future: send via SMS/email)
+            </a>
+            <button
+              className="mt-2 px-4 py-2 bg-gray-300 text-gray-800 rounded"
+              onClick={() => setShowParentCredentials(false)}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -68,6 +68,8 @@
     "expo-sqlite": "latest",
     "gel": "latest",
     "input-otp": "1.4.1",
+    "iron-session": "^8.0.4",
+    "jsonwebtoken": "^9.0.2",
     "knex": "latest",
     "kysely": "latest",
     "lucide-react": "^0.454.0",
@@ -76,6 +78,7 @@
     "next-themes": "^0.4.4",
     "pg": "latest",
     "postgres": "latest",
+    "prisma": "^6.10.1",
     "react": "^18",
     "react-day-picker": "8.10.1",
     "react-dom": "^18",
@@ -96,6 +99,7 @@
     "@types/react-dom": "^18",
     "postcss": "^8.5",
     "tailwindcss": "^3.4.17",
+    "tsx": "^4.20.3",
     "typescript": "^5"
   }
 }

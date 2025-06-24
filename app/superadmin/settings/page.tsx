@@ -18,8 +18,12 @@ import {
   RefreshCw
 } from "lucide-react"
 import Link from "next/link"
+import { useUser } from "@/hooks/use-user"
+import { useRouter } from "next/navigation"
 
 export default function SettingsPage() {
+  const router = useRouter()
+  const { user } = useUser()
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [settings, setSettings] = useState({
@@ -45,15 +49,15 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
-    const authStatus = localStorage.getItem("superadmin-auth")
-    if (authStatus === "true") {
-      setIsAuthenticated(true)
-      loadSettings()
+    if (!user || (user && (!user.isLoggedIn || user.role !== 'super_admin'))) {
+      if (typeof window !== 'undefined') {
+        router.replace('/superadmin/login')
+      }
     } else {
-      window.location.href = "/superadmin/login"
+      loadSettings()
     }
     setIsLoading(false)
-  }, [])
+  }, [user, router])
 
   const loadSettings = () => {
     const savedSettings = localStorage.getItem("superadmin-settings")

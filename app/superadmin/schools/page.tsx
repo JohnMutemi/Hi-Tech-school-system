@@ -6,31 +6,37 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { School, Plus, Search, Eye, Edit, Trash2, Users, GraduationCap, Calendar } from "lucide-react"
+import { School, Plus, Search, Eye, Edit, Trash2, Users, GraduationCap, Calendar, LogIn, Copy } from "lucide-react"
 import Link from "next/link"
-import { getAllSchools } from "@/lib/school-storage"
-import type { SchoolData } from "@/lib/school-storage"
+import { useUser } from "@/hooks/use-user"
+import { useRouter } from "next/navigation"
+import { useToast } from "@/hooks/use-toast"
 
 export default function SchoolsManagementPage() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
-  const [schools, setSchools] = useState<SchoolData[]>([])
+  const router = useRouter()
+  const { user } = useUser()
+  const { toast } = useToast()
+  const [schools, setSchools] = useState<any[]>([])
   const [searchTerm, setSearchTerm] = useState("")
 
   useEffect(() => {
-    const authStatus = localStorage.getItem("superadmin-auth")
-    if (authStatus === "true") {
-      setIsAuthenticated(true)
-      loadSchools()
+    if (!user || (user && (!user.isLoggedIn || user.role !== 'super_admin'))) {
+      if (typeof window !== 'undefined') {
+        router.replace('/superadmin/login')
+      }
     } else {
-      window.location.href = "/superadmin/login"
+      loadSchools()
     }
-    setIsLoading(false)
-  }, [])
+  }, [user, router])
 
-  const loadSchools = () => {
-    const allSchools = getAllSchools()
-    setSchools(allSchools)
+  const loadSchools = async () => {
+    try {
+      const res = await fetch("/api/schools")
+      const data = await res.json()
+      setSchools(data)
+    } catch (err) {
+      setSchools([])
+    }
   }
 
   const filteredSchools = schools.filter(
@@ -39,7 +45,47 @@ export default function SchoolsManagementPage() {
       school.schoolCode.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
-  if (isLoading) {
+  const handleAutofillLogin = async (school: any) => {
+    try {
+      // Get admin credentials for this school
+      const res = await fetch(`/api/schools/${school.schoolCode}/admin-credentials`)
+      if (res.ok) {
+        const data = await res.json()
+        // Open the school portal with just the email autofilled
+        const portalUrl = `${window.location.origin}/schools/${school.schoolCode}?email=${encodeURIComponent(data.email)}&schoolName=${encodeURIComponent(school.name)}`
+        window.open(portalUrl, "_blank")
+        toast({
+          title: "Login Page Opened",
+          description: `School login page opened with autofilled email for ${school.name}. Please enter your password.`,
+        })
+      } else {
+        // Fallback: open portal without autofill
+        window.open(school.portalUrl, "_blank")
+        toast({
+          title: "Portal Opened",
+          description: `School portal opened for ${school.name}`,
+        })
+      }
+    } catch (error) {
+      // Fallback: open portal without autofill
+      window.open(school.portalUrl, "_blank")
+      toast({
+        title: "Portal Opened",
+        description: `School portal opened for ${school.name}`,
+      })
+    }
+  }
+
+  const copyPortalUrl = (school: any) => {
+    const portalUrl = `${window.location.origin}${school.portalUrl}`
+    navigator.clipboard.writeText(portalUrl)
+    toast({
+      title: "URL Copied",
+      description: `Portal URL for ${school.name} copied to clipboard`,
+    })
+  }
+
+  if (!user || (user && (!user.isLoggedIn || user.role !== 'super_admin'))) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -48,10 +94,6 @@ export default function SchoolsManagementPage() {
         </div>
       </div>
     )
-  }
-
-  if (!isAuthenticated) {
-    return null
   }
 
   return (
@@ -257,8 +299,29 @@ export default function SchoolsManagementPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex space-x-2">
-                            <Button variant="outline" size="sm" onClick={() => window.open(school.portalUrl, "_blank")}>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => handleAutofillLogin(school)}
+                              title="Login with autofilled credentials"
+                            >
+                              <LogIn className="w-4 h-4" />
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => window.open(school.portalUrl, "_blank")}
+                              title="View school portal"
+                            >
                               <Eye className="w-4 h-4" />
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => copyPortalUrl(school)}
+                              title="Copy portal URL"
+                            >
+                              <Copy className="w-4 h-4" />
                             </Button>
                             <Button variant="outline" size="sm" disabled>
                               <Edit className="w-4 h-4" />

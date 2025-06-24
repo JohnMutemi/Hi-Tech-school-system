@@ -126,6 +126,14 @@ export function SchoolCreationSuccess({
               {copiedField === "url" && (
                 <p className="text-xs text-green-600">URL copied to clipboard!</p>
               )}
+              <Button
+                className="mt-4 w-full"
+                onClick={() => {
+                  window.open(`${portalUrl}?email=${encodeURIComponent(adminEmail)}&password=${encodeURIComponent(tempPassword)}&schoolName=${encodeURIComponent(schoolName)}`, "_blank")
+                }}
+              >
+                Go to Portal (Auto-fill Login)
+              </Button>
             </div>
           </div>
 
