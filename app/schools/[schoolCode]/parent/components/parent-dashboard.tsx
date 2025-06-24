@@ -1,111 +1,110 @@
-"use client"
+"use client";
 
-import { useEffect, useState, useRef } from "react"
-import { useRouter } from "next/navigation"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Avatar } from "@/components/ui/avatar"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { Input } from "@/components/ui/input"
-import { Camera, Users, DollarSign, Receipt, BarChart2, Key, LogOut, Calendar, AlertCircle, CheckCircle, Edit, Trash2, RefreshCw, Download, Eye } from "lucide-react"
-import { ReceiptView } from "@/components/ui/receipt-view"
-import { Badge } from "@/components/ui/badge"
-import { Table, TableHeader, TableBody, TableCell, TableRow, TableHead } from "@/components/ui/table"
-import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog"
-import { toast } from "@/components/ui/use-toast"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { PaymentModal } from "@/components/payment/payment-modal"
+import { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Avatar } from "@/components/ui/avatar";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Camera, Users, DollarSign, Receipt, BarChart2, Key, LogOut, Calendar, AlertCircle, CheckCircle, Edit, Trash2, RefreshCw, Download } from "lucide-react";
+import { ReceiptView } from "@/components/ui/receipt-view";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableHeader, TableBody, TableCell, TableRow, TableHead } from "@/components/ui/table";
+import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
+import { toast } from "@/components/ui/use-toast";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { PaymentModal } from "@/components/payment/payment-modal";
 
 interface FeeStructure {
-  id: string
-  term: string
-  year: number
-  classLevel: string
-  totalAmount: number
-  breakdown: Record<string, number>
-  isActive: boolean
-  createdAt: string
+  id: string;
+  term: string;
+  year: number;
+  classLevel: string;
+  totalAmount: number;
+  breakdown: Record<string, number>;
+  isActive: boolean;
+  createdAt: string;
   creator: {
-    id: string
-    name: string
-    email: string
-  }
+    id: string;
+    name: string;
+    email: string;
+  };
 }
 
-export default function ParentDashboardPage({ params }: { params: { schoolCode: string; parentId: string } }) {
-  const { schoolCode, parentId } = params
-  const [parent, setParent] = useState<any>(null)
-  const [students, setStudents] = useState<any[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState("children")
-  const [avatarUploading, setAvatarUploading] = useState(false)
-  const [avatarError, setAvatarError] = useState("")
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const [receipts, setReceipts] = useState<any[]>([])
-  const [selectedReceipt, setSelectedReceipt] = useState<any>(null)
-  const router = useRouter()
-  const [oldPassword, setOldPassword] = useState("")
-  const [newPassword, setNewPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
-  const [passwordMsg, setPasswordMsg] = useState("")
-  const [feeStructures, setFeeStructures] = useState<FeeStructure[]>([])
-  const [loadingFees, setLoadingFees] = useState(true)
-  const [pendingParentCredentials, setPendingParentCredentials] = useState<{ phone: string; tempPassword: string } | null>(null)
+export function ParentDashboard({ schoolCode, parentId }: { schoolCode: string; parentId?: string }) {
+  const [parent, setParent] = useState<any>(null);
+  const [students, setStudents] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("children");
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarError, setAvatarError] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [receipts, setReceipts] = useState<any[]>([]);
+  const [selectedReceipt, setSelectedReceipt] = useState<any>(null);
+  const router = useRouter();
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordMsg, setPasswordMsg] = useState("");
+  const [feeStructures, setFeeStructures] = useState<FeeStructure[]>([]);
+  const [loadingFees, setLoadingFees] = useState(true);
+  const [pendingParentCredentials, setPendingParentCredentials] = useState<{ phone: string; tempPassword: string } | null>(null);
   
   // Payment modal state
-  const [paymentModalOpen, setPaymentModalOpen] = useState(false)
-  const [selectedStudent, setSelectedStudent] = useState<any>(null)
-  const [selectedFeeStructure, setSelectedFeeStructure] = useState<FeeStructure | null>(null)
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<any>(null);
+  const [selectedFeeStructure, setSelectedFeeStructure] = useState<FeeStructure | null>(null);
 
   useEffect(() => {
     async function fetchSession() {
       try {
-        console.log('ParentDashboard: Starting fetchSession', { schoolCode, parentId })
+        console.log('ParentDashboard: Starting fetchSession', { schoolCode, parentId });
         
         // If parentId is provided, fetch specific parent data
         if (parentId) {
-          console.log('ParentDashboard: Fetching parent by ID:', parentId)
-          const res = await fetch(`/api/schools/${schoolCode}/parents/${parentId}`)
-          console.log('ParentDashboard: Parent by ID response status:', res.status)
+          console.log('ParentDashboard: Fetching parent by ID:', parentId);
+          const res = await fetch(`/api/schools/${schoolCode}/parents/${parentId}`);
+          console.log('ParentDashboard: Parent by ID response status:', res.status);
           
           if (!res.ok) {
-            console.log('ParentDashboard: Parent by ID failed, redirecting to login')
-            router.replace(`/schools/${schoolCode}/parent/login`)
-            return
+            console.log('ParentDashboard: Parent by ID failed, redirecting to login');
+            router.replace(`/schools/${schoolCode}/parent/login`);
+            return;
           }
-          const data = await res.json()
-          console.log('ParentDashboard: Parent data received:', { parent: data.parent, studentsCount: data.students?.length })
-          setParent(data.parent)
-          setStudents(data.students)
+          const data = await res.json();
+          console.log('ParentDashboard: Parent data received:', { parent: data.parent, studentsCount: data.students?.length });
+          setParent(data.parent);
+          setStudents(data.students);
         } else {
-          console.log('ParentDashboard: Using session-based authentication')
+          console.log('ParentDashboard: Using session-based authentication');
           // Fallback to session-based authentication
-          const res = await fetch(`/api/schools/${schoolCode}/parents/session`)
-          console.log('ParentDashboard: Session response status:', res.status)
+          const res = await fetch(`/api/schools/${schoolCode}/parents/session`);
+          console.log('ParentDashboard: Session response status:', res.status);
           
           if (!res.ok) {
-            console.log('ParentDashboard: Session failed, redirecting to login')
-            router.replace(`/schools/${schoolCode}/parent/login`)
-            return
+            console.log('ParentDashboard: Session failed, redirecting to login');
+            router.replace(`/schools/${schoolCode}/parent/login`);
+            return;
           }
-          const data = await res.json()
-          console.log('ParentDashboard: Session data received:', { parent: data.parent, studentsCount: data.students?.length })
-          setParent(data.parent)
-          setStudents(data.students)
+          const data = await res.json();
+          console.log('ParentDashboard: Session data received:', { parent: data.parent, studentsCount: data.students?.length });
+          setParent(data.parent);
+          setStudents(data.students);
         }
         
         // Fetch fee structures for all students
-        await fetchFeeStructures(students)
+        await fetchFeeStructures(students);
       } catch (error) {
-        console.error("ParentDashboard: Failed to fetch session:", error)
-        router.replace(`/schools/${schoolCode}/parent/login`)
+        console.error("ParentDashboard: Failed to fetch session:", error);
+        router.replace(`/schools/${schoolCode}/parent/login`);
       } finally {
-        setIsLoading(false)
+        setIsLoading(false);
       }
     }
-    fetchSession()
-  }, [schoolCode, parentId])
+    fetchSession();
+  }, [schoolCode, parentId]);
 
   // Listen for fee structure updates from admin panel
   useEffect(() => {
@@ -144,87 +143,87 @@ export default function ParentDashboardPage({ params }: { params: { schoolCode: 
   // Fetch fee structures for students
   const fetchFeeStructures = async (studentList: any[]) => {
     try {
-      setLoadingFees(true)
-      const classLevels = [...new Set(studentList.map(student => student.className || student.classLevel))]
+      setLoadingFees(true);
+      const classLevels = [...new Set(studentList.map(student => student.className || student.classLevel))];
       
-      console.log('Fetching fee structures for class levels:', classLevels)
+      console.log('Fetching fee structures for class levels:', classLevels);
       
       // Get current term
-      const currentDate = new Date()
-      const currentYear = currentDate.getFullYear()
-      const currentMonth = currentDate.getMonth()
+      const currentDate = new Date();
+      const currentYear = currentDate.getFullYear();
+      const currentMonth = currentDate.getMonth();
       
-      let currentTerm = "Term 1"
-      if (currentMonth >= 4 && currentMonth <= 7) currentTerm = "Term 2"
-      else if (currentMonth >= 8) currentTerm = "Term 3"
+      let currentTerm = "Term 1";
+      if (currentMonth >= 4 && currentMonth <= 7) currentTerm = "Term 2";
+      else if (currentMonth >= 8) currentTerm = "Term 3";
 
-      console.log(`Current term: ${currentTerm}, Year: ${currentYear}`)
+      console.log(`Current term: ${currentTerm}, Year: ${currentYear}`);
 
       // Fetch fee structures for each class level using the same logic as student dashboard
       const feePromises = classLevels.map(async (classLevel) => {
         const response = await fetch(
           `/api/schools/${schoolCode}/fee-structure?term=${currentTerm}&year=${currentYear}&classLevel=${encodeURIComponent(classLevel)}`
-        )
+        );
         if (response.ok) {
-          const data = await response.json()
-          console.log(`Fee structures for ${classLevel}:`, data)
+          const data = await response.json();
+          console.log(`Fee structures for ${classLevel}:`, data);
           
           // Find active fee structure (same logic as student dashboard)
-          const activeFeeStructure = data.find((fee: any) => fee.isActive)
-          console.log(`Active fee structure for ${classLevel}:`, activeFeeStructure)
+          const activeFeeStructure = data.find((fee: any) => fee.isActive);
+          console.log(`Active fee structure for ${classLevel}:`, activeFeeStructure);
           
-          return activeFeeStructure || null
+          return activeFeeStructure || null;
         } else {
-          console.error(`Failed to fetch fee structures for ${classLevel}:`, response.status, response.statusText)
-          return null
+          console.error(`Failed to fetch fee structures for ${classLevel}:`, response.status, response.statusText);
+          return null;
         }
-      })
+      });
 
-      const feeResults = await Promise.all(feePromises)
-      const allFees = feeResults.filter(fee => fee !== null)
-      console.log('All active fee structures:', allFees)
-      setFeeStructures(allFees)
+      const feeResults = await Promise.all(feePromises);
+      const allFees = feeResults.filter(fee => fee !== null);
+      console.log('All active fee structures:', allFees);
+      setFeeStructures(allFees);
     } catch (error) {
-      console.error("Failed to fetch fee structures:", error)
+      console.error("Failed to fetch fee structures:", error);
     } finally {
-      setLoadingFees(false)
+      setLoadingFees(false);
     }
-  }
+  };
 
   // Get fee structure for a specific student (updated to match student dashboard logic)
   const getStudentFeeStructure = (studentClass: string) => {
-    const currentDate = new Date()
-    const currentYear = currentDate.getFullYear()
-    const currentMonth = currentDate.getMonth()
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth();
     
-    let currentTerm = "Term 1"
-    if (currentMonth >= 4 && currentMonth <= 7) currentTerm = "Term 2"
-    else if (currentMonth >= 8) currentTerm = "Term 3"
+    let currentTerm = "Term 1";
+    if (currentMonth >= 4 && currentMonth <= 7) currentTerm = "Term 2";
+    else if (currentMonth >= 8) currentTerm = "Term 3";
 
     return feeStructures.find(fee => 
       fee.classLevel === studentClass && 
       fee.term === currentTerm && 
       fee.year === currentYear &&
       fee.isActive
-    )
-  }
+    );
+  };
 
   // Handle payment modal opening
   const handleOpenPaymentModal = (student: any) => {
-    const feeStructure = getStudentFeeStructure(student.className || student.classLevel)
+    const feeStructure = getStudentFeeStructure(student.className || student.classLevel);
     if (!feeStructure) {
       toast({ 
         title: "Error", 
         description: "No fee structure available for this student", 
         variant: "destructive" 
-      })
-      return
+      });
+      return;
     }
 
-    setSelectedStudent(student)
-    setSelectedFeeStructure(feeStructure)
-    setPaymentModalOpen(true)
-  }
+    setSelectedStudent(student);
+    setSelectedFeeStructure(feeStructure);
+    setPaymentModalOpen(true);
+  };
 
   // Handle payment success
   const handlePaymentSuccess = (payment: any) => {
@@ -232,13 +231,13 @@ export default function ParentDashboardPage({ params }: { params: { schoolCode: 
       title: "Payment Successful", 
       description: `Payment of KES ${payment.amount?.toLocaleString() || selectedFeeStructure?.totalAmount.toLocaleString()} has been processed successfully.`,
       variant: "default" 
-    })
+    });
     
     // Close modal
-    setPaymentModalOpen(false)
-    setSelectedStudent(null)
-    setSelectedFeeStructure(null)
-  }
+    setPaymentModalOpen(false);
+    setSelectedStudent(null);
+    setSelectedFeeStructure(null);
+  };
 
   // Handle payment error
   const handlePaymentError = (error: string) => {
@@ -246,107 +245,107 @@ export default function ParentDashboardPage({ params }: { params: { schoolCode: 
       title: "Payment Failed", 
       description: error || "An error occurred while processing payment",
       variant: "destructive" 
-    })
-  }
+    });
+  };
 
   // Fetch receipts for all students
   const fetchReceipts = async () => {
     try {
       const receiptPromises = students.map(async (student) => {
-        const response = await fetch(`/api/schools/${schoolCode}/students/${student.id}/payments`)
+        const response = await fetch(`/api/schools/${schoolCode}/students/${student.id}/payments`);
         if (response.ok) {
-          const data = await response.json()
-          return data.map((receipt: any) => ({ ...receipt, studentName: student.name }))
+          const data = await response.json();
+          return data.map((receipt: any) => ({ ...receipt, studentName: student.name }));
         }
-        return []
-      })
+        return [];
+      });
 
-      const allReceipts = await Promise.all(receiptPromises)
-      const flattenedReceipts = allReceipts.flat()
-      setReceipts(flattenedReceipts)
+      const allReceipts = await Promise.all(receiptPromises);
+      const flattenedReceipts = allReceipts.flat();
+      setReceipts(flattenedReceipts);
     } catch (error) {
-      console.error("Failed to fetch receipts:", error)
+      console.error("Failed to fetch receipts:", error);
     }
-  }
+  };
 
   // Profile picture upload
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    setAvatarError("")
-    const file = e.target.files?.[0]
-    if (!file) return
+    setAvatarError("");
+    const file = e.target.files?.[0];
+    if (!file) return;
     
     if (!file.type.startsWith("image/")) {
-      setAvatarError("Please select a valid image file.")
-      return
+      setAvatarError("Please select a valid image file.");
+      return;
     }
     
     if (file.size > 5 * 1024 * 1024) {
-      setAvatarError("Image must be less than 5MB.")
-      return
+      setAvatarError("Image must be less than 5MB.");
+      return;
     }
     
-    setAvatarUploading(true)
-    const reader = new FileReader()
+    setAvatarUploading(true);
+    const reader = new FileReader();
     reader.onload = async (ev) => {
-      const avatarUrl = ev.target?.result as string
-      const session = localStorage.getItem("parent-auth")
+      const avatarUrl = ev.target?.result as string;
+      const session = localStorage.getItem("parent-auth");
       if (!session) {
-        setAvatarUploading(false)
-        setAvatarError("Session expired. Please log in again.")
-        return
+        setAvatarUploading(false);
+        setAvatarError("Session expired. Please log in again.");
+        return;
       }
-      const { parentId } = JSON.parse(session)
+      const { parentId } = JSON.parse(session);
       await fetch(`/api/schools/${schoolCode}/parents`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ parentId, avatarUrl }),
-      })
-      setParent((prev: any) => ({ ...prev, avatarUrl }))
-      setAvatarUploading(false)
-    }
+      });
+      setParent((prev: any) => ({ ...prev, avatarUrl }));
+      setAvatarUploading(false);
+    };
     reader.onerror = () => {
-      setAvatarUploading(false)
-      setAvatarError("Failed to read image file. Please try again.")
-    }
-    reader.readAsDataURL(file)
-  }
+      setAvatarUploading(false);
+      setAvatarError("Failed to read image file. Please try again.");
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleLogout = async () => {
     // Optionally, call a logout API to clear the cookie
-    await fetch(`/api/schools/${schoolCode}/parents/logout`, { method: "POST" })
-    router.replace(`/schools/${schoolCode}/parent/login`)
-  }
+    await fetch(`/api/schools/${schoolCode}/parents/logout`, { method: "POST" });
+    router.replace(`/schools/${schoolCode}/parent/login`);
+  };
 
   // Change password logic
   const handleChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setPasswordMsg("")
+    e.preventDefault();
+    setPasswordMsg("");
     if (!oldPassword || !newPassword || !confirmPassword) {
-      setPasswordMsg("All fields are required.")
-      return
+      setPasswordMsg("All fields are required.");
+      return;
     }
     if (newPassword !== confirmPassword) {
-      setPasswordMsg("New passwords do not match.")
-      return
+      setPasswordMsg("New passwords do not match.");
+      return;
     }
     if (oldPassword !== parent?.tempPassword) {
-      setPasswordMsg("Old password is incorrect.")
-      return
+      setPasswordMsg("Old password is incorrect.");
+      return;
     }
-    const session = localStorage.getItem("parent-auth")
-    if (!session) return
-    const { parentId } = JSON.parse(session)
+    const session = localStorage.getItem("parent-auth");
+    if (!session) return;
+    const { parentId } = JSON.parse(session);
     await fetch(`/api/schools/${schoolCode}/parents`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ parentId, tempPassword: newPassword }),
-    })
-    setParent((prev: any) => ({ ...prev, tempPassword: newPassword }))
-    setPasswordMsg("Password changed successfully!")
-    setOldPassword("")
-    setNewPassword("")
-    setConfirmPassword("")
-  }
+    });
+    setParent((prev: any) => ({ ...prev, tempPassword: newPassword }));
+    setPasswordMsg("Password changed successfully!");
+    setOldPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+  };
 
   // Handle receipt generation
   const handleReceiptGenerated = (receipt: any) => {
@@ -354,10 +353,10 @@ export default function ParentDashboardPage({ params }: { params: { schoolCode: 
       title: "Receipt Generated", 
       description: "Receipt has been generated successfully.",
       variant: "default" 
-    })
+    });
     // Refresh receipts list
-    fetchReceipts()
-  }
+    fetchReceipts();
+  };
 
   // Handle receipt download
   const handleDownloadReceipt = (receipt: any) => {
@@ -366,8 +365,8 @@ export default function ParentDashboardPage({ params }: { params: { schoolCode: 
       title: "Download Started", 
       description: "Receipt download has been initiated.",
       variant: "default" 
-    })
-  }
+    });
+  };
 
   if (isLoading) {
     return (
@@ -377,7 +376,7 @@ export default function ParentDashboardPage({ params }: { params: { schoolCode: 
           <p className="text-gray-600">Loading parent dashboard...</p>
         </div>
       </div>
-    )
+    );
   }
 
   if (!parent) {
@@ -387,7 +386,7 @@ export default function ParentDashboardPage({ params }: { params: { schoolCode: 
           <p className="text-gray-600">Parent not found. Redirecting to login...</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -464,7 +463,7 @@ export default function ParentDashboardPage({ params }: { params: { schoolCode: 
             ) : (
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {students.map((student) => {
-                  const feeStructure = getStudentFeeStructure(student.className || student.classLevel)
+                  const feeStructure = getStudentFeeStructure(student.className || student.classLevel);
                   return (
                     <Card key={student.id} className="hover:shadow-lg transition-shadow">
                       <CardHeader>
@@ -501,7 +500,7 @@ export default function ParentDashboardPage({ params }: { params: { schoolCode: 
                         </Button>
                       </CardContent>
                     </Card>
-                  )
+                  );
                 })}
               </div>
             )}
@@ -645,7 +644,7 @@ export default function ParentDashboardPage({ params }: { params: { schoolCode: 
                     />
                   </div>
                   <div>
-                    <label className="blockText-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       New Password
                     </label>
                     <Input
@@ -684,11 +683,12 @@ export default function ParentDashboardPage({ params }: { params: { schoolCode: 
         <PaymentModal
           isOpen={paymentModalOpen}
           onClose={() => {
-            setPaymentModalOpen(false)
-            setSelectedStudent(null)
-            setSelectedFeeStructure(null)
+            setPaymentModalOpen(false);
+            setSelectedStudent(null);
+            setSelectedFeeStructure(null);
           }}
-          studentId={selectedStudent.id}
+          student={selectedStudent}
+          feeStructure={selectedFeeStructure}
           schoolCode={schoolCode}
           onSuccess={handlePaymentSuccess}
           onError={handlePaymentError}
@@ -706,5 +706,5 @@ export default function ParentDashboardPage({ params }: { params: { schoolCode: 
         />
       )}
     </div>
-  )
-} 
+  );
+}
