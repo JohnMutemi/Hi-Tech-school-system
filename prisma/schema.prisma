@@ -30,6 +30,7 @@ model School {
   classes         Class[]
   termlyFees      TermlyFeeStructure[]
   feeStructures   FeeStructure[]
+  paymentRequests PaymentRequest[]
 }
 
 model User {
@@ -114,6 +115,7 @@ model Student {
   class         Class?         @relation(fields: [classId], references: [id])
   parent        User?          @relation("ParentStudents", fields: [parentId], references: [id])
   payments      Payment[]
+  paymentRequests PaymentRequest[]
   studentFees   StudentFee[]
   receipts      Receipt[]
   feeStatements FeeStatement[]
@@ -230,4 +232,24 @@ model FeeStatement {
   generatedAt    DateTime
 
   student Student @relation(fields: [studentId], references: [id])
+}
+
+// New model for payment requests (API integration)
+model PaymentRequest {
+  id              String   @id @default(uuid())
+  studentId       String
+  schoolId        String
+  amount          Float
+  currency        String   @default("KES")
+  paymentMethod   String
+  description     String
+  referenceNumber String
+  callbackUrl     String?
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  expiresAt       DateTime
+  status          String   // 'pending', 'processing', 'completed', 'failed', 'cancelled', 'expired'
+
+  student Student @relation(fields: [studentId], references: [id])
+  school   School @relation(fields: [schoolId], references: [id])
 }
