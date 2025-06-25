@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar } from "@/components/ui/avatar"
 import { LogOut, User, BookOpen, FileText, DollarSign, Settings, Receipt, Key, Camera, Eye, Menu } from "lucide-react"
@@ -10,6 +10,7 @@ import { ReceiptGenerator } from "@/components/ui/receipt-generator"
 import { ReceiptView } from "@/components/ui/receipt-view"
 import { paymentService } from "@/lib/services/payment-service"
 import { Payment } from "@/lib/types/fees"
+import { Badge } from "@/components/ui/badge"
 
 const sidebarNav = [
   { label: "My Class", icon: BookOpen, section: "class" },
@@ -77,6 +78,7 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
   const [loadingFees, setLoadingFees] = useState(true)
   const [selectedTerm, setSelectedTerm] = useState<string>("")
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [showLogoutModal, setShowLogoutModal] = useState(false)
 
   useEffect(() => {
     async function fetchStudent() {
@@ -380,114 +382,120 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
   if (!student) return null
 
   return (
-    <div className="flex min-h-screen bg-gray-100">
+    <div className="flex min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-20 w-64 bg-white border-r p-4 transform transition-transform md:relative md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="flex flex-col items-center text-center p-4 border-b">
-          <Avatar className="w-24 h-24 mb-4">
-            <img src={student.avatarUrl || "/placeholder-user.jpg"} alt={student.name} />
+      <aside className={`fixed inset-y-0 left-0 z-30 w-64 bg-gradient-to-b from-blue-800 to-blue-500 text-white shadow-xl flex flex-col items-center py-10 px-4 border-r transition-transform md:relative md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="flex flex-col items-center mb-10 w-full">
+          <Avatar className="w-24 h-24 mb-4 ring-4 ring-white shadow-lg">
+            <img src={student?.avatarUrl || '/placeholder-user.jpg'} alt={student?.name} />
           </Avatar>
-          <h2 className="font-bold text-xl">{student.name}</h2>
-          <p className="text-sm text-gray-500">{student.admissionNumber}</p>
+          <div className="font-bold text-xl truncate w-full text-center">{student?.name}</div>
+          <div className="text-xs text-blue-100 mb-2">{student?.admissionNumber}</div>
         </div>
-        <nav className="mt-6 space-y-2">
+        <nav className="flex flex-col gap-3 w-full">
           {sidebarNav.map(item => (
-            <Button
+            <button
               key={item.section}
-              variant={activeSection === item.section ? 'secondary' : 'ghost'}
-              className="w-full justify-start"
+              className={`flex items-center gap-3 px-5 py-3 rounded-xl transition font-semibold text-base text-left shadow-sm border border-transparent ${activeSection === item.section ? 'bg-white text-blue-700 shadow-md' : 'hover:bg-blue-600/80 hover:text-white text-blue-100'}`}
               onClick={() => { setActiveSection(item.section); setIsSidebarOpen(false); }}
             >
-              <item.icon className="w-4 h-4 mr-2" /> {item.label}
-            </Button>
+              <item.icon className="w-5 h-5" /> {item.label}
+            </button>
           ))}
         </nav>
-        <div className="absolute bottom-4 left-4 right-4">
-          <Button variant="outline" className="w-full" onClick={handleLogout}>
+        <div className="mt-auto w-full pt-10">
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => setShowLogoutModal(true)}
+          >
             <LogOut className="w-4 h-4 mr-2" /> Logout
           </Button>
         </div>
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col">
-        <header className="bg-white border-b p-4 flex justify-between items-center sticky top-0 z-10 md:hidden">
-          <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
+      <div className="flex-1 flex flex-col min-h-screen">
+        {/* Mobile Header */}
+        <header className="bg-gradient-to-r from-blue-700 to-blue-500 text-white border-b p-4 flex justify-between items-center sticky top-0 z-20 md:hidden shadow-md">
+          <Button variant="ghost" size="icon" className="text-white" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
             <Menu />
           </Button>
-          <h1 className="font-semibold text-lg">{student.name}</h1>
-          <Avatar className="w-8 h-8">
-            <img src={student.avatarUrl || "/placeholder-user.jpg"} alt={student.name} />
-          </Avatar>
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-base truncate max-w-[120px]">{student?.name}</span>
+            <Avatar className="w-8 h-8">
+              <img src={student?.avatarUrl || '/placeholder-user.jpg'} alt={student?.name} />
+            </Avatar>
+          </div>
         </header>
 
-        <main className="flex-grow p-4 md:p-6">
+        <main className="flex-grow p-4 md:p-8 bg-gradient-to-br from-white via-blue-50 to-purple-50">
           {activeSection === "profile" && student && !editProfile && (
             <SectionBlock>
               <div className="w-full min-h-[60vh] flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 py-12">
-                <Card className="w-full max-w-3xl rounded-2xl shadow-2xl bg-white/95 p-10 flex flex-col items-center">
-                  <h2 className="text-3xl font-extrabold text-blue-800 mb-6 text-center">Profile Information</h2>
-                  <div className="w-full">
-                    <div className="flex flex-col items-center mb-8">
-                      <Avatar className="w-28 h-28 mb-3 ring-4 ring-blue-200 shadow-lg relative group">
-                        <img
-                          src={student.avatarUrl || "/placeholder-user.jpg"}
-                          alt={student.name || "Student Avatar"}
-                          className="rounded-full object-cover w-full h-full"
-                        />
-                        <label className="absolute bottom-2 right-2 bg-blue-600 text-white rounded-full p-1 cursor-pointer shadow-md group-hover:scale-110 transition" title="Change profile picture">
-                          <input type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} disabled={avatarUploading} />
-                          <Camera className="w-5 h-5" />
-                        </label>
-                        {avatarUploading && <div className="absolute inset-0 flex items-center justify-center bg-white/70 rounded-full"><span className="text-blue-600 font-bold">Uploading...</span></div>}
-                        {avatarError && <div className="absolute left-0 right-0 -bottom-8 text-xs text-red-600 text-center">{avatarError}</div>}
-                      </Avatar>
-                      <div className="text-xl font-bold text-gray-900">{student.name}</div>
-                      <div className="text-blue-700 font-semibold text-sm">{student.className || student.classLevel}</div>
+                <Card className="w-full max-w-2xl rounded-3xl shadow-2xl bg-white/95 p-8 md:p-12 flex flex-col items-center border-2 border-blue-200">
+                  <h2 className="text-3xl font-extrabold text-blue-800 mb-8 text-center drop-shadow-lg tracking-tight">
+                    Profile Information
+                  </h2>
+                  <div className="flex flex-col items-center mb-8">
+                    <Avatar className="w-28 h-28 mb-3 ring-4 ring-blue-200 shadow-lg relative group">
+                      <img
+                        src={student.avatarUrl || "/placeholder-user.jpg"}
+                        alt={student.name || "Student Avatar"}
+                        className="rounded-full object-cover w-full h-full"
+                      />
+                    </Avatar>
+                    <div className="text-xl font-bold text-gray-900">{student.name}</div>
+                    <div className="text-blue-700 font-semibold text-sm">{student.className || student.classLevel}</div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-base py-4 w-full max-w-3xl">
+                    <div>
+                      <div className="font-semibold text-gray-700">Admission No:</div>
+                      <div>{student.admissionNumber}</div>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10 text-xl py-8 w-full max-w-5xl">
-                      <div>
-                        <div className="font-semibold text-gray-700">Admission No:</div>
-                        <div>{student.admissionNumber}</div>
-                      </div>
-                      <div>
-                        <div className="font-semibold text-gray-700">Class:</div>
-                        <div>{student.className || student.classLevel}</div>
-                      </div>
-                      <div>
-                        <div className="font-semibold text-gray-700">Phone:</div>
-                        <div>{student.phone || "-"}</div>
-                      </div>
-                      <div>
-                        <div className="font-semibold text-gray-700">Parent Name:</div>
-                        <div>{student.parentName}</div>
-                      </div>
-                      <div>
-                        <div className="font-semibold text-gray-700">Parent Phone:</div>
-                        <div>{student.parentPhone}</div>
-                      </div>
-                      <div>
-                        <div className="font-semibold text-gray-700">Date of Birth:</div>
-                        <div>{student.dateOfBirth}</div>
-                      </div>
-                      <div>
-                        <div className="font-semibold text-gray-700">Gender:</div>
-                        <div>{student.gender}</div>
-                      </div>
-                      <div>
-                        <div className="font-semibold text-gray-700">Address:</div>
-                        <div>{student.address}</div>
-                      </div>
-                      <div>
-                        <div className="font-semibold text-gray-700">Date Admitted:</div>
-                        <div>{student.dateAdmitted}</div>
-                      </div>
-                      <div>
-                        <div className="font-semibold text-gray-700">Status:</div>
-                        <div>{student.status}</div>
-                      </div>
+                    <div>
+                      <div className="font-semibold text-gray-700">Class:</div>
+                      <div>{student.className || student.classLevel}</div>
+                    </div>
+                    <div>
+                      <div className="font-semibold text-gray-700">Phone:</div>
+                      <div>{student.phone || "-"}</div>
+                    </div>
+                    <div>
+                      <div className="font-semibold text-gray-700">Parent Name:</div>
+                      <div>{student.parentName}</div>
+                    </div>
+                    <div>
+                      <div className="font-semibold text-gray-700">Parent Phone:</div>
+                      <div>{student.parentPhone}</div>
+                    </div>
+                    <div>
+                      <div className="font-semibold text-gray-700">Date of Birth:</div>
+                      <div>{student.dateOfBirth}</div>
+                    </div>
+                    <div>
+                      <div className="font-semibold text-gray-700">Gender:</div>
+                      <div>{student.gender}</div>
+                    </div>
+                    <div>
+                      <div className="font-semibold text-gray-700">Address:</div>
+                      <div>{student.address}</div>
+                    </div>
+                    <div>
+                      <div className="font-semibold text-gray-700">Date Admitted:</div>
+                      <div>{student.dateAdmitted}</div>
+                    </div>
+                    <div>
+                      <div className="font-semibold text-gray-700">Status:</div>
+                      <div>{student.status}</div>
                     </div>
                   </div>
+                  <Button
+                    onClick={handleEditProfile}
+                    className="mt-8 w-full md:w-auto bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 px-8 rounded-xl text-lg shadow"
+                  >
+                    Edit Profile
+                  </Button>
                 </Card>
               </div>
             </SectionBlock>
@@ -495,9 +503,11 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
           {activeSection === "profile" && student && editProfile && (
             <SectionBlock>
               <div className="w-full min-h-[60vh] flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 py-12">
-                <Card className="w-full max-w-3xl rounded-2xl shadow-2xl bg-white/95 p-10 flex flex-col items-center">
-                  <h2 className="text-3xl font-extrabold text-blue-800 mb-6 text-center">Edit Profile</h2>
-                  <div className="w-full">
+                <Card className="w-full max-w-2xl rounded-3xl shadow-2xl bg-white/95 p-8 md:p-12 flex flex-col items-center border-2 border-blue-200">
+                  <h2 className="text-3xl font-extrabold text-blue-800 mb-8 text-center drop-shadow-lg tracking-tight">
+                    Edit Profile
+                  </h2>
+                  <form onSubmit={handleSaveProfile} className="w-full space-y-6">
                     <div className="flex flex-col items-center mb-8">
                       <Avatar className="w-28 h-28 mb-3 ring-4 ring-blue-200 shadow-lg relative group">
                         <img
@@ -509,13 +519,13 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
                       <div className="text-xl font-bold text-gray-900">{editData.name}</div>
                       <div className="text-blue-700 font-semibold text-sm">{editData.email}</div>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10 text-xl py-8 w-full max-w-5xl">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-base w-full max-w-3xl mx-auto">
                       <div className="flex flex-col gap-2">
                         <label className="font-semibold text-gray-700">Name</label>
                         <input
                           type="text"
                           name="name"
-                          className="border rounded px-3 py-2"
+                          className="border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
                           value={editData.name}
                           onChange={handleEditChange}
                           required
@@ -526,7 +536,7 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
                         <input
                           type="text"
                           name="phone"
-                          className="border rounded px-3 py-2"
+                          className="border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
                           value={editData.phone}
                           onChange={handleEditChange}
                         />
@@ -536,7 +546,7 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
                         <input
                           type="text"
                           name="parentName"
-                          className="border rounded px-3 py-2"
+                          className="border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
                           value={editData.parentName}
                           onChange={handleEditChange}
                           required
@@ -547,7 +557,7 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
                         <input
                           type="text"
                           name="parentPhone"
-                          className="border rounded px-3 py-2"
+                          className="border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
                           value={editData.parentPhone}
                           onChange={handleEditChange}
                           required
@@ -558,7 +568,7 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
                         <input
                           type="text"
                           name="className"
-                          className="border rounded px-3 py-2"
+                          className="border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
                           value={editData.className || editData.classLevel || ""}
                           onChange={handleEditChange}
                           required
@@ -569,7 +579,7 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
                         <input
                           type="date"
                           name="dateOfBirth"
-                          className="border rounded px-3 py-2"
+                          className="border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
                           value={editData.dateOfBirth}
                           onChange={handleEditChange}
                         />
@@ -579,7 +589,7 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
                         <input
                           type="text"
                           name="gender"
-                          className="border rounded px-3 py-2"
+                          className="border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
                           value={editData.gender}
                           onChange={handleEditChange}
                         />
@@ -589,238 +599,157 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
                         <input
                           type="text"
                           name="address"
-                          className="border rounded px-3 py-2"
+                          className="border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
                           value={editData.address}
                           onChange={handleEditChange}
                         />
                       </div>
-                      <div className="flex flex-col gap-2 col-span-2 mt-4 flex-row-reverse">
-                        <Button type="submit" className="mr-2">Save</Button>
-                        <Button type="button" variant="outline" onClick={handleCancelEdit}>Cancel</Button>
-                      </div>
                     </div>
-                  </div>
+                    <div className="flex flex-col md:flex-row justify-end mt-8 gap-4">
+                      <Button
+                        type="submit"
+                        className="bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 px-8 rounded-xl text-lg shadow"
+                      >
+                        Save
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleCancelEdit}
+                        className="font-bold py-3 px-8 rounded-xl text-lg shadow"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </form>
                 </Card>
               </div>
             </SectionBlock>
           )}
           {activeSection === "finance" && (
             <SectionBlock>
-              <div className="w-full min-h-[75vh] flex items-center justify-center bg-gradient-to-br from-green-50 via-white to-blue-50 py-12">
-                <Card className="w-[90vw] max-w-5xl min-h-[60vh] rounded-2xl shadow-2xl bg-white/95 p-12 flex flex-col items-center justify-center">
-                  <h2 className="text-4xl font-extrabold text-green-800 mb-8 text-center">Finance & Fees</h2>
-                  
-                  {/* Term Fee Structures */}
-                  <div className="w-full mb-8">
-                    <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-2xl font-bold text-gray-800">Term Fee Structures</h3>
-                      <Button 
-                        variant="outline"
-                        onClick={() => {
-                          // Download all terms as PDF
-                          alert('Download all terms feature will be implemented soon!');
-                        }}
-                      >
-                        <FileText className="w-4 h-4 mr-2" />
-                        Download All Terms
-                      </Button>
-                    </div>
-                    
-                    {/* Term Selection Tabs */}
-                    <div className="flex space-x-1 mb-6 bg-gray-100 p-1 rounded-lg">
-                      {['Term 1', 'Term 2', 'Term 3'].map((term) => {
-                        const currentDate = new Date();
-                        const currentYear = currentDate.getFullYear();
-                        const currentMonth = currentDate.getMonth();
-                        
-                        let currentTerm = "Term 1";
-                        if (currentMonth >= 4 && currentMonth <= 7) currentTerm = "Term 2";
-                        else if (currentMonth >= 8) currentTerm = "Term 3";
-                        
-                        const isCurrentTerm = term === currentTerm;
-                        const isSelected = term === (feeStructure?.term || currentTerm);
-                        
-                        return (
-                          <button
-                            key={term}
-                            onClick={() => fetchFeeStructure(student?.className || student?.classLevel, term)}
-                            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all duration-200 ${
-                              isSelected 
-                                ? 'bg-white text-green-700 shadow-sm' 
-                                : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
-                            } ${isCurrentTerm ? 'ring-2 ring-green-200' : ''}`}
-                          >
-                            <div className="flex items-center justify-center space-x-2">
-                              <span>{term}</span>
-                              {isCurrentTerm && (
-                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                              )}
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                    
+              <div className="w-full min-h-[75vh] flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-green-50 py-12">
+                <Card className="w-full max-w-3xl rounded-3xl shadow-2xl bg-white/95 p-6 md:p-10 flex flex-col items-center border-2 border-green-200">
+                  <h2 className="text-4xl font-extrabold text-green-700 mb-8 text-center drop-shadow-lg tracking-tight">
+                    Fee Status
+                  </h2>
+                  <div className="w-full flex flex-col gap-8">
+                    {/* Fee Structure Summary */}
                     {loadingFees ? (
-                      <div className="text-center py-8">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto mb-4"></div>
-                        <p className="text-gray-600">Loading fee structure...</p>
+                      <div className="flex justify-center items-center py-8">
+                        <span className="text-lg text-gray-500">Loading fee structure...</span>
                       </div>
                     ) : feeStructure ? (
-                      <div className="bg-green-50 rounded-lg p-6 border border-green-200">
-                        <div className="grid md:grid-cols-2 gap-6">
+                      <div className="flex flex-col gap-4">
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                           <div>
-                            <div className="text-center mb-4">
-                              <div className="text-3xl font-bold text-green-600">
-                                KES {feeStructure.totalAmount?.toLocaleString() || '0'}
-                              </div>
-                              <div className="text-sm text-gray-600">Total Term Fees</div>
-                              <div className="text-xs text-gray-500 mt-1">
-                                {feeStructure.term} {feeStructure.year} - {feeStructure.classLevel}
-                              </div>
-                            </div>
-                            
-                            <div className="bg-white rounded-lg p-4 space-y-2">
-                              <div className="font-semibold text-gray-700 mb-3">Fee Breakdown:</div>
-                              {Object.entries(feeStructure.breakdown || {}).map(([key, value]) => (
-                                <div key={key} className="flex justify-between text-sm">
-                                  <span className="capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
-                                  <span className="font-medium">KES {value?.toLocaleString() || '0'}</span>
-                                </div>
-                              ))}
-                            </div>
+                            <span className="font-semibold text-gray-700">Term:</span>{" "}
+                            <span className="text-green-700 font-bold">{feeStructure.term}</span>
+                            <span className="mx-2 text-gray-400">|</span>
+                            <span className="font-semibold text-gray-700">Year:</span>{" "}
+                            <span className="text-green-700 font-bold">{feeStructure.year}</span>
                           </div>
-                          
-                          <div className="flex flex-col justify-center">
-                            <div className="text-center">
-                              <div className="text-sm text-gray-600 mb-2">Released on</div>
-                              <div className="font-medium">{new Date(feeStructure.createdAt).toLocaleDateString()}</div>
-                            </div>
-                            
-                            <div className="mt-6 text-center">
-                              <div className="text-sm text-gray-600 mb-2">Status</div>
-                              <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                                <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                                Active
+                          <div>
+                            <span className="font-semibold text-gray-700">Class:</span>{" "}
+                            <span className="text-green-700 font-bold">{feeStructure.classLevel}</span>
+                          </div>
+                        </div>
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                          <div className="text-2xl font-bold text-green-800">
+                            Total Fees: <span className="text-green-600">KES {feeStructure.totalAmount.toLocaleString()}</span>
+                          </div>
+                          <Button
+                            onClick={handlePayment}
+                            className="w-full md:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-xl text-lg shadow"
+                          >
+                            Make Payment
+                          </Button>
+                        </div>
+                        {/* Fee Breakdown */}
+                        <div className="mt-4">
+                          <h3 className="font-semibold text-gray-700 mb-2">Breakdown</h3>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {Object.entries(feeStructure.breakdown).map(([key, value]) => (
+                              <div
+                                key={key}
+                                className="flex justify-between items-center bg-green-50 rounded-lg px-4 py-2 shadow-sm"
+                              >
+                                <span className="text-gray-700">{key}</span>
+                                <span className="font-bold text-green-700">KES {(value as number).toLocaleString()}</span>
                               </div>
-                            </div>
-                            
-                            <div className="mt-6 text-center space-y-2">
-                              <Button 
-                                variant="outline"
-                                className="w-full"
-                                onClick={() => {
-                                  // Download fee structure as PDF
-                                  const feeStructureData = {
-                                    term: feeStructure.term,
-                                    year: feeStructure.year,
-                                    classLevel: feeStructure.classLevel,
-                                    totalAmount: feeStructure.totalAmount,
-                                    breakdown: feeStructure.breakdown,
-                                    studentName: student.name,
-                                    admissionNumber: student.admissionNumber
-                                  };
-                                  // For now, just show an alert. In production, this would generate and download a PDF
-                                  alert(`Downloading ${feeStructure.term} ${feeStructure.year} fee structure as PDF...`);
-                                }}
-                              >
-                                <FileText className="w-4 h-4 mr-2" />
-                                Download PDF
-                              </Button>
-                              <Button 
-                                variant="outline"
-                                className="w-full"
-                                onClick={() => {
-                                  // View detailed fee structure
-                                  alert(`Viewing detailed ${feeStructure.term} ${feeStructure.year} fee structure...`);
-                                }}
-                              >
-                                <Eye className="w-4 h-4 mr-2" />
-                                View Details
-                              </Button>
-                            </div>
+                            ))}
                           </div>
                         </div>
                       </div>
                     ) : (
-                      <div className="text-center py-8">
-                        <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                          <svg className="w-8 h-8 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                          </svg>
-                        </div>
-                        <p className="text-orange-600 font-medium">No fee structure available</p>
-                        <p className="text-sm text-gray-500 mt-1">
-                          Fee structure for this term has not been released yet.
-                        </p>
+                      <div className="flex justify-center items-center py-8">
+                        <span className="text-lg text-gray-500">No active fee structure for the selected term.</span>
                       </div>
                     )}
-                  </div>
-                  
-                  {/* Payment History */}
-                  <div className="w-full">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-2xl font-bold text-gray-800">Payment History</h3>
-                      {payments.length > 0 && (
-                        <Button 
-                          onClick={() => setShowReceiptGenerator(true)}
-                          className="bg-green-600 hover:bg-green-700"
-                        >
-                          <Receipt className="w-4 h-4 mr-2" />
-                          Generate Receipt
-                        </Button>
-                      )}
+
+                    {/* Payment History */}
+                    <div className="mt-8">
+                      <h3 className="font-semibold text-gray-700 mb-2">Payment History</h3>
+                      <Card className="w-full max-w-3xl rounded-3xl shadow-2xl bg-white/95 p-8 md:p-12 border-2 border-green-200 mx-auto mt-10">
+                        <CardHeader>
+                          <CardTitle className="text-3xl font-extrabold text-green-800 mb-2 text-center drop-shadow-lg tracking-tight">
+                            Payments History
+                          </CardTitle>
+                          <CardDescription className="text-center text-gray-500 mb-6">
+                            A log of all payments made for your children.
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="overflow-x-auto rounded-xl shadow bg-gray-50">
+                            <table className="min-w-full text-sm rounded-xl overflow-hidden">
+                              <thead>
+                                <tr className="bg-green-100 text-green-800">
+                                  <th className="px-4 py-2 border">Student</th>
+                                  <th className="px-4 py-2 border">Amount (KES)</th>
+                                  <th className="px-4 py-2 border">Date</th>
+                                  <th className="px-4 py-2 border">Receipt No.</th>
+                                  <th className="px-4 py-2 border">Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {payments.length > 0 ? (
+                                  payments.map((receipt) => (
+                                    <tr key={receipt.id} className="even:bg-green-50">
+                                      <td className="px-4 py-2 border font-medium">
+                                        {student.name}
+                                      </td>
+                                      <td className="px-4 py-2 border font-bold text-green-700">
+                                        {receipt.amount.toLocaleString()}
+                                      </td>
+                                      <td className="px-4 py-2 border">
+                                        {new Date(receipt.paymentDate).toLocaleDateString()}
+                                      </td>
+                                      <td className="px-4 py-2 border">{receipt.receiptNumber}</td>
+                                      <td className="px-4 py-2 border">
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => setSelectedReceipt(receipt)}
+                                          className="text-green-700 border-green-200 hover:bg-green-100"
+                                        >
+                                          View Receipt
+                                        </Button>
+                                      </td>
+                                    </tr>
+                                  ))
+                                ) : (
+                                  <tr>
+                                    <td colSpan={5} className="text-center py-8 text-gray-500">
+                                      No payment history found.
+                                    </td>
+                                  </tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </CardContent>
+                      </Card>
                     </div>
-                    <table className="min-w-full text-sm border">
-                      <thead>
-                        <tr className="bg-gray-100">
-                          <th className="px-4 py-2 border">Receipt No</th>
-                          <th className="px-4 py-2 border">Date</th>
-                          <th className="px-4 py-2 border">Amount</th>
-                          <th className="px-4 py-2 border">Method</th>
-                          <th className="px-4 py-2 border">Description</th>
-                          <th className="px-4 py-2 border">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {payments.length === 0 ? (
-                          <tr>
-                            <td colSpan={6} className="text-center py-8 text-gray-500">
-                              <div className="flex flex-col items-center">
-                                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-2">
-                                  <Receipt className="w-6 h-6 text-gray-400" />
-                                </div>
-                                <p className="text-sm">No payment history found</p>
-                                <p className="text-xs text-gray-400 mt-1">Receipts will appear here once payments are made</p>
-                              </div>
-                            </td>
-                          </tr>
-                        ) : (
-                          payments.map((payment) => (
-                            <tr key={payment.id}>
-                              <td className="px-4 py-2 border">{payment.receiptNumber}</td>
-                              <td className="px-4 py-2 border">{new Date(payment.paymentDate).toLocaleDateString()}</td>
-                              <td className="px-4 py-2 border">{payment.amount.toFixed(2)}</td>
-                              <td className="px-4 py-2 border">{payment.paymentMethod.replace('_', ' ').toUpperCase()}</td>
-                              <td className="px-4 py-2 border">{payment.description}</td>
-                              <td className="px-4 py-2 border">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => {
-                                    setSelectedReceipt(payment);
-                                    setShowReceiptView(true);
-                                  }}
-                                  className="flex items-center gap-1"
-                                >
-                                  <Receipt className="w-4 h-4" /> View
-                                </Button>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
                   </div>
                 </Card>
               </div>
@@ -829,20 +758,22 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
           {activeSection === "class" && (
             <SectionBlock>
               <div className="w-full min-h-[75vh] flex items-center justify-center bg-gradient-to-br from-yellow-50 via-white to-blue-50 py-12">
-                <Card className="w-[90vw] max-w-5xl min-h-[60vh] rounded-2xl shadow-2xl bg-white/95 p-12 flex flex-col items-center justify-center">
-                  <h2 className="text-4xl font-extrabold text-yellow-700 mb-8 text-center">Class Information</h2>
+                <Card className="w-full max-w-3xl rounded-3xl shadow-2xl bg-white/95 p-10 flex flex-col items-center border-2 border-blue-100">
+                  <h2 className="text-4xl font-extrabold text-blue-700 mb-8 text-center drop-shadow-lg tracking-tight">
+                    Class Information
+                  </h2>
                   <div className="w-full flex flex-col items-center">
                     <div className="mb-6 text-2xl font-semibold">
                       Class: <span className="text-blue-700">{student.className || student.classLevel}</span>
                     </div>
                     <div className="font-semibold mb-4 text-lg">Subjects Taking</div>
-                    <ul className="list-disc ml-8 text-gray-700 text-lg grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-2 w-full max-w-2xl">
+                    <ul className="grid grid-cols-2 sm:grid-cols-3 gap-3 w-full max-w-2xl">
                       {/* Placeholder for future scalability, replace with real data if available */}
-                      <li>Mathematics</li>
-                      <li>English</li>
-                      <li>Science</li>
-                      <li>Social Studies</li>
-                      <li>Computer Studies</li>
+                      <li className="bg-blue-100 text-blue-700 rounded-full px-4 py-2 font-medium text-center shadow">Mathematics</li>
+                      <li className="bg-blue-100 text-blue-700 rounded-full px-4 py-2 font-medium text-center shadow">English</li>
+                      <li className="bg-blue-100 text-blue-700 rounded-full px-4 py-2 font-medium text-center shadow">Science</li>
+                      <li className="bg-blue-100 text-blue-700 rounded-full px-4 py-2 font-medium text-center shadow">Social Studies</li>
+                      <li className="bg-blue-100 text-blue-700 rounded-full px-4 py-2 font-medium text-center shadow">Computer Studies</li>
                     </ul>
                   </div>
                 </Card>
@@ -852,43 +783,55 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
           {activeSection === "grades" && (
             <SectionBlock>
               <div className="w-full min-h-[75vh] flex items-center justify-center bg-gradient-to-br from-purple-50 via-white to-blue-50 py-12">
-                <Card className="w-[90vw] max-w-5xl min-h-[60vh] rounded-2xl shadow-2xl bg-white/95 p-12 flex flex-col items-center justify-center">
-                  <h2 className="text-4xl font-extrabold text-purple-800 mb-8 text-center">Academic Performance</h2>
+                <Card className="w-full max-w-3xl rounded-3xl shadow-2xl bg-white/95 p-10 flex flex-col items-center border-2 border-purple-100">
+                  <h2 className="text-4xl font-extrabold text-purple-800 mb-8 text-center drop-shadow-lg tracking-tight">
+                    Academic Performance
+                  </h2>
                   <div className="w-full">
-                    <div className="mb-4 text-gray-700 text-lg">Below are your term-based grades. Download your performance report for each term.</div>
-                    <table className="min-w-full text-sm border mb-6">
-                      <thead>
-                        <tr className="bg-gray-100">
-                          <th className="px-4 py-2 border">Term</th>
-                          <th className="px-4 py-2 border">Average Grade</th>
-                          <th className="px-4 py-2 border">Download Report</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {/* Placeholder data, replace with real grades if available */}
-                        <tr>
-                          <td className="px-4 py-2 border">Term 1</td>
-                          <td className="px-4 py-2 border">B+</td>
-                          <td className="px-4 py-2 border">
-                            <a href="#" className="text-blue-600 underline">Download Performance Report</a>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="px-4 py-2 border">Term 2</td>
-                          <td className="px-4 py-2 border">A-</td>
-                          <td className="px-4 py-2 border">
-                            <a href="#" className="text-blue-600 underline">Download Performance Report</a>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="px-4 py-2 border">Term 3</td>
-                          <td className="px-4 py-2 border">A</td>
-                          <td className="px-4 py-2 border">
-                            <a href="#" className="text-blue-600 underline">Download Performance Report</a>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
+                    <div className="mb-4 text-gray-700 text-lg">
+                      Below are your term-based grades. Download your performance report for each term.
+                    </div>
+                    <div className="overflow-x-auto rounded-xl shadow">
+                      <table className="min-w-full text-sm border mb-6 rounded-xl overflow-hidden">
+                        <thead>
+                          <tr className="bg-purple-100 text-purple-800">
+                            <th className="px-4 py-2 border">Term</th>
+                            <th className="px-4 py-2 border">Average Grade</th>
+                            <th className="px-4 py-2 border">Download Report</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {/* Placeholder data, replace with real grades if available */}
+                          <tr className="even:bg-purple-50">
+                            <td className="px-4 py-2 border font-medium">Term 1</td>
+                            <td className="px-4 py-2 border font-bold text-blue-700 text-lg">B+</td>
+                            <td className="px-4 py-2 border">
+                              <a href="#" className="text-blue-600 underline font-semibold hover:text-blue-800 transition">
+                                Download Performance Report
+                              </a>
+                            </td>
+                          </tr>
+                          <tr className="even:bg-purple-50">
+                            <td className="px-4 py-2 border font-medium">Term 2</td>
+                            <td className="px-4 py-2 border font-bold text-blue-700 text-lg">A-</td>
+                            <td className="px-4 py-2 border">
+                              <a href="#" className="text-blue-600 underline font-semibold hover:text-blue-800 transition">
+                                Download Performance Report
+                              </a>
+                            </td>
+                          </tr>
+                          <tr className="even:bg-purple-50">
+                            <td className="px-4 py-2 border font-medium">Term 3</td>
+                            <td className="px-4 py-2 border font-bold text-blue-700 text-lg">A</td>
+                            <td className="px-4 py-2 border">
+                              <a href="#" className="text-blue-600 underline font-semibold hover:text-blue-800 transition">
+                                Download Performance Report
+                              </a>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </Card>
               </div>
@@ -897,35 +840,68 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
           {activeSection === "settings" && (
             <SectionBlock>
               <div className="w-full min-h-[60vh] flex items-center justify-center bg-gradient-to-br from-gray-50 via-white to-blue-50 py-12">
-                <Card className="w-full max-w-3xl rounded-2xl shadow-2xl bg-white/95 p-10 flex flex-col items-center">
-                  <h2 className="text-3xl font-extrabold text-gray-800 mb-6 text-center">Account Settings</h2>
+                <Card className="w-full max-w-2xl rounded-3xl shadow-2xl bg-white/95 p-8 md:p-12 flex flex-col items-center border-2 border-blue-200">
+                  <h2 className="text-3xl font-extrabold text-blue-800 mb-8 text-center drop-shadow-lg tracking-tight">
+                    Account Settings
+                  </h2>
                   <div className="w-full">
-                    <div className="text-gray-500 mb-6">(Settings and preferences will appear here.)</div>
-                    <form onSubmit={handleChangePassword} className="space-y-4 max-w-md mx-auto bg-blue-50 p-6 rounded-xl shadow">
-                      <div className="text-lg font-semibold mb-2 flex items-center gap-2"><Key className="w-5 h-5" /> Change Password</div>
-                      <input
-                        type="password"
-                        className="w-full border rounded px-3 py-2"
-                        placeholder="Old Password"
-                        value={oldPassword}
-                        onChange={e => setOldPassword(e.target.value)}
-                      />
-                      <input
-                        type="password"
-                        className="w-full border rounded px-3 py-2"
-                        placeholder="New Password"
-                        value={newPassword}
-                        onChange={e => setNewPassword(e.target.value)}
-                      />
-                      <input
-                        type="password"
-                        className="w-full border rounded px-3 py-2"
-                        placeholder="Confirm New Password"
-                        value={confirmPassword}
-                        onChange={e => setConfirmPassword(e.target.value)}
-                      />
-                      {passwordMsg && <div className={`text-sm ${passwordMsg.includes("success") ? "text-green-600" : "text-red-600"}`}>{passwordMsg}</div>}
-                      <Button type="submit" className="w-full">Change Password</Button>
+                    <form
+                      onSubmit={handleChangePassword}
+                      className="space-y-6 max-w-md mx-auto bg-blue-50 p-6 rounded-2xl shadow"
+                    >
+                      <div className="text-lg font-semibold mb-2 flex items-center gap-2">
+                        <Key className="w-5 h-5" /> Change Password
+                      </div>
+                      <div className="flex flex-col gap-4">
+                        <div>
+                          <label className="block font-medium text-gray-700 mb-1">Old Password</label>
+                          <input
+                            type="password"
+                            className="w-full border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
+                            placeholder="Enter old password"
+                            value={oldPassword}
+                            onChange={e => setOldPassword(e.target.value)}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block font-medium text-gray-700 mb-1">New Password</label>
+                          <input
+                            type="password"
+                            className="w-full border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
+                            placeholder="Enter new password"
+                            value={newPassword}
+                            onChange={e => setNewPassword(e.target.value)}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block font-medium text-gray-700 mb-1">Confirm New Password</label>
+                          <input
+                            type="password"
+                            className="w-full border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
+                            placeholder="Confirm new password"
+                            value={confirmPassword}
+                            onChange={e => setConfirmPassword(e.target.value)}
+                            required
+                          />
+                        </div>
+                      </div>
+                      {passwordMsg && (
+                        <div
+                          className={`text-sm ${
+                            passwordMsg.includes("success") ? "text-green-600" : "text-red-600"
+                          }`}
+                        >
+                          {passwordMsg}
+                        </div>
+                      )}
+                      <Button
+                        type="submit"
+                        className="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 px-8 rounded-xl text-lg shadow"
+                      >
+                        Update Password
+                      </Button>
                     </form>
                   </div>
                 </Card>
@@ -979,6 +955,28 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
             >
               Close
             </button>
+          </div>
+        </div>
+      )}
+      {showLogoutModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
+            <h2 className="text-2xl font-bold text-blue-700 mb-4">Confirm Logout</h2>
+            <p className="mb-6 text-gray-700">Are you sure you want to log out?</p>
+            <div className="flex gap-4 justify-center">
+              <Button
+                variant="outline"
+                onClick={() => setShowLogoutModal(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleLogout}
+              >
+                Logout
+              </Button>
+            </div>
           </div>
         </div>
       )}

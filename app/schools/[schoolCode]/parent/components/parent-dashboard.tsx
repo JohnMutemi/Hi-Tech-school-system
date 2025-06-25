@@ -57,6 +57,7 @@ export function ParentDashboard({ schoolCode, parentId }: { schoolCode: string; 
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [selectedFeeStructure, setSelectedFeeStructure] = useState<FeeStructure | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   useEffect(() => {
     async function fetchSession() {
@@ -421,23 +422,30 @@ export function ParentDashboard({ schoolCode, parentId }: { schoolCode: string; 
   };
 
   const ChildrenManagement = () => (
-    <Card>
+    <Card className="w-full max-w-3xl rounded-3xl shadow-2xl bg-white/95 p-8 md:p-12 border-2 border-blue-200 mx-auto">
       <CardHeader>
-        <CardTitle>My Children</CardTitle>
-        <CardDescription>Overview of your children's details and fee status.</CardDescription>
+        <CardTitle className="text-3xl font-extrabold text-blue-800 mb-2 text-center drop-shadow-lg tracking-tight">
+          My Children
+        </CardTitle>
+        <CardDescription className="text-center text-gray-500 mb-6">
+          Overview of your children's details and fee status.
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
+        <div className="space-y-6">
           {students.map((student) => {
             const feeStructure = getStudentFeeStructure(student.className || student.classLevel);
             return (
-              <Card key={student.id} className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <Card
+                key={student.id}
+                className="p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 rounded-2xl border shadow-md"
+              >
                 <div className="flex items-center gap-4">
-                  <Avatar className="w-16 h-16">
-                    <img src={student.avatarUrl || "/placeholder-user.jpg"} alt={student.name} />
+                  <Avatar className="w-16 h-16 ring-2 ring-blue-200">
+                    <img src={student.avatarUrl || '/placeholder-user.jpg'} alt={student.name} />
                   </Avatar>
                   <div>
-                    <h3 className="font-bold text-lg">{student.name}</h3>
+                    <h3 className="font-bold text-lg text-blue-800">{student.name}</h3>
                     <p className="text-sm text-gray-600">
                       Class: {student.className} | Adm No: {student.admissionNumber}
                     </p>
@@ -445,14 +453,23 @@ export function ParentDashboard({ schoolCode, parentId }: { schoolCode: string; 
                 </div>
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
                   {feeStructure ? (
-                    <Button onClick={() => handleOpenPaymentModal(student)} className="w-full sm:w-auto">
+                    <Button
+                      onClick={() => handleOpenPaymentModal(student)}
+                      className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-xl shadow"
+                    >
                       <DollarSign className="w-4 h-4 mr-2" />
                       Pay KES {feeStructure.totalAmount.toLocaleString()}
                     </Button>
                   ) : (
-                    <Badge variant="outline">No Fee Structure</Badge>
+                    <Badge variant="outline" className="text-blue-700 border-blue-300">
+                      No Fee Structure
+                    </Badge>
                   )}
-                  <Button variant="outline" className="w-full sm:w-auto" onClick={() => router.push(`/schools/${schoolCode}/student/${student.id}`)}>
+                  <Button
+                    variant="outline"
+                    className="w-full sm:w-auto border-blue-200"
+                    onClick={() => router.push(`/schools/${schoolCode}/student/${student.id}`)}
+                  >
                     View Dashboard
                   </Button>
                 </div>
@@ -465,60 +482,132 @@ export function ParentDashboard({ schoolCode, parentId }: { schoolCode: string; 
   );
 
   const PaymentsHistory = () => (
-    <Card>
+    <Card className="w-full max-w-3xl rounded-3xl shadow-2xl bg-white/95 p-8 md:p-12 border-2 border-green-200 mx-auto mt-10">
       <CardHeader>
-        <CardTitle>Payments History</CardTitle>
-        <CardDescription>A log of all payments made for your children.</CardDescription>
+        <CardTitle className="text-3xl font-extrabold text-green-800 mb-2 text-center drop-shadow-lg tracking-tight">
+          Payments History
+        </CardTitle>
+        <CardDescription className="text-center text-gray-500 mb-6">
+          A log of all payments made for your children.
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Student</TableHead>
-                <TableHead>Amount (KES)</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Receipt No.</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {receipts.map((receipt) => (
-                <TableRow key={receipt.id}>
-                  <TableCell>{students.find(s => s.id === receipt.studentId)?.name || 'N/A'}</TableCell>
-                  <TableCell>{receipt.amount.toLocaleString()}</TableCell>
-                  <TableCell>{new Date(receipt.paymentDate).toLocaleDateString()}</TableCell>
-                  <TableCell>{receipt.receiptNumber}</TableCell>
-                  <TableCell>
-                    <Button variant="outline" size="sm" onClick={() => setSelectedReceipt(receipt)}>
-                      View Receipt
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <div className="overflow-x-auto rounded-xl shadow bg-gray-50">
+          <table className="min-w-full text-sm rounded-xl overflow-hidden">
+            <thead>
+              <tr className="bg-green-100 text-green-800">
+                <th className="px-4 py-2 border">Student</th>
+                <th className="px-4 py-2 border">Amount (KES)</th>
+                <th className="px-4 py-2 border">Date</th>
+                <th className="px-4 py-2 border">Receipt No.</th>
+                <th className="px-4 py-2 border">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {receipts.length > 0 ? (
+                receipts.map((receipt) => (
+                  <tr key={receipt.id} className="even:bg-green-50">
+                    <td className="px-4 py-2 border font-medium">
+                      {students.find((s) => s.id === receipt.studentId)?.name || 'N/A'}
+                    </td>
+                    <td className="px-4 py-2 border font-bold text-green-700">
+                      {receipt.amount.toLocaleString()}
+                    </td>
+                    <td className="px-4 py-2 border">
+                      {new Date(receipt.paymentDate).toLocaleDateString()}
+                    </td>
+                    <td className="px-4 py-2 border">{receipt.receiptNumber}</td>
+                    <td className="px-4 py-2 border">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSelectedReceipt(receipt)}
+                        className="text-green-700 border-green-200 hover:bg-green-100"
+                      >
+                        View Receipt
+                      </Button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={5} className="text-center py-8 text-gray-500">
+                    No payment history found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </CardContent>
     </Card>
   );
 
   const ProfileSettings = () => (
-    <Card>
+    <Card className="w-full max-w-2xl rounded-3xl shadow-2xl bg-white/95 p-8 md:p-12 border-2 border-blue-200 mx-auto mt-10">
       <CardHeader>
-        <CardTitle>Profile & Security</CardTitle>
-        <CardDescription>Manage your contact information and password.</CardDescription>
+        <CardTitle className="text-3xl font-extrabold text-blue-800 mb-2 text-center drop-shadow-lg tracking-tight">
+          Profile & Security
+        </CardTitle>
+        <CardDescription className="text-center text-gray-500 mb-6">
+          Manage your contact information and password.
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleChangePassword} className="space-y-4">
-          <h3 className="font-semibold">Change Password</h3>
-          <div className="grid sm:grid-cols-3 gap-4">
-            <Input type="password" placeholder="Old Password" value={oldPassword} onChange={e => setOldPassword(e.target.value)} required />
-            <Input type="password" placeholder="New Password" value={newPassword} onChange={e => setNewPassword(e.target.value)} required />
-            <Input type="password" placeholder="Confirm New Password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required />
+        <form onSubmit={handleChangePassword} className="space-y-8 max-w-md mx-auto bg-blue-50 p-6 rounded-2xl shadow">
+          <h3 className="font-semibold text-lg flex items-center gap-2 mb-4">
+            <Key className="w-5 h-5" /> Change Password
+          </h3>
+          <div className="flex flex-col gap-4">
+            <div>
+              <label className="block font-medium text-gray-700 mb-1">Old Password</label>
+              <input
+                type="password"
+                className="w-full border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
+                placeholder="Enter old password"
+                value={oldPassword}
+                onChange={e => setOldPassword(e.target.value)}
+                required
+              />
+            </div>
+            <div>
+              <label className="block font-medium text-gray-700 mb-1">New Password</label>
+              <input
+                type="password"
+                className="w-full border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
+                placeholder="Enter new password"
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+                required
+              />
+            </div>
+            <div>
+              <label className="block font-medium text-gray-700 mb-1">Confirm New Password</label>
+              <input
+                type="password"
+                className="w-full border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
+                placeholder="Confirm new password"
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                required
+              />
+            </div>
           </div>
-          {passwordMsg && <p className="text-sm">{passwordMsg}</p>}
-          <Button type="submit">Update Password</Button>
+          {passwordMsg && (
+            <div
+              className={`text-sm ${
+                passwordMsg.includes('success') ? 'text-green-600' : 'text-red-600'
+              }`}
+            >
+              {passwordMsg}
+            </div>
+          )}
+          <Button
+            type="submit"
+            className="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 px-8 rounded-xl text-lg shadow mt-4"
+          >
+            Update Password
+          </Button>
         </form>
       </CardContent>
     </Card>
@@ -541,7 +630,7 @@ export function ParentDashboard({ schoolCode, parentId }: { schoolCode: string; 
           </Button>
         </nav>
         <div className="absolute bottom-4 left-4 right-4">
-          <Button variant="outline" className="w-full" onClick={handleLogout}>
+          <Button variant="outline" className="w-full" onClick={() => setShowLogoutModal(true)}>
             <LogOut className="w-4 h-4 mr-2" /> Logout
           </Button>
         </div>
@@ -581,6 +670,28 @@ export function ParentDashboard({ schoolCode, parentId }: { schoolCode: string; 
           onPaymentSuccess={handlePaymentSuccess}
           onPaymentError={handlePaymentError}
         />
+      )}
+      {showLogoutModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
+            <h2 className="text-2xl font-bold text-blue-700 mb-4">Confirm Logout</h2>
+            <p className="mb-6 text-gray-700">Are you sure you want to log out?</p>
+            <div className="flex gap-4 justify-center">
+              <Button
+                variant="outline"
+                onClick={() => setShowLogoutModal(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleLogout}
+              >
+                Logout
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
