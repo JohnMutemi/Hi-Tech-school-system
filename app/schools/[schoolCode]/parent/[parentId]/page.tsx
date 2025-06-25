@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Avatar } from "@/components/ui/avatar"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
-import { Camera, Users, DollarSign, Receipt, BarChart2, Key, LogOut, Calendar, AlertCircle, CheckCircle, Edit, Trash2, RefreshCw, Download, Eye } from "lucide-react"
+import { Camera, Users, DollarSign, Receipt, BarChart2, Key, LogOut, Calendar, AlertCircle, CheckCircle, Edit, Trash2, RefreshCw, Download, Eye, School } from "lucide-react"
 import { ReceiptView } from "@/components/ui/receipt-view"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableHeader, TableBody, TableCell, TableRow, TableHead } from "@/components/ui/table"
@@ -15,6 +15,7 @@ import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader,
 import { toast } from "@/components/ui/use-toast"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { PaymentModal } from "@/components/payment/payment-modal"
+import { Label } from "@/components/ui/label"
 
 interface FeeStructure {
   id: string
@@ -57,6 +58,8 @@ export default function ParentDashboardPage({ params }: { params: { schoolCode: 
   const [paymentModalOpen, setPaymentModalOpen] = useState(false)
   const [selectedStudent, setSelectedStudent] = useState<any>(null)
   const [selectedFeeStructure, setSelectedFeeStructure] = useState<FeeStructure | null>(null)
+
+  const [showLogoutModal, setShowLogoutModal] = useState(false)
 
   useEffect(() => {
     async function fetchSession() {
@@ -413,9 +416,12 @@ export default function ParentDashboardPage({ params }: { params: { schoolCode: 
                 <p className="text-sm text-gray-500">Parent Dashboard</p>
               </div>
             </div>
-            <Button onClick={handleLogout} variant="outline" className="flex items-center gap-2">
-              <LogOut className="w-4 h-4" />
-              Logout
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => setShowLogoutModal(true)}
+            >
+              <LogOut className="w-4 h-4 mr-2" /> Logout
             </Button>
           </div>
         </div>
@@ -626,52 +632,73 @@ export default function ParentDashboardPage({ params }: { params: { schoolCode: 
           <TabsContent value="settings" className="space-y-6">
             <h2 className="text-2xl font-bold text-gray-900">Account Settings</h2>
             
-            <Card>
-              <CardHeader>
-                <CardTitle>Change Password</CardTitle>
-                <CardDescription>Update your account password</CardDescription>
+            <Card className="w-full max-w-2xl mx-auto rounded-3xl shadow-2xl border-2 border-blue-200 bg-white/95 p-6 md:p-10">
+              <CardHeader className="flex flex-col items-center">
+                <div className="w-16 h-16 flex items-center justify-center rounded-full bg-blue-100 mb-4">
+                  <School className="w-8 h-8 text-blue-600" />
+                </div>
+                <CardTitle className="text-2xl font-extrabold text-blue-800 mb-2 text-center drop-shadow-lg tracking-tight">
+                  Profile & Security
+                </CardTitle>
+                <CardDescription className="text-center text-gray-500 mb-6">
+                  Manage your contact information and password.
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleChangePassword} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Current Password
-                    </label>
-                    <Input
-                      type="password"
-                      value={oldPassword}
-                      onChange={(e) => setOldPassword(e.target.value)}
-                      placeholder="Enter current password"
-                    />
-                  </div>
-                  <div>
-                    <label className="blockText-sm font-medium text-gray-700 mb-1">
-                      New Password
-                    </label>
-                    <Input
-                      type="password"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="Enter new password"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Confirm New Password
-                    </label>
-                    <Input
-                      type="password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="Confirm new password"
-                    />
+                <form onSubmit={handleChangePassword} className="space-y-8 max-w-md mx-auto bg-blue-50 p-6 rounded-2xl shadow">
+                  <h3 className="font-semibold text-lg flex items-center gap-2 mb-4">
+                    <Key className="w-5 h-5" /> Change Password
+                  </h3>
+                  <div className="flex flex-col gap-4">
+                    <div>
+                      <label className="block font-medium text-gray-700 mb-1">Old Password</label>
+                      <input
+                        type="password"
+                        className="w-full border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
+                        placeholder="Enter old password"
+                        value={oldPassword}
+                        onChange={e => setOldPassword(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-medium text-gray-700 mb-1">New Password</label>
+                      <input
+                        type="password"
+                        className="w-full border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
+                        placeholder="Enter new password"
+                        value={newPassword}
+                        onChange={e => setNewPassword(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-medium text-gray-700 mb-1">Confirm New Password</label>
+                      <input
+                        type="password"
+                        className="w-full border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
+                        placeholder="Confirm new password"
+                        value={confirmPassword}
+                        onChange={e => setConfirmPassword(e.target.value)}
+                        required
+                      />
+                    </div>
                   </div>
                   {passwordMsg && (
-                    <div className={`text-sm ${passwordMsg.includes("success") ? "text-green-600" : "text-red-600"}`}>
+                    <div
+                      className={`text-sm ${
+                        passwordMsg.includes('success') ? 'text-green-600' : 'text-red-600'
+                      }`}
+                    >
                       {passwordMsg}
                     </div>
                   )}
-                  <Button type="submit">Change Password</Button>
+                  <Button
+                    type="submit"
+                    className="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 px-8 rounded-xl text-lg shadow mt-4"
+                  >
+                    Update Password
+                  </Button>
                 </form>
               </CardContent>
             </Card>
@@ -690,8 +717,6 @@ export default function ParentDashboardPage({ params }: { params: { schoolCode: 
           }}
           studentId={selectedStudent.id}
           schoolCode={schoolCode}
-          onSuccess={handlePaymentSuccess}
-          onError={handlePaymentError}
         />
       )}
 
@@ -704,6 +729,29 @@ export default function ParentDashboardPage({ params }: { params: { schoolCode: 
           admissionNumber={selectedReceipt.admissionNumber}
           onClose={() => setSelectedReceipt(null)}
         />
+      )}
+
+      {showLogoutModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
+            <h2 className="text-2xl font-bold text-blue-700 mb-4">Confirm Logout</h2>
+            <p className="mb-6 text-gray-700">Are you sure you want to log out?</p>
+            <div className="flex gap-4 justify-center">
+              <Button
+                variant="outline"
+                onClick={() => setShowLogoutModal(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleLogout}
+              >
+                Logout
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

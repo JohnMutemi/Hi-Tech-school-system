@@ -24,10 +24,10 @@ export default function SuperAdminPage() {
   }
 
   return (
-    <div>
-      <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-          <h1 className="text-xl font-semibold text-gray-900">Super Admin Dashboard</h1>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      <header className="bg-white shadow-sm sticky top-0 z-20">
+        <div className="max-w-7xl mx-auto py-4 px-4 flex justify-between items-center">
+          <h1 className="text-xl font-bold text-blue-800">Super Admin Dashboard</h1>
           <button
             onClick={async () => {
               await fetch('/api/superadmin/logout', { method: 'POST' })
@@ -39,10 +39,8 @@ export default function SuperAdminPage() {
           </button>
         </div>
       </header>
-      <main>
-        <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-          <SuperAdminDashboard />
-        </div>
+      <main className="max-w-3xl mx-auto py-6 px-2 sm:px-4 flex flex-col gap-6">
+        <SuperAdminDashboard />
       </main>
     </div>
   )

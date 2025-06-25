@@ -7,9 +7,9 @@ export function Footer() {
   return (
     <footer className="bg-gray-900 text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid md:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* Company Info */}
-          <div className="space-y-4">
+          <div className="md:col-span-2 lg:col-span-1 space-y-4">
             <div className="flex items-center space-x-2">
               <div className="relative">
                 {/* Main logo container */}
@@ -34,10 +34,16 @@ export function Footer() {
               Empowering educational institutions with cutting-edge technology and comprehensive management solutions
               for the digital age.
             </p>
-            <div className="flex space-x-4">
-              <Facebook className="w-5 h-5 text-gray-400 hover:text-white cursor-pointer" />
-              <Twitter className="w-5 h-5 text-gray-400 hover:text-white cursor-pointer" />
-              <Instagram className="w-5 h-5 text-gray-400 hover:text-white cursor-pointer" />
+            <div className="flex space-x-4 pt-2">
+              <a href="#" aria-label="Facebook" className="text-gray-400 hover:text-white transition-colors">
+                <Facebook className="w-5 h-5" />
+              </a>
+              <a href="#" aria-label="Twitter" className="text-gray-400 hover:text-white transition-colors">
+                <Twitter className="w-5 h-5" />
+              </a>
+              <a href="#" aria-label="Instagram" className="text-gray-400 hover:text-white transition-colors">
+                <Instagram className="w-5 h-5" />
+              </a>
             </div>
           </div>
 
@@ -122,15 +128,15 @@ export function Footer() {
             <h4 className="text-lg font-semibold mb-4">Contact Info</h4>
             <div className="space-y-3 text-sm">
               <div className="flex items-center space-x-3">
-                <Phone className="w-4 h-4 text-blue-500" />
+                <Phone className="w-4 h-4 text-blue-500 flex-shrink-0" />
                 <span className="text-gray-400">+254 112 240 468</span>
               </div>
               <div className="flex items-center space-x-3">
-                <Mail className="w-4 h-4 text-blue-500" />
+                <Mail className="w-4 h-4 text-blue-500 flex-shrink-0" />
                 <span className="text-gray-400">info@hitechsms.co.ke</span>
               </div>
               <div className="flex items-center space-x-3">
-                <MapPin className="w-4 h-4 text-red-500" />
+                <MapPin className="w-4 h-4 text-red-500 flex-shrink-0" />
                 <span className="text-gray-400">Nairobi, Kenya</span>
               </div>
             </div>
@@ -139,8 +145,9 @@ export function Footer() {
 
         <div className="border-t border-gray-800 mt-8 pt-8 text-center text-sm text-gray-400">
           <p>
-            &copy; 2024 Hi-Tech School Management Software. All rights reserved. Built with ❤️ for educational
-            excellence.
+            &copy; {new Date().getFullYear()} Hi-Tech School Management Software. All rights reserved.
+            <br className="sm:hidden" />
+            Built with ❤️ for educational excellence.
           </p>
         </div>
       </div>
