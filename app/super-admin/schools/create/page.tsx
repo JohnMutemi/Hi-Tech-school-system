@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { createSchool } from "@/lib/actions/school-actions"
+import { createSchoolClient } from "@/lib/actions/school-actions"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
@@ -17,7 +17,7 @@ export default function CreateSchoolPage() {
   async function handleSubmit(formData: FormData) {
     setIsLoading(true)
     try {
-      const result = await createSchool(formData)
+      const result = await createSchoolClient(formData)
       if (result?.error) {
         toast.error(result.error)
       } else {
