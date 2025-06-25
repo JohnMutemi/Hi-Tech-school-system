@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Avatar } from "@/components/ui/avatar"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
-import { Camera, Users, DollarSign, Receipt, BarChart2, Key, LogOut, Calendar, AlertCircle, CheckCircle, Edit, Trash2, RefreshCw, Download, Eye } from "lucide-react"
+import { Camera, Users, DollarSign, Receipt, BarChart2, Key, LogOut, Calendar, AlertCircle, CheckCircle, Edit, Trash2, RefreshCw, Download, Eye, School } from "lucide-react"
 import { ReceiptView } from "@/components/ui/receipt-view"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableHeader, TableBody, TableCell, TableRow, TableHead } from "@/components/ui/table"
@@ -15,6 +15,7 @@ import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader,
 import { toast } from "@/components/ui/use-toast"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { PaymentModal } from "@/components/payment/payment-modal"
+import { Label } from "@/components/ui/label"
 
 interface FeeStructure {
   id: string
@@ -631,9 +632,12 @@ export default function ParentDashboardPage({ params }: { params: { schoolCode: 
           <TabsContent value="settings" className="space-y-6">
             <h2 className="text-2xl font-bold text-gray-900">Account Settings</h2>
             
-            <Card className="w-full max-w-2xl rounded-3xl shadow-2xl bg-white/95 p-8 md:p-12 border-2 border-blue-200 mx-auto mt-10">
-              <CardHeader>
-                <CardTitle className="text-3xl font-extrabold text-blue-800 mb-2 text-center drop-shadow-lg tracking-tight">
+            <Card className="w-full max-w-2xl mx-auto rounded-3xl shadow-2xl border-2 border-blue-200 bg-white/95 p-6 md:p-10">
+              <CardHeader className="flex flex-col items-center">
+                <div className="w-16 h-16 flex items-center justify-center rounded-full bg-blue-100 mb-4">
+                  <School className="w-8 h-8 text-blue-600" />
+                </div>
+                <CardTitle className="text-2xl font-extrabold text-blue-800 mb-2 text-center drop-shadow-lg tracking-tight">
                   Profile & Security
                 </CardTitle>
                 <CardDescription className="text-center text-gray-500 mb-6">
@@ -713,8 +717,6 @@ export default function ParentDashboardPage({ params }: { params: { schoolCode: 
           }}
           studentId={selectedStudent.id}
           schoolCode={schoolCode}
-          onSuccess={handlePaymentSuccess}
-          onError={handlePaymentError}
         />
       )}
 
