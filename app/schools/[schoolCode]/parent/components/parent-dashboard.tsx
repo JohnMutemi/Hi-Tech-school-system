@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { Camera, Users, DollarSign, Receipt, BarChart2, Key, LogOut, Calendar, AlertCircle, CheckCircle, Edit, Trash2, RefreshCw, Download } from "lucide-react";
+import { Camera, Users, DollarSign, Receipt, BarChart2, Key, LogOut, Calendar, AlertCircle, CheckCircle, Edit, Trash2, RefreshCw, Download, Menu } from "lucide-react";
 import { ReceiptView } from "@/components/ui/receipt-view";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableBody, TableCell, TableRow, TableHead } from "@/components/ui/table";
@@ -56,6 +56,7 @@ export function ParentDashboard({ schoolCode, parentId }: { schoolCode: string; 
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [selectedFeeStructure, setSelectedFeeStructure] = useState<FeeStructure | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
     async function fetchSession() {
@@ -360,20 +361,26 @@ export function ParentDashboard({ schoolCode, parentId }: { schoolCode: string; 
 
   // Handle receipt download
   const handleDownloadReceipt = (receipt: any) => {
-    // In a real implementation, this would download the receipt as PDF
-    toast({ 
-      title: "Download Started", 
-      description: "Receipt download has been initiated.",
-      variant: "default" 
-    });
+    // This is a placeholder. In a real app, you'd generate a PDF.
+    const receiptContent = `
+      Receipt for: ${receipt.student.name}
+      Amount: KES ${receipt.amount}
+      Date: ${new Date(receipt.date).toLocaleDateString()}
+    `;
+    const blob = new Blob([receiptContent], { type: "text/plain" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `receipt-${receipt.id}.txt`;
+    link.click();
+    URL.revokeObjectURL(link.href);
   };
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading parent dashboard...</p>
+      <div className="flex items-center justify-center min-h-screen bg-gray-100">
+        <div className="flex flex-col items-center space-y-4">
+          <RefreshCw className="w-12 h-12 text-blue-600 animate-spin" />
+          <p className="text-lg text-gray-700">Loading Parent Portal...</p>
         </div>
       </div>
     );
@@ -381,328 +388,198 @@ export function ParentDashboard({ schoolCode, parentId }: { schoolCode: string; 
 
   if (!parent) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-600">Parent not found. Redirecting to login...</p>
-        </div>
+      <div className="flex items-center justify-center min-h-screen bg-gray-100 p-4">
+        <Card className="w-full max-w-md text-center shadow-lg">
+          <CardHeader>
+            <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+            <CardTitle className="text-2xl">Access Denied</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-gray-600 mb-6">
+              You are not logged in or your session has expired. Please log in to access the parent portal.
+            </p>
+            <Button onClick={() => router.push(`/schools/${schoolCode}/parent/login`)}>
+              Go to Login
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-4">
-              <Avatar className="w-12 h-12">
-                <img
-                  src={parent.avatarUrl || "/placeholder-user.jpg"}
-                  alt={parent.name}
-                  className="rounded-full object-cover w-full h-full"
-                />
-                <label className="absolute bottom-0 right-0 bg-blue-600 text-white rounded-full p-1 cursor-pointer shadow-md">
-                  <input type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} disabled={avatarUploading} />
-                  <Camera className="w-4 h-4" />
-                </label>
-              </Avatar>
-              <div>
-                <h1 className="text-xl font-semibold text-gray-900">{parent.name}</h1>
-                <p className="text-sm text-gray-500">Parent Dashboard</p>
-              </div>
-            </div>
-            <Button onClick={handleLogout} variant="outline" className="flex items-center gap-2">
-              <LogOut className="w-4 h-4" />
-              Logout
-            </Button>
-          </div>
+  const renderContent = () => {
+    switch (activeTab) {
+      case "children":
+        return <ChildrenManagement />;
+      case "payments":
+        return <PaymentsHistory />;
+      case "profile":
+        return <ProfileSettings />;
+      default:
+        return <ChildrenManagement />;
+    }
+  };
+
+  const ChildrenManagement = () => (
+    <Card>
+      <CardHeader>
+        <CardTitle>My Children</CardTitle>
+        <CardDescription>Overview of your children's details and fee status.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {students.map((student) => {
+            const feeStructure = getStudentFeeStructure(student.className || student.classLevel);
+            return (
+              <Card key={student.id} className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <Avatar className="w-16 h-16">
+                    <img src={student.avatarUrl || "/placeholder-user.jpg"} alt={student.name} />
+                  </Avatar>
+                  <div>
+                    <h3 className="font-bold text-lg">{student.name}</h3>
+                    <p className="text-sm text-gray-600">
+                      Class: {student.className} | Adm No: {student.admissionNumber}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
+                  {feeStructure ? (
+                    <Button onClick={() => handleOpenPaymentModal(student)} className="w-full sm:w-auto">
+                      <DollarSign className="w-4 h-4 mr-2" />
+                      Pay KES {feeStructure.totalAmount.toLocaleString()}
+                    </Button>
+                  ) : (
+                    <Badge variant="outline">No Fee Structure</Badge>
+                  )}
+                  <Button variant="outline" className="w-full sm:w-auto" onClick={() => router.push(`/schools/${schoolCode}/student/${student.id}`)}>
+                    View Dashboard
+                  </Button>
+                </div>
+              </Card>
+            );
+          })}
         </div>
-      </header>
+      </CardContent>
+    </Card>
+  );
+
+  const PaymentsHistory = () => (
+    <Card>
+      <CardHeader>
+        <CardTitle>Payments History</CardTitle>
+        <CardDescription>A log of all payments made for your children.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Student</TableHead>
+                <TableHead>Amount (KES)</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Receipt No.</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {receipts.map((receipt) => (
+                <TableRow key={receipt.id}>
+                  <TableCell>{students.find(s => s.id === receipt.studentId)?.name || 'N/A'}</TableCell>
+                  <TableCell>{receipt.amount.toLocaleString()}</TableCell>
+                  <TableCell>{new Date(receipt.paymentDate).toLocaleDateString()}</TableCell>
+                  <TableCell>{receipt.receiptNumber}</TableCell>
+                  <TableCell>
+                    <Button variant="outline" size="sm" onClick={() => setSelectedReceipt(receipt)}>
+                      View Receipt
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const ProfileSettings = () => (
+    <Card>
+      <CardHeader>
+        <CardTitle>Profile & Security</CardTitle>
+        <CardDescription>Manage your contact information and password.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleChangePassword} className="space-y-4">
+          <h3 className="font-semibold">Change Password</h3>
+          <div className="grid sm:grid-cols-3 gap-4">
+            <Input type="password" placeholder="Old Password" value={oldPassword} onChange={e => setOldPassword(e.target.value)} required />
+            <Input type="password" placeholder="New Password" value={newPassword} onChange={e => setNewPassword(e.target.value)} required />
+            <Input type="password" placeholder="Confirm New Password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required />
+          </div>
+          {passwordMsg && <p className="text-sm">{passwordMsg}</p>}
+          <Button type="submit">Update Password</Button>
+        </form>
+      </CardContent>
+    </Card>
+  );
+
+  return (
+    <div className="flex min-h-screen bg-gray-50">
+      {/* Sidebar */}
+      <aside className={`fixed inset-y-0 left-0 z-20 w-64 bg-white border-r p-4 transform transition-transform md:relative md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <h2 className="font-bold text-xl mb-6">Parent Portal</h2>
+        <nav className="space-y-2">
+          <Button variant={activeTab === 'children' ? 'secondary' : 'ghost'} className="w-full justify-start" onClick={() => setActiveTab('children')}>
+            <Users className="w-4 h-4 mr-2" /> My Children
+          </Button>
+          <Button variant={activeTab === 'payments' ? 'secondary' : 'ghost'} className="w-full justify-start" onClick={() => setActiveTab('payments')}>
+            <Receipt className="w-4 h-4 mr-2" /> Payments
+          </Button>
+          <Button variant={activeTab === 'profile' ? 'secondary' : 'ghost'} className="w-full justify-start" onClick={() => setActiveTab('profile')}>
+            <Key className="w-4 h-4 mr-2" /> Profile
+          </Button>
+        </nav>
+        <div className="absolute bottom-4 left-4 right-4">
+          <Button variant="outline" className="w-full" onClick={handleLogout}>
+            <LogOut className="w-4 h-4 mr-2" /> Logout
+          </Button>
+        </div>
+      </aside>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="children" className="flex items-center gap-2">
-              <Users className="w-4 h-4" />
-              My Children
-            </TabsTrigger>
-            <TabsTrigger value="finance" className="flex items-center gap-2">
-              <DollarSign className="w-4 h-4" />
-              Finances
-            </TabsTrigger>
-            <TabsTrigger value="receipts" className="flex items-center gap-2">
-              <Receipt className="w-4 h-4" />
-              Receipts
-            </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center gap-2">
-              <Key className="w-4 h-4" />
-              Settings
-            </TabsTrigger>
-          </TabsList>
+      <div className="flex-1 flex flex-col">
+        <header className="bg-white border-b p-4 flex justify-between items-center sticky top-0 z-10">
+          <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
+            <Menu />
+          </Button>
+          <h1 className="font-semibold text-lg">{parent.name}</h1>
+          <Avatar>
+            <img src={avatarUrl || parent.avatarUrl || "/placeholder-user.jpg"} alt={parent.name} />
+          </Avatar>
+        </header>
 
-          {/* My Children Tab */}
-          <TabsContent value="children" className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-gray-900">My Children</h2>
-              <Button onClick={handleRefreshFees} variant="outline" className="flex items-center gap-2">
-                <RefreshCw className="w-4 h-4" />
-                Refresh Fees
-              </Button>
-            </div>
-            
-            {students.length === 0 ? (
-              <Card>
-                <CardContent className="text-center py-12">
-                  <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No children found</h3>
-                  <p className="text-gray-500">No children are currently registered under this parent account.</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {students.map((student) => {
-                  const feeStructure = getStudentFeeStructure(student.className || student.classLevel);
-                  return (
-                    <Card key={student.id} className="hover:shadow-lg transition-shadow">
-                      <CardHeader>
-                        <div className="flex items-center justify-between">
-                          <CardTitle className="text-lg">{student.name}</CardTitle>
-                          <Badge variant={student.status === 'active' ? 'default' : 'secondary'}>
-                            {student.status}
-                          </Badge>
-                        </div>
-                        <CardDescription>
-                          Class: {student.className || student.classLevel} | Admission: {student.admissionNumber}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-600">Fee Structure:</span>
-                          <span className="font-medium">
-                            {feeStructure ? `${feeStructure.term} ${feeStructure.year}` : 'Not Available'}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-600">Total Fees:</span>
-                          <span className="font-medium">
-                            {feeStructure ? `KES ${feeStructure.totalAmount?.toLocaleString()}` : 'Not Set'}
-                          </span>
-                        </div>
-                        <Button 
-                          onClick={() => handleOpenPaymentModal(student)}
-                          disabled={!feeStructure}
-                          className="w-full"
-                        >
-                          <DollarSign className="w-4 h-4 mr-2" />
-                          Pay Fees
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
-          </TabsContent>
+        <main className="flex-grow p-4 md:p-6">
+          {renderContent()}
+        </main>
+      </div>
 
-          {/* Finance Tab */}
-          <TabsContent value="finance" className="space-y-6">
-            <h2 className="text-2xl font-bold text-gray-900">Financial Overview</h2>
-            
-            {loadingFees ? (
-              <Card>
-                <CardContent className="text-center py-12">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                  <p className="text-gray-600">Loading fee structures...</p>
-                </CardContent>
-              </Card>
-            ) : feeStructures.length === 0 ? (
-              <Card>
-                <CardContent className="text-center py-12">
-                  <AlertCircle className="w-12 h-12 text-orange-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No fee structures available</h3>
-                  <p className="text-gray-500">Fee structures for your children's classes have not been set up yet.</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {feeStructures.map((feeStructure) => (
-                  <Card key={feeStructure.id}>
-                    <CardHeader>
-                      <CardTitle className="text-lg">{feeStructure.classLevel}</CardTitle>
-                      <CardDescription>
-                        {feeStructure.term} {feeStructure.year}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600">Total Amount:</span>
-                          <span className="font-semibold text-lg">
-                            KES {feeStructure.totalAmount?.toLocaleString()}
-                          </span>
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          Breakdown:
-                        </div>
-                        {Object.entries(feeStructure.breakdown || {}).map(([key, value]) => (
-                          <div key={key} className="flex justify-between text-xs">
-                            <span className="capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
-                            <span>KES {value?.toLocaleString()}</span>
-                          </div>
-                        ))}
-                        <div className="flex items-center justify-between text-xs">
-                          <span>Status:</span>
-                          <Badge variant={feeStructure.isActive ? 'default' : 'secondary'}>
-                            {feeStructure.isActive ? 'Active' : 'Inactive'}
-                          </Badge>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          {/* Receipts Tab */}
-          <TabsContent value="receipts" className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-gray-900">Payment Receipts</h2>
-              <Button onClick={fetchReceipts} variant="outline">
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Refresh
-              </Button>
-            </div>
-            
-            {receipts.length === 0 ? (
-              <Card>
-                <CardContent className="text-center py-12">
-                  <Receipt className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No receipts found</h3>
-                  <p className="text-gray-500">Payment receipts will appear here once payments are made.</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-4">
-                {receipts.map((receipt) => (
-                  <Card key={receipt.id}>
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="font-medium">{receipt.studentName}</h4>
-                          <p className="text-sm text-gray-500">
-                            Receipt #{receipt.receiptNumber} • {new Date(receipt.paymentDate).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <span className="font-semibold">KES {receipt.amount?.toFixed(2)}</span>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setSelectedReceipt(receipt)}
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleDownloadReceipt(receipt)}
-                          >
-                            <Download className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          {/* Settings Tab */}
-          <TabsContent value="settings" className="space-y-6">
-            <h2 className="text-2xl font-bold text-gray-900">Account Settings</h2>
-            
-            <Card>
-              <CardHeader>
-                <CardTitle>Change Password</CardTitle>
-                <CardDescription>Update your account password</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleChangePassword} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Current Password
-                    </label>
-                    <Input
-                      type="password"
-                      value={oldPassword}
-                      onChange={(e) => setOldPassword(e.target.value)}
-                      placeholder="Enter current password"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      New Password
-                    </label>
-                    <Input
-                      type="password"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="Enter new password"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Confirm New Password
-                    </label>
-                    <Input
-                      type="password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="Confirm new password"
-                    />
-                  </div>
-                  {passwordMsg && (
-                    <div className={`text-sm ${passwordMsg.includes("success") ? "text-green-600" : "text-red-600"}`}>
-                      {passwordMsg}
-                    </div>
-                  )}
-                  <Button type="submit">Change Password</Button>
-                </form>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </main>
-
-      {/* Payment Modal */}
-      {paymentModalOpen && selectedStudent && selectedFeeStructure && (
-        <PaymentModal
-          isOpen={paymentModalOpen}
-          onClose={() => {
-            setPaymentModalOpen(false);
-            setSelectedStudent(null);
-            setSelectedFeeStructure(null);
-          }}
-          student={selectedStudent}
-          feeStructure={selectedFeeStructure}
-          schoolCode={schoolCode}
-          onSuccess={handlePaymentSuccess}
-          onError={handlePaymentError}
-        />
-      )}
-
-      {/* Receipt View Modal */}
       {selectedReceipt && (
         <ReceiptView
           receipt={selectedReceipt}
-          studentName={selectedReceipt.studentName}
-          studentClass={selectedReceipt.studentClass}
-          admissionNumber={selectedReceipt.admissionNumber}
           onClose={() => setSelectedReceipt(null)}
+          onDownload={() => handleDownloadReceipt(selectedReceipt)}
+        />
+      )}
+
+      {paymentModalOpen && selectedStudent && selectedFeeStructure && (
+        <PaymentModal
+          student={selectedStudent}
+          feeStructure={selectedFeeStructure}
+          schoolCode={schoolCode}
+          onClose={() => setPaymentModalOpen(false)}
+          onPaymentSuccess={handlePaymentSuccess}
+          onPaymentError={handlePaymentError}
         />
       )}
     </div>

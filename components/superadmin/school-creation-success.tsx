@@ -52,39 +52,40 @@ export function SchoolCreationSuccess({
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <Card className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <CardHeader className="text-center">
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+      <Card className="max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl rounded-2xl">
+        <CardHeader className="text-center bg-gray-50/50 p-6 rounded-t-2xl">
           <div className="flex items-center justify-center mb-4">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
               <CheckCircle className="w-8 h-8 text-green-600" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold text-green-600">School Created Successfully!</CardTitle>
-          <CardDescription>
-            Your school portal has been created and is ready for setup.
-          </CardDescription>
+          <CardTitle className="text-2xl md:text-3xl font-bold text-green-700">School Created Successfully!</CardTitle>
+          <CardDescription>The school portal is now ready for setup and configuration.</CardDescription>
         </CardHeader>
         
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-6 p-6">
           {/* School Info */}
-          <div className="bg-blue-50 rounded-lg p-4">
-            <div className="flex items-center space-x-2 mb-2">
-              <School className="w-5 h-5 text-blue-600" />
-              <h3 className="font-semibold text-blue-900">School Information</h3>
+          <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+            <div className="flex items-center space-x-3 mb-3">
+              <div className="p-2 bg-blue-100 rounded-full">
+                <School className="w-5 h-5 text-blue-600" />
+              </div>
+              <h3 className="font-semibold text-blue-900 text-lg">School Information</h3>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
               <div>
-                <span className="font-medium">School Name:</span>
-                <p className="text-blue-800">{schoolName}</p>
+                <span className="font-medium text-gray-600">School Name:</span>
+                <p className="text-blue-800 font-semibold">{schoolName}</p>
               </div>
               <div>
-                <span className="font-medium">School Code:</span>
+                <span className="font-medium text-gray-600">School Code:</span>
                 <div className="flex items-center space-x-2">
-                  <Badge variant="outline" className="font-mono">{schoolCode}</Badge>
+                  <Badge variant="outline" className="font-mono bg-white">{schoolCode}</Badge>
                   <Button
                     variant="ghost"
-                    size="sm"
+                    size="icon"
+                    className="h-8 w-8"
                     onClick={() => copyToClipboard(schoolCode, "code")}
                   >
                     <Copy className="w-4 h-4" />
@@ -95,41 +96,50 @@ export function SchoolCreationSuccess({
           </div>
 
           {/* Portal URL */}
-          <div className="bg-purple-50 rounded-lg p-4">
-            <div className="flex items-center space-x-2 mb-2">
-              <LinkIcon className="w-5 h-5 text-purple-600" />
-              <h3 className="font-semibold text-purple-900">Portal URL</h3>
+          <div className="bg-purple-50 rounded-xl p-4 border border-purple-100">
+            <div className="flex items-center space-x-3 mb-3">
+              <div className="p-2 bg-purple-100 rounded-full">
+                <LinkIcon className="w-5 h-5 text-purple-600" />
+              </div>
+              <h3 className="font-semibold text-purple-900 text-lg">Portal URL</h3>
             </div>
             <div className="space-y-2">
-              <p className="text-sm text-purple-800">
-                Share this URL with your school admin to access the portal:
-              </p>
-              <div className="flex items-center space-x-2">
-                <Badge variant="outline" className="font-mono text-xs flex-1 text-left">
+              <p className="text-sm text-purple-800">Share this URL with the school admin to access the portal:</p>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+                <Badge variant="outline" className="font-mono text-xs text-left w-full break-all bg-white">
                   {portalUrl}
                 </Badge>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => copyToClipboard(portalUrl, "url")}
-                >
-                  <Copy className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={openPortal}
-                >
-                  <ExternalLink className="w-4 h-4" />
-                </Button>
+                <div className="flex-shrink-0 flex space-x-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => copyToClipboard(portalUrl, "url")}
+                  >
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={openPortal}
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
               {copiedField === "url" && (
                 <p className="text-xs text-green-600">URL copied to clipboard!</p>
               )}
               <Button
-                className="mt-4 w-full"
+                className="mt-4 w-full bg-purple-600 hover:bg-purple-700"
                 onClick={() => {
-                  window.open(`${portalUrl}?email=${encodeURIComponent(adminEmail)}&password=${encodeURIComponent(tempPassword)}&schoolName=${encodeURIComponent(schoolName)}`, "_blank")
+                  window.open(
+                    `${portalUrl}?email=${encodeURIComponent(adminEmail)}&password=${encodeURIComponent(
+                      tempPassword
+                    )}&schoolName=${encodeURIComponent(schoolName)}`,
+                    "_blank"
+                  );
                 }}
               >
                 Go to Portal (Auto-fill Login)
@@ -138,24 +148,25 @@ export function SchoolCreationSuccess({
           </div>
 
           {/* Admin Credentials */}
-          <div className="bg-orange-50 rounded-lg p-4">
-            <div className="flex items-center space-x-2 mb-2">
-              <Lock className="w-5 h-5 text-orange-600" />
-              <h3 className="font-semibold text-orange-900">Admin Credentials</h3>
+          <div className="bg-orange-50 rounded-xl p-4 border border-orange-100">
+            <div className="flex items-center space-x-3 mb-3">
+              <div className="p-2 bg-orange-100 rounded-full">
+                <Lock className="w-5 h-5 text-orange-600" />
+              </div>
+              <h3 className="font-semibold text-orange-900 text-lg">Admin Credentials</h3>
             </div>
             <div className="space-y-3">
-              <p className="text-sm text-orange-800">
-                Use these credentials to log in to the school portal:
-              </p>
+              <p className="text-sm text-orange-800">Use these credentials to log in to the school portal:</p>
               
               <div className="space-y-2">
                 <div className="flex items-center space-x-2">
-                  <Mail className="w-4 h-4 text-orange-600" />
+                  <Mail className="w-4 h-4 text-orange-600 flex-shrink-0" />
                   <span className="text-sm font-medium">Email:</span>
-                  <span className="text-sm">{adminEmail}</span>
+                  <span className="text-sm truncate">{adminEmail}</span>
                   <Button
                     variant="ghost"
-                    size="sm"
+                    size="icon"
+                    className="h-8 w-8 ml-auto"
                     onClick={() => copyToClipboard(adminEmail, "email")}
                   >
                     <Copy className="w-4 h-4" />
@@ -163,22 +174,22 @@ export function SchoolCreationSuccess({
                 </div>
                 
                 <div className="flex items-center space-x-2">
-                  <Lock className="w-4 h-4 text-orange-600" />
+                  <Lock className="w-4 h-4 text-orange-600 flex-shrink-0" />
                   <span className="text-sm font-medium">Password:</span>
                   <div className="flex items-center space-x-1">
-                    <span className="text-sm font-mono">
-                      {showPassword ? tempPassword : "••••••••"}
-                    </span>
+                    <span className="text-sm font-mono">{showPassword ? tempPassword : "••••••••"}</span>
                     <Button
                       variant="ghost"
-                      size="sm"
+                      size="icon"
+                      className="h-8 w-8"
                       onClick={() => setShowPassword(!showPassword)}
                     >
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </Button>
                     <Button
                       variant="ghost"
-                      size="sm"
+                      size="icon"
+                      className="h-8 w-8"
                       onClick={() => copyToClipboard(tempPassword, "password")}
                     >
                       <Copy className="w-4 h-4" />
@@ -196,17 +207,17 @@ export function SchoolCreationSuccess({
           </div>
 
           {/* Important Notes */}
-          <div className="bg-yellow-50 rounded-lg p-4">
+          <div className="bg-yellow-50 rounded-xl p-4 border border-yellow-200">
             <h3 className="font-semibold text-yellow-900 mb-2">Important Notes:</h3>
-            <ul className="text-sm text-yellow-800 space-y-1">
-              <li>• The school admin should change their password on first login</li>
-              <li>• The portal is currently in "Setup" mode and needs configuration</li>
-              <li>• Save these credentials securely - they won't be shown again</li>
-              <li>• The school admin can add teachers, students, and configure subjects</li>
+            <ul className="text-sm text-yellow-800 space-y-1 list-disc list-inside">
+              <li>The school admin should change their password on first login.</li>
+              <li>The portal is currently in "Setup" mode and needs configuration.</li>
+              <li>Save these credentials securely - they won't be shown again.</li>
+              <li>The school admin can add teachers, students, and configure subjects.</li>
             </ul>
           </div>
 
-          <Separator />
+          <Separator className="my-6" />
 
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row gap-3">
@@ -217,11 +228,7 @@ export function SchoolCreationSuccess({
               <ExternalLink className="w-4 h-4 mr-2" />
               Open School Portal
             </Button>
-            <Button
-              onClick={onClose}
-              variant="outline"
-              className="flex-1"
-            >
+            <Button onClick={onClose} variant="outline" className="flex-1">
               Close
             </Button>
           </div>

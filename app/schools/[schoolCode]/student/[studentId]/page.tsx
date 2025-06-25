@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar } from "@/components/ui/avatar"
-import { LogOut, User, BookOpen, FileText, DollarSign, Settings, Receipt, Key, Camera, Eye } from "lucide-react"
+import { LogOut, User, BookOpen, FileText, DollarSign, Settings, Receipt, Key, Camera, Eye, Menu } from "lucide-react"
 import { ReceiptGenerator } from "@/components/ui/receipt-generator"
 import { ReceiptView } from "@/components/ui/receipt-view"
 import { paymentService } from "@/lib/services/payment-service"
@@ -76,6 +76,7 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
   const [feeStructure, setFeeStructure] = useState<any>(null)
   const [loadingFees, setLoadingFees] = useState(true)
   const [selectedTerm, setSelectedTerm] = useState<string>("")
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 
   useEffect(() => {
     async function fetchStudent() {
@@ -266,105 +267,161 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ studentId, ...editData }),
     })
-    setStudent((prev: any) => ({ ...prev, ...editData }))
+    const updatedStudent = await fetch(`/api/schools/${schoolCode}/students/${studentId}`)
+    if (!updatedStudent.ok) {
+      console.error("Failed to update student profile")
+      return
+    }
+    const studentData = await updatedStudent.json()
+    setStudent(studentData)
     setEditProfile(false)
     setLastParentCredentials({
-      admissionNumber: student.admissionNumber,
-      parentPhone: student.parentPhone,
-      parentEmail: student.parentEmail,
-      tempPassword: student.tempPassword,
+      admissionNumber: studentData.admissionNumber,
+      parentPhone: studentData.parentPhone,
+      parentEmail: studentData.parentEmail,
+      tempPassword: studentData.tempPassword,
     })
     setShowParentCredentials(true)
   }
   const handleCancelEdit = () => {
     setEditProfile(false)
     setEditData({ ...student })
+    setActiveSection("class")
   }
 
   // Change password logic
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault()
     setPasswordMsg("")
-    if (!oldPassword || !newPassword || !confirmPassword) {
-      setPasswordMsg("All fields are required.")
-      return
-    }
     if (newPassword !== confirmPassword) {
       setPasswordMsg("New passwords do not match.")
       return
     }
-    if (oldPassword !== student?.tempPassword) {
-      setPasswordMsg("Old password is incorrect.")
-      return
+    try {
+      // API call to change password
+      const res = await fetch(`/api/schools/${schoolCode}/students/password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("student-token")}`,
+        },
+        body: JSON.stringify({ oldPassword, newPassword }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || "Failed to change password")
+      }
+      setPasswordMsg("Password changed successfully!")
+      setOldPassword("")
+      setNewPassword("")
+      setConfirmPassword("")
+    } catch (err: any) {
+      setPasswordMsg(err.message)
     }
-    const session = localStorage.getItem("student-auth")
-    if (!session) return
-    const { studentId } = JSON.parse(session)
-    await fetch(`/api/schools/${schoolCode}/students`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ studentId, tempPassword: newPassword }),
-    })
-    setStudent((prev: any) => ({ ...prev, tempPassword: newPassword }))
-    setPasswordMsg("Password changed successfully!")
-    setOldPassword("")
-    setNewPassword("")
-    setConfirmPassword("")
+  }
+
+  // Handle term selection
+  const handleTermChange = (term: string) => {
+    setSelectedTerm(term)
+    if (student) {
+      fetchFeeStructure(student.className || student.classLevel, term)
+    }
+  }
+
+  // Generate parent credentials
+  const generateParentCredentials = async () => {
+    const res = await fetch(
+      `/api/schools/${schoolCode}/parents/credentials`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ studentId: student.id }),
+      }
+    )
+    if (res.ok) {
+      const creds = await res.json()
+      setLastParentCredentials(creds)
+    }
+  }
+
+  const handlePayment = async () => {
+    setShowReceiptGenerator(true)
+  }
+
+  const handleReceiptGenerated = async (paymentDetails: Omit<Payment, "id" | "receiptNumber" | "student" | "createdAt" | "receivedBy">) => {
+    // A mock payment object, since we don't have a backend implementation for this part yet
+    const mockPayment: Payment = {
+      ...paymentDetails,
+      id: `PAY-${Date.now()}`,
+      student: student,
+      receiptNumber: `RCPT-${Math.floor(Math.random() * 10000)}`,
+      paymentDate: new Date().toISOString(), // Use ISO string
+      status: 'completed', // Assuming a status field exists
+      paymentMethod: 'mpesa', // Valid enum value
+      receivedBy: 'System',
+      createdAt: new Date().toISOString()
+    };
+  
+    // Add the new payment to the list
+    setPayments(prev => [mockPayment, ...prev]);
+    setSelectedReceipt(mockPayment);
+    setShowReceiptGenerator(false);
+    setShowReceiptView(true);
+  
+    // In a real app, you would send this to the backend
+    try {
+      await paymentService.recordPayment(schoolCode, student.id, mockPayment);
+      // Maybe show a success toast
+    } catch (error) {
+      // Handle error, maybe show an error toast
+    }
   }
 
   if (!student) return null
 
   return (
-    <div className="min-h-screen bg-gray-50/90 flex">
+    <div className="flex min-h-screen bg-gray-100">
       {/* Sidebar */}
-      <aside className="w-80 bg-white/90 shadow-xl flex flex-col items-center py-10 px-6 border-r rounded-r-3xl min-h-screen sticky top-0 z-10">
-        {/* Profile at top */}
-        <div className="flex flex-col items-center mb-8">
-          <Avatar className="w-28 h-28 mb-3 ring-4 ring-blue-200 shadow-lg relative group">
-            <img
-              src={student.avatarUrl || "/placeholder-user.jpg"}
-              alt={student.name || "Student Avatar"}
-              className="rounded-full object-cover w-full h-full"
-            />
-            <label className="absolute bottom-2 right-2 bg-blue-600 text-white rounded-full p-1 cursor-pointer shadow-md group-hover:scale-110 transition" title="Change profile picture">
-              <input type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} disabled={avatarUploading} />
-              <Camera className="w-5 h-5" />
-            </label>
-            {avatarUploading && <div className="absolute inset-0 flex items-center justify-center bg-white/70 rounded-full"><span className="text-blue-600 font-bold">Uploading...</span></div>}
-            {avatarError && <div className="absolute left-0 right-0 -bottom-8 text-xs text-red-600 text-center">{avatarError}</div>}
+      <aside className={`fixed inset-y-0 left-0 z-20 w-64 bg-white border-r p-4 transform transition-transform md:relative md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="flex flex-col items-center text-center p-4 border-b">
+          <Avatar className="w-24 h-24 mb-4">
+            <img src={student.avatarUrl || "/placeholder-user.jpg"} alt={student.name} />
           </Avatar>
-          <div className="text-xl font-bold text-gray-900">{student.name}</div>
-          <div className="text-blue-700 font-semibold text-sm">{student.className || student.classLevel}</div>
+          <h2 className="font-bold text-xl">{student.name}</h2>
+          <p className="text-sm text-gray-500">{student.admissionNumber}</p>
         </div>
-        {/* Navigation */}
-        <nav className="flex flex-col w-full gap-2 mb-10">
-          {sidebarNav.map((item) => (
-            <button
+        <nav className="mt-6 space-y-2">
+          {sidebarNav.map(item => (
+            <Button
               key={item.section}
-              className={`flex items-center gap-3 px-5 py-3 rounded-xl transition font-semibold text-lg text-left shadow-sm border border-transparent ${activeSection === item.section ? "bg-blue-600 text-white shadow-md" : "hover:bg-blue-50 hover:border-blue-200 text-gray-700"}`}
-              onClick={() => { setActiveSection(item.section); setEditProfile(false); }}
+              variant={activeSection === item.section ? 'secondary' : 'ghost'}
+              className="w-full justify-start"
+              onClick={() => { setActiveSection(item.section); setIsSidebarOpen(false); }}
             >
-              <item.icon className="w-6 h-6" /> {item.label}
-            </button>
+              <item.icon className="w-4 h-4 mr-2" /> {item.label}
+            </Button>
           ))}
         </nav>
-        {/* Bottom: Profile edit and logout */}
-        <div className="mt-auto w-full flex flex-col gap-2">
-          <button
-            className={`flex items-center gap-3 px-5 py-3 rounded-xl transition font-semibold text-lg text-left shadow-sm border border-transparent hover:bg-blue-50 hover:border-blue-200 text-gray-700`}
-            onClick={handleEditProfile}
-          >
-            <User className="w-6 h-6" /> Edit Profile
-          </button>
-          <Button onClick={handleLogout} variant="outline" className="w-full flex items-center gap-2 border-blue-200">
-            <LogOut className="w-5 h-5" /> Logout
+        <div className="absolute bottom-4 left-4 right-4">
+          <Button variant="outline" className="w-full" onClick={handleLogout}>
+            <LogOut className="w-4 h-4 mr-2" /> Logout
           </Button>
         </div>
       </aside>
+
       {/* Main Content */}
-      <main className="flex-1 flex flex-col items-center justify-start py-0 px-0">
-        <div className="w-full flex flex-col items-center">
-          {/* Profile Section */}
+      <div className="flex-1 flex flex-col">
+        <header className="bg-white border-b p-4 flex justify-between items-center sticky top-0 z-10 md:hidden">
+          <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
+            <Menu />
+          </Button>
+          <h1 className="font-semibold text-lg">{student.name}</h1>
+          <Avatar className="w-8 h-8">
+            <img src={student.avatarUrl || "/placeholder-user.jpg"} alt={student.name} />
+          </Avatar>
+        </header>
+
+        <main className="flex-grow p-4 md:p-6">
           {activeSection === "profile" && student && !editProfile && (
             <SectionBlock>
               <div className="w-full min-h-[60vh] flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 py-12">
@@ -435,7 +492,6 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
               </div>
             </SectionBlock>
           )}
-          {/* Edit Profile Section */}
           {activeSection === "profile" && student && editProfile && (
             <SectionBlock>
               <div className="w-full min-h-[60vh] flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 py-12">
@@ -548,7 +604,6 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
               </div>
             </SectionBlock>
           )}
-          {/* Finance Section */}
           {activeSection === "finance" && (
             <SectionBlock>
               <div className="w-full min-h-[75vh] flex items-center justify-center bg-gradient-to-br from-green-50 via-white to-blue-50 py-12">
@@ -771,7 +826,6 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
               </div>
             </SectionBlock>
           )}
-          {/* My Class Section */}
           {activeSection === "class" && (
             <SectionBlock>
               <div className="w-full min-h-[75vh] flex items-center justify-center bg-gradient-to-br from-yellow-50 via-white to-blue-50 py-12">
@@ -795,7 +849,6 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
               </div>
             </SectionBlock>
           )}
-          {/* My Grades Section */}
           {activeSection === "grades" && (
             <SectionBlock>
               <div className="w-full min-h-[75vh] flex items-center justify-center bg-gradient-to-br from-purple-50 via-white to-blue-50 py-12">
@@ -841,7 +894,6 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
               </div>
             </SectionBlock>
           )}
-          {/* Settings Section */}
           {activeSection === "settings" && (
             <SectionBlock>
               <div className="w-full min-h-[60vh] flex items-center justify-center bg-gradient-to-br from-gray-50 via-white to-blue-50 py-12">
@@ -880,28 +932,22 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
               </div>
             </SectionBlock>
           )}
-        </div>
-      </main>
-      {/* Receipt Generator Modal */}
-      {/* for simulation purposes */}
+        </main>
+      </div>
+
       {showReceiptGenerator && (
         <ReceiptGenerator
+          student={student}
+          feeStructure={feeStructure}
           onClose={() => setShowReceiptGenerator(false)}
-          onGenerate={() => {
-            paymentService.createPayment().then(() => {
-              setShowReceiptGenerator(false);
-            });
-          }}
+          onReceiptGenerated={handleReceiptGenerated}
         />
       )}
-      {/* Receipt View Modal */}
       {showReceiptView && selectedReceipt && (
         <ReceiptView
           receipt={selectedReceipt}
-          studentName={student.name}
-          studentClass={student.className || student.classLevel}
-          admissionNumber={student.admissionNumber}
           onClose={() => setShowReceiptView(false)}
+          onDownload={() => { /* Placeholder */ }}
         />
       )}
       {showParentCredentials && lastParentCredentials && (

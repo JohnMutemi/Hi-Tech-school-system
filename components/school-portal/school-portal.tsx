@@ -155,51 +155,59 @@ export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="max-w-md w-full mx-4">
-        <Card>
-          <CardHeader className="text-center">
+    <div
+      className="min-h-screen flex items-center justify-center p-4"
+      style={{
+        background: `linear-gradient(to bottom right, ${schoolData.colorTheme}10, #ffffff)`,
+      }}
+    >
+      <div className="w-full max-w-md">
+        <Card className="shadow-2xl rounded-2xl">
+          <CardHeader className="text-center p-6 bg-white rounded-t-2xl">
             <div className="flex items-center justify-center mb-4">
               {schoolData.logoUrl ? (
                 <img
                   src={schoolData.logoUrl || "/placeholder.svg"}
                   alt={`${schoolData.name} logo`}
-                  className="w-16 h-16 object-cover rounded-full border-4"
+                  className="w-20 h-20 object-cover rounded-full border-4"
                   style={{ borderColor: schoolData.colorTheme }}
                 />
               ) : (
                 <div
-                  className="w-16 h-16 rounded-full flex items-center justify-center border-4"
+                  className="w-20 h-20 rounded-full flex items-center justify-center border-4"
                   style={{
                     backgroundColor: schoolData.colorTheme + "20",
                     borderColor: schoolData.colorTheme,
                   }}
                 >
-                  <School className="w-8 h-8" style={{ color: schoolData.colorTheme }} />
+                  <School className="w-10 h-10" style={{ color: schoolData.colorTheme }} />
                 </div>
               )}
             </div>
-            <CardTitle className="text-2xl font-bold">{schoolData.name}</CardTitle>
-            <div className="text-lg font-semibold text-blue-700 mb-2">
+            <CardTitle className="text-2xl md:text-3xl font-bold">{schoolData.name}</CardTitle>
+            <div className="text-lg font-semibold" style={{ color: schoolData.colorTheme }}>
               Welcome to {autoSchoolName || schoolData?.name}!
             </div>
-            <CardDescription>
-              School Code: <span className="font-mono font-bold">{schoolData.schoolCode ? schoolData.schoolCode.toUpperCase() : ""}</span>
+            <CardDescription className="mt-1">
+              School Code:{" "}
+              <span className="font-mono font-bold">{schoolData.schoolCode ? schoolData.schoolCode.toUpperCase() : ""}</span>
             </CardDescription>
-            <Badge variant={schoolData.status === "active" ? "default" : "secondary"} className="mt-2">
+            <Badge
+              variant={schoolData.status === "active" ? "default" : "secondary"}
+              className="mt-2"
+              style={{
+                backgroundColor: schoolData.status === "active" ? "hsl(var(--primary))" : "hsl(var(--secondary))",
+                color: schoolData.status === "active" ? "hsl(var(--primary-foreground))" : "hsl(var(--secondary-foreground))",
+              }}
+            >
               {schoolData.status === "setup" ? "Setup Required" : schoolData.status}
             </Badge>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-6">
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="schoolCode">School Code</Label>
-                <Input
-                  id="schoolCode"
-                  value={schoolCode}
-                  readOnly
-                  required
-                />
+                <Input id="schoolCode" value={schoolCode} readOnly required className="bg-gray-100" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Email Address</Label>
@@ -242,22 +250,21 @@ export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
                 </div>
               )}
 
-              <Button type="submit" className="w-full" style={{ backgroundColor: schoolData.colorTheme }}>
+              <Button
+                type="submit"
+                className="w-full text-lg py-6"
+                style={{
+                  backgroundColor: schoolData.colorTheme,
+                  color: "#ffffff",
+                }}
+              >
                 <User className="w-4 h-4 mr-2" />
                 Sign In to {schoolData.name}
               </Button>
             </form>
 
-            <div className="mt-6 text-center text-sm text-gray-600">
-              <p>Use the credentials provided by your system administrator.</p>
-              <div className="mt-2 p-2 bg-blue-50 rounded text-xs">
-                <p>
-                  <strong>Admin:</strong> {schoolData.adminFirstName} {schoolData.adminLastName}
-                </p>
-                <p>
-                  <strong>Email:</strong> {schoolData.adminEmail}
-                </p>
-              </div>
+            <div className="text-center mt-6 text-sm text-gray-500">
+              Powered by Hi-Tech SMS
             </div>
           </CardContent>
         </Card>

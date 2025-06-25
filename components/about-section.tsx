@@ -48,11 +48,11 @@ const values = [
 
 export function AboutSection() {
   return (
-    <section id="about" className="py-20 bg-white">
+    <section id="about" className="py-16 md:py-20 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="text-center mb-16">
-          <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
+        <div className="text-center mb-12 md:mb-16">
+          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
             About Hi-Tech School Management Software
           </h2>
           <p className="text-lg text-gray-600 max-w-3xl mx-auto">
@@ -63,7 +63,7 @@ export function AboutSection() {
 
         {/* Story */}
         <div className="grid lg:grid-cols-2 gap-12 items-center mb-16">
-          <div className="space-y-6">
+          <div className="space-y-6 text-center lg:text-left">
             <h3 className="text-2xl font-bold text-gray-900">Our Story</h3>
             <p className="text-gray-600">
               Founded with a vision to revolutionize education management in Kenya, Hi-Tech School Management Software
@@ -80,17 +80,17 @@ export function AboutSection() {
               education.
             </p>
           </div>
-          <div className="relative">
-            <div className="bg-gradient-to-br from-blue-100 to-purple-100 rounded-2xl p-8">
+          <div className="relative mt-12 lg:mt-0">
+            <div className="bg-gradient-to-br from-blue-100 to-purple-100 rounded-2xl p-6 md:p-8">
               <div className="grid grid-cols-2 gap-6">
                 {achievements.map((achievement, index) => (
                   <div key={index} className="text-center">
-                    <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center mx-auto mb-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center mx-auto mb-3 shadow-lg">
                       <achievement.icon className="w-6 h-6 text-white" />
                     </div>
                     <div className="text-2xl font-bold text-gray-900">{achievement.number}</div>
                     <div className="text-sm font-medium text-gray-700">{achievement.label}</div>
-                    <div className="text-xs text-gray-600 mt-1">{achievement.description}</div>
+                    <p className="text-xs text-gray-600 mt-1 hidden sm:block">{achievement.description}</p>
                   </div>
                 ))}
               </div>
@@ -107,9 +107,9 @@ export function AboutSection() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {values.map((value, index) => (
-              <Card key={index} className="border-gray-200 hover:shadow-lg transition-shadow">
+              <Card key={index} className="border-gray-200 hover:shadow-lg transition-shadow duration-300">
                 <CardContent className="p-6 text-center">
                   <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
                     <value.icon className="w-8 h-8 text-blue-600" />

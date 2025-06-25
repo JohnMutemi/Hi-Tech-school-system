@@ -27,10 +27,10 @@ export function ContactSection() {
   }
 
   return (
-    <section id="contact" className="py-20 bg-gray-50">
+    <section id="contact" className="py-16 md:py-20 bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">Get In Touch</h2>
+        <div className="text-center mb-12 md:mb-16">
+          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Get In Touch</h2>
           <p className="text-lg text-gray-600 max-w-3xl mx-auto">
             Ready to transform your school management? Contact us today for a personalized consultation and demo.
           </p>
@@ -39,23 +39,27 @@ export function ContactSection() {
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Contact Information */}
           <div className="space-y-6">
-            <Card>
+            <Card className="shadow-sm hover:shadow-md transition-shadow">
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Phone className="w-5 h-5 text-blue-600" />
+                <CardTitle className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                    <Phone className="w-5 h-5 text-blue-600" />
+                  </div>
                   <span>Phone Support</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold text-gray-900">+254 112 240 468</p>
+                <p className="text-xl md:text-2xl font-bold text-gray-900">+254 112 240 468</p>
                 <p className="text-gray-600 mt-1">Available 24/7 for urgent support</p>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="shadow-sm hover:shadow-md transition-shadow">
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Mail className="w-5 h-5 text-blue-600" />
+                <CardTitle className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                    <Mail className="w-5 h-5 text-blue-600" />
+                  </div>
                   <span>Email Us</span>
                 </CardTitle>
               </CardHeader>
@@ -65,10 +69,12 @@ export function ContactSection() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="shadow-sm hover:shadow-md transition-shadow">
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <MapPin className="w-5 h-5 text-blue-600" />
+                <CardTitle className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                    <MapPin className="w-5 h-5 text-blue-600" />
+                  </div>
                   <span>Visit Our Office</span>
                 </CardTitle>
               </CardHeader>
@@ -78,10 +84,12 @@ export function ContactSection() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="shadow-sm hover:shadow-md transition-shadow">
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Clock className="w-5 h-5 text-blue-600" />
+                <CardTitle className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                    <Clock className="w-5 h-5 text-blue-600" />
+                  </div>
                   <span>Business Hours</span>
                 </CardTitle>
               </CardHeader>
@@ -106,7 +114,7 @@ export function ContactSection() {
 
           {/* Contact Form */}
           <div className="lg:col-span-2">
-            <Card>
+            <Card className="shadow-lg">
               <CardHeader>
                 <CardTitle>Send Us a Message</CardTitle>
                 <CardDescription>
@@ -126,7 +134,7 @@ export function ContactSection() {
                   </div>
                 ) : (
                   <form onSubmit={handleSubmit} className="space-y-6">
-                    <div className="grid md:grid-cols-2 gap-4">
+                    <div className="grid sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="contactFirstName">First Name *</Label>
                         <Input id="contactFirstName" placeholder="John" required />
@@ -137,7 +145,7 @@ export function ContactSection() {
                       </div>
                     </div>
 
-                    <div className="grid md:grid-cols-2 gap-4">
+                    <div className="grid sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="contactEmail">Email Address *</Label>
                         <Input id="contactEmail" type="email" placeholder="john@school.edu" required />
@@ -176,7 +184,7 @@ export function ContactSection() {
 
                     <Button
                       type="submit"
-                      className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                      className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-lg py-6"
                       disabled={isLoading}
                     >
                       {isLoading ? (
