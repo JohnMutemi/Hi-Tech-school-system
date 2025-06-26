@@ -56,39 +56,49 @@ export default function StudentLoginPage({ params }: { params: { schoolCode: str
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 px-2">
-      <Card className="w-full max-w-md mb-8">
-        <CardHeader>
-          <CardTitle>Student Login</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <Input
-              placeholder="Admission Number"
-              value={admissionNumber}
-              onChange={(e) => setAdmissionNumber(e.target.value)}
-            />
-            <div className="text-center text-gray-400 text-xs">or</div>
-            <Input
-              type="email"
-              placeholder="Email (optional)"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            <Input
-              type="password"
-              placeholder="Temporary Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-            {error && <div className="text-red-500 text-sm">{error}</div>}
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Logging in..." : "Login"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+    <div className="min-h-screen w-full flex items-center justify-center relative overflow-hidden">
+      {/* Background image */}
+      <img
+        src="/library-bg.jpg"
+        alt="Library background"
+        className="absolute inset-0 w-full h-full object-cover object-center"
+        draggable={false}
+      />
+      {/* Login card, centered with glassmorphism */}
+      <div className="relative z-10 flex items-center justify-center w-full min-h-screen">
+        <Card className="w-full max-w-sm p-2 sm:p-4 rounded-xl shadow-xl bg-white/80 backdrop-blur-md">
+          <CardHeader>
+            <CardTitle>Student Login</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleLogin} className="space-y-3">
+              <Input
+                placeholder="Admission Number"
+                value={admissionNumber}
+                onChange={(e) => setAdmissionNumber(e.target.value)}
+              />
+              <div className="text-center text-gray-400 text-xs">or</div>
+              <Input
+                type="email"
+                placeholder="Email (optional)"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+              <Input
+                type="password"
+                placeholder="Temporary Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+              {error && <div className="text-red-500 text-sm">{error}</div>}
+              <Button type="submit" className="w-full py-2 text-base" disabled={loading}>
+                {loading ? "Logging in..." : "Login"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 } 

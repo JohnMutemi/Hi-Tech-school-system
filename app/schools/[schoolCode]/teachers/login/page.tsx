@@ -45,34 +45,44 @@ export default function TeacherLoginPage({ params }: { params: { schoolCode: str
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 px-2">
-      <Card className="w-full max-w-md mb-8">
-        <CardHeader>
-          <CardTitle>Teacher Login</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <Input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-            <Input
-              type="password"
-              placeholder="Password or Temporary Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-            {error && <div className="text-red-500 text-sm">{error}</div>}
-            <Button type="submit" className="w-full">
-              Login
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+    <div className="min-h-screen w-full flex items-center justify-center relative overflow-hidden">
+      {/* Background image */}
+      <img
+        src="/library-bg.jpg"
+        alt="Library background"
+        className="absolute inset-0 w-full h-full object-cover object-center"
+        draggable={false}
+      />
+      {/* Login card, centered with glassmorphism */}
+      <div className="relative z-10 flex items-center justify-center w-full min-h-screen">
+        <Card className="w-full max-w-sm mb-8 p-2 sm:p-4 rounded-xl shadow-xl bg-white/80 backdrop-blur-md">
+          <CardHeader>
+            <CardTitle>Teacher Login</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <Input
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+              <Input
+                type="password"
+                placeholder="Password or Temporary Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+              {error && <div className="text-red-500 text-sm">{error}</div>}
+              <Button type="submit" className="w-full">
+                Login
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }
