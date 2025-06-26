@@ -1,88 +1,65 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import Link from "next/link";
 
-export default function ParentsListPage({ params }: { params: { schoolCode: string } }) {
-  const { schoolCode } = params;
+export default function ParentsListPage() {
+  const router = useRouter();
+  const params = useParams();
+  const schoolCode = params.schoolCode as string;
   const [parents, setParents] = useState<any[]>([]);
-  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchParents() {
-      try {
-        const res = await fetch(`/api/schools/${schoolCode}/parents`);
-        if (!res.ok) throw new Error("Failed to fetch parents");
-        const data = await res.json();
-        setParents(data);
-      } catch (err) {
-        setParents([]);
+      setLoading(true);
+      const res = await fetch(`/api/schools/${schoolCode}/parents`);
+      if (res.ok) {
+        setParents(await res.json());
       }
+      setLoading(false);
     }
-    fetchParents();
+    if (schoolCode) fetchParents();
   }, [schoolCode]);
 
-  const filteredParents = parents.filter((p) =>
-    (p.parentName || "").toLowerCase().includes(search.toLowerCase()) ||
-    (p.parentPhone || "").toLowerCase().includes(search.toLowerCase()) ||
-    (p.parentEmail || "").toLowerCase().includes(search.toLowerCase())
-  );
-
   return (
-    <div className="min-h-screen flex flex-col items-center justify-start bg-gradient-to-br from-blue-50 via-white to-purple-50 py-12">
-      <Card className="w-full max-w-5xl rounded-2xl shadow-2xl bg-white/95 p-10 flex flex-col items-center">
-        <CardHeader>
-          <CardTitle className="text-3xl font-extrabold text-blue-800 mb-6 text-center">Parents List</CardTitle>
+    <div className="max-w-4xl mx-auto py-8">
+      <Card className="mb-6">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Parents</CardTitle>
+          <Button asChild>
+            <Link href={`/schools/${schoolCode}/parents/add`}>Add Parent</Link>
+          </Button>
         </CardHeader>
-        <CardContent className="w-full">
-          <div className="mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
-            <Input
-              placeholder="Search by parent name, phone, or email"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="max-w-xs"
-            />
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm border rounded-xl overflow-hidden">
-              <thead>
-                <tr className="bg-gray-100">
-                  <th className="px-4 py-2 border">Parent Name</th>
-                  <th className="px-4 py-2 border">Phone</th>
-                  <th className="px-4 py-2 border">Email</th>
-                  <th className="px-4 py-2 border">Linked Student(s)</th>
-                  <th className="px-4 py-2 border">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredParents.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="text-center py-4 text-gray-500">No parents found</td>
-                  </tr>
-                ) : (
-                  filteredParents.map((parent, idx) => (
-                    <tr key={idx}>
-                      <td className="px-4 py-2 border font-semibold">{parent.parentName}</td>
-                      <td className="px-4 py-2 border">{parent.parentPhone}</td>
-                      <td className="px-4 py-2 border">{parent.parentEmail || <span className="text-gray-400">-</span>}</td>
-                      <td className="px-4 py-2 border">
-                        {parent.students.map((s: any) => (
-                          <div key={s.admissionNumber} className="mb-1">
-                            {s.name} <span className="text-xs text-gray-500">({s.admissionNumber})</span>
-                          </div>
-                        ))}
-                      </td>
-                      <td className="px-4 py-2 border text-center">
-                        <Button size="sm" variant="outline">View</Button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+        <CardContent>
+          {loading ? (
+            <div>Loading...</div>
+          ) : parents.length === 0 ? (
+            <div>No parents found.</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Email</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {parents.map((parent) => (
+                  <TableRow key={parent.id}>
+                    <TableCell>{parent.name}</TableCell>
+                    <TableCell>{parent.phone}</TableCell>
+                    <TableCell>{parent.email}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -99,42 +99,6 @@ export default function AnalyticsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-4">
-              <Link href="/superadmin" className="text-blue-600 hover:text-blue-800">
-                <ArrowLeft className="w-5 h-5" />
-              </Link>
-              <div className="flex items-center space-x-2">
-                <BarChart3 className="w-8 h-8 text-blue-600" />
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-900">Platform Analytics</h1>
-                  <p className="text-sm text-gray-600">Comprehensive insights and performance metrics</p>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Button
-                variant={timeRange === "30d" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setTimeRange("30d")}
-              >
-                30 Days
-              </Button>
-              <Button
-                variant={timeRange === "90d" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setTimeRange("90d")}
-              >
-                90 Days
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Key Metrics */}

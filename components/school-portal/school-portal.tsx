@@ -155,14 +155,17 @@ export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
   }
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center p-4"
-      style={{
-        background: `linear-gradient(to bottom right, ${schoolData.colorTheme}10, #ffffff)`,
-      }}
-    >
-      <div className="w-full max-w-md">
-        <Card className="shadow-2xl rounded-2xl">
+    <div className="min-h-screen w-full flex items-center justify-center relative overflow-hidden">
+      {/* Background image */}
+      <img
+        src="/library-bg.jpg"
+        alt="Library background"
+        className="absolute inset-0 w-full h-full object-cover object-center"
+        draggable={false}
+      />
+      {/* Login card, centered with glassmorphism */}
+      <div className="relative z-10 flex items-center justify-center w-full min-h-screen p-2 sm:p-4">
+        <Card className="w-full max-w-md shadow-2xl rounded-2xl bg-white/80 backdrop-blur-md">
           <CardHeader className="text-center p-6 bg-white rounded-t-2xl">
             <div className="flex items-center justify-center mb-4">
               {schoolData.logoUrl ? (

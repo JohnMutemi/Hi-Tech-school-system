@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import useSWR, { mutate } from 'swr'
 import { useRouter } from 'next/navigation'
 
 interface User {
@@ -9,31 +9,23 @@ interface User {
   role?: string
 }
 
-export function useUser({ redirectTo = '', redirectIfFound = false } = {}) {
+const fetcher = (url: string) => fetch(url).then(res => res.json())
+
+export function useUser({ redirectTo = '', redirectIfFound = false, enabled = true } = {}) {
   const router = useRouter()
-  const [user, setUser] = useState<User | undefined>()
+  const { data: user, error, isLoading } = useSWR<User>(
+    enabled ? '/api/superadmin/user' : null, 
+    fetcher
+  )
 
-  useEffect(() => {
-    async function fetchUser() {
-      try {
-        const res = await fetch('/api/superadmin/user')
-        const data: User = await res.json()
-        setUser(data)
-      } catch (error) {
-        setUser({ isLoggedIn: false })
-      }
+  // Handle redirects based on user state
+  if (user && redirectTo) {
+    if ((redirectIfFound && user.isLoggedIn) || (!redirectIfFound && !user.isLoggedIn)) {
+      router.push(redirectTo)
     }
+  }
 
-    fetchUser()
-  }, [])
+  return { user, isLoading, error }
+}
 
-  useEffect(() => {
-    if (user && redirectTo) {
-      if ((redirectIfFound && user.isLoggedIn) || (!redirectIfFound && !user.isLoggedIn)) {
-        router.push(redirectTo)
-      }
-    }
-  }, [user, redirectIfFound, redirectTo, router])
-
-  return { user }
-} 
+export { mutate } 

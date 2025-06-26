@@ -24,6 +24,7 @@ import { generateSchoolCode, generateTempPassword } from "@/lib/utils/school-gen
 import { SchoolCreationSuccess } from "./school-creation-success"
 import { createSchoolClient } from "@/lib/actions/school-actions"
 import { useToast } from "@/hooks/use-toast"
+import { useRouter } from "next/navigation"
 
 interface AddSchoolFormProps {
   onSchoolAdded?: () => void
@@ -31,6 +32,7 @@ interface AddSchoolFormProps {
 
 const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
   const { toast } = useToast()
+  const router = useRouter()
   const [schoolData, setSchoolData] = useState({
     name: "",
     address: "",
@@ -204,248 +206,261 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
     })
   }
 
+  const handleSuccessModalClose = () => {
+    setShowSuccessModal(false)
+    router.push('/superadmin/schools')
+  }
+
   return (
-    <Card className="w-full max-w-2xl mx-auto rounded-3xl shadow-2xl border-2 border-blue-200 bg-white/95 p-6 md:p-10">
-      <CardHeader className="flex flex-col items-center">
-        <div className="w-16 h-16 flex items-center justify-center rounded-full bg-blue-100 mb-4">
-          <School className="w-8 h-8 text-blue-600" />
-        </div>
-        <CardTitle className="text-2xl font-extrabold text-blue-800 mb-2 text-center drop-shadow-lg tracking-tight">
-          Add New School
-        </CardTitle>
-        <CardDescription className="text-center text-gray-500 mb-6">
-          Register a new school to the platform.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <Label htmlFor="name" className="font-semibold text-gray-700 mb-1">School Name</Label>
-            <Input
-              id="name"
-              name="name"
-              value={schoolData.name}
-              onChange={handleChange}
-              className="w-full border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
-              required
-            />
+    <>
+      <Card className="w-full max-w-2xl mx-auto rounded-3xl shadow-2xl border-2 border-blue-200 bg-white/95 p-6 md:p-10">
+        <CardHeader className="flex flex-col items-center">
+          <div className="w-16 h-16 flex items-center justify-center rounded-full bg-blue-100 mb-4">
+            <School className="w-8 h-8 text-blue-600" />
           </div>
-          <div>
-            <Label htmlFor="code" className="font-semibold text-gray-700 mb-1">School Code (Optional)</Label>
-            <Input
-              id="code"
-              name="code"
-              value={schoolData.code}
-              onChange={handleChange}
-              className="w-full border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
-            />
-          </div>
-          <div>
-            <Label htmlFor="description" className="font-semibold text-gray-700 mb-1">Description</Label>
-            <Textarea
-              id="description"
-              name="description"
-              value={schoolData.description}
-              onChange={handleChange}
-              className="w-full border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
-              rows={3}
-            />
-          </div>
-          <div>
-            <Label htmlFor="email" className="font-semibold text-gray-700 mb-1">Admin Email</Label>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              value={schoolData.email}
-              onChange={handleChange}
-              className="w-full border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor="phone" className="font-semibold text-gray-700 mb-1">Phone Number</Label>
-            <Input
-              id="phone"
-              name="phone"
-              type="tel"
-              value={schoolData.phone}
-              onChange={handleChange}
-              className="w-full border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor="address" className="font-semibold text-gray-700 mb-1">Address</Label>
-            <Textarea
-              id="address"
-              name="address"
-              value={schoolData.address}
-              onChange={handleChange}
-              className="w-full border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
-              rows={2}
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor="website" className="font-semibold text-gray-700 mb-1">Website</Label>
-            <Input
-              id="website"
-              name="website"
-              type="url"
-              value={schoolData.website}
-              onChange={handleChange}
-              className="w-full border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
-            />
-          </div>
-          <div>
-            <Label htmlFor="principalName" className="font-semibold text-gray-700 mb-1">Principal Name</Label>
-            <Input
-              id="principalName"
-              name="principalName"
-              value={schoolData.principalName}
-              onChange={handleChange}
-              className="w-full border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
-            />
-          </div>
-          <div>
-            <Label htmlFor="establishedYear" className="font-semibold text-gray-700 mb-1">Established Year</Label>
-            <Input
-              id="establishedYear"
-              name="establishedYear"
-              value={schoolData.establishedYear}
-              onChange={handleChange}
-              className="w-full border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
-            />
-          </div>
-          <div>
-            <Label htmlFor="motto" className="font-semibold text-gray-700 mb-1">School Motto</Label>
-            <Input
-              id="motto"
-              name="motto"
-              value={schoolData.motto}
-              onChange={handleChange}
-              className="w-full border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
-            />
-          </div>
-          <div>
-            <Label htmlFor="colorTheme" className="font-semibold text-gray-700 mb-1">Color Theme</Label>
-            <div className="flex items-center space-x-3">
-              <input
-                id="colorTheme"
-                name="colorTheme"
-                type="color"
-                value={schoolData.colorTheme}
-                onChange={handleColorThemeChange}
-                className="w-12 h-12 rounded-lg border cursor-pointer"
+          <CardTitle className="text-2xl font-extrabold text-blue-800 mb-2 text-center drop-shadow-lg tracking-tight">
+            Add New School
+          </CardTitle>
+          <CardDescription className="text-center text-gray-500 mb-6">
+            Register a new school to the platform.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <Label htmlFor="name" className="font-semibold text-gray-700 mb-1">School Name</Label>
+              <Input
+                id="name"
+                name="name"
+                value={schoolData.name}
+                onChange={handleChange}
+                className="w-full border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
+                required
               />
-              <div className="flex-1">
-                <Input
+            </div>
+            <div>
+              <Label htmlFor="code" className="font-semibold text-gray-700 mb-1">School Code (Optional)</Label>
+              <Input
+                id="code"
+                name="code"
+                value={schoolData.code}
+                onChange={handleChange}
+                className="w-full border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
+              />
+            </div>
+            <div>
+              <Label htmlFor="description" className="font-semibold text-gray-700 mb-1">Description</Label>
+              <Textarea
+                id="description"
+                name="description"
+                value={schoolData.description}
+                onChange={handleChange}
+                className="w-full border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
+                rows={3}
+              />
+            </div>
+            <div>
+              <Label htmlFor="email" className="font-semibold text-gray-700 mb-1">Admin Email</Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                value={schoolData.email}
+                onChange={handleChange}
+                className="w-full border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="phone" className="font-semibold text-gray-700 mb-1">Phone Number</Label>
+              <Input
+                id="phone"
+                name="phone"
+                type="tel"
+                value={schoolData.phone}
+                onChange={handleChange}
+                className="w-full border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="address" className="font-semibold text-gray-700 mb-1">Address</Label>
+              <Textarea
+                id="address"
+                name="address"
+                value={schoolData.address}
+                onChange={handleChange}
+                className="w-full border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
+                rows={2}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="website" className="font-semibold text-gray-700 mb-1">Website</Label>
+              <Input
+                id="website"
+                name="website"
+                type="url"
+                value={schoolData.website}
+                onChange={handleChange}
+                className="w-full border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
+              />
+            </div>
+            <div>
+              <Label htmlFor="principalName" className="font-semibold text-gray-700 mb-1">Principal Name</Label>
+              <Input
+                id="principalName"
+                name="principalName"
+                value={schoolData.principalName}
+                onChange={handleChange}
+                className="w-full border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
+              />
+            </div>
+            <div>
+              <Label htmlFor="establishedYear" className="font-semibold text-gray-700 mb-1">Established Year</Label>
+              <Input
+                id="establishedYear"
+                name="establishedYear"
+                value={schoolData.establishedYear}
+                onChange={handleChange}
+                className="w-full border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
+              />
+            </div>
+            <div>
+              <Label htmlFor="motto" className="font-semibold text-gray-700 mb-1">School Motto</Label>
+              <Input
+                id="motto"
+                name="motto"
+                value={schoolData.motto}
+                onChange={handleChange}
+                className="w-full border rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-blue-300"
+              />
+            </div>
+            <div>
+              <Label htmlFor="colorTheme" className="font-semibold text-gray-700 mb-1">Color Theme</Label>
+              <div className="flex items-center space-x-3">
+                <input
+                  id="colorTheme"
+                  name="colorTheme"
+                  type="color"
                   value={schoolData.colorTheme}
                   onChange={handleColorThemeChange}
-                  className="font-mono"
+                  className="w-12 h-12 rounded-lg border cursor-pointer"
                 />
+                <div className="flex-1">
+                  <Input
+                    value={schoolData.colorTheme}
+                    onChange={handleColorThemeChange}
+                    className="font-mono"
+                  />
+                </div>
               </div>
             </div>
-          </div>
-          <div>
-            <Label htmlFor="logo" className="font-semibold text-gray-700 mb-1">School Logo</Label>
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
-              {logoPreview ? (
-                <div className="space-y-4">
-                  <img
-                    src={logoPreview}
-                    alt="Logo preview"
-                    className="w-20 h-20 mx-auto object-contain rounded-lg border"
-                  />
-                  <div className="space-y-2">
-                    <p className="text-sm text-gray-600">{logoFile?.name}</p>
+            <div>
+              <Label htmlFor="logo" className="font-semibold text-gray-700 mb-1">School Logo</Label>
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+                {logoPreview ? (
+                  <div className="space-y-4">
+                    <img
+                      src={logoPreview}
+                      alt="Logo preview"
+                      className="w-20 h-20 mx-auto object-contain rounded-lg border"
+                    />
+                    <div className="space-y-2">
+                      <p className="text-sm text-gray-600">{logoFile?.name}</p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setLogoFile(null)
+                          setLogoPreview("")
+                          if (fileInputRef.current) fileInputRef.current.value = ""
+                        }}
+                      >
+                        Remove Logo
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <Upload className="w-12 h-12 mx-auto text-gray-400" />
+                    <div>
+                      <p className="text-sm text-gray-600">
+                        Click to upload or drag and drop
+                      </p>
+                      <p className="text-xs text-gray-500">PNG, JPG up to 5MB</p>
+                    </div>
                     <Button
                       type="button"
                       variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setLogoFile(null)
-                        setLogoPreview("")
-                        if (fileInputRef.current) fileInputRef.current.value = ""
-                      }}
+                      onClick={() => fileInputRef.current?.click()}
                     >
-                      Remove Logo
+                      Choose File
                     </Button>
                   </div>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <Upload className="w-12 h-12 mx-auto text-gray-400" />
-                  <div>
-                    <p className="text-sm text-gray-600">
-                      Click to upload or drag and drop
-                    </p>
-                    <p className="text-xs text-gray-500">PNG, JPG up to 5MB</p>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoChange}
+                  className="hidden"
+                />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="generatedPortal" className="font-semibold text-gray-700 mb-1">Generated Portal</Label>
+              <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <LinkIcon className="w-4 h-4 text-gray-500" />
+                    <span className="text-sm font-medium">Portal URL:</span>
                   </div>
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => fileInputRef.current?.click()}
+                    size="sm"
+                    onClick={() => copyToClipboard(generatedPortalUrl)}
                   >
-                    Choose File
+                    <Copy className="w-4 h-4 mr-1" />
+                    Copy
                   </Button>
                 </div>
-              )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleLogoChange}
-                className="hidden"
-              />
-            </div>
-          </div>
-          <div>
-            <Label htmlFor="generatedPortal" className="font-semibold text-gray-700 mb-1">Generated Portal</Label>
-            <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-              <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <LinkIcon className="w-4 h-4 text-gray-500" />
-                  <span className="text-sm font-medium">Portal URL:</span>
+                  <Badge variant="outline" className="font-mono text-xs">
+                    {generatedPortalUrl}
+                  </Badge>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => window.open(generatedPortalUrl, "_blank")}
+                  >
+                    <Eye className="w-4 h-4" />
+                  </Button>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => copyToClipboard(generatedPortalUrl)}
-                >
-                  <Copy className="w-4 h-4 mr-1" />
-                  Copy
-                </Button>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Badge variant="outline" className="font-mono text-xs">
-                  {generatedPortalUrl}
-                </Badge>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => window.open(generatedPortalUrl, "_blank")}
-                >
-                  <Eye className="w-4 h-4" />
-                </Button>
               </div>
             </div>
-          </div>
-          <Button
-            type="submit"
-            className="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 px-8 rounded-xl text-lg shadow mt-4"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? 'Adding...' : 'Add School'}
-          </Button>
-          {error && <div className="text-red-600 text-sm mt-2">{error}</div>}
-          {success && <div className="text-green-600 text-sm mt-2">{success}</div>}
-        </form>
-      </CardContent>
-    </Card>
+            <Button
+              type="submit"
+              className="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 px-8 rounded-xl text-lg shadow mt-4"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Adding...' : 'Add School'}
+            </Button>
+            {error && <div className="text-red-600 text-sm mt-2">{error}</div>}
+            {success && <div className="text-green-600 text-sm mt-2">{success}</div>}
+          </form>
+        </CardContent>
+      </Card>
+      {showSuccessModal && (
+        <SchoolCreationSuccess
+          {...successData}
+          onClose={handleSuccessModalClose}
+        />
+      )}
+    </>
   )
 }
 

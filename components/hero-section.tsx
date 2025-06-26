@@ -4,8 +4,8 @@ import Link from "next/link"
 
 export function HeroSection() {
   return (
-    <section className="bg-gradient-to-br from-slate-50 to-blue-50 py-16 md:py-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section className="bg-gradient-to-br from-slate-50 to-blue-50 py-16 md:py-24 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           {/* Left Content */}
           <div className="space-y-8 text-center lg:text-left">
@@ -29,7 +29,7 @@ export function HeroSection() {
               <Button
                 asChild
                 size="lg"
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8"
+                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 shadow-lg"
               >
                 <Link href="/demo">TRY FREE DEMO</Link>
               </Button>

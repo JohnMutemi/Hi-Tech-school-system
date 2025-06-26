@@ -5,8 +5,24 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Menu, X, Phone, Facebook, Twitter, Instagram } from "lucide-react"
 
+const navLinks = [
+  { label: "About", id: "about" },
+  { label: "Features", id: "features" },
+  { label: "Pricing", id: "pricing" },
+  { label: "Contact", id: "contact" },
+]
+
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+
+  // Smooth scroll handler
+  const handleNavClick = (id: string) => {
+    const el = document.getElementById(id)
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth" })
+      setIsMenuOpen(false)
+    }
+  }
 
   return (
     <>
@@ -28,15 +44,44 @@ export function Header() {
       </div>
 
       {/* Main Header */}
-      <header className="bg-white shadow sticky top-0 z-30">
+      <header className="bg-white shadow sticky top-0 z-40">
         <div className="max-w-7xl mx-auto flex justify-between items-center py-4 px-4">
           <div className="flex items-center gap-4">
-            <img src="/logo.svg" alt="Logo" className="h-8 w-auto" />
-            <span className="font-bold text-xl text-blue-700">HiTech School System</span>
+            <img
+              src="/hi-tech-logo.svg"
+              alt="Hi-Tech SMS Logo"
+              className="h-10 w-10 transition-transform duration-200 hover:scale-105 hover:drop-shadow-lg"
+            />
+            <span className="font-extrabold text-2xl text-blue-700 tracking-tight leading-tight">
+              Hi-Tech <span className="text-slate-700 font-semibold">SMS</span>
+            </span>
           </div>
-          <div className="flex items-center gap-4">
-            {/* Add nav links or login/signup buttons here */}
-          </div>
+          {/* Desktop Nav */}
+          <nav className="hidden md:flex items-center gap-6">
+            {navLinks.map((link) => (
+              <button
+                key={link.id}
+                onClick={() => handleNavClick(link.id)}
+                className="text-gray-700 hover:text-blue-600 font-medium transition-colors"
+              >
+                {link.label}
+              </button>
+            ))}
+            <Button
+              asChild
+              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 px-6 text-white ml-2"
+            >
+              <Link href="/demo">Try Free Demo</Link>
+            </Button>
+          </nav>
+          {/* Mobile Hamburger */}
+          <button
+            className="md:hidden p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            onClick={() => setIsMenuOpen(true)}
+            aria-label="Open menu"
+          >
+            <Menu className="h-7 w-7 text-blue-700" />
+          </button>
         </div>
       </header>
 
@@ -48,7 +93,7 @@ export function Header() {
         onClick={() => setIsMenuOpen(false)}
       >
         <div
-          className={`fixed top-0 right-0 h-full w-64 bg-white shadow-xl transform transition-transform duration-300 ease-in-out ${
+          className={`fixed top-0 right-0 h-full w-72 bg-white shadow-xl transform transition-transform duration-300 ease-in-out ${
             isMenuOpen ? "translate-x-0" : "translate-x-full"
           }`}
           onClick={(e) => e.stopPropagation()}
@@ -58,48 +103,21 @@ export function Header() {
               <X className="h-6 w-6" />
             </Button>
           </div>
-          <nav className="flex flex-col space-y-6 px-6">
-            <button
-              onClick={() => {
-                document.getElementById("about")?.scrollIntoView({ behavior: "smooth" });
-                setIsMenuOpen(false);
-              }}
-              className="text-gray-700 hover:text-blue-600 font-medium text-left text-lg"
-            >
-              ABOUT
-            </button>
-            <button
-              onClick={() => {
-                document.getElementById("features")?.scrollIntoView({ behavior: "smooth" });
-                setIsMenuOpen(false);
-              }}
-              className="text-gray-700 hover:text-blue-600 font-medium text-left text-lg"
-            >
-              FEATURES
-            </button>
-            <button
-              onClick={() => {
-                document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" });
-                setIsMenuOpen(false);
-              }}
-              className="text-gray-700 hover:text-blue-600 font-medium text-left text-lg"
-            >
-              PRICING
-            </button>
-            <button
-              onClick={() => {
-                document.getElementById("contact")?.scrollIntoView({ behavior: "smooth" });
-                setIsMenuOpen(false);
-              }}
-              className="text-gray-700 hover:text-blue-600 font-medium text-left text-lg"
-            >
-              CONTACT
-            </button>
+          <nav className="flex flex-col space-y-6 px-8 mt-8">
+            {navLinks.map((link) => (
+              <button
+                key={link.id}
+                onClick={() => handleNavClick(link.id)}
+                className="text-gray-700 hover:text-blue-600 font-semibold text-left text-lg"
+              >
+                {link.label}
+              </button>
+            ))}
             <Button
               asChild
-              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 w-full text-center"
+              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 w-full text-center mt-4"
             >
-              <Link href="/demo">TRY FREE DEMO</Link>
+              <Link href="/demo">Try Free Demo</Link>
             </Button>
           </nav>
         </div>

@@ -20,5 +20,9 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/superadmin/:path*', '/superadmin'],
+  matcher: [
+    // Match all superadmin routes except the login page
+    '/superadmin((?!/login).*)',
+    '/superadmin'
+  ],
 } 

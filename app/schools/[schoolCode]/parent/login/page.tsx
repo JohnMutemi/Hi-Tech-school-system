@@ -79,42 +79,52 @@ export default function ParentLoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 py-12">
-      <Card className="w-full max-w-md rounded-2xl shadow-2xl bg-white/95 p-8 flex flex-col items-center">
-        <CardHeader>
-          <CardTitle className="text-2xl font-extrabold text-blue-800 mb-2 text-center">Parent Login</CardTitle>
-        </CardHeader>
-        <CardContent className="w-full">
-          {autoFilled && (
-            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-              <div className="flex items-center gap-2 text-green-700 text-sm">
-                <span className="text-green-600">✓</span>
-                <span>Credentials auto-filled for quick login</span>
+    <div className="min-h-screen w-full flex items-center justify-center relative overflow-hidden">
+      {/* Background image */}
+      <img
+        src="/library-bg.jpg"
+        alt="Library background"
+        className="absolute inset-0 w-full h-full object-cover object-center"
+        draggable={false}
+      />
+      {/* Login card, centered with glassmorphism */}
+      <div className="relative z-10 flex items-center justify-center w-full min-h-screen">
+        <Card className="w-full max-w-sm rounded-2xl shadow-2xl bg-white/80 backdrop-blur-md p-4 flex flex-col items-center">
+          <CardHeader>
+            <CardTitle className="text-2xl font-extrabold text-blue-800 mb-2 text-center">Parent Login</CardTitle>
+          </CardHeader>
+          <CardContent className="w-full">
+            {autoFilled && (
+              <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center gap-2 text-green-700 text-sm">
+                  <span className="text-green-600">✓</span>
+                  <span>Credentials auto-filled for quick login</span>
+                </div>
               </div>
-            </div>
-          )}
-          <form onSubmit={handleLogin} className="space-y-4">
-            <Input
-              type="tel"
-              placeholder="Your Phone Number"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              required
-            />
-            <Input
-              type="password"
-              placeholder="Password or Temporary Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-            {error && <p className="text-sm text-red-600 text-center">{error}</p>}
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Logging in..." : "Login"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+            )}
+            <form onSubmit={handleLogin} className="space-y-4">
+              <Input
+                type="tel"
+                placeholder="Your Phone Number"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                required
+              />
+              <Input
+                type="password"
+                placeholder="Password or Temporary Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+              {error && <p className="text-sm text-red-600 text-center">{error}</p>}
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "Logging in..." : "Login"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 } 
