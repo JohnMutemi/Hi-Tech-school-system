@@ -1506,13 +1506,14 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                 }}
               />
             ) : (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    Students ({students.length})
+              <Card className="bg-white/70 backdrop-blur-lg rounded-2xl shadow-xl border-0 px-2 py-2 md:px-8 md:py-6">
+                <CardHeader className="px-2 py-2 md:px-6 md:py-4">
+                  <CardTitle className="flex items-center justify-between text-base md:text-lg">
+                    <span>Students ({students.length})</span>
                     <Button
                       onClick={() => setViewMode((prev) => ({ ...prev, students: "form" }))}
                       style={{ backgroundColor: schoolData.colorTheme }}
+                      className="w-full md:w-auto py-3 md:py-2 text-base md:text-sm rounded-xl md:rounded-lg"
                     >
                       <Plus className="w-4 h-4 mr-2" />
                       Add Student
@@ -1528,7 +1529,7 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                     </div>
                   ) : (
                     <div className="overflow-x-auto">
-                      <Table>
+                      <Table className="hidden md:table">
                         <TableHeader>
                           <TableRow>
                             <TableHead>Name</TableHead>
@@ -1542,7 +1543,7 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                         </TableHeader>
                         <TableBody>
                           {students.map((student) => (
-                            <TableRow key={student.id}>
+                            <TableRow key={student.id} className="hover:bg-blue-50/30 transition-colors duration-200">
                               <TableCell className="font-medium">{student.name}</TableCell>
                               <TableCell>{student.admissionNumber}</TableCell>
                               <TableCell>{student.className}</TableCell>
@@ -1555,15 +1556,15 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                               </TableCell>
                               <TableCell>
                                 <div className="flex space-x-2">
-                                  <Button variant="outline" size="sm" onClick={() => setViewingItem(student)}>
+                                  <Button variant="outline" size="sm" onClick={() => setViewingItem(student)} className="hover:bg-blue-100 active:scale-95">
                                     View Details
                                   </Button>
-                                  <Button variant="outline" size="sm" onClick={() => setEditingItem(student)}>
+                                  <Button variant="outline" size="sm" onClick={() => setEditingItem(student)} className="hover:bg-green-100 active:scale-95">
                                     <Edit className="w-4 h-4" />
                                   </Button>
                                   <AlertDialog>
                                     <AlertDialogTrigger asChild>
-                                      <Button variant="outline" size="sm" className="text-red-600">
+                                      <Button variant="outline" size="sm" className="text-red-600 hover:bg-red-100 active:scale-95">
                                         <Trash2 className="w-4 h-4" />
                                       </Button>
                                     </AlertDialogTrigger>
@@ -1588,74 +1589,122 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                           ))}
                         </TableBody>
                       </Table>
+                      {/* Mobile Card List */}
+                      <div className="md:hidden space-y-4">
+                        {students.map((student) => (
+                          <div key={student.id} className="bg-white/90 rounded-xl shadow-md p-4 flex flex-col gap-2 border border-gray-100">
+                            <div className="flex items-center justify-between">
+                              <div className="font-bold text-lg text-gray-800">{student.name}</div>
+                              <Badge variant={student.status === "active" ? "default" : "secondary"}>
+                                {student.status}
+                              </Badge>
+                            </div>
+                            <div className="flex flex-wrap gap-2 text-xs text-gray-600">
+                              <span>Adm: {student.admissionNumber}</span>
+                              <span>Class: {student.className}</span>
+                            </div>
+                            <div className="flex flex-wrap gap-2 text-xs text-gray-600">
+                              <span>Parent: {student.parentName}</span>
+                              <span>Phone: {student.parentPhone}</span>
+                            </div>
+                            <div className="flex gap-2 pt-2">
+                              <Button variant="outline" size="sm" onClick={() => setViewingItem(student)} className="flex-1 active:scale-95">
+                                View
+                              </Button>
+                              <Button variant="outline" size="sm" onClick={() => setEditingItem(student)} className="flex-1 active:scale-95">
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="outline" size="sm" className="flex-1 text-red-600 active:scale-95">
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent className="max-w-full px-2">
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete Student</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Are you sure you want to delete {student.name}? This action cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => deleteStudent(student.id)}>
+                                      Delete
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </CardContent>
               </Card>
             )}
-
-            {/* Student View Dialog */}
+            {/* Student View Dialog - make full width and mobile friendly */}
             <Dialog open={!!viewingItem && activeTab === "students"} onOpenChange={() => setViewingItem(null)}>
-              <DialogContent className="max-w-4xl">
+              <DialogContent className="max-w-full md:max-w-4xl px-2 py-4 rounded-2xl">
                 <DialogHeader>
-                  <DialogTitle>Student Details</DialogTitle>
+                  <DialogTitle className="text-lg md:text-2xl">Student Details</DialogTitle>
                   <DialogDescription>Complete information for {viewingItem?.name}</DialogDescription>
                 </DialogHeader>
                 {viewingItem && (
-                  <div className="space-y-4">
-                    <div className="grid md:grid-cols-3 gap-4">
+                  <div className="space-y-4 text-base md:text-sm">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
-                        <Label className="text-sm font-medium text-gray-600">Full Name</Label>
-                        <p className="text-sm">{viewingItem.name}</p>
+                        <Label className="text-xs font-medium text-gray-600">Full Name</Label>
+                        <p className="text-gray-800">{viewingItem.name}</p>
                       </div>
                       <div>
-                        <Label className="text-sm font-medium text-gray-600">Admission Number</Label>
-                        <p className="text-sm">{viewingItem.admissionNumber}</p>
+                        <Label className="text-xs font-medium text-gray-600">Admission Number</Label>
+                        <p className="text-gray-800">{viewingItem.admissionNumber}</p>
                       </div>
                       <div>
-                        <Label className="text-sm font-medium text-gray-600">Class</Label>
-                        <p className="text-sm">{viewingItem.className}</p>
-                      </div>
-                    </div>
-                    <div className="grid md:grid-cols-3 gap-4">
-                      <div>
-                        <Label className="text-sm font-medium text-gray-600">Date of Birth</Label>
-                        <p className="text-sm">{viewingItem.dateOfBirth}</p>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium text-gray-600">Gender</Label>
-                        <p className="text-sm">{viewingItem.gender}</p>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium text-gray-600">Date Admitted</Label>
-                        <p className="text-sm">{viewingItem.dateAdmitted}</p>
+                        <Label className="text-xs font-medium text-gray-600">Class</Label>
+                        <p className="text-gray-800">{viewingItem.className}</p>
                       </div>
                     </div>
-                    <div className="grid md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
-                        <Label className="text-sm font-medium text-gray-600">Student Email</Label>
-                        <p className="text-sm">{viewingItem.email || "Not provided"}</p>
+                        <Label className="text-xs font-medium text-gray-600">Date of Birth</Label>
+                        <p className="text-gray-800">{viewingItem.dateOfBirth}</p>
                       </div>
                       <div>
-                        <Label className="text-sm font-medium text-gray-600">Student Phone</Label>
-                        <p className="text-sm">{viewingItem.phone || "Not provided"}</p>
-                      </div>
-                    </div>
-                    <div className="grid md:grid-cols-3 gap-4">
-                      <div>
-                        <Label className="text-sm font-medium text-gray-600">Parent Name</Label>
-                        <p className="text-sm">{viewingItem.parentName}</p>
+                        <Label className="text-xs font-medium text-gray-600">Gender</Label>
+                        <p className="text-gray-800">{viewingItem.gender}</p>
                       </div>
                       <div>
-                        <Label className="text-sm font-medium text-gray-600">Parent Phone</Label>
-                        <p className="text-sm">{viewingItem.parentPhone}</p>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium text-gray-600">Parent Email</Label>
-                        <p className="text-sm">{viewingItem.parentEmail || "Not provided"}</p>
+                        <Label className="text-xs font-medium text-gray-600">Date Admitted</Label>
+                        <p className="text-gray-800">{viewingItem.dateAdmitted}</p>
                       </div>
                     </div>
-                    {/* Parent credentials from API */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-xs font-medium text-gray-600">Student Email</Label>
+                        <p className="text-gray-800">{viewingItem.email || "Not provided"}</p>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-medium text-gray-600">Student Phone</Label>
+                        <p className="text-gray-800">{viewingItem.phone || "Not provided"}</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <Label className="text-xs font-medium text-gray-600">Parent Name</Label>
+                        <p className="text-gray-800">{viewingItem.parentName}</p>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-medium text-gray-600">Parent Phone</Label>
+                        <p className="text-gray-800">{viewingItem.parentPhone}</p>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-medium text-gray-600">Parent Email</Label>
+                        <p className="text-gray-800">{viewingItem.parentEmail || "Not provided"}</p>
+                      </div>
+                    </div>
                     {viewingItem.parent && (
                       <div className="space-y-2 mt-4">
                         <div className="font-bold">Parent Login Credentials</div>
@@ -1664,11 +1713,11 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                       </div>
                     )}
                     <div>
-                      <Label className="text-sm font-medium text-gray-600">Home Address</Label>
-                      <p className="text-sm">{viewingItem.address || "Not provided"}</p>
+                      <Label className="text-xs font-medium text-gray-600">Home Address</Label>
+                      <p className="text-gray-800">{viewingItem.address || "Not provided"}</p>
                     </div>
                     <div>
-                      <Label className="text-sm font-medium text-gray-600">Status</Label>
+                      <Label className="text-xs font-medium text-gray-600">Status</Label>
                       <Badge variant={viewingItem.status === "active" ? "default" : "secondary"}>
                         {viewingItem.status}
                       </Badge>
@@ -1676,7 +1725,7 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                     <div className="pt-4 flex flex-col items-center">
                       <a
                         href={`/schools/${schoolData.schoolCode}/parent/login`}
-                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+                        className="w-full md:w-auto px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition text-center"
                       >
                         Go to Parent Login
                       </a>

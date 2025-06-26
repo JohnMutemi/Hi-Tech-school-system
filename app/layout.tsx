@@ -3,7 +3,7 @@ import './globals.css'
 import { Toaster } from "@/components/ui/toaster"
 
 export const metadata: Metadata = {
-  title: 'eduSMS - Educational School Management System',
+  title: 'Hi-Tech SMS - Educational School Management System',
   description: 'A comprehensive school management system for educational institutions',
   generator: 'v0.dev',
 }

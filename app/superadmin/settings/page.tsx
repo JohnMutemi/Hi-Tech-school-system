@@ -27,8 +27,8 @@ export default function SettingsPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [settings, setSettings] = useState({
-    platformName: "eduSMS Platform",
-    adminEmail: "admin@edusms.com",
+    platformName: "Hi-Tech SMS Platform",
+    adminEmail: "admin@hitechsms.com",
     notifications: {
       newSchoolAlert: true,
       systemAlerts: true,

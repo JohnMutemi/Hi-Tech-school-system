@@ -422,7 +422,7 @@ export function ParentDashboard({ schoolCode, parentId }: { schoolCode: string; 
   };
 
   const ChildrenManagement = () => (
-    <Card className="w-full max-w-3xl rounded-3xl shadow-2xl bg-white/95 p-8 md:p-12 border-2 border-blue-200 mx-auto">
+    <Card className="bg-white/70 backdrop-blur-lg rounded-2xl shadow-xl border-0 px-2 py-2 md:px-8 md:py-6">
       <CardHeader>
         <CardTitle className="text-3xl font-extrabold text-blue-800 mb-2 text-center drop-shadow-lg tracking-tight">
           My Children
@@ -482,7 +482,7 @@ export function ParentDashboard({ schoolCode, parentId }: { schoolCode: string; 
   );
 
   const PaymentsHistory = () => (
-    <Card className="w-full max-w-3xl rounded-3xl shadow-2xl bg-white/95 p-8 md:p-12 border-2 border-green-200 mx-auto mt-10">
+    <Card className="bg-white/70 backdrop-blur-lg rounded-2xl shadow-xl border-0 px-2 py-2 md:px-8 md:py-6">
       <CardHeader>
         <CardTitle className="text-3xl font-extrabold text-green-800 mb-2 text-center drop-shadow-lg tracking-tight">
           Payments History
@@ -544,7 +544,7 @@ export function ParentDashboard({ schoolCode, parentId }: { schoolCode: string; 
   );
 
   const ProfileSettings = () => (
-    <Card className="w-full max-w-2xl rounded-3xl shadow-2xl bg-white/95 p-8 md:p-12 border-2 border-blue-200 mx-auto mt-10">
+    <Card className="bg-white/70 backdrop-blur-lg rounded-2xl shadow-xl border-0 px-2 py-2 md:px-8 md:py-6">
       <CardHeader>
         <CardTitle className="text-3xl font-extrabold text-blue-800 mb-2 text-center drop-shadow-lg tracking-tight">
           Profile & Security
