@@ -98,32 +98,6 @@ export default function SchoolsManagementPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-4">
-              <Link href="/superadmin" className="text-blue-600 hover:text-blue-800">
-                ← Back to Dashboard
-              </Link>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Schools Management</h1>
-                <p className="text-sm text-gray-600">Manage all schools in the system</p>
-              </div>
-            </div>
-            <Button
-              asChild
-              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-            >
-              <Link href="/superadmin/schools/add">
-                <Plus className="w-4 h-4 mr-2" />
-                Add New School
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </div>
-
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Stats Cards */}

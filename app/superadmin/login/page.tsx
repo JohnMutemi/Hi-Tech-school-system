@@ -1,6 +1,9 @@
 import { SuperAdminLogin } from "@/components/superadmin/login"
 
 export default function SuperAdminLoginPage() {
+  // This should only run on the login page, not in any parent layout
+  console.log('Login page rendering - no parent layout should be active')
+  
   return (
     <div className="min-h-screen w-full flex items-center justify-center relative overflow-hidden">
       {/* Background image only */}

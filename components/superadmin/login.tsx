@@ -8,11 +8,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Eye, EyeOff } from "lucide-react"
-import { useUser } from "@/hooks/use-user"
+import { mutate } from "@/hooks/use-user"
 
 export function SuperAdminLogin() {
   const router = useRouter()
-  const { user } = useUser()
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -34,6 +33,7 @@ export function SuperAdminLogin() {
       })
 
       if (res.ok) {
+        await mutate('/api/superadmin/user')
         router.push('/superadmin')
       } else {
         setError("Invalid credentials. Please try again.")
