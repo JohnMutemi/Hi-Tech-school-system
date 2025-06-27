@@ -16,6 +16,11 @@ import { toast } from "@/components/ui/use-toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { PaymentModal } from "@/components/payment/payment-modal";
 
+// @ts-ignore
+declare global {
+  interface Window { html2pdf: any }
+}
+
 interface FeeStructure {
   id: string;
   term: string;
@@ -107,12 +112,19 @@ export function ParentDashboard({ schoolCode, parentId }: { schoolCode: string; 
   const [paymentType, setPaymentType] = useState<'full' | 'partial'>('full');
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [mpesaProcessing, setMpesaProcessing] = useState(false);
+  const [mpesaSuccess, setMpesaSuccess] = useState(false);
   
   // Payment history state
   const [paymentHistory, setPaymentHistory] = useState<PaymentHistory[]>([]);
   
   // Collapsible term state
   const [collapsedTerms, setCollapsedTerms] = useState<{[studentId: string]: {[term: string]: boolean}}>({});
+  
+  // Format selection modal state
+  const [formatModalOpen, setFormatModalOpen] = useState(false);
+  const [selectedReceiptForDownload, setSelectedReceiptForDownload] = useState<PaymentReceipt | null>(null);
+  const [lastReceiptHtml, setLastReceiptHtml] = useState<string | null>(null);
+  const [lastReceiptFormat, setLastReceiptFormat] = useState<'A3' | 'A4' | 'A5' | null>(null);
   
   useEffect(() => {
     async function fetchSession() {
@@ -853,80 +865,75 @@ Thank you for your payment!
     return true;
   };
 
-  // Enhanced M-Pesa simulation
+  // Enhanced M-Pesa simulation with UX improvement
   const simulateMpesaPayment = async () => {
     if (!validatePaymentForm()) return;
-    if (!selectedFeeStructure) return;
-    
+    if (!selectedFeeStructure || !selectedStudent) return;
     setMpesaProcessing(true);
-    setPaymentMessage("Initiating M-Pesa payment...");
-    
-    // Step 1: Initiating payment
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setPaymentMessage("Sending payment request to M-Pesa...");
-    
-    // Step 2: M-Pesa processing
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setPaymentMessage("M-Pesa is processing your payment...");
-    
-    // Step 3: Payment completion
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Simulate successful payment (no more random failures)
-    const transactionId = `TXN-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const receiptNumber = `RCP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
-    const paymentRecord: PaymentHistory = {
-      id: `payment-${Date.now()}`,
-      studentId: selectedStudent.id,
-      studentName: selectedStudent.name,
-      term: selectedTerm,
-      year: selectedFeeStructure.year,
-      totalAmount: selectedFeeStructure.totalAmount,
-      paidAmount: paymentAmount,
-      balance: selectedFeeStructure.totalAmount - paymentAmount,
-      paymentDate: new Date().toISOString(),
-      status: paymentAmount >= selectedFeeStructure.totalAmount ? 'completed' : 'partial',
-      paymentMethod: 'mpesa',
-      receiptNumber: receiptNumber,
-      transactionId: transactionId
-    };
-
-    // Update payment history
-    setPaymentHistory(prev => [paymentRecord, ...prev]);
-
-    // Generate receipt
-    const receipt: PaymentReceipt = {
-      id: `receipt-${Date.now()}`,
-      receiptNumber: receiptNumber,
-      studentName: selectedStudent.name,
-      studentClass: selectedStudent.className || selectedStudent.classLevel,
-      admissionNumber: selectedStudent.admissionNumber,
-      term: selectedTerm,
-      year: selectedFeeStructure.year,
-      amount: paymentAmount,
-      paymentMethod: 'mpesa',
-      paymentDate: new Date().toISOString(),
-      transactionId: transactionId,
-      status: paymentAmount >= selectedFeeStructure.totalAmount ? 'completed' : 'partial',
-      breakdown: selectedFeeStructure.breakdown
-    };
-
-    setReceipts(prev => [receipt, ...prev]);
-
+    setMpesaSuccess(false);
+    setPaymentMessage("Processing payment via M-Pesa...");
+    // Simulate processing duration
+    await new Promise(resolve => setTimeout(resolve, 3000));
     setMpesaProcessing(false);
-    setPaymentStatus('success');
+    setMpesaSuccess(true);
     setPaymentMessage("Payment completed successfully!");
 
-    toast({
-      title: "Payment Successful",
-      description: `Payment of KES ${paymentAmount.toLocaleString()} processed via M-Pesa. Receipt generated.`,
-      variant: "default"
-    });
+    // --- Add payment to history and generate receipt ---
+    const now = new Date();
+    const transactionId = `TXN-${now.getTime()}-${Math.random().toString(36).substr(2, 9)}`;
+    const receiptNumber = `RCP-${now.getTime()}-${Math.random().toString(36).substr(2, 9)}`;
 
-    // Auto-close modal after 3 seconds
+    // Calculate the new balance after this payment
+    const newBalance = Math.max(
+      0,
+      selectedFeeStructure.totalAmount - (getTotalPaidAmount(selectedStudent.id, selectedTerm) + paymentAmount)
+    );
+
+    // Add payment record
+    setPaymentHistory(prev => [
+      {
+        id: `payment-${now.getTime()}`,
+        studentId: selectedStudent.id,
+        studentName: selectedStudent.name,
+        term: selectedTerm,
+        year: selectedFeeStructure.year,
+        totalAmount: selectedFeeStructure.totalAmount,
+        paidAmount: paymentAmount,
+        balance: newBalance,
+        paymentDate: now.toISOString(),
+        status: 'completed',
+        paymentMethod: 'mobile_money',
+        receiptNumber,
+        transactionId
+      },
+      ...prev
+    ]);
+
+    // Add receipt
+    setReceipts(prev => [
+      {
+        id: `receipt-${now.getTime()}`,
+        receiptNumber,
+        studentName: selectedStudent.name,
+        studentClass: selectedStudent.className || selectedStudent.classLevel,
+        admissionNumber: selectedStudent.admissionNumber,
+        term: selectedTerm,
+        year: selectedFeeStructure.year,
+        amount: paymentAmount,
+        paymentMethod: 'mobile_money',
+        paymentDate: now.toISOString(),
+        transactionId,
+        status: 'completed',
+        breakdown: selectedFeeStructure.breakdown,
+        balance: newBalance
+      },
+      ...prev
+    ]);
+
+    // Show payment complete for 1.5s, then close modal and reset state
     setTimeout(() => {
       setPaymentModalOpen(false);
+      setMpesaSuccess(false);
       setPaymentProcessing(false);
       setPaymentStatus('idle');
       setPaymentMessage("");
@@ -938,7 +945,453 @@ Thank you for your payment!
       setPaymentType('full');
       setShowPaymentForm(false);
       setMpesaProcessing(false);
-    }, 3000);
+    }, 1500);
+  };
+
+  // Helper function to convert amount to words
+  const amountToWords = (amount: number): string => {
+    const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+    const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+    const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+
+    const convertLessThanOneThousand = (num: number): string => {
+      if (num === 0) return '';
+
+      if (num < 10) return ones[num];
+      if (num < 20) return teens[num - 10];
+      if (num < 100) return tens[Math.floor(num / 10)] + (num % 10 !== 0 ? ' ' + ones[num % 10] : '');
+      return ones[Math.floor(num / 100)] + ' Hundred' + (num % 100 !== 0 ? ' and ' + convertLessThanOneThousand(num % 100) : '');
+    };
+
+    if (amount === 0) return 'Zero';
+    if (amount < 0) return 'Negative ' + amountToWords(Math.abs(amount));
+
+    let words = '';
+
+    if (Math.floor(amount / 1000000) > 0) {
+      words += convertLessThanOneThousand(Math.floor(amount / 1000000)) + ' Million ';
+      amount %= 1000000;
+    }
+
+    if (Math.floor(amount / 1000) > 0) {
+      words += convertLessThanOneThousand(Math.floor(amount / 1000)) + ' Thousand ';
+      amount %= 1000;
+    }
+
+    if (amount > 0) {
+      words += convertLessThanOneThousand(amount);
+    }
+
+    return words.trim() + ' Shillings Only';
+  };
+
+  const schoolName = 'Hi-Tech School Management System';
+  // Enhanced receipt generation with multiple formats
+  const generateBeautifulReceipt = (receipt: PaymentReceipt, format: 'A3' | 'A4' | 'A5' = 'A4') => {
+    const totalAmount = receipt.amount;
+    const amountInWords = amountToWords(totalAmount);
+    const remainingBalance = getRemainingBalance(receipt.admissionNumber, receipt.term);
+    const isFullyPaid = remainingBalance === 0;
+    
+    // Get current date and time
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+    const timeStr = now.toLocaleTimeString('en-US', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+
+    // CSS styles based on format
+    const formatStyles = {
+      A3: { width: '297mm', height: '420mm', fontSize: '16px', padding: '40px' },
+      A4: { width: '210mm', height: '297mm', fontSize: '14px', padding: '30px' },
+      A5: { width: '148mm', height: '210mm', fontSize: '12px', padding: '20px' }
+    };
+
+    const styles = formatStyles[format];
+
+    const receiptHTML = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Payment Receipt - ${receipt.receiptNumber}</title>
+          <style>
+            @page { size: ${format}; margin: 10mm; }
+            body { 
+              font-family: 'Times New Roman', serif; 
+              margin: 0; 
+              padding: ${styles.padding}; 
+              font-size: ${styles.fontSize};
+              background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+              min-height: 100vh;
+            }
+            .receipt-container {
+              background: white;
+              border-radius: 20px;
+              box-shadow: 
+                0 20px 40px rgba(0,0,0,0.1),
+                0 0 0 1px rgba(255,255,255,0.8);
+              overflow: hidden;
+              position: relative;
+              max-width: ${styles.width};
+              margin: 0 auto;
+            }
+            .receipt-container::before {
+              content: '';
+              position: absolute;
+              top: 0;
+              left: 0;
+              right: 0;
+              height: 8px;
+              background: linear-gradient(90deg, #2563eb, #3b82f6, #60a5fa);
+            }
+            .header {
+              background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+              color: white;
+              padding: 30px;
+              text-align: center;
+              position: relative;
+            }
+            .header::after {
+              content: '';
+              position: absolute;
+              bottom: -20px;
+              left: 50%;
+              transform: translateX(-50%);
+              width: 0;
+              height: 0;
+              border-left: 20px solid transparent;
+              border-right: 20px solid transparent;
+              border-top: 20px solid #3b82f6;
+            }
+            .school-name {
+              font-size: ${format === 'A3' ? '32px' : format === 'A4' ? '28px' : '24px'};
+              font-weight: bold;
+              margin-bottom: 8px;
+              text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            }
+            .receipt-title {
+              font-size: ${format === 'A3' ? '24px' : format === 'A4' ? '20px' : '18px'};
+              margin-bottom: 5px;
+              opacity: 0.9;
+            }
+            .receipt-number {
+              font-size: ${format === 'A3' ? '18px' : format === 'A4' ? '16px' : '14px'};
+              opacity: 0.8;
+              font-family: 'Courier New', monospace;
+            }
+            .content {
+              padding: 40px 30px;
+              position: relative;
+            }
+            .section {
+              margin-bottom: 25px;
+              position: relative;
+            }
+            .section-title {
+              font-size: ${format === 'A3' ? '20px' : format === 'A4' ? '18px' : '16px'};
+              font-weight: bold;
+              color: #1e40af;
+              margin-bottom: 15px;
+              padding-bottom: 8px;
+              border-bottom: 2px solid #e5e7eb;
+              position: relative;
+            }
+            .section-title::after {
+              content: '';
+              position: absolute;
+              bottom: -2px;
+              left: 0;
+              width: 50px;
+              height: 2px;
+              background: #3b82f6;
+            }
+            .info-grid {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 15px;
+              margin-bottom: 20px;
+            }
+            .info-item {
+              display: flex;
+              justify-content: space-between;
+              padding: 8px 0;
+              border-bottom: 1px solid #f3f4f6;
+            }
+            .info-label {
+              font-weight: 600;
+              color: #374151;
+            }
+            .info-value {
+              font-weight: 500;
+              color: #1f2937;
+            }
+            .amount-section {
+              text-align: center;
+              background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+              padding: 25px;
+              border-radius: 15px;
+              margin: 25px 0;
+              border: 2px solid #0ea5e9;
+            }
+            .amount-figure {
+              font-size: ${format === 'A3' ? '36px' : format === 'A4' ? '32px' : '28px'};
+              font-weight: bold;
+              color: #0c4a6e;
+              margin-bottom: 10px;
+            }
+            .amount-words {
+              font-size: ${format === 'A3' ? '16px' : format === 'A4' ? '14px' : '12px'};
+              color: #0369a1;
+              font-style: italic;
+              line-height: 1.4;
+            }
+            .balance-info {
+              background: ${isFullyPaid ? '#f0fdf4' : '#fef3c7'};
+              border: 2px solid ${isFullyPaid ? '#22c55e' : '#f59e0b'};
+              border-radius: 10px;
+              padding: 15px;
+              margin: 20px 0;
+              text-align: center;
+            }
+            .balance-text {
+              font-size: ${format === 'A3' ? '18px' : format === 'A4' ? '16px' : '14px'};
+              font-weight: bold;
+              color: ${isFullyPaid ? '#166534' : '#92400e'};
+            }
+            .breakdown {
+              background: #f8fafc;
+              border-radius: 10px;
+              padding: 20px;
+              margin: 20px 0;
+            }
+            .breakdown-item {
+              display: flex;
+              justify-content: space-between;
+              padding: 8px 0;
+              border-bottom: 1px solid #e2e8f0;
+            }
+            .breakdown-item:last-child {
+              border-bottom: none;
+              font-weight: bold;
+              color: #1e40af;
+            }
+            .footer {
+              background: #f8fafc;
+              padding: 25px;
+              text-align: center;
+              border-top: 2px solid #e5e7eb;
+              margin-top: 30px;
+            }
+            .footer-text {
+              color: #6b7280;
+              font-size: ${format === 'A3' ? '14px' : format === 'A4' ? '12px' : '10px'};
+              margin-bottom: 5px;
+            }
+            .watermark {
+              position: absolute;
+              top: 50%;
+              left: 50%;
+              transform: translate(-50%, -50%) rotate(-45deg);
+              font-size: 120px;
+              color: rgba(59, 130, 246, 0.05);
+              font-weight: bold;
+              pointer-events: none;
+              z-index: 1;
+            }
+            .content > * {
+              position: relative;
+              z-index: 2;
+            }
+            @media print {
+              body { background: white; }
+              .receipt-container { box-shadow: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="receipt-container">
+            <div class="watermark">${schoolName}</div>
+            
+            <div class="header">
+              <div class="school-name">Hi-Tech School System</div>
+              <div class="receipt-title">OFFICIAL PAYMENT RECEIPT</div>
+              <div class="receipt-number">Receipt #: ${receipt.receiptNumber}</div>
+            </div>
+            
+            <div class="content">
+              <div class="section">
+                <div class="section-title">Student Information</div>
+                <div class="info-grid">
+                  <div class="info-item">
+                    <span class="info-label">Student Name:</span>
+                    <span class="info-value">${receipt.studentName}</span>
+                  </div>
+                  <div class="info-item">
+                    <span class="info-label">Admission Number:</span>
+                    <span class="info-value">${receipt.admissionNumber}</span>
+                  </div>
+                  <div class="info-item">
+                    <span class="info-label">Class:</span>
+                    <span class="info-value">${receipt.studentClass}</span>
+                  </div>
+                  <div class="info-item">
+                    <span class="info-label">Academic Year:</span>
+                    <span class="info-value">${receipt.year}</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="section">
+                <div class="section-title">Payment Details</div>
+                <div class="info-grid">
+                  <div class="info-item">
+                    <span class="info-label">Term:</span>
+                    <span class="info-value">${receipt.term}</span>
+                  </div>
+                  <div class="info-item">
+                    <span class="info-label">Payment Method:</span>
+                    <span class="info-value">${receipt.paymentMethod.toUpperCase()}</span>
+                  </div>
+                  <div class="info-item">
+                    <span class="info-label">Transaction ID:</span>
+                    <span class="info-value">${receipt.transactionId}</span>
+                  </div>
+                  <div class="info-item">
+                    <span class="info-label">Payment Date:</span>
+                    <span class="info-value">${dateStr} at ${timeStr}</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="amount-section">
+                <div class="amount-figure">KES ${totalAmount.toLocaleString()}</div>
+                <div class="amount-words">${amountInWords}</div>
+              </div>
+              
+              ${remainingBalance === 0 ? `
+                <div class="balance-info">
+                  <div class="balance-text">✓ Payment Complete - No Outstanding Balance</div>
+                </div>
+              ` : `
+                <div class="balance-info">
+                  <div class="balance-text">Remaining Balance: KES ${remainingBalance.toLocaleString()}</div>
+                </div>
+              `}
+              
+              <div class="section">
+                <div class="section-title">Fee Breakdown</div>
+                <div class="breakdown">
+                  ${Object.entries(receipt.breakdown || {}).map(([key, value]) => `
+                    <div class="breakdown-item">
+                      <span>${key.replace(/([A-Z])/g, ' $1').trim()}</span>
+                      <span>KES ${value.toLocaleString()}</span>
+                    </div>
+                  `).join('')}
+                  <div class="breakdown-item">
+                    <span>Total Amount Paid</span>
+                    <span>KES ${totalAmount.toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="footer">
+              <div class="footer-text">This is an official computer-generated receipt</div>
+              <div class="footer-text">Generated on ${dateStr} at ${timeStr}</div>
+              <div class="footer-text">Thank you for your payment!</div>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    // Create blob and download
+    const blob = new Blob([receiptHTML], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `receipt-${receipt.receiptNumber}-${format.toLowerCase()}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: "Receipt Downloaded",
+      description: `Beautiful receipt downloaded in ${format} format.`,
+      variant: "default"
+    });
+  };
+
+  // Enhanced receipt download with format selection
+  const handleReceiptDownload = (receipt: PaymentReceipt) => {
+    setSelectedReceiptForDownload(receipt);
+    setFormatModalOpen(true);
+  };
+
+  // Handle format selection and download
+  const handleFormatSelection = (format: 'A3' | 'A4' | 'A5') => {
+    if (selectedReceiptForDownload) {
+      generateBeautifulReceipt(selectedReceiptForDownload, format);
+    }
+    setFormatModalOpen(false);
+    setSelectedReceiptForDownload(null);
+  };
+
+  useEffect(() => {
+    // Add html2pdf.js CDN if not present
+    if (!document.getElementById('html2pdf-cdn')) {
+      const script = document.createElement('script');
+      script.id = 'html2pdf-cdn';
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+      script.async = true;
+      document.head.appendChild(script);
+    }
+  }, []);
+
+  const handlePrintReceipt = () => {
+    if (lastReceiptHtml) {
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(lastReceiptHtml);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => {
+          printWindow.print();
+        }, 500);
+      }
+    }
+  };
+
+  const handleDownloadPdf = () => {
+    if (lastReceiptHtml && window.html2pdf) {
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+      const doc = iframe.contentWindow?.document;
+      if (doc) {
+        doc.open();
+        doc.write(lastReceiptHtml);
+        doc.close();
+        iframe.onload = () => {
+          window.html2pdf(iframe.contentDocument?.body, {
+            margin: 0,
+            filename: `receipt.pdf`,
+            html2canvas: { scale: 2 },
+            jsPDF: { unit: 'mm', format: lastReceiptFormat || 'a4', orientation: 'portrait' }
+          }).then(() => {
+            document.body.removeChild(iframe);
+          });
+        };
+      }
+    } else {
+      toast({ title: 'PDF Export Error', description: 'PDF library not loaded yet. Please try again.', variant: 'destructive' });
+    }
   };
 
   if (isLoading) {
@@ -1403,10 +1856,10 @@ Thank you for your payment!
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => generatePDFReceipt(receipt)}
+                                  onClick={() => handleReceiptDownload(receipt)}
                                   className="flex items-center gap-1"
                                 >
-                                  <Download className="w-4 h-4" /> PDF
+                                  <Download className="w-4 h-4" /> Download
                                 </Button>
                               </div>
                             </td>
@@ -1418,7 +1871,17 @@ Thank you for your payment!
                 )}
                 {selectedReceipt && (
                   <ReceiptView
-                    receipt={selectedReceipt}
+                    receipt={{
+                      ...selectedReceipt,
+                      paymentMethod: 
+                        ['mobile_money', 'cash', 'bank_transfer', 'check'].includes(selectedReceipt.paymentMethod)
+                          ? (selectedReceipt.paymentMethod as 'mobile_money' | 'cash' | 'bank_transfer' | 'check')
+                          : 'mobile_money',
+                      studentId: selectedReceipt.admissionNumber,
+                      description: `${selectedReceipt.term} ${selectedReceipt.year} School Fees`,
+                      receivedBy: 'School System',
+                      createdAt: selectedReceipt.paymentDate
+                    }}
                     studentName={selectedReceipt.studentName}
                     studentClass={selectedReceipt.studentClass}
                     admissionNumber={selectedReceipt.admissionNumber}
@@ -1553,25 +2016,12 @@ Thank you for your payment!
                                     onClick={() => {
                                       const receipt = receipts.find(r => r.receiptNumber === payment.receiptNumber);
                                       if (receipt) {
-                                        setSelectedReceipt(receipt);
+                                        handleReceiptDownload(receipt);
                                       }
                                     }}
                                     className="flex items-center gap-1"
                                   >
-                                    <Receipt className="w-3 h-3" /> View
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => {
-                                      const receipt = receipts.find(r => r.receiptNumber === payment.receiptNumber);
-                                      if (receipt) {
-                                        generatePDFReceipt(receipt);
-                                      }
-                                    }}
-                                    className="flex items-center gap-1"
-                                  >
-                                    <Download className="w-3 h-3" /> PDF
+                                    <Download className="w-3 h-3" /> Download
                                   </Button>
                                 </div>
                               </td>
@@ -1584,7 +2034,17 @@ Thank you for your payment!
                     {/* Payment Details Modal */}
                     {selectedReceipt && (
                       <ReceiptView
-                        receipt={selectedReceipt}
+                        receipt={{
+                          ...selectedReceipt,
+                          paymentMethod: 
+                            ['mobile_money', 'cash', 'bank_transfer', 'check'].includes(selectedReceipt.paymentMethod)
+                              ? (selectedReceipt.paymentMethod as 'mobile_money' | 'cash' | 'bank_transfer' | 'check')
+                              : 'mobile_money',
+                          studentId: selectedReceipt.admissionNumber,
+                          description: `${selectedReceipt.term} ${selectedReceipt.year} School Fees`,
+                          receivedBy: 'School System',
+                          createdAt: selectedReceipt.paymentDate
+                        }}
                         studentName={selectedReceipt.studentName}
                         studentClass={selectedReceipt.studentClass}
                         admissionNumber={selectedReceipt.admissionNumber}
@@ -1715,6 +2175,13 @@ Thank you for your payment!
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-green-600"></div>
                     Processing Payment...
                   </>
+                ) : mpesaSuccess ? (
+                  <>
+                    <div className="w-7 h-7 bg-green-600 rounded-full flex items-center justify-center animate-bounce">
+                      <CheckCircle className="w-6 h-6 text-white" />
+                    </div>
+                    <span className="text-green-700 font-bold ml-2">Payment Complete</span>
+                  </>
                 ) : (
                   <>
                     <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center">
@@ -1734,7 +2201,13 @@ Thank you for your payment!
                       </div>
                     </div>
                   </div>
+                ) : mpesaSuccess ? (
+                  <div className="space-y-3 text-center">
+                    <div className="text-green-700 text-lg font-bold">Payment Complete!</div>
+                    <div className="text-sm text-gray-600">Thank you for your payment.</div>
+                  </div>
                 ) : (
+                  // ...existing payment form...
                   <div className="space-y-4">
                     {/* Compact Student Info */}
                     <div className="bg-gray-50 p-3 rounded-lg">
@@ -1757,7 +2230,6 @@ Thank you for your payment!
                         </div>
                       )}
                     </div>
-
                     {/* Payment Type Selection - Compact */}
                     <div className="space-y-2">
                       <label className="block text-xs font-medium text-gray-700">Payment Type</label>
@@ -1786,7 +2258,6 @@ Thank you for your payment!
                         </button>
                       </div>
                     </div>
-
                     {/* Amount and Phone - Side by Side */}
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
@@ -1812,7 +2283,6 @@ Thank you for your payment!
                         />
                       </div>
                     </div>
-
                     {/* Payment Method Badge */}
                     <div className="flex items-center justify-center">
                       <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
@@ -1822,7 +2292,6 @@ Thank you for your payment!
                         M-Pesa Payment
                       </div>
                     </div>
-
                     {/* Simulation Notice - Compact */}
                     <div className="bg-yellow-50 p-2 rounded text-xs text-yellow-800 text-center">
                       <strong>Simulation Mode:</strong> Test environment - no actual charges
@@ -1832,9 +2301,11 @@ Thank you for your payment!
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="gap-2">
-              {!mpesaProcessing && (
+              {!mpesaProcessing && !mpesaSuccess && (
                 <>
-                  <AlertDialogCancel 
+                  <Button 
+                    type="button"
+                    variant="outline"
                     onClick={() => {
                       setPaymentModalOpen(false);
                       setSelectedStudent(null);
@@ -1848,20 +2319,107 @@ Thank you for your payment!
                     className="text-xs px-3 py-2"
                   >
                     Cancel
-                  </AlertDialogCancel>
-                  <AlertDialogAction 
+                  </Button>
+                  <Button
+                    type="button"
                     onClick={simulateMpesaPayment}
                     className="bg-green-600 hover:bg-green-700 text-white text-xs px-4 py-2"
                     disabled={!phoneNumber.trim() || paymentAmount <= 0}
                   >
                     Pay via M-Pesa
-                  </AlertDialogAction>
+                  </Button>
                 </>
               )}
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
       )}
+
+      {/* Format Selection Modal */}
+      <AlertDialog open={formatModalOpen} onOpenChange={setFormatModalOpen}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-lg font-bold text-blue-800 flex items-center gap-2">
+              <Download className="w-5 h-5" />
+              Select Receipt Format
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {lastReceiptHtml ? (
+                <>
+                  Your receipt is ready! You can print or download as PDF below.
+                </>
+              ) : (
+                <>Choose your preferred receipt format for download:</>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {!lastReceiptHtml ? (
+            <div className="space-y-3 py-4">
+              <button
+                onClick={() => handleFormatSelection('A4')}
+                className="w-full p-4 border-2 border-blue-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all text-left"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-semibold text-blue-800">A4 (Standard)</div>
+                    <div className="text-sm text-gray-600">210mm × 297mm - Perfect for printing</div>
+                  </div>
+                  <div className="text-blue-600 font-bold">✓</div>
+                </div>
+              </button>
+              <button
+                onClick={() => handleFormatSelection('A3')}
+                className="w-full p-4 border-2 border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all text-left"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-semibold text-gray-800">A3 (Large)</div>
+                    <div className="text-sm text-gray-600">297mm × 420mm - Larger format for detailed view</div>
+                  </div>
+                  <div className="text-gray-400">→</div>
+                </div>
+              </button>
+              <button
+                onClick={() => handleFormatSelection('A5')}
+                className="w-full p-4 border-2 border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all text-left"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-semibold text-gray-800">A5 (Compact)</div>
+                    <div className="text-sm text-gray-600">148mm × 210mm - Compact for easy storage</div>
+                  </div>
+                  <div className="text-gray-400">→</div>
+                </div>
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4 py-4">
+              <Button onClick={handlePrintReceipt} className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+                Print Receipt
+              </Button>
+              <Button onClick={handleDownloadPdf} className="w-full bg-green-600 hover:bg-green-700 text-white">
+                Download as PDF
+              </Button>
+              <Button variant="outline" onClick={() => {
+                setLastReceiptHtml(null);
+                setLastReceiptFormat(null);
+              }} className="w-full">
+                Choose Different Format
+              </Button>
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setFormatModalOpen(false);
+              setSelectedReceiptForDownload(null);
+              setLastReceiptHtml(null);
+              setLastReceiptFormat(null);
+            }}>
+              Close
+            </AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

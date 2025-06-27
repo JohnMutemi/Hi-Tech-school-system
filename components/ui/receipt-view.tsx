@@ -76,6 +76,9 @@ Description: ${receipt.description}
           <div><strong>Admission No:</strong> {admissionNumber}</div>
           <div><strong>Class:</strong> {studentClass}</div>
           <div><strong>Amount Paid:</strong> {receipt.amount.toFixed(2)}</div>
+          {typeof receipt.balance !== 'undefined' && (
+            <div><strong>Balance after payment:</strong> {receipt.balance.toLocaleString()}</div>
+          )}
           <div><strong>Payment Method:</strong> {receipt.paymentMethod}</div>
           <div><strong>Received By:</strong> {receipt.receivedBy}</div>
           {receipt.referenceNumber && (
