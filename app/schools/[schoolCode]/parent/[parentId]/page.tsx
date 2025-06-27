@@ -32,6 +32,44 @@ interface FeeStructure {
   };
 }
 
+interface StudentFeeStructures {
+  [studentId: string]: {
+    [term: string]: FeeStructure | null;
+  };
+}
+
+interface PaymentHistory {
+  id: string;
+  studentId: string;
+  studentName: string;
+  term: string;
+  year: number;
+  totalAmount: number;
+  paidAmount: number;
+  balance: number;
+  paymentDate: string;
+  status: 'pending' | 'partial' | 'completed' | 'failed';
+  paymentMethod: string;
+  receiptNumber: string;
+  transactionId: string;
+}
+
+interface PaymentReceipt {
+  id: string;
+  receiptNumber: string;
+  studentName: string;
+  studentClass: string;
+  admissionNumber: string;
+  term: string;
+  year: number;
+  amount: number;
+  paymentMethod: string;
+  paymentDate: string;
+  transactionId: string;
+  status: string;
+  breakdown: Record<string, number>;
+}
+
 export function ParentDashboard({ schoolCode, parentId }: { schoolCode: string; parentId?: string }) {
   const [parent, setParent] = useState<any>(null);
   const [students, setStudents] = useState<any[]>([]);
@@ -41,14 +79,14 @@ export function ParentDashboard({ schoolCode, parentId }: { schoolCode: string; 
   const [avatarError, setAvatarError] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [receipts, setReceipts] = useState<any[]>([]);
-  const [selectedReceipt, setSelectedReceipt] = useState<any>(null);
+  const [receipts, setReceipts] = useState<PaymentReceipt[]>([]);
+  const [selectedReceipt, setSelectedReceipt] = useState<PaymentReceipt | null>(null);
   const router = useRouter();
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordMsg, setPasswordMsg] = useState("");
-  const [feeStructures, setFeeStructures] = useState<FeeStructure[]>([]);
+  const [studentFeeStructures, setStudentFeeStructures] = useState<StudentFeeStructures>({});
   const [loadingFees, setLoadingFees] = useState(true);
   const [pendingParentCredentials, setPendingParentCredentials] = useState<{ phone: string; tempPassword: string } | null>(null);
   
@@ -56,7 +94,26 @@ export function ParentDashboard({ schoolCode, parentId }: { schoolCode: string; 
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [selectedFeeStructure, setSelectedFeeStructure] = useState<FeeStructure | null>(null);
-
+  const [selectedTerm, setSelectedTerm] = useState<string>("");
+  
+  // Payment processing state
+  const [paymentProcessing, setPaymentProcessing] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'success' | 'failed'>('idle');
+  const [paymentMessage, setPaymentMessage] = useState("");
+  
+  // Enhanced payment state
+  const [paymentAmount, setPaymentAmount] = useState<number>(0);
+  const [phoneNumber, setPhoneNumber] = useState<string>("");
+  const [paymentType, setPaymentType] = useState<'full' | 'partial'>('full');
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [mpesaProcessing, setMpesaProcessing] = useState(false);
+  
+  // Payment history state
+  const [paymentHistory, setPaymentHistory] = useState<PaymentHistory[]>([]);
+  
+  // Collapsible term state
+  const [collapsedTerms, setCollapsedTerms] = useState<{[studentId: string]: {[term: string]: boolean}}>({});
+  
   useEffect(() => {
     async function fetchSession() {
       try {
@@ -93,9 +150,6 @@ export function ParentDashboard({ schoolCode, parentId }: { schoolCode: string; 
           setParent(data.parent);
           setStudents(data.students);
         }
-        
-        // Fetch fee structures for all students
-        await fetchFeeStructures(students);
       } catch (error) {
         console.error("ParentDashboard: Failed to fetch session:", error);
         router.replace(`/schools/${schoolCode}/parent/login`);
@@ -105,6 +159,13 @@ export function ParentDashboard({ schoolCode, parentId }: { schoolCode: string; 
     }
     fetchSession();
   }, [schoolCode, parentId]);
+
+  // Add this useEffect to fetch fee structures after students state is updated
+  useEffect(() => {
+    if (students.length > 0) {
+      fetchFeeStructures(students);
+    }
+  }, [students]);
 
   // Listen for fee structure updates from admin panel
   useEffect(() => {
@@ -144,45 +205,54 @@ export function ParentDashboard({ schoolCode, parentId }: { schoolCode: string; 
   const fetchFeeStructures = async (studentList: any[]) => {
     try {
       setLoadingFees(true);
-      const classLevels = [...new Set(studentList.map(student => student.className || student.classLevel))];
+      const currentYear = new Date().getFullYear();
+      const terms = ['Term 1', 'Term 2', 'Term 3'];
       
-      console.log('Fetching fee structures for class levels:', classLevels);
-      
-      // Get current term
-      const currentDate = new Date();
-      const currentYear = currentDate.getFullYear();
-      const currentMonth = currentDate.getMonth();
-      
-      let currentTerm = "Term 1";
-      if (currentMonth >= 4 && currentMonth <= 7) currentTerm = "Term 2";
-      else if (currentMonth >= 8) currentTerm = "Term 3";
+      console.log('Fetching fee structures for all terms and students:', studentList.length);
+      console.log('Student list:', studentList.map(s => ({ id: s.id, name: s.name, className: s.className })));
 
-      console.log(`Current term: ${currentTerm}, Year: ${currentYear}`);
-
-      // Fetch fee structures for each class level using the same logic as student dashboard
-      const feePromises = classLevels.map(async (classLevel) => {
-        const response = await fetch(
-          `/api/schools/${schoolCode}/fee-structure?term=${currentTerm}&year=${currentYear}&classLevel=${encodeURIComponent(classLevel)}`
-        );
-        if (response.ok) {
-          const data = await response.json();
-          console.log(`Fee structures for ${classLevel}:`, data);
+      // Fetch fee structures for each student and all terms
+      const allFeePromises = studentList.map(async (student) => {
+        const studentFees: { [term: string]: FeeStructure | null } = {};
+        
+        console.log(`Processing student: ${student.name} (ID: ${student.id})`);
+        
+        // Fetch fees for each term
+        for (const term of terms) {
+          const response = await fetch(
+            `/api/schools/${schoolCode}/fee-structure?term=${term}&year=${currentYear}&classLevel=${encodeURIComponent(student.className || student.classLevel)}`
+          );
           
-          // Find active fee structure (same logic as student dashboard)
-          const activeFeeStructure = data.find((fee: any) => fee.isActive);
-          console.log(`Active fee structure for ${classLevel}:`, activeFeeStructure);
-          
-          return activeFeeStructure || null;
-        } else {
-          console.error(`Failed to fetch fee structures for ${classLevel}:`, response.status, response.statusText);
-          return null;
+          if (response.ok) {
+            const data = await response.json();
+            console.log(`Fee structures for ${student.name} - ${term}:`, data);
+            
+            // Find active fee structure
+            const activeFeeStructure = data.find((fee: any) => fee.isActive);
+            console.log(`Active fee structure for ${student.name} - ${term}:`, activeFeeStructure);
+            
+            studentFees[term] = activeFeeStructure || null;
+          } else {
+            console.error(`Failed to fetch fee structures for ${student.name} - ${term}:`, response.status, response.statusText);
+            studentFees[term] = null;
+          }
         }
+        
+        console.log(`Student fees for ${student.name}:`, studentFees);
+        return { studentId: student.id, fees: studentFees };
       });
 
-      const feeResults = await Promise.all(feePromises);
-      const allFees = feeResults.filter(fee => fee !== null);
-      console.log('All active fee structures:', allFees);
-      setFeeStructures(allFees);
+      const results = await Promise.all(allFeePromises);
+      
+      // Update state with all fee structures
+      const newStudentFeeStructures: StudentFeeStructures = {};
+      results.forEach(({ studentId, fees }) => {
+        newStudentFeeStructures[studentId] = fees;
+        console.log(`Stored fees for student ID ${studentId}:`, fees);
+      });
+      
+      console.log('All student fee structures:', newStudentFeeStructures);
+      setStudentFeeStructures(newStudentFeeStructures);
     } catch (error) {
       console.error("Failed to fetch fee structures:", error);
     } finally {
@@ -190,27 +260,25 @@ export function ParentDashboard({ schoolCode, parentId }: { schoolCode: string; 
     }
   };
 
-  // Get fee structure for a specific student (updated to match student dashboard logic)
-  const getStudentFeeStructure = (studentClass: string) => {
-    const currentDate = new Date();
-    const currentYear = currentDate.getFullYear();
-    const currentMonth = currentDate.getMonth();
-    
-    let currentTerm = "Term 1";
-    if (currentMonth >= 4 && currentMonth <= 7) currentTerm = "Term 2";
-    else if (currentMonth >= 8) currentTerm = "Term 3";
-
-    return feeStructures.find(fee => 
-      fee.classLevel === studentClass && 
-      fee.term === currentTerm && 
-      fee.year === currentYear &&
-      fee.isActive
-    );
+  // Get fee structure for a specific student and term
+  const getStudentFeeStructure = (studentId: string, term: string) => {
+    return studentFeeStructures[studentId] && studentFeeStructures[studentId][term];
   };
 
-  // Handle payment modal opening
+  // Get current term
+  const getCurrentTerm = () => {
+    const currentDate = new Date();
+    const currentMonth = currentDate.getMonth();
+    
+    if (currentMonth >= 4 && currentMonth <= 7) return "Term 2";
+    else if (currentMonth >= 8) return "Term 3";
+    else return "Term 1";
+  };
+
+  // Handle payment modal opening for current term
   const handleOpenPaymentModal = (student: any) => {
-    const feeStructure = getStudentFeeStructure(student.className || student.classLevel);
+    const currentTerm = getCurrentTerm();
+    const feeStructure = getStudentFeeStructure(student.id, currentTerm);
     if (!feeStructure) {
       toast({ 
         title: "Error", 
@@ -222,6 +290,40 @@ export function ParentDashboard({ schoolCode, parentId }: { schoolCode: string; 
 
     setSelectedStudent(student);
     setSelectedFeeStructure(feeStructure);
+    setSelectedTerm(currentTerm);
+    setPaymentModalOpen(true);
+  };
+
+  // Handle payment modal opening for specific term
+  const handleOpenPaymentModalForTerm = (student: any, term: string) => {
+    const feeStructure = getStudentFeeStructure(student.id, term);
+    if (!feeStructure) {
+      toast({ 
+        title: "Error", 
+        description: `No fee structure available for ${term}`, 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    const totalPaid = getTotalPaidAmount(student.id, term);
+    const remainingBalance = getRemainingBalance(student.id, term);
+    
+    setSelectedStudent(student);
+    setSelectedFeeStructure(feeStructure);
+    setSelectedTerm(term);
+    
+    // Set default payment amount based on remaining balance
+    if (remainingBalance > 0) {
+      setPaymentAmount(remainingBalance);
+      setPaymentType('partial');
+    } else {
+      setPaymentAmount(feeStructure.totalAmount);
+      setPaymentType('full');
+    }
+    
+    setPhoneNumber("");
+    setShowPaymentForm(false);
     setPaymentModalOpen(true);
   };
 
@@ -253,14 +355,20 @@ export function ParentDashboard({ schoolCode, parentId }: { schoolCode: string; 
     try {
       // This would fetch actual receipts from your API
       // For now, we'll use placeholder data
-      const mockReceipts = students.map((student, index) => ({
+      const mockReceipts: PaymentReceipt[] = students.map((student, index) => ({
         id: `receipt-${index}`,
-        student: { name: student.name, className: student.className, admissionNumber: student.admissionNumber },
         receiptNumber: `RCP-${Date.now()}-${index}`,
-        paymentDate: new Date().toISOString(),
+        studentName: student.name,
+        studentClass: student.className || student.classLevel,
+        admissionNumber: student.admissionNumber,
+        term: 'Term 1',
+        year: new Date().getFullYear(),
         amount: 5000,
         paymentMethod: 'mobile_money',
-        description: 'School fees payment'
+        paymentDate: new Date().toISOString(),
+        transactionId: `TXN-${Date.now()}-${index}`,
+        status: 'completed',
+        breakdown: { 'School Fees': 5000 }
       }));
       setReceipts(mockReceipts);
     } catch (error) {
@@ -416,6 +524,423 @@ Thank you for your payment!
     });
   };
 
+  // Simulate payment processing
+  const simulatePayment = async (student: any, feeStructure: FeeStructure, term: string, amount: number) => {
+    setPaymentProcessing(true);
+    setPaymentStatus('processing');
+    setPaymentMessage("Processing payment...");
+
+    // Simulate payment processing delay
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    // Simulate random payment scenarios (full payment, partial payment, or failure)
+    const scenarios = ['full', 'partial', 'failed'];
+    const randomScenario = scenarios[Math.floor(Math.random() * scenarios.length)];
+    
+    let paidAmount = 0;
+    let status: 'completed' | 'partial' | 'failed' = 'failed';
+    let transactionId = `TXN-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    let receiptNumber = `RCP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    switch (randomScenario) {
+      case 'full':
+        paidAmount = amount;
+        status = 'completed';
+        break;
+      case 'partial':
+        paidAmount = Math.floor(amount * 0.6); // 60% payment
+        status = 'partial';
+        break;
+      case 'failed':
+        paidAmount = 0;
+        status = 'failed';
+        break;
+    }
+
+    const paymentRecord: PaymentHistory = {
+      id: `payment-${Date.now()}`,
+      studentId: student.id,
+      studentName: student.name,
+      term: term,
+      year: feeStructure.year,
+      totalAmount: amount,
+      paidAmount: paidAmount,
+      balance: amount - paidAmount,
+      paymentDate: new Date().toISOString(),
+      status: status,
+      paymentMethod: 'mobile_money',
+      receiptNumber: receiptNumber,
+      transactionId: transactionId
+    };
+
+    // Update payment history
+    setPaymentHistory(prev => [paymentRecord, ...prev]);
+
+    if (status === 'failed') {
+      setPaymentStatus('failed');
+      setPaymentMessage("Payment failed. Please try again.");
+      toast({
+        title: "Payment Failed",
+        description: "Payment could not be processed. Please try again.",
+        variant: "destructive"
+      });
+    } else {
+      setPaymentStatus('success');
+      setPaymentMessage(status === 'completed' ? "Payment completed successfully!" : "Partial payment received!");
+      
+      // Generate receipt if payment was successful
+      if (paidAmount > 0) {
+        const receipt: PaymentReceipt = {
+          id: `receipt-${Date.now()}`,
+          receiptNumber: receiptNumber,
+          studentName: student.name,
+          studentClass: student.className || student.classLevel,
+          admissionNumber: student.admissionNumber,
+          term: term,
+          year: feeStructure.year,
+          amount: paidAmount,
+          paymentMethod: 'mobile_money',
+          paymentDate: new Date().toISOString(),
+          transactionId: transactionId,
+          status: status,
+          breakdown: feeStructure.breakdown
+        };
+
+        setReceipts(prev => [receipt, ...prev]);
+
+        toast({
+          title: status === 'completed' ? "Payment Successful" : "Partial Payment Received",
+          description: status === 'completed' 
+            ? `Payment of KES ${paidAmount.toLocaleString()} completed successfully. Receipt generated.`
+            : `Partial payment of KES ${paidAmount.toLocaleString()} received. Balance: KES ${(amount - paidAmount).toLocaleString()}`,
+          variant: "default"
+        });
+      }
+
+      // Auto-close payment modal after 3 seconds
+      setTimeout(() => {
+        setPaymentModalOpen(false);
+        setPaymentProcessing(false);
+        setPaymentStatus('idle');
+        setPaymentMessage("");
+        setSelectedStudent(null);
+        setSelectedFeeStructure(null);
+        setSelectedTerm("");
+      }, 3000);
+    }
+
+    setPaymentProcessing(false);
+  };
+
+  // Generate PDF receipt
+  const generatePDFReceipt = (receipt: PaymentReceipt) => {
+    // Create a simple PDF-like structure using HTML
+    const pdfContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Payment Receipt - ${receipt.receiptNumber}</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 40px; }
+            .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; }
+            .school-name { font-size: 24px; font-weight: bold; color: #2563eb; }
+            .receipt-title { font-size: 20px; margin: 10px 0; }
+            .receipt-number { font-size: 16px; color: #666; }
+            .section { margin: 20px 0; }
+            .section-title { font-weight: bold; font-size: 16px; margin-bottom: 10px; color: #333; }
+            .info-row { display: flex; justify-content: space-between; margin: 5px 0; }
+            .label { font-weight: bold; }
+            .value { }
+            .amount { font-size: 24px; font-weight: bold; color: #059669; text-align: center; margin: 20px 0; }
+            .breakdown { background: #f9fafb; padding: 15px; border-radius: 8px; margin: 15px 0; }
+            .footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; color: #666; }
+            @media print { body { margin: 20px; } }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="school-name">Hi-Tech School System</div>
+            <div class="receipt-title">PAYMENT RECEIPT</div>
+            <div class="receipt-number">Receipt #: ${receipt.receiptNumber}</div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Student Information</div>
+            <div class="info-row">
+              <span class="label">Student Name:</span>
+              <span class="value">${receipt.studentName}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">Class:</span>
+              <span class="value">${receipt.studentClass}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">Admission Number:</span>
+              <span class="value">${receipt.admissionNumber}</span>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Payment Details</div>
+            <div class="info-row">
+              <span class="label">Term:</span>
+              <span class="value">${receipt.term}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">Academic Year:</span>
+              <span class="value">${receipt.year}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">Payment Method:</span>
+              <span class="value">${receipt.paymentMethod.toUpperCase()}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">Transaction ID:</span>
+              <span class="value">${receipt.transactionId}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">Payment Date:</span>
+              <span class="value">${new Date(receipt.paymentDate).toLocaleDateString()}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">Status:</span>
+              <span class="value">${receipt.status.toUpperCase()}</span>
+            </div>
+          </div>
+
+          <div class="amount">
+            Total Amount: KES ${receipt.amount.toLocaleString()}
+          </div>
+
+          <div class="section">
+            <div class="section-title">Fee Breakdown</div>
+            <div class="breakdown">
+              ${Object.entries(receipt.breakdown || {}).map(([key, value]) => `
+                <div class="info-row">
+                  <span class="label">${key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                  <span class="value">KES ${value.toLocaleString()}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+
+          <div class="footer">
+            <p>Thank you for your payment!</p>
+            <p>Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</p>
+            <p>This is a computer-generated receipt. No signature required.</p>
+          </div>
+        </body>
+      </html>
+    `;
+
+    // Create blob and download
+    const blob = new Blob([pdfContent], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `receipt-${receipt.receiptNumber}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: "Receipt Downloaded",
+      description: "Receipt has been downloaded as PDF.",
+      variant: "default"
+    });
+  };
+
+  // Toggle term collapse
+  const toggleTermCollapse = (studentId: string, term: string) => {
+    setCollapsedTerms(prev => {
+      const newState = { ...prev };
+      
+      // If we're expanding this term, collapse others
+      if (newState[studentId]?.[term]) {
+        // Collapsing this term
+        newState[studentId] = { ...newState[studentId], [term]: false };
+      } else {
+        // Expanding this term - collapse others
+        newState[studentId] = {};
+        newState[studentId][term] = true;
+      }
+      
+      return newState;
+    });
+  };
+
+  // Get payment history for a student and term
+  const getPaymentHistory = (studentId: string, term: string) => {
+    return paymentHistory.filter(payment => 
+      payment.studentId === studentId && payment.term === term
+    );
+  };
+
+  // Get total paid amount for a student and term
+  const getTotalPaidAmount = (studentId: string, term: string) => {
+    const payments = getPaymentHistory(studentId, term);
+    return payments.reduce((total, payment) => total + payment.paidAmount, 0);
+  };
+
+  // Get remaining balance for a student and term
+  const getRemainingBalance = (studentId: string, term: string) => {
+    const feeStructure = getStudentFeeStructure(studentId, term);
+    if (!feeStructure) return 0;
+    
+    const totalPaid = getTotalPaidAmount(studentId, term);
+    return Math.max(0, feeStructure.totalAmount - totalPaid);
+  };
+
+  // Enhanced payment functions
+  const handlePaymentTypeChange = (type: 'full' | 'partial') => {
+    setPaymentType(type);
+    if (type === 'full' && selectedFeeStructure) {
+      setPaymentAmount(selectedFeeStructure.totalAmount);
+    } else if (type === 'partial' && selectedStudent && selectedTerm) {
+      const remainingBalance = getRemainingBalance(selectedStudent.id, selectedTerm);
+      setPaymentAmount(remainingBalance);
+    }
+  };
+
+  const handleAmountChange = (amount: number) => {
+    if (!selectedFeeStructure) return;
+    
+    const maxAmount = paymentType === 'full' 
+      ? selectedFeeStructure.totalAmount 
+      : getRemainingBalance(selectedStudent.id, selectedTerm);
+    
+    if (amount > maxAmount) {
+      toast({
+        title: "Invalid Amount",
+        description: `Amount cannot exceed KES ${maxAmount.toLocaleString()}`,
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setPaymentAmount(amount);
+  };
+
+  const validatePaymentForm = () => {
+    if (!phoneNumber.trim()) {
+      toast({
+        title: "Phone Number Required",
+        description: "Please enter your M-Pesa phone number",
+        variant: "destructive"
+      });
+      return false;
+    }
+    
+    if (!phoneNumber.match(/^(07|01)\d{8}$/)) {
+      toast({
+        title: "Invalid Phone Number",
+        description: "Please enter a valid Kenyan phone number (07XXXXXXXX or 01XXXXXXXX)",
+        variant: "destructive"
+      });
+      return false;
+    }
+    
+    if (paymentAmount <= 0) {
+      toast({
+        title: "Invalid Amount",
+        description: "Please enter a valid payment amount",
+        variant: "destructive"
+      });
+      return false;
+    }
+    
+    return true;
+  };
+
+  // Enhanced M-Pesa simulation
+  const simulateMpesaPayment = async () => {
+    if (!validatePaymentForm()) return;
+    if (!selectedFeeStructure) return;
+    
+    setMpesaProcessing(true);
+    setPaymentMessage("Initiating M-Pesa payment...");
+    
+    // Step 1: Initiating payment
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setPaymentMessage("Sending payment request to M-Pesa...");
+    
+    // Step 2: M-Pesa processing
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    setPaymentMessage("M-Pesa is processing your payment...");
+    
+    // Step 3: Payment completion
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    // Simulate successful payment (no more random failures)
+    const transactionId = `TXN-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const receiptNumber = `RCP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    const paymentRecord: PaymentHistory = {
+      id: `payment-${Date.now()}`,
+      studentId: selectedStudent.id,
+      studentName: selectedStudent.name,
+      term: selectedTerm,
+      year: selectedFeeStructure.year,
+      totalAmount: selectedFeeStructure.totalAmount,
+      paidAmount: paymentAmount,
+      balance: selectedFeeStructure.totalAmount - paymentAmount,
+      paymentDate: new Date().toISOString(),
+      status: paymentAmount >= selectedFeeStructure.totalAmount ? 'completed' : 'partial',
+      paymentMethod: 'mpesa',
+      receiptNumber: receiptNumber,
+      transactionId: transactionId
+    };
+
+    // Update payment history
+    setPaymentHistory(prev => [paymentRecord, ...prev]);
+
+    // Generate receipt
+    const receipt: PaymentReceipt = {
+      id: `receipt-${Date.now()}`,
+      receiptNumber: receiptNumber,
+      studentName: selectedStudent.name,
+      studentClass: selectedStudent.className || selectedStudent.classLevel,
+      admissionNumber: selectedStudent.admissionNumber,
+      term: selectedTerm,
+      year: selectedFeeStructure.year,
+      amount: paymentAmount,
+      paymentMethod: 'mpesa',
+      paymentDate: new Date().toISOString(),
+      transactionId: transactionId,
+      status: paymentAmount >= selectedFeeStructure.totalAmount ? 'completed' : 'partial',
+      breakdown: selectedFeeStructure.breakdown
+    };
+
+    setReceipts(prev => [receipt, ...prev]);
+
+    setMpesaProcessing(false);
+    setPaymentStatus('success');
+    setPaymentMessage("Payment completed successfully!");
+
+    toast({
+      title: "Payment Successful",
+      description: `Payment of KES ${paymentAmount.toLocaleString()} processed via M-Pesa. Receipt generated.`,
+      variant: "default"
+    });
+
+    // Auto-close modal after 3 seconds
+    setTimeout(() => {
+      setPaymentModalOpen(false);
+      setPaymentProcessing(false);
+      setPaymentStatus('idle');
+      setPaymentMessage("");
+      setSelectedStudent(null);
+      setSelectedFeeStructure(null);
+      setSelectedTerm("");
+      setPaymentAmount(0);
+      setPhoneNumber("");
+      setPaymentType('full');
+      setShowPaymentForm(false);
+      setMpesaProcessing(false);
+    }, 3000);
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -479,6 +1004,12 @@ Thank you for your payment!
             <Receipt className="w-6 h-6" /> Receipts
           </button>
           <button
+            className={`flex items-center gap-3 px-5 py-3 rounded-xl transition font-semibold text-lg text-left shadow-sm border border-transparent ${activeTab === "payment-history" ? "bg-blue-600 text-white shadow-md" : "hover:bg-blue-50 hover:border-blue-200 text-gray-700"}`}
+            onClick={() => setActiveTab("payment-history")}
+          >
+            <Calendar className="w-6 h-6" /> Payment History
+          </button>
+          <button
             className={`flex items-center gap-3 px-5 py-3 rounded-xl transition font-semibold text-lg text-left shadow-sm border border-transparent ${activeTab === "performance" ? "bg-blue-600 text-white shadow-md" : "hover:bg-blue-50 hover:border-blue-200 text-gray-700"}`}
             onClick={() => setActiveTab("performance")}
           >
@@ -521,10 +1052,11 @@ Thank you for your payment!
       {/* Main Content */}
       <main className="flex-1 p-8 overflow-y-auto">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-5 mb-8">
+          <TabsList className="grid w-full grid-cols-6 mb-8">
             <TabsTrigger value="children">My Children</TabsTrigger>
             <TabsTrigger value="fees">Fees</TabsTrigger>
             <TabsTrigger value="receipts">Receipts</TabsTrigger>
+            <TabsTrigger value="payment-history">Payment History</TabsTrigger>
             <TabsTrigger value="performance">Performance</TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
@@ -609,21 +1141,14 @@ Thank you for your payment!
                 ) : students.length === 0 ? (
                   <div className="text-center text-gray-500">No children found.</div>
                 ) : (
-                  <div className="grid md:grid-cols-2 gap-6">
+                  <div className="space-y-8">
                     {students.map((student: any) => {
-                      const currentDate = new Date();
-                      const currentYear = currentDate.getFullYear();
-                      const currentMonth = currentDate.getMonth();
+                      const currentTerm = getCurrentTerm();
+                      const studentFees = studentFeeStructures[student.id] || {};
                       
-                      let currentTerm = "Term 1";
-                      if (currentMonth >= 4 && currentMonth <= 7) currentTerm = "Term 2";
-                      else if (currentMonth >= 8) currentTerm = "Term 3";
-
-                      const feeStructure = getStudentFeeStructure(student.className || student.classLevel);
-
                       return (
                         <Card key={student.admissionNumber} className="p-6 border-2 border-blue-100 hover:border-blue-200 transition-all">
-                          <div className="flex items-center gap-4 mb-4">
+                          <div className="flex items-center gap-4 mb-6">
                             <Avatar className="w-16 h-16">
                               <img
                                 src={student.avatarUrl || "/placeholder-user.jpg"}
@@ -638,55 +1163,181 @@ Thank you for your payment!
                             </div>
                           </div>
                           
-                          <div className="space-y-3 mb-6">
-                            <div className="text-center">
-                              <Badge variant="outline" className="mb-2">
-                                {student.className || student.classLevel} - {currentTerm} {currentYear}
-                              </Badge>
-                            </div>
-                            
-                            {feeStructure ? (
-                              <div className="space-y-3">
-                                <div className="text-center">
-                                  <div className="text-2xl font-bold text-green-600">
-                                    KES {feeStructure.totalAmount?.toLocaleString() || '0'}
+                          {/* Term Selection Tabs */}
+                          <div className="flex space-x-1 mb-6 bg-gray-100 p-1 rounded-lg">
+                            {['Term 1', 'Term 2', 'Term 3'].map((term) => {
+                              const isCurrentTerm = term === currentTerm;
+                              const hasFeeStructure = studentFees[term];
+                              const totalPaid = getTotalPaidAmount(student.id, term);
+                              const remainingBalance = getRemainingBalance(student.id, term);
+                              const isPartiallyPaid = totalPaid > 0 && remainingBalance > 0;
+                              const isFullyPaid = totalPaid > 0 && remainingBalance === 0;
+                              
+                              return (
+                                <button
+                                  key={term}
+                                  className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all duration-200 ${
+                                    hasFeeStructure 
+                                      ? isFullyPaid 
+                                        ? 'bg-green-100 text-green-700 shadow-sm' 
+                                        : isPartiallyPaid
+                                        ? 'bg-yellow-100 text-yellow-700 shadow-sm'
+                                        : 'bg-white text-blue-700 shadow-sm'
+                                      : 'text-gray-400 bg-gray-50'
+                                  } ${isCurrentTerm ? 'ring-2 ring-blue-200' : ''}`}
+                                >
+                                  <div className="flex items-center justify-center space-x-2">
+                                    <span>{term}</span>
+                                    {isCurrentTerm && (
+                                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                    )}
+                                    {hasFeeStructure && (
+                                      isFullyPaid ? (
+                                        <CheckCircle className="w-4 h-4 text-green-500" />
+                                      ) : isPartiallyPaid ? (
+                                        <div className="w-4 h-4 text-yellow-500">●</div>
+                                      ) : (
+                                        <CheckCircle className="w-4 h-4 text-green-500" />
+                                      )
+                                    )}
                                   </div>
-                                  <div className="text-sm text-gray-600">Total Term Fees</div>
-                                </div>
-                                
-                                <div className="bg-white rounded-lg p-4 space-y-2">
-                                  <div className="font-semibold text-gray-700 mb-2">Fee Breakdown:</div>
-                                  {Object.entries(feeStructure.breakdown || {}).map(([key, value]) => (
-                                    <div key={key} className="flex justify-between text-sm">
-                                      <span className="capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
-                                      <span className="font-medium">KES {value?.toLocaleString() || '0'}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                                
-                                <div className="text-center text-xs text-gray-500">
-                                  Released on {new Date(feeStructure.createdAt).toLocaleDateString()}
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="text-center py-4">
-                                <AlertCircle className="w-8 h-8 text-orange-500 mx-auto mb-2" />
-                                <p className="text-orange-600 font-medium">No fee structure available</p>
-                                <p className="text-sm text-gray-500 mt-1">
-                                  Fee structure for {student.className || student.classLevel} - {currentTerm} {currentYear} has not been released yet.
-                                </p>
-                              </div>
-                            )}
+                                </button>
+                              );
+                            })}
                           </div>
                           
-                          <div className="space-y-2">
-                            <Button
-                              className="w-full"
-                              disabled={!feeStructure}
-                              onClick={() => handleOpenPaymentModal(student)}
-                            >
-                              Pay Fees
-                            </Button>
+                          {/* Fee Structures for Each Term */}
+                          <div className="space-y-4">
+                            {['Term 1', 'Term 2', 'Term 3'].map((term) => {
+                              const feeStructure = studentFees[term];
+                              const totalPaid = getTotalPaidAmount(student.id, term);
+                              const remainingBalance = getRemainingBalance(student.id, term);
+                              const isPartiallyPaid = totalPaid > 0 && remainingBalance > 0;
+                              const isFullyPaid = totalPaid > 0 && remainingBalance === 0;
+                              const isCollapsed = collapsedTerms[student.id]?.[term] || false;
+                              
+                              return (
+                                <div key={term} className="border border-gray-200 rounded-lg">
+                                  <div 
+                                    className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50"
+                                    onClick={() => toggleTermCollapse(student.id, term)}
+                                  >
+                                    <div className="flex items-center gap-3">
+                                      <h4 className="font-semibold text-gray-800">{term} {new Date().getFullYear()}</h4>
+                                      {feeStructure && (
+                                        <Badge variant="outline" className={
+                                          isFullyPaid ? "text-green-700 border-green-300" :
+                                          isPartiallyPaid ? "text-yellow-700 border-yellow-300" :
+                                          "text-green-700 border-green-300"
+                                        }>
+                                          {isFullyPaid ? "Paid" : isPartiallyPaid ? "Partial" : "Active"}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      {feeStructure && (
+                                        <div className="text-sm text-gray-600">
+                                          {isFullyPaid ? (
+                                            <span className="text-green-600">Fully Paid</span>
+                                          ) : isPartiallyPaid ? (
+                                            <span className="text-yellow-600">Balance: KES {remainingBalance.toLocaleString()}</span>
+                                          ) : (
+                                            <span className="text-blue-600">KES {feeStructure.totalAmount.toLocaleString()}</span>
+                                          )}
+                                        </div>
+                                      )}
+                                      <button className="text-gray-400 hover:text-gray-600">
+                                        {isCollapsed ? '▼' : '▲'}
+                                      </button>
+                                    </div>
+                                  </div>
+                                  
+                                  {!isCollapsed && (
+                                    <div className="px-4 pb-4">
+                                      {feeStructure ? (
+                                        <div className="space-y-3">
+                                          <div className="text-center">
+                                            <div className="text-2xl font-bold text-green-600">
+                                              KES {feeStructure.totalAmount?.toLocaleString() || '0'}
+                                            </div>
+                                            <div className="text-sm text-gray-600">Total Term Fees</div>
+                                            {totalPaid > 0 && (
+                                              <div className="text-sm text-blue-600 mt-1">
+                                                Paid: KES {totalPaid.toLocaleString()}
+                                                {remainingBalance > 0 && (
+                                                  <span className="text-yellow-600 ml-2">
+                                                    Balance: KES {remainingBalance.toLocaleString()}
+                                                  </span>
+                                                )}
+                                              </div>
+                                            )}
+                                          </div>
+                                          
+                                          <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                                            <div className="font-semibold text-gray-700 mb-2">Fee Breakdown:</div>
+                                            {Object.entries(feeStructure.breakdown || {}).map(([key, value]) => (
+                                              <div key={key} className="flex justify-between text-sm">
+                                                <span className="capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                                                <span className="font-medium">KES {value?.toLocaleString() || '0'}</span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                          
+                                          <div className="text-center text-xs text-gray-500">
+                                            Released on {new Date(feeStructure.createdAt).toLocaleDateString()}
+                                          </div>
+                                          
+                                          {/* Payment Buttons */}
+                                          <div className="space-y-2">
+                                            {isFullyPaid ? (
+                                              <div className="text-center py-2">
+                                                <Badge variant="outline" className="text-green-700 border-green-300">
+                                                  ✓ Payment Complete
+                                                </Badge>
+                                              </div>
+                                            ) : (
+                                              <Button
+                                                className="w-full"
+                                                onClick={() => {
+                                                  setSelectedStudent(student);
+                                                  setSelectedFeeStructure(feeStructure);
+                                                  setSelectedTerm(term);
+                                                  setPaymentModalOpen(true);
+                                                }}
+                                              >
+                                                {isPartiallyPaid ? `Pay Balance (KES ${remainingBalance.toLocaleString()})` : `Pay ${term} Fees`}
+                                              </Button>
+                                            )}
+                                          </div>
+                                          
+                                          {/* Payment History */}
+                                          {totalPaid > 0 && (
+                                            <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                                              <div className="font-semibold text-blue-800 mb-2">Payment History</div>
+                                              {getPaymentHistory(student.id, term).map((payment) => (
+                                                <div key={payment.id} className="text-sm text-blue-700 mb-1">
+                                                  {new Date(payment.paymentDate).toLocaleDateString()}: 
+                                                  KES {payment.paidAmount.toLocaleString()} 
+                                                  ({payment.status})
+                                                </div>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        <div className="text-center py-4">
+                                          <AlertCircle className="w-8 h-8 text-orange-500 mx-auto mb-2" />
+                                          <p className="text-orange-600 font-medium">No fee structure available</p>
+                                          <p className="text-sm text-gray-500 mt-1">
+                                            Fee structure for {term} has not been released yet.
+                                          </p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         </Card>
                       );
@@ -716,19 +1367,29 @@ Thank you for your payment!
                           <th className="px-4 py-2 border">Date</th>
                           <th className="px-4 py-2 border">Amount</th>
                           <th className="px-4 py-2 border">Method</th>
-                          <th className="px-4 py-2 border">Description</th>
+                          <th className="px-4 py-2 border">Term</th>
+                          <th className="px-4 py-2 border">Status</th>
                           <th className="px-4 py-2 border">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {receipts.map((receipt) => (
                           <tr key={receipt.id}>
-                            <td className="px-4 py-2 border">{receipt.student.name}</td>
+                            <td className="px-4 py-2 border">{receipt.studentName}</td>
                             <td className="px-4 py-2 border">{receipt.receiptNumber}</td>
                             <td className="px-4 py-2 border">{new Date(receipt.paymentDate).toLocaleDateString()}</td>
-                            <td className="px-4 py-2 border">{receipt.amount.toFixed(2)}</td>
+                            <td className="px-4 py-2 border">KES {receipt.amount.toLocaleString()}</td>
                             <td className="px-4 py-2 border">{receipt.paymentMethod.replace('_', ' ').toUpperCase()}</td>
-                            <td className="px-4 py-2 border">{receipt.description}</td>
+                            <td className="px-4 py-2 border">{receipt.term} {receipt.year}</td>
+                            <td className="px-4 py-2 border">
+                              <Badge variant="outline" className={
+                                receipt.status === 'completed' ? "text-green-700 border-green-300" :
+                                receipt.status === 'partial' ? "text-yellow-700 border-yellow-300" :
+                                "text-red-700 border-red-300"
+                              }>
+                                {receipt.status.toUpperCase()}
+                              </Badge>
+                            </td>
                             <td className="px-4 py-2 border">
                               <div className="flex gap-2">
                                 <Button
@@ -742,10 +1403,10 @@ Thank you for your payment!
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => handleDownloadReceipt(receipt)}
+                                  onClick={() => generatePDFReceipt(receipt)}
                                   className="flex items-center gap-1"
                                 >
-                                  <Download className="w-4 h-4" /> Download
+                                  <Download className="w-4 h-4" /> PDF
                                 </Button>
                               </div>
                             </td>
@@ -758,11 +1419,179 @@ Thank you for your payment!
                 {selectedReceipt && (
                   <ReceiptView
                     receipt={selectedReceipt}
-                    studentName={selectedReceipt.student.name}
-                    studentClass={selectedReceipt.student.className || selectedReceipt.student.classLevel}
-                    admissionNumber={selectedReceipt.student.admissionNumber}
+                    studentName={selectedReceipt.studentName}
+                    studentClass={selectedReceipt.studentClass}
+                    admissionNumber={selectedReceipt.admissionNumber}
                     onClose={() => setSelectedReceipt(null)}
                   />
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Payment History Tab */}
+          <TabsContent value="payment-history">
+            <Card className="w-full max-w-6xl rounded-2xl shadow-2xl bg-white/95 p-10 flex flex-col items-center mb-8">
+              <CardHeader>
+                <CardTitle className="text-2xl font-extrabold text-blue-800 mb-6 text-center">Payment History</CardTitle>
+              </CardHeader>
+              <CardContent className="w-full">
+                {paymentHistory.length === 0 ? (
+                  <div className="text-center text-gray-500">
+                    <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                    <p className="text-lg">No payment history found.</p>
+                    <p className="text-sm text-gray-400 mt-2">Payment history will appear here after making payments.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {/* Summary Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                      <Card className="p-4 bg-green-50 border-green-200">
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-green-600">
+                            {paymentHistory.filter(p => p.status === 'completed').length}
+                          </div>
+                          <div className="text-sm text-green-700">Completed Payments</div>
+                        </div>
+                      </Card>
+                      <Card className="p-4 bg-yellow-50 border-yellow-200">
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-yellow-600">
+                            {paymentHistory.filter(p => p.status === 'partial').length}
+                          </div>
+                          <div className="text-sm text-yellow-700">Partial Payments</div>
+                        </div>
+                      </Card>
+                      <Card className="p-4 bg-red-50 border-red-200">
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-red-600">
+                            {paymentHistory.filter(p => p.status === 'failed').length}
+                          </div>
+                          <div className="text-sm text-red-700">Failed Payments</div>
+                        </div>
+                      </Card>
+                      <Card className="p-4 bg-blue-50 border-blue-200">
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-blue-600">
+                            KES {paymentHistory.reduce((total, p) => total + p.paidAmount, 0).toLocaleString()}
+                          </div>
+                          <div className="text-sm text-blue-700">Total Paid</div>
+                        </div>
+                      </Card>
+                    </div>
+
+                    {/* Payment History Table */}
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-sm border">
+                        <thead>
+                          <tr className="bg-gray-100">
+                            <th className="px-4 py-3 border text-left">Student</th>
+                            <th className="px-4 py-3 border text-left">Term</th>
+                            <th className="px-4 py-3 border text-left">Date</th>
+                            <th className="px-4 py-3 border text-right">Total Amount</th>
+                            <th className="px-4 py-3 border text-right">Paid Amount</th>
+                            <th className="px-4 py-3 border text-right">Balance</th>
+                            <th className="px-4 py-3 border text-center">Status</th>
+                            <th className="px-4 py-3 border text-center">Method</th>
+                            <th className="px-4 py-3 border text-center">Receipt</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {paymentHistory.map((payment) => (
+                            <tr key={payment.id} className="hover:bg-gray-50">
+                              <td className="px-4 py-3 border">
+                                <div>
+                                  <div className="font-medium">{payment.studentName}</div>
+                                  <div className="text-xs text-gray-500">ID: {payment.studentId}</div>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 border">
+                                <div className="font-medium">{payment.term}</div>
+                                <div className="text-xs text-gray-500">{payment.year}</div>
+                              </td>
+                              <td className="px-4 py-3 border">
+                                {new Date(payment.paymentDate).toLocaleDateString()}
+                                <div className="text-xs text-gray-500">
+                                  {new Date(payment.paymentDate).toLocaleTimeString()}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 border text-right font-medium">
+                                KES {payment.totalAmount.toLocaleString()}
+                              </td>
+                              <td className="px-4 py-3 border text-right font-medium text-green-600">
+                                KES {payment.paidAmount.toLocaleString()}
+                              </td>
+                              <td className="px-4 py-3 border text-right">
+                                {payment.balance > 0 ? (
+                                  <span className="text-yellow-600 font-medium">
+                                    KES {payment.balance.toLocaleString()}
+                                  </span>
+                                ) : (
+                                  <span className="text-green-600 font-medium">-</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 border text-center">
+                                <Badge variant="outline" className={
+                                  payment.status === 'completed' ? "text-green-700 border-green-300" :
+                                  payment.status === 'partial' ? "text-yellow-700 border-yellow-300" :
+                                  payment.status === 'failed' ? "text-red-700 border-red-300" :
+                                  "text-gray-700 border-gray-300"
+                                }>
+                                  {payment.status.toUpperCase()}
+                                </Badge>
+                              </td>
+                              <td className="px-4 py-3 border text-center">
+                                <span className="text-sm font-medium">
+                                  {payment.paymentMethod.replace('_', ' ').toUpperCase()}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 border text-center">
+                                <div className="flex justify-center gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      const receipt = receipts.find(r => r.receiptNumber === payment.receiptNumber);
+                                      if (receipt) {
+                                        setSelectedReceipt(receipt);
+                                      }
+                                    }}
+                                    className="flex items-center gap-1"
+                                  >
+                                    <Receipt className="w-3 h-3" /> View
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      const receipt = receipts.find(r => r.receiptNumber === payment.receiptNumber);
+                                      if (receipt) {
+                                        generatePDFReceipt(receipt);
+                                      }
+                                    }}
+                                    className="flex items-center gap-1"
+                                  >
+                                    <Download className="w-3 h-3" /> PDF
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Payment Details Modal */}
+                    {selectedReceipt && (
+                      <ReceiptView
+                        receipt={selectedReceipt}
+                        studentName={selectedReceipt.studentName}
+                        studentClass={selectedReceipt.studentClass}
+                        admissionNumber={selectedReceipt.admissionNumber}
+                        onClose={() => setSelectedReceipt(null)}
+                      />
+                    )}
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -875,23 +1704,163 @@ Thank you for your payment!
         </Tabs>
       </main>
 
-      {/* Payment Modal */}
+      {/* Enhanced Payment Modal */}
       {selectedStudent && selectedFeeStructure && (
-        <PaymentModal
-          isOpen={paymentModalOpen}
-          onClose={() => {
-            setPaymentModalOpen(false);
-            setSelectedStudent(null);
-            setSelectedFeeStructure(null);
-          }}
-          studentId={selectedStudent.id}
-          schoolCode={schoolCode}
-          amount={selectedFeeStructure.totalAmount}
-          feeType="School Fees"
-          term={selectedFeeStructure.term}
-          academicYear={selectedFeeStructure.year.toString()}
-          onReceiptGenerated={handleReceiptGenerated}
-        />
+        <AlertDialog open={paymentModalOpen} onOpenChange={setPaymentModalOpen}>
+          <AlertDialogContent className="max-w-md">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-lg font-bold text-blue-800 flex items-center gap-2">
+                {mpesaProcessing ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-green-600"></div>
+                    Processing Payment...
+                  </>
+                ) : (
+                  <>
+                    <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center">
+                      <span className="text-white text-xs font-bold">M</span>
+                    </div>
+                    M-Pesa Payment
+                  </>
+                )}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {mpesaProcessing ? (
+                  <div className="space-y-3">
+                    <div className="text-center">
+                      <p className="text-gray-600 font-medium text-sm">{paymentMessage}</p>
+                      <div className="mt-3 p-2 bg-green-50 rounded text-xs text-green-700">
+                        <strong>Tip:</strong> Check your phone for the M-Pesa prompt and enter your PIN
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Compact Student Info */}
+                    <div className="bg-gray-50 p-3 rounded-lg">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">Student:</span>
+                        <span className="font-medium">{selectedStudent.name}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm mt-1">
+                        <span className="text-gray-600">Term:</span>
+                        <span className="font-medium">{selectedTerm} {selectedFeeStructure.year}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm mt-1">
+                        <span className="text-gray-600">Total:</span>
+                        <span className="font-bold text-blue-600">KES {selectedFeeStructure.totalAmount.toLocaleString()}</span>
+                      </div>
+                      {getTotalPaidAmount(selectedStudent.id, selectedTerm) > 0 && (
+                        <div className="flex items-center justify-between text-sm mt-1">
+                          <span className="text-gray-600">Balance:</span>
+                          <span className="font-bold text-yellow-600">KES {getRemainingBalance(selectedStudent.id, selectedTerm).toLocaleString()}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Payment Type Selection - Compact */}
+                    <div className="space-y-2">
+                      <label className="block text-xs font-medium text-gray-700">Payment Type</label>
+                      <div className="flex space-x-1">
+                        <button
+                          type="button"
+                          onClick={() => handlePaymentTypeChange('full')}
+                          className={`flex-1 py-2 px-3 rounded-md border text-xs font-medium transition-all ${
+                            paymentType === 'full'
+                              ? 'border-blue-500 bg-blue-50 text-blue-700'
+                              : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                          }`}
+                        >
+                          Full Payment
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handlePaymentTypeChange('partial')}
+                          className={`flex-1 py-2 px-3 rounded-md border text-xs font-medium transition-all ${
+                            paymentType === 'partial'
+                              ? 'border-blue-500 bg-blue-50 text-blue-700'
+                              : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                          }`}
+                        >
+                          Partial Payment
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Amount and Phone - Side by Side */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="block text-xs font-medium text-gray-700">Amount (KES)</label>
+                        <Input
+                          type="number"
+                          value={paymentAmount}
+                          onChange={(e) => handleAmountChange(Number(e.target.value))}
+                          placeholder="0"
+                          className="text-sm h-9"
+                          min="1"
+                          max={paymentType === 'full' ? selectedFeeStructure.totalAmount : getRemainingBalance(selectedStudent.id, selectedTerm)}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="block text-xs font-medium text-gray-700">Phone Number</label>
+                        <Input
+                          type="tel"
+                          value={phoneNumber}
+                          onChange={(e) => setPhoneNumber(e.target.value)}
+                          placeholder="07XXXXXXXX"
+                          className="text-sm h-9"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Payment Method Badge */}
+                    <div className="flex items-center justify-center">
+                      <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                        <div className="w-4 h-4 bg-green-600 rounded-full flex items-center justify-center">
+                          <span className="text-white text-xs font-bold">M</span>
+                        </div>
+                        M-Pesa Payment
+                      </div>
+                    </div>
+
+                    {/* Simulation Notice - Compact */}
+                    <div className="bg-yellow-50 p-2 rounded text-xs text-yellow-800 text-center">
+                      <strong>Simulation Mode:</strong> Test environment - no actual charges
+                    </div>
+                  </div>
+                )}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="gap-2">
+              {!mpesaProcessing && (
+                <>
+                  <AlertDialogCancel 
+                    onClick={() => {
+                      setPaymentModalOpen(false);
+                      setSelectedStudent(null);
+                      setSelectedFeeStructure(null);
+                      setSelectedTerm("");
+                      setPaymentAmount(0);
+                      setPhoneNumber("");
+                      setPaymentType('full');
+                      setShowPaymentForm(false);
+                    }}
+                    className="text-xs px-3 py-2"
+                  >
+                    Cancel
+                  </AlertDialogCancel>
+                  <AlertDialogAction 
+                    onClick={simulateMpesaPayment}
+                    className="bg-green-600 hover:bg-green-700 text-white text-xs px-4 py-2"
+                    disabled={!phoneNumber.trim() || paymentAmount <= 0}
+                  >
+                    Pay via M-Pesa
+                  </AlertDialogAction>
+                </>
+              )}
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
     </div>
   );
