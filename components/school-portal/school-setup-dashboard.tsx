@@ -1263,23 +1263,12 @@ export function SchoolSetupDashboard({
     );
   };
 
-  // Function to map className + gradeName to classId
-  const mapClassToId = (className: string, gradeName: string) => {
-    // Find the grade first
-    const grade = grades.find(g => g.name === gradeName);
-    if (!grade) {
-      throw new Error(`Grade not found: ${gradeName}`);
-    }
-    
-    // Find the class with matching name and gradeId
-    const classObj = classes.find(cls => 
-      cls.name === className && cls.gradeId === grade.id
-    );
-    
+  // Function to map className to classId (no gradeName)
+  const mapClassToId = (className: string) => {
+    const classObj = classes.find((cls) => cls.name === className);
     if (!classObj) {
-      throw new Error(`Class not found: ${className} (${gradeName})`);
+      throw new Error(`Class not found: ${className}`);
     }
-    
     return classObj.id;
   };
 
@@ -1287,20 +1276,19 @@ export function SchoolSetupDashboard({
   const bulkImportStudents = async (students: any[]) => {
     setIsImporting(true);
     try {
-      // Map className + gradeName to classId for each student
+      console.log("[DEBUG] All classes loaded at import:", classes);
+      classes.forEach((cls) => {
+        console.log(
+          `[DEBUG] Class: name='${cls.name}', gradeId='${cls.gradeId}', isActive=${cls.isActive}, academicYear=${cls.academicYear}`
+        );
+      });
+      // Map className to classId for each student
       const mappedStudents = students.map((student) => {
-        const classId = mapClassToId(student.className, student.gradeName);
-        if (!classId) {
-          throw new Error(
-            `Class not found: ${student.className} (${student.gradeName})`
-          );
-        }
+        const classId = mapClassToId(student.className);
         return {
           ...student,
           classId,
-          // Remove className and gradeName as backend expects classId
-          className: undefined,
-          gradeName: undefined,
+          className: undefined, // Remove for backend
         };
       });
 
@@ -3930,55 +3918,49 @@ export function SchoolSetupDashboard({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {parsedStudents.map((student, index) => (
-                      <TableRow key={index}>
-                        <TableCell className="font-medium">
-                          {student.name || (
-                            <span className="text-red-500">Missing</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {student.email || (
-                            <span className="text-red-500">Missing</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {student.classId || (
-                            <span className="text-red-500">Missing</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {student.gradeName || (
-                            <span className="text-red-500">Missing</span>
-                          )}
-                        </TableCell>
-                        <TableCell>{student.parentName || "N/A"}</TableCell>
-                        <TableCell>{student.parentPhone || "N/A"}</TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={
-                              student.name &&
+                    {parsedStudents.map((student, index) => {
+                      const classObj = classes.find((cls) => cls.name === student.className);
+                      const gradeObj = classObj && grades.find((g) => g.id === classObj.gradeId);
+                      return (
+                        <TableRow key={index}>
+                          <TableCell className="font-medium">
+                            {student.name || <span className="text-red-500">Missing</span>}
+                          </TableCell>
+                          <TableCell>
+                            {student.email || <span className="text-red-500">Missing</span>}
+                          </TableCell>
+                          <TableCell>
+                            {student.className || <span className="text-red-500">Missing</span>}
+                          </TableCell>
+                          <TableCell>
+                            {gradeObj ? gradeObj.name : <span className="text-gray-400">Unknown</span>}
+                          </TableCell>
+                          <TableCell>{student.parentName || "N/A"}</TableCell>
+                          <TableCell>{student.parentPhone || "N/A"}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                student.name &&
+                                student.email &&
+                                student.className &&
+                                student.parentName &&
+                                student.parentPhone
+                                  ? "default"
+                                  : "destructive"
+                              }
+                            >
+                              {student.name &&
                               student.email &&
                               student.className &&
-                              student.gradeName &&
                               student.parentName &&
                               student.parentPhone
-                                ? "default"
-                                : "destructive"
-                            }
-                          >
-                            {student.name &&
-                            student.email &&
-                            student.className &&
-                            student.gradeName &&
-                            student.parentName &&
-                            student.parentPhone
-                              ? "Valid"
-                              : "Invalid"}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                                ? "Valid"
+                                : "Invalid"}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
@@ -3991,11 +3973,10 @@ export function SchoolSetupDashboard({
                         s.name &&
                         s.email &&
                         s.className &&
-                        s.gradeName &&
                         s.parentName &&
                         s.parentPhone
                     ).length
-                  }{" "}
+                  }{' '}
                   of {parsedStudents.length} students are valid
                 </div>
                 <div className="flex gap-2">
@@ -4014,7 +3995,6 @@ export function SchoolSetupDashboard({
                           s.name &&
                           s.email &&
                           s.className &&
-                          s.gradeName &&
                           s.parentName &&
                           s.parentPhone
                       ).length === 0
