@@ -4,15 +4,6 @@ import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
-function generateTempPassword(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let result = '';
-  for (let i = 0; i < 8; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
-}
-
 export async function GET(req: NextRequest, { params }: { params: { schoolCode: string } }) {
   try {
     const school = await prisma.school.findUnique({
@@ -22,6 +13,9 @@ export async function GET(req: NextRequest, { params }: { params: { schoolCode: 
           include: {
             user: true,
             parent: true,
+            class: {
+              include: { grade: true }
+            }
           },
         },
       },
@@ -36,7 +30,8 @@ export async function GET(req: NextRequest, { params }: { params: { schoolCode: 
       name: student.user?.name,
       email: student.user?.email,
       phone: student.user?.phone,
-      className: student.className,
+      className: student.class?.name,
+      gradeName: student.class?.grade?.name,
       parent: student.parent ? {
         name: student.parent.name,
         email: student.parent.email,
@@ -54,14 +49,13 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
   try {
     const data = await req.json();
     const {
-      name, email, phone, tempPassword, admissionNumber, dateOfBirth, dateAdmitted,
-      parentName, parentPhone, parentEmail, address, gender,
-      className, classLevel, classSection, academicYear, avatarUrl,
+      name, email, phone, admissionNumber, dateOfBirth, dateAdmitted,
+      parentName, parentPhone, parentEmail, address, gender, classId, avatarUrl,
       emergencyContact, medicalInfo, notes
     } = data;
 
-    if (!name || !email || !tempPassword || !className) {
-      return NextResponse.json({ error: 'Missing required fields: name, email, tempPassword, and className are required.' }, { status: 400 });
+    if (!name || !email || !classId) {
+      return NextResponse.json({ error: 'Missing required fields: name, email, and classId are required.' }, { status: 400 });
     }
 
     const school = await prisma.school.findUnique({ where: { code: params.schoolCode } });
@@ -70,9 +64,8 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
     }
 
     let parentUser = null;
-    let parentTempPassword = null;
+    let parentTempPassword = 'parent123';
     if (parentPhone) {
-      // Check if parent user already exists
       parentUser = await prisma.user.findFirst({
         where: {
           phone: parentPhone,
@@ -80,11 +73,8 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
           schoolId: school.id,
         },
       });
-
-      // If parent does not exist, create a new one
+      const hashedParentPassword = await bcrypt.hash(parentTempPassword, 12);
       if (!parentUser) {
-        parentTempPassword = generateTempPassword();
-        const hashedParentPassword = await bcrypt.hash(parentTempPassword, 12);
         parentUser = await prisma.user.create({
           data: {
             name: parentName || `Parent of ${name}`,
@@ -96,10 +86,15 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
             schoolId: school.id,
           },
         });
+      } else {
+        await prisma.user.update({
+          where: { id: parentUser.id },
+          data: { password: hashedParentPassword },
+        });
       }
     }
 
-    const hashedPassword = await bcrypt.hash(tempPassword, 12);
+    const hashedPassword = await bcrypt.hash('student123', 12);
 
     const studentUser = await prisma.user.create({
       data: {
@@ -117,20 +112,16 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
       data: {
         userId: studentUser.id,
         schoolId: school.id,
+        classId,
         admissionNumber: admissionNumber || `ADM${Date.now()}`,
         dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
         dateAdmitted: dateAdmitted ? new Date(dateAdmitted) : new Date(),
-        tempPassword: hashedPassword,
         parentName,
         parentPhone,
         parentEmail,
         address,
         gender,
         parentId: parentUser?.id,
-        className,
-        classLevel: classLevel || className,
-        classSection,
-        academicYear,
         status: "active",
         avatarUrl,
         emergencyContact,
@@ -141,6 +132,7 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
       include: {
         user: true,
         parent: true,
+        class: { include: { grade: true } }
       },
     });
 
@@ -149,7 +141,8 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
       name: studentUser.name,
       email: studentUser.email,
       phone: studentUser.phone,
-      tempPassword: tempPassword,
+      className: student.class?.name,
+      gradeName: student.class?.grade?.name,
       parent: parentUser ? {
         ...parentUser,
         tempPassword: parentTempPassword,
@@ -166,11 +159,11 @@ export async function PUT(req: NextRequest, { params }: { params: { schoolCode: 
   try {
     const { schoolCode } = params;
     const body = await req.json();
+    const studentId = body.studentId || body.id;
     const {
-      studentId, name, email, phone, admissionNumber, dateOfBirth, dateAdmitted,
+      name, email, phone, admissionNumber, dateOfBirth, dateAdmitted,
       parentName, parentPhone, parentEmail, address, gender, parentId,
-      className, classLevel, classSection, academicYear, status, avatarUrl,
-      emergencyContact, medicalInfo, notes, isActive
+      classId, status, avatarUrl, emergencyContact, medicalInfo, notes, isActive
     } = body;
 
     if (!studentId) {
@@ -207,10 +200,7 @@ export async function PUT(req: NextRequest, { params }: { params: { schoolCode: 
         address,
         gender,
         parentId,
-        className,
-        classLevel: classLevel || className,
-        classSection,
-        academicYear,
+        classId,
         status,
         avatarUrl,
         emergencyContact,
@@ -219,7 +209,7 @@ export async function PUT(req: NextRequest, { params }: { params: { schoolCode: 
         isActive: typeof isActive === "boolean" ? isActive : (status === "active"),
         updatedAt: new Date(),
       },
-      include: { user: true, parent: true }
+      include: { user: true, parent: true, class: { include: { grade: true } } }
     });
 
     return NextResponse.json(updatedStudent);
@@ -232,7 +222,9 @@ export async function PUT(req: NextRequest, { params }: { params: { schoolCode: 
 
 export async function DELETE(req: NextRequest, { params }: { params: { schoolCode: string } }) {
   try {
-    const { studentId } = await req.json();
+    const body = await req.json();
+    // Accept both 'studentId' and 'id' for compatibility
+    const studentId = body.studentId || body.id;
 
     if (!studentId) {
       return NextResponse.json({ error: 'studentId is required for deletion.' }, { status: 400 });

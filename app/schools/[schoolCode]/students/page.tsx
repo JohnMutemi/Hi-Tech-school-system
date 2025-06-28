@@ -1,30 +1,37 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { useRouter, useParams } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import Link from "next/link"
+import { useEffect, useState } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import Link from "next/link";
 
 export default function StudentsListPage() {
-  const router = useRouter()
-  const params = useParams()
-  const schoolCode = params.schoolCode as string
-  const [students, setStudents] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const router = useRouter();
+  const params = useParams();
+  const schoolCode = params.schoolCode as string;
+  const [students, setStudents] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchStudents() {
-      setLoading(true)
-      const res = await fetch(`/api/schools/${schoolCode}/students`)
+      setLoading(true);
+      const res = await fetch(`/api/schools/${schoolCode}/students`);
       if (res.ok) {
-        setStudents(await res.json())
+        setStudents(await res.json());
       }
-      setLoading(false)
+      setLoading(false);
     }
-    if (schoolCode) fetchStudents()
-  }, [schoolCode])
+    if (schoolCode) fetchStudents();
+  }, [schoolCode]);
 
   return (
     <div className="max-w-4xl mx-auto py-8">
@@ -32,7 +39,9 @@ export default function StudentsListPage() {
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Students</CardTitle>
           <Button asChild>
-            <Link href={`/schools/${schoolCode}/students/add`}>Add Student</Link>
+            <Link href={`/schools/${schoolCode}/students/add`}>
+              Add Student
+            </Link>
           </Button>
         </CardHeader>
         <CardContent>
@@ -47,7 +56,8 @@ export default function StudentsListPage() {
                   <TableHead>Name</TableHead>
                   <TableHead>Admission No.</TableHead>
                   <TableHead>Email</TableHead>
-                  <TableHead>Class</TableHead>
+                  <TableHead>Grade</TableHead>
+                  <TableHead>Section/Stream</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -56,6 +66,7 @@ export default function StudentsListPage() {
                     <TableCell>{student.name}</TableCell>
                     <TableCell>{student.admissionNumber}</TableCell>
                     <TableCell>{student.email}</TableCell>
+                    <TableCell>{student.gradeName}</TableCell>
                     <TableCell>{student.className}</TableCell>
                   </TableRow>
                 ))}
@@ -65,5 +76,5 @@ export default function StudentsListPage() {
         </CardContent>
       </Card>
     </div>
-  )
-} 
+  );
+}

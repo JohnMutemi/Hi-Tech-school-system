@@ -1,0 +1,6 @@
+name,email,parentName,parentPhone,className,gradeName,phone,parentEmail,admissionNumber,dateOfBirth,gender,address
+John Doe,john.doe@email.com,John Doe Sr.,+254700000001,Grade 1A,Grade 1,+254700000002,john.sr@email.com,ADM001,2010-05-15,male,"123 Main St, Nairobi"
+Jane Smith,jane.smith@email.com,Jane Smith Sr.,+254700000003,Grade 1A,Grade 1,+254700000004,jane.sr@email.com,ADM002,2010-08-22,female,"456 Oak Ave, Mombasa"
+Mike Johnson,mike.johnson@email.com,Mike Johnson Sr.,+254700000005,Grade 2A,Grade 2,+254700000006,mike.sr@email.com,ADM003,2010-03-10,male,"789 Pine Rd, Kisumu"
+Sarah Wilson,sarah.wilson@email.com,Sarah Wilson Sr.,+254700000007,Grade 1A,Grade 1,+254700000008,sarah.sr@email.com,ADM004,2010-11-05,female,"321 Elm St, Nakuru"
+David Brown,david.brown@email.com,David Brown Sr.,+254700000009,Grade 1A,Grade 1,+254700000010,david.sr@email.com,ADM005,2010-07-18,male,"654 Maple Dr, Eldoret" 

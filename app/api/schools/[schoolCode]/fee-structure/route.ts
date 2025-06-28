@@ -11,7 +11,7 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     
     const term = searchParams.get('term');
     const year = searchParams.get('year');
-    const classLevel = searchParams.get('classLevel');
+    const gradeId = searchParams.get('gradeId');
 
     // Find the school
     const school = await prisma.school.findUnique({
@@ -30,12 +30,13 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
 
     if (term) whereClause.term = term;
     if (year) whereClause.year = parseInt(year);
-    if (classLevel) whereClause.classLevel = classLevel;
+    if (gradeId) whereClause.gradeId = gradeId;
 
     // Fetch fee structures
     const feeStructures = await prisma.termlyFeeStructure.findMany({
       where: whereClause,
       include: {
+        grade: true,
         creator: {
           select: {
             id: true,
@@ -60,12 +61,17 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       },
       orderBy: [
         { year: 'desc' },
-        { term: 'asc' },
-        { classLevel: 'asc' }
+        { term: 'asc' }
       ]
     });
 
-    return NextResponse.json(feeStructures);
+    // Add gradeName to each fee structure for display
+    const feeStructuresWithGrade = feeStructures.map(fee => ({
+      ...fee,
+      gradeName: fee.grade?.name || ''
+    }));
+
+    return NextResponse.json(feeStructuresWithGrade);
   } catch (error) {
     console.error('Error fetching fee structures:', error);
     return NextResponse.json({ error: 'Failed to fetch fee structures' }, { status: 500 });
@@ -81,16 +87,16 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
     const {
       term,
       year,
-      classLevel,
+      gradeId,
       totalAmount,
       breakdown,
       isActive = true
     } = body;
 
     // Validate required fields
-    if (!term || !year || !classLevel || !totalAmount || !breakdown) {
+    if (!term || !year || !gradeId || !totalAmount || !breakdown) {
       return NextResponse.json(
-        { error: 'Missing required fields: term, year, classLevel, totalAmount, breakdown' },
+        { error: 'Missing required fields: term, year, gradeId, totalAmount, breakdown' },
         { status: 400 }
       );
     }
@@ -117,13 +123,13 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
       return NextResponse.json({ error: 'No admin user found for this school' }, { status: 404 });
     }
 
-    // Check if a fee structure already exists for this term/year/classLevel
+    // Check if a fee structure already exists for this term/year/gradeId
     const existingFeeStructure = await prisma.termlyFeeStructure.findFirst({
       where: {
         schoolId: school.id,
         term,
         year: parseInt(year),
-        classLevel
+        gradeId
       }
     });
 
@@ -141,6 +147,7 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
           updatedAt: new Date()
         },
         include: {
+          grade: true,
           creator: {
             select: {
               id: true,
@@ -157,7 +164,7 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
         data: {
           term,
           year: parseInt(year),
-          classLevel,
+          gradeId,
           totalAmount: parseFloat(totalAmount),
           breakdown,
           isActive,
@@ -165,6 +172,7 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
           schoolId: school.id
         },
         include: {
+          grade: true,
           creator: {
             select: {
               id: true,
@@ -185,7 +193,7 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
         details: {
           term,
           year: parseInt(year),
-          classLevel,
+          gradeId,
           totalAmount: parseFloat(totalAmount),
           breakdown
         }

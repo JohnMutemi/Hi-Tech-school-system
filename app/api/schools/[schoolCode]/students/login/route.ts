@@ -51,15 +51,14 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
     }
 
-    // Check if tempPassword exists
-    if (!student.tempPassword) {
-      console.log('No tempPassword found for student:', student.id)
+    // Check if user password exists
+    if (!student.user || !student.user.password) {
+      console.log('No user password found for student:', student.id)
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
     }
 
-    // Compare the provided password with the hashed tempPassword
-    const isPasswordValid = await bcrypt.compare(password, student.tempPassword)
-    
+    // Compare the provided password with the hashed user password
+    const isPasswordValid = await bcrypt.compare(password, student.user.password)
     if (!isPasswordValid) {
       console.log('Invalid password for student:', student.id)
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
