@@ -10,7 +10,11 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     if (!school) {
       return NextResponse.json({ error: "School not found" }, { status: 404 });
     }
-    const classes = await prisma.class.findMany({ where: { schoolId: school.id } });
+    const { searchParams } = new URL(request.url);
+    const gradeId = searchParams.get('gradeId');
+    const whereClause: any = { schoolId: school.id };
+    if (gradeId) whereClause.gradeId = gradeId;
+    const classes = await prisma.class.findMany({ where: whereClause });
     return NextResponse.json(classes);
   } catch (error) {
     return NextResponse.json({ error: "Failed to fetch classes" }, { status: 500 });
@@ -25,22 +29,22 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
       return NextResponse.json({ error: "School not found" }, { status: 404 });
     }
     const body = await request.json();
-    const { name, level, capacity, currentStudents, classTeacherId } = body;
-    if (!name || !level) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    const { name, level, academicYear, teacherId, gradeId } = body;
+    if (!name || !academicYear || !gradeId) {
+      return NextResponse.json({ error: "Missing required fields: name, academicYear, and gradeId are required" }, { status: 400 });
     }
     const newClass = await prisma.class.create({
       data: {
         name,
-        level,
-        capacity: capacity || 30,
-        currentStudents: currentStudents || 0,
-        classTeacherId: classTeacherId || null,
+        academicYear,
+        teacherId: teacherId || null,
         schoolId: school.id,
+        gradeId: gradeId,
       },
     });
     return NextResponse.json(newClass, { status: 201 });
   } catch (error) {
+    console.error("Error creating class:", error);
     return NextResponse.json({ error: "Failed to create class" }, { status: 500 });
   }
 }
@@ -53,7 +57,7 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
       return NextResponse.json({ error: "School not found" }, { status: 404 });
     }
     const body = await request.json();
-    const { id, name, level, capacity, currentStudents, classTeacherId } = body;
+    const { id, name, academicYear, teacherId, gradeId } = body;
     if (!id) {
       return NextResponse.json({ error: "Class ID is required" }, { status: 400 });
     }
@@ -61,14 +65,14 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
       where: { id },
       data: {
         name,
-        level,
-        capacity,
-        currentStudents,
-        classTeacherId: classTeacherId || null,
+        academicYear,
+        teacherId: teacherId || null,
+        gradeId: gradeId,
       },
     });
     return NextResponse.json(updatedClass);
   } catch (error) {
+    console.error("Error updating class:", error);
     return NextResponse.json({ error: "Failed to update class" }, { status: 500 });
   }
 }

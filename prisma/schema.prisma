@@ -31,6 +31,8 @@ model School {
   termlyFees      TermlyFeeStructure[]
   feeStructures   FeeStructure[]
   paymentRequests PaymentRequest[]
+  promotionCriteria PromotionCriteria[]
+  classProgressions  ClassProgression[]
 }
 
 model User {
@@ -53,6 +55,8 @@ model User {
   studentProfile    Student?
   feeStructureLogs  FeeStructureLog[]
   createdTermlyFees TermlyFeeStructure[] @relation("UserCreatedTermlyFees")
+  promotions        PromotionLog[]        @relation("UserPromotions")
+  exclusions        PromotionExclusion[]  @relation("UserExclusions")
 }
 
 model TeacherProfile {
@@ -64,9 +68,19 @@ model TeacherProfile {
   userId         String   @unique
 }
 
+model Grade {
+  id        String   @id @default(uuid())
+  name      String   // e.g., "Grade 5"
+  schoolId  String
+  classes   Class[]
+  termlyFees TermlyFeeStructure[]
+  // ...timestamps, etc.
+}
+
 model Class {
   id           String   @id @default(uuid())
-  name         String
+  name         String   // e.g., "5A" or "Grade 5" for single-section
+  gradeId      String
   schoolId     String
   teacherId    String?
   academicYear String
@@ -74,16 +88,17 @@ model Class {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  school   School    @relation(fields: [schoolId], references: [id])
-  teacher  User?     @relation("TeacherClasses", fields: [teacherId], references: [id])
+  grade   Grade   @relation(fields: [gradeId], references: [id])
+  teacher User?   @relation("TeacherClasses", fields: [teacherId], references: [id])
   students Student[]
+  school   School    @relation(fields: [schoolId], references: [id])
 }
 
 model Student {
   id              String    @id @default(uuid())
   userId          String    @unique
   schoolId        String
-  classId         String?
+  classId         String?   // references Class (section/stream)
   admissionNumber String
   dateOfBirth     DateTime?
   dateAdmitted    DateTime?
@@ -99,12 +114,6 @@ model Student {
   parentEmail     String?
   address         String?
   gender          String?
-  
-  className       String?
-  classLevel      String?
-  classSection    String?
-  academicYear    String?
-  
   avatarUrl       String?
   emergencyContact String?
   medicalInfo     String?
@@ -119,6 +128,8 @@ model Student {
   studentFees   StudentFee[]
   receipts      Receipt[]
   feeStatements FeeStatement[]
+  promotionLogs   PromotionLog[]
+  promotionExclusions PromotionExclusion[]
 }
 
 model Payment {
@@ -175,8 +186,7 @@ model TermlyFeeStructure {
   id          String   @id @default(uuid())
   term        String   // 'Term 1', 'Term 2', 'Term 3'
   year        Int
-  classLevel  String   // 'Grade 1', 'Grade 2', etc.
-  className   String?  // Specific class name if applicable (e.g., "Grade 5A")
+  gradeId     String   // references Grade
   totalAmount Decimal  @db.Decimal(10, 2)
   breakdown   Json     // {"tuition": 20000, "books": 5000, "lunch": 10000}
   isActive    Boolean  @default(true)
@@ -187,6 +197,7 @@ model TermlyFeeStructure {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  grade   Grade   @relation(fields: [gradeId], references: [id])
   school  School @relation(fields: [schoolId], references: [id])
   creator User   @relation("UserCreatedTermlyFees", fields: [createdBy], references: [id])
   logs    FeeStructureLog[]
@@ -252,4 +263,68 @@ model PaymentRequest {
 
   student Student @relation(fields: [studentId], references: [id])
   school   School @relation(fields: [schoolId], references: [id])
+}
+
+// Promotion Management Models
+model PromotionCriteria {
+  id          String   @id @default(uuid())
+  schoolId    String
+  classLevel  String
+  minGrade    Float?   // Minimum grade requirement (0-100)
+  attendance  Int?     // Minimum attendance percentage
+  feeStatus   String   // 'paid', 'partial', 'none'
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  school      School   @relation(fields: [schoolId], references: [id])
+
+  @@unique([schoolId, classLevel])
+}
+
+model ClassProgression {
+  id          String   @id @default(uuid())
+  schoolId    String
+  fromClass   String
+  toClass     String
+  order       Int
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  school      School   @relation(fields: [schoolId], references: [id])
+
+  @@unique([schoolId, fromClass])
+}
+
+model PromotionLog {
+  id              String   @id @default(uuid())
+  studentId       String
+  fromClass       String
+  toClass         String
+  fromYear        String
+  toYear          String
+  promotedBy      String
+  promotionDate   DateTime @default(now())
+  criteria        Json     // What criteria were met
+  notes           String?
+  promotionType   String   // 'automatic', 'manual', 'bulk'
+  
+  student         Student  @relation(fields: [studentId], references: [id])
+  user            User     @relation("UserPromotions", fields: [promotedBy], references: [id])
+  exclusions      PromotionExclusion[]
+}
+
+model PromotionExclusion {
+  id              String   @id @default(uuid())
+  promotionLogId  String
+  studentId       String
+  reason          String   // 'academic', 'fees', 'disciplinary', 'parent_request', 'attendance', 'other'
+  notes           String?
+  excludedBy      String
+  excludedAt      DateTime @default(now())
+  
+  promotionLog    PromotionLog @relation(fields: [promotionLogId], references: [id])
+  student         Student      @relation(fields: [studentId], references: [id])
+  user            User         @relation("UserExclusions", fields: [excludedBy], references: [id])
 }

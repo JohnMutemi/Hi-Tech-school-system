@@ -1,21 +1,48 @@
-"use client"
+"use client";
 
-import { DialogTrigger } from "@/components/ui/dialog"
-import { useToast } from "@/hooks/use-toast"
+import { DialogTrigger } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import Papa from "papaparse";
+import * as XLSX from "xlsx";
 
-import type React from "react"
+import type React from "react";
 
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,7 +53,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+} from "@/components/ui/alert-dialog";
 import {
   School,
   Users,
@@ -40,44 +67,56 @@ import {
   Eye,
   ArrowLeft,
   DollarSign,
-} from "lucide-react"
-import type { SchoolData, SchoolProfile, Teacher, Student, Subject, SchoolClass } from "@/lib/types"
-import {
-  updateSchoolClasses,
-  getSchool,
-} from "@/lib/school-storage"
-import Link from "next/link"
-import { generateTempPassword } from "@/lib/utils/school-generator"
-import { FeeManagement } from "./fee-management"
+  ArrowRight,
+  Upload,
+} from "lucide-react";
+import type {
+  SchoolData,
+  SchoolProfile,
+  Teacher,
+  Student,
+  Subject,
+  SchoolClass,
+  Grade,
+} from "@/lib/types";
+import { updateSchoolClasses, getSchool } from "@/lib/school-storage";
+import Link from "next/link";
+import { generateTempPassword } from "@/lib/utils/school-generator";
+import { FeeManagement } from "./fee-management";
 
 interface SchoolSetupDashboardProps {
-  schoolData: SchoolData
-  onLogout: () => void
+  schoolData: SchoolData;
+  onLogout: () => void;
 }
 
 interface SetupStep {
-  id: string
-  title: string
-  description: string
-  completed: boolean
-  icon: React.ElementType
+  id: string;
+  title: string;
+  description: string;
+  completed: boolean;
+  icon: React.ElementType;
 }
 
-type ViewMode = "list" | "form" | "view"
+type ViewMode = "list" | "form" | "view";
 
-export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }: SchoolSetupDashboardProps) {
-  const { toast } = useToast()
-  const [activeTab, setActiveTab] = useState("overview")
-  const [schoolData, setSchoolData] = useState(initialSchoolData)
+export function SchoolSetupDashboard({
+  schoolData: initialSchoolData,
+  onLogout,
+}: SchoolSetupDashboardProps) {
+  const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState("overview");
+  const [schoolData, setSchoolData] = useState(initialSchoolData);
   const [viewMode, setViewMode] = useState<Record<string, ViewMode>>({
     staff: "list",
     students: "list",
     subjects: "list",
-  })
-  const [editingItem, setEditingItem] = useState<any>(null)
-  const [viewingItem, setViewingItem] = useState<any>(null)
-  const [profileSaved, setProfileSaved] = useState(!!initialSchoolData.profile?.address)
-  const [isEditingProfile, setIsEditingProfile] = useState(false)
+  });
+  const [editingItem, setEditingItem] = useState<any>(null);
+  const [viewingItem, setViewingItem] = useState<any>(null);
+  const [profileSaved, setProfileSaved] = useState(
+    !!initialSchoolData.profile?.address
+  );
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
 
   const [setupSteps, setSetupSteps] = useState<SetupStep[]>([
     {
@@ -105,7 +144,9 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
       id: "subjects",
       title: "Setup Subjects & Classes",
       description: "Configure subjects, classes, and timetables",
-      completed: (schoolData.subjects?.length || 0) > 0 && (schoolData.classes?.length || 0) > 0,
+      completed:
+        (schoolData.subjects?.length || 0) > 0 &&
+        (schoolData.classes?.length || 0) > 0,
       icon: BookOpen,
     },
     {
@@ -115,7 +156,7 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
       completed: false, // Will be updated based on fee structures
       icon: DollarSign,
     },
-  ])
+  ]);
 
   const [schoolProfile, setSchoolProfile] = useState<SchoolProfile>(
     schoolData.profile || {
@@ -128,81 +169,196 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
       email: "",
       motto: "",
       type: "primary",
-    },
-  )
+    }
+  );
 
-  const [teachers, setTeachers] = useState<Teacher[]>([])
-  const [students, setStudents] = useState<Student[]>(schoolData.students || [])
-  const [subjects, setSubjects] = useState<Subject[]>(schoolData.subjects || [])
-  const [classes, setClasses] = useState<SchoolClass[]>(schoolData.classes || [])
-  const [feeStructures, setFeeStructures] = useState<any[]>([])
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [students, setStudents] = useState<Student[]>(
+    schoolData.students || []
+  );
+  const [studentsLoading, setStudentsLoading] = useState(false);
+  const [subjects, setSubjects] = useState<Subject[]>(
+    schoolData.subjects || []
+  );
+  const [classes, setClasses] = useState<SchoolClass[]>(
+    schoolData.classes || []
+  );
+  const [feeStructures, setFeeStructures] = useState<any[]>([]);
+  const [grades, setGrades] = useState<Grade[]>([]);
+
+  // Fetch grades from API on component mount
+  useEffect(() => {
+    async function fetchGrades() {
+      try {
+        const res = await fetch(`/api/schools/${schoolData.schoolCode}/grades`);
+        if (res.ok) {
+          const data = await res.json();
+          setGrades(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch grades", error);
+        toast({
+          title: "Error",
+          description: "Could not load grades.",
+          variant: "destructive",
+        });
+      }
+    }
+    if (schoolData.schoolCode) {
+      fetchGrades();
+    }
+  }, [schoolData.schoolCode, toast]);
+
+  // Fetch classes from API on component mount
+  useEffect(() => {
+    async function fetchClasses() {
+      try {
+        const res = await fetch(
+          `/api/schools/${schoolData.schoolCode}/classes`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setClasses(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch classes", error);
+        toast({
+          title: "Error",
+          description: "Could not load classes.",
+          variant: "destructive",
+        });
+      }
+    }
+    if (schoolData.schoolCode) {
+      fetchClasses();
+    }
+  }, [schoolData.schoolCode, toast]);
 
   // Form states for new items
-  const [newTeacher, setNewTeacher] = useState<Partial<Teacher>>({})
-  const [newStudent, setNewStudent] = useState<Partial<Student>>({})
-  const [newSubject, setNewSubject] = useState<Partial<Subject>>({})
-  const [newClass, setNewClass] = useState<Partial<SchoolClass>>({})
+  const [newTeacher, setNewTeacher] = useState<Partial<Teacher>>({});
+  const [newStudent, setNewStudent] = useState<Partial<Student>>({});
+  const [newSubject, setNewSubject] = useState<Partial<Subject>>({});
+  const [newClass, setNewClass] = useState<Partial<SchoolClass>>({});
 
   // Add state for showing credentials
-  const [showTeacherCredentials, setShowTeacherCredentials] = useState(false)
-  const [lastTeacherCredentials, setLastTeacherCredentials] = useState<{ email: string; tempPassword: string } | null>(null)
-  const [showStudentCredentials, setShowStudentCredentials] = useState(false)
-  const [lastStudentCredentials, setLastStudentCredentials] = useState<{ admissionNumber: string; email: string; tempPassword: string } | null>(null)
-  const [lastParentCredentials, setLastParentCredentials] = useState<any>(null)
-  const [showParentCredentials, setShowParentCredentials] = useState(false)
+  const [showTeacherCredentials, setShowTeacherCredentials] = useState(false);
+  const [lastTeacherCredentials, setLastTeacherCredentials] = useState<{
+    email: string;
+    tempPassword: string;
+  } | null>(null);
+  const [showStudentCredentials, setShowStudentCredentials] = useState(false);
+  const [lastStudentCredentials, setLastStudentCredentials] = useState<{
+    admissionNumber: string;
+    email: string;
+    tempPassword: string;
+  } | null>(null);
+  const [lastParentCredentials, setLastParentCredentials] = useState<any>(null);
+  const [showParentCredentials, setShowParentCredentials] = useState(false);
+
+  // Bulk import states
+  const [showBulkImportDialog, setShowBulkImportDialog] = useState(false);
+  const [parsedStudents, setParsedStudents] = useState<any[]>([]);
+  const [importResults, setImportResults] = useState<any[]>([]);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importStep, setImportStep] = useState<
+    "upload" | "preview" | "results"
+  >("upload");
+
+  // Add state for search and class filter
+  const [studentSearch, setStudentSearch] = useState("");
+  const [studentClassFilter, setStudentClassFilter] = useState("All");
+
+  // Compute unique class options from students
+  const classOptions = [
+    "All",
+    ...Array.from(
+      new Set(students.map((s) => s.className).filter(Boolean))
+    ).sort(),
+  ];
+
+  // Filter students based on search and class
+  const filteredStudents = students.filter((student) => {
+    const search = studentSearch.toLowerCase();
+    const matchesSearch =
+      student.name?.toLowerCase().includes(search) ||
+      student.admissionNumber?.toLowerCase().includes(search) ||
+      student.parentName?.toLowerCase().includes(search) ||
+      student.parentPhone?.toLowerCase().includes(search);
+    const matchesClass =
+      studentClassFilter === "All" || student.className === studentClassFilter;
+    return matchesSearch && matchesClass;
+  });
 
   // Fetch teachers from API on component mount
   useEffect(() => {
     async function fetchTeachers() {
       try {
-        const res = await fetch(`/api/schools/${schoolData.schoolCode}/teachers`);
+        const res = await fetch(
+          `/api/schools/${schoolData.schoolCode}/teachers`
+        );
         if (res.ok) {
           const data = await res.json();
           setTeachers(data);
         }
       } catch (error) {
         console.error("Failed to fetch teachers", error);
-        toast({ title: "Error", description: "Could not load teacher data.", variant: "destructive" });
+        toast({
+          title: "Error",
+          description: "Could not load teacher data.",
+          variant: "destructive",
+        });
       }
     }
     fetchTeachers();
   }, [schoolData.schoolCode, toast]);
 
   // Fetch students from API on component mount
-  useEffect(() => {
-    async function fetchStudents() {
-      try {
-        const res = await fetch(`/api/schools/${schoolData.schoolCode}/students`);
-        if (res.ok) {
-          const data = await res.json();
-          setStudents(data);
-        }
-      } catch (error) {
-        console.error("Failed to fetch students", error);
-        toast({ title: "Error", description: "Could not load student data.", variant: "destructive" });
+  const fetchStudents = async () => {
+    setStudentsLoading(true);
+    try {
+      const res = await fetch(`/api/schools/${schoolData.schoolCode}/students`);
+      if (res.ok) {
+        const data = await res.json();
+        setStudents(data);
       }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Could not load student data.",
+        variant: "destructive",
+      });
+    } finally {
+      setStudentsLoading(false);
     }
-    if (schoolData.schoolCode) {
-        fetchStudents();
-    }
-  }, [schoolData.schoolCode, toast]);
+  };
+
+  // Fetch students on mount and when schoolCode changes
+  useEffect(() => {
+    fetchStudents();
+  }, [schoolData.schoolCode]);
 
   // Fetch subjects from API on component mount
   useEffect(() => {
     async function fetchSubjects() {
       try {
-        const res = await fetch(`/api/schools/${schoolData.schoolCode}/subjects`);
+        const res = await fetch(
+          `/api/schools/${schoolData.schoolCode}/subjects`
+        );
         if (res.ok) {
           const data = await res.json();
           setSubjects(data);
         }
       } catch (error) {
         console.error("Failed to fetch subjects", error);
-        toast({ title: "Error", description: "Could not load subject data.", variant: "destructive" });
+        toast({
+          title: "Error",
+          description: "Could not load subject data.",
+          variant: "destructive",
+        });
       }
     }
     if (schoolData.schoolCode) {
-        fetchSubjects();
+      fetchSubjects();
     }
   }, [schoolData.schoolCode, toast]);
 
@@ -210,14 +366,20 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
   useEffect(() => {
     async function fetchFeeStructures() {
       try {
-        const res = await fetch(`/api/schools/${schoolData.schoolCode}/fee-structure`);
+        const res = await fetch(
+          `/api/schools/${schoolData.schoolCode}/fee-structure`
+        );
         if (res.ok) {
           const data = await res.json();
           setFeeStructures(data);
           // Update fee management step completion status
-          setSetupSteps(prev => prev.map(step => 
-            step.id === "fees" ? { ...step, completed: data.length > 0 } : step
-          ));
+          setSetupSteps((prev) =>
+            prev.map((step) =>
+              step.id === "fees"
+                ? { ...step, completed: data.length > 0 }
+                : step
+            )
+          );
         }
       } catch (error) {
         console.error("Failed to fetch fee structures", error);
@@ -225,31 +387,35 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
       }
     }
     if (schoolData.schoolCode) {
-        fetchFeeStructures();
+      fetchFeeStructures();
     }
   }, [schoolData.schoolCode]);
 
   // Refresh school data when localStorage changes
   useEffect(() => {
     async function fetchSchool() {
-      const refreshedData = await getSchool(schoolData.schoolCode)
+      const refreshedData = await getSchool(schoolData.schoolCode);
       if (refreshedData) {
-        setSchoolData(refreshedData)
-        setTeachers(refreshedData.teachers || [])
-        setStudents(refreshedData.students || [])
-        setSubjects(refreshedData.subjects || [])
-        setClasses(refreshedData.classes || [])
+        setSchoolData(refreshedData);
+        setTeachers(refreshedData.teachers || []);
+        // setStudents(refreshedData.students || []); // Only update students from the API, not from local storage
+        setSubjects(refreshedData.subjects || []);
+        setClasses(refreshedData.classes || []);
       }
     }
-    fetchSchool()
-  }, [schoolData.schoolCode])
+    fetchSchool();
+  }, [schoolData.schoolCode]);
 
-  const completedSteps = setupSteps.filter((step) => step.completed).length
-  const progressPercentage = (completedSteps / setupSteps.length) * 100
+  const completedSteps = setupSteps.filter((step) => step.completed).length;
+  const progressPercentage = (completedSteps / setupSteps.length) * 100;
 
   const handleStepComplete = (stepId: string) => {
-    setSetupSteps((prev) => prev.map((step) => (step.id === stepId ? { ...step, completed: true } : step)))
-  }
+    setSetupSteps((prev) =>
+      prev.map((step) =>
+        step.id === stepId ? { ...step, completed: true } : step
+      )
+    );
+  };
 
   const saveSchoolProfile = async () => {
     try {
@@ -269,47 +435,54 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
           status: schoolData.status,
           profile: schoolProfile,
         }),
-      })
-      if (!res.ok) throw new Error("Failed to update school profile")
-      handleStepComplete("profile")
-      setProfileSaved(true)
-      setIsEditingProfile(false)
+      });
+      if (!res.ok) throw new Error("Failed to update school profile");
+      handleStepComplete("profile");
+      setProfileSaved(true);
+      setIsEditingProfile(false);
       toast({
         title: "Success!",
         description: "School profile saved successfully!",
-      })
+      });
     } catch (err) {
       toast({
         title: "Error",
         description: "Failed to save school profile.",
         variant: "destructive",
-      })
+      });
     }
-  }
+  };
 
   // Teacher CRUD operations
   const createTeacher = async (teacherData: Partial<Teacher>) => {
     if (!teacherData.name || !teacherData.email) {
-      toast({ title: "Validation Error", description: "Name and Email are required.", variant: "destructive" });
+      toast({
+        title: "Validation Error",
+        description: "Name and Email are required.",
+        variant: "destructive",
+      });
       return false;
     }
 
     const tempPassword = generateTempPassword();
     try {
-      const response = await fetch(`/api/schools/${schoolData.schoolCode}/teachers`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...teacherData, tempPassword }),
-      });
+      const response = await fetch(
+        `/api/schools/${schoolData.schoolCode}/teachers`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...teacherData, tempPassword }),
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create teacher');
+        throw new Error(errorData.error || "Failed to create teacher");
       }
 
       const newTeacher = await response.json();
       setTeachers([...teachers, newTeacher]);
-      
+
       setNewTeacher({});
       setViewMode((prev) => ({ ...prev, staff: "list" }));
       handleStepComplete("staff");
@@ -318,91 +491,143 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
       toast({ title: "Success!", description: "Teacher added successfully!" });
       return true;
     } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to create teacher.", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create teacher.",
+        variant: "destructive",
+      });
       return false;
     }
   };
 
   const updateTeacher = async (updatedTeacher: Teacher) => {
     try {
-      const response = await fetch(`/api/schools/${schoolData.schoolCode}/teachers`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedTeacher),
-      });
+      const response = await fetch(
+        `/api/schools/${schoolData.schoolCode}/teachers`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updatedTeacher),
+        }
+      );
 
       if (!response.ok) {
-        throw new Error('Failed to update teacher');
+        throw new Error("Failed to update teacher");
       }
 
       const returnedTeacher = await response.json();
-      setTeachers(teachers.map((t) => (t.id === returnedTeacher.id ? returnedTeacher : t)));
-      
+      setTeachers(
+        teachers.map((t) => (t.id === returnedTeacher.id ? returnedTeacher : t))
+      );
+
       setEditingItem(null);
       setViewMode((prev) => ({ ...prev, staff: "list" }));
-      toast({ title: "Success!", description: "Teacher updated successfully!" });
+      toast({
+        title: "Success!",
+        description: "Teacher updated successfully!",
+      });
     } catch (error) {
-      toast({ title: "Error", description: "Failed to update teacher.", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: "Failed to update teacher.",
+        variant: "destructive",
+      });
     }
   };
 
   const deleteTeacher = async (id: string) => {
     try {
-      const response = await fetch(`/api/schools/${schoolData.schoolCode}/teachers`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      });
+      const response = await fetch(
+        `/api/schools/${schoolData.schoolCode}/teachers`,
+        {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id }),
+        }
+      );
 
       if (!response.ok) {
-        throw new Error('Failed to delete teacher');
+        throw new Error("Failed to delete teacher");
       }
 
       setTeachers(teachers.filter((t) => t.id !== id));
-      toast({ title: "Success!", description: "Teacher deleted successfully!" });
+      toast({
+        title: "Success!",
+        description: "Teacher deleted successfully!",
+      });
     } catch (error) {
-      toast({ title: "Error", description: "Failed to delete teacher.", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: "Failed to delete teacher.",
+        variant: "destructive",
+      });
     }
   };
 
   // Student CRUD operations
   const createStudent = async (studentData: Partial<Student>) => {
-    if (!studentData.name || !studentData.parentName || !studentData.parentPhone || !studentData.email || !studentData.className) {
-      toast({ title: "Validation Error", description: "Student Name, Email, Class, Parent Name, and Parent Phone are required.", variant: "destructive" });
+    if (
+      !studentData.name ||
+      !studentData.parentName ||
+      !studentData.parentPhone ||
+      !studentData.email ||
+      !studentData.classId
+    ) {
+      toast({
+        title: "Validation Error",
+        description:
+          "Student Name, Email, Class, Parent Name, and Parent Phone are required.",
+        variant: "destructive",
+      });
       return false;
     }
 
-    const tempPassword = generateTempPassword();
+    const tempPassword = "student123";
     const admissionNumber = studentData.admissionNumber || `ADM${Date.now()}`;
-    
-    console.log('Creating student with data:', { ...studentData, tempPassword, admissionNumber });
-    
+
+    console.log("Creating student with data:", {
+      ...studentData,
+      tempPassword,
+      admissionNumber,
+    });
+
     try {
-      const response = await fetch(`/api/schools/${schoolData.schoolCode}/students`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...studentData, tempPassword, admissionNumber }),
-      });
+      const response = await fetch(
+        `/api/schools/${schoolData.schoolCode}/students`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...studentData,
+            tempPassword,
+            admissionNumber,
+          }),
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create student');
+        throw new Error(errorData.error || "Failed to create student");
       }
 
       const newStudent = await response.json();
-      console.log('API response for new student:', newStudent);
-      
+      console.log("API response for new student:", newStudent);
+
       setStudents([...students, newStudent]);
-      console.log('Updated students state:', [...students, newStudent]);
-      
+      console.log("Updated students state:", [...students, newStudent]);
+
       setNewStudent({});
       setViewMode((prev) => ({ ...prev, students: "list" }));
       handleStepComplete("students");
-      
+
       // Set student credentials
-      setLastStudentCredentials({ admissionNumber, email: newStudent.email, tempPassword: newStudent.tempPassword });
+      setLastStudentCredentials({
+        admissionNumber,
+        email: newStudent.email,
+        tempPassword: newStudent.tempPassword,
+      });
       setShowStudentCredentials(true);
-      
+
       // Set parent credentials if parent was created
       if (newStudent.parent && newStudent.parent.tempPassword) {
         setLastParentCredentials({
@@ -413,77 +638,116 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
         });
         setShowParentCredentials(true);
       }
-      
+
       toast({ title: "Success!", description: "Student added successfully!" });
+      await fetchStudents();
       return true;
     } catch (error: any) {
-      console.error('Error creating student:', error);
-      toast({ title: "Error", description: error.message || "Failed to create student.", variant: "destructive" });
+      console.error("Error creating student:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create student.",
+        variant: "destructive",
+      });
       return false;
     }
   };
 
   const updateStudent = async (updatedStudent: Student) => {
     try {
-      const response = await fetch(`/api/schools/${schoolData.schoolCode}/students`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedStudent),
-      });
+      const response = await fetch(
+        `/api/schools/${schoolData.schoolCode}/students`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...updatedStudent,
+            studentId: updatedStudent.id,
+          }),
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update student');
+        throw new Error(errorData.error || "Failed to update student");
       }
 
       const returnedStudent = await response.json();
-      setStudents(students.map((s) => (s.id === returnedStudent.id ? returnedStudent : s)));
-      
+      setStudents(
+        students.map((s) => (s.id === returnedStudent.id ? returnedStudent : s))
+      );
+
       setEditingItem(null);
       setViewMode((prev) => ({ ...prev, students: "list" }));
-      toast({ title: "Success!", description: "Student updated successfully!" });
+      toast({
+        title: "Success!",
+        description: "Student updated successfully!",
+      });
+      await fetchStudents();
     } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to update student.", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update student.",
+        variant: "destructive",
+      });
     }
   };
 
   const deleteStudent = async (id: string) => {
     try {
-      const response = await fetch(`/api/schools/${schoolData.schoolCode}/students`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      });
+      const response = await fetch(
+        `/api/schools/${schoolData.schoolCode}/students`,
+        {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ studentId: id }),
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete student');
+        throw new Error(errorData.error || "Failed to delete student");
       }
 
       setStudents(students.filter((s) => s.id !== id));
-      toast({ title: "Success!", description: "Student deleted successfully!" });
+      toast({
+        title: "Success!",
+        description: "Student deleted successfully!",
+      });
+      await fetchStudents();
     } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to delete student.", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete student.",
+        variant: "destructive",
+      });
     }
   };
 
   // Subject CRUD operations
   const createSubject = async () => {
     if (!newSubject.name || !newSubject.code) {
-      toast({ title: "Validation Error", description: "Subject Name and Code are required.", variant: "destructive" });
+      toast({
+        title: "Validation Error",
+        description: "Subject Name and Code are required.",
+        variant: "destructive",
+      });
       return;
     }
 
     try {
-      const response = await fetch(`/api/schools/${schoolData.schoolCode}/subjects`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newSubject),
-      });
+      const response = await fetch(
+        `/api/schools/${schoolData.schoolCode}/subjects`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(newSubject),
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create subject');
+        throw new Error(errorData.error || "Failed to create subject");
       }
 
       const createdSubject = await response.json();
@@ -491,71 +755,101 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
       setNewSubject({});
       toast({ title: "Success!", description: "Subject added successfully!" });
     } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to create subject.", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create subject.",
+        variant: "destructive",
+      });
     }
   };
 
   const updateSubject = async (updatedSubject: Subject) => {
     try {
-      const response = await fetch(`/api/schools/${schoolData.schoolCode}/subjects`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedSubject),
-      });
+      const response = await fetch(
+        `/api/schools/${schoolData.schoolCode}/subjects`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updatedSubject),
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update subject');
+        throw new Error(errorData.error || "Failed to update subject");
       }
 
       const returnedSubject = await response.json();
-      setSubjects(subjects.map((s) => (s.id === returnedSubject.id ? returnedSubject : s)));
+      setSubjects(
+        subjects.map((s) => (s.id === returnedSubject.id ? returnedSubject : s))
+      );
       setEditingItem(null);
-      toast({ title: "Success!", description: "Subject updated successfully!" });
+      toast({
+        title: "Success!",
+        description: "Subject updated successfully!",
+      });
     } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to update subject.", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update subject.",
+        variant: "destructive",
+      });
     }
   };
 
   const deleteSubject = async (id: string) => {
     try {
-      const response = await fetch(`/api/schools/${schoolData.schoolCode}/subjects`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      });
+      const response = await fetch(
+        `/api/schools/${schoolData.schoolCode}/subjects`,
+        {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id }),
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete subject');
+        throw new Error(errorData.error || "Failed to delete subject");
       }
 
       setSubjects(subjects.filter((s) => s.id !== id));
-      toast({ title: "Success!", description: "Subject deleted successfully!" });
+      toast({
+        title: "Success!",
+        description: "Subject deleted successfully!",
+      });
     } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to delete subject.", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete subject.",
+        variant: "destructive",
+      });
     }
   };
 
   // Class CRUD operations
   const createClass = async () => {
-    if (!newClass.name || !newClass.level) {
+    if (!newClass.name || !newClass.level || !newClass.gradeId) {
       toast({
         title: "Validation Error",
-        description: "Please fill in required fields (Class Name and Level)",
+        description:
+          "Please fill in required fields (Class Name, Level, and Grade)",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
     try {
-      const response = await fetch(`/api/schools/${schoolData.schoolCode}/classes`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newClass),
-      });
+      const response = await fetch(
+        `/api/schools/${schoolData.schoolCode}/classes`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...newClass, gradeId: newClass.gradeId }),
+        }
+      );
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create class');
+        throw new Error(errorData.error || "Failed to create class");
       }
       const createdClass = await response.json();
       setClasses([...classes, createdClass]);
@@ -572,21 +866,26 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
         variant: "destructive",
       });
     }
-  }
+  };
 
   const updateClass = async (updatedClass: SchoolClass) => {
     try {
-      const response = await fetch(`/api/schools/${schoolData.schoolCode}/classes`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedClass),
-      });
+      const response = await fetch(
+        `/api/schools/${schoolData.schoolCode}/classes`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updatedClass),
+        }
+      );
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update class');
+        throw new Error(errorData.error || "Failed to update class");
       }
       const returnedClass = await response.json();
-      setClasses(classes.map((c) => (c.id === returnedClass.id ? returnedClass : c)));
+      setClasses(
+        classes.map((c) => (c.id === returnedClass.id ? returnedClass : c))
+      );
       setEditingItem(null);
       toast({
         title: "Success!",
@@ -599,18 +898,21 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
         variant: "destructive",
       });
     }
-  }
+  };
 
   const deleteClass = async (id: string) => {
     try {
-      const response = await fetch(`/api/schools/${schoolData.schoolCode}/classes`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      });
+      const response = await fetch(
+        `/api/schools/${schoolData.schoolCode}/classes`,
+        {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id }),
+        }
+      );
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete class');
+        throw new Error(errorData.error || "Failed to delete class");
       }
       setClasses(classes.filter((c) => c.id !== id));
       toast({
@@ -624,29 +926,35 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
         variant: "destructive",
       });
     }
-  }
+  };
 
   // Teacher Form Component
   const TeacherForm = ({
     teacher,
     onSave,
     onCancel,
-  }: { teacher?: Teacher; onSave: (teacher: Teacher) => void; onCancel: () => void }) => {
-    const [formData, setFormData] = useState<Partial<Teacher>>(teacher || newTeacher)
+  }: {
+    teacher?: Teacher;
+    onSave: (teacher: Teacher) => void;
+    onCancel: () => void;
+  }) => {
+    const [formData, setFormData] = useState<Partial<Teacher>>(
+      teacher || newTeacher
+    );
 
-    const handleSubmit = (e: React.FormEvent) => {
-      e.preventDefault()
+    const handleSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
       if (teacher) {
-        onSave(formData as Teacher)
+        onSave(formData as Teacher);
       } else {
         // Directly create teacher without setting state first
-        const success = createTeacher(formData)
+        const success = await createTeacher(formData);
         if (success) {
           // Reset form data after successful creation
-          setFormData({})
+          setFormData({});
         }
       }
-    }
+    };
 
     return (
       <Card>
@@ -666,7 +974,9 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                 <Label>Full Name *</Label>
                 <Input
                   value={formData.name || ""}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
                   placeholder="Teacher Name"
                   required
                 />
@@ -676,7 +986,9 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                 <Input
                   type="email"
                   value={formData.email || ""}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, email: e.target.value })
+                  }
                   placeholder="teacher@school.edu"
                   required
                 />
@@ -687,7 +999,9 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                 <Label>Phone Number</Label>
                 <Input
                   value={formData.phone || ""}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, phone: e.target.value })
+                  }
                   placeholder="+254 700 000 000"
                 />
               </div>
@@ -695,7 +1009,9 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                 <Label>Qualification</Label>
                 <Input
                   value={formData.qualification || ""}
-                  onChange={(e) => setFormData({ ...formData, qualification: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, qualification: e.target.value })
+                  }
                   placeholder="e.g., Bachelor of Education"
                 />
               </div>
@@ -705,55 +1021,73 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
               <Input
                 type="date"
                 value={formData.dateJoined || ""}
-                onChange={(e) => setFormData({ ...formData, dateJoined: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, dateJoined: e.target.value })
+                }
               />
             </div>
             <div className="flex justify-end space-x-4">
               <Button type="button" variant="outline" onClick={onCancel}>
                 Cancel
               </Button>
-              <Button type="submit" style={{ backgroundColor: schoolData.colorTheme }}>
+              <Button
+                type="submit"
+                style={{ backgroundColor: schoolData.colorTheme }}
+              >
                 {teacher ? "Update Teacher" : "Add Teacher"}
               </Button>
             </div>
           </form>
         </CardContent>
       </Card>
-    )
-  }
+    );
+  };
 
   // Student Form Component
   const StudentForm = ({
     student,
     onSave,
     onCancel,
-  }: { student?: Student; onSave: (student: Student) => void; onCancel: () => void }) => {
-    const [formData, setFormData] = useState<Partial<Student>>(student || newStudent)
+  }: {
+    student?: Student;
+    onSave: (student: Student) => void;
+    onCancel: () => void;
+  }) => {
+    const [formData, setFormData] = useState<Partial<Student>>(
+      student || newStudent
+    );
 
     const handleSubmit = async (e: React.FormEvent) => {
-      e.preventDefault()
-      
+      e.preventDefault();
+
       // Additional validation for required fields
-      if (!formData.name || !formData.email || !formData.className || !formData.parentName || !formData.parentPhone) {
-        toast({ 
-          title: "Validation Error", 
-          description: "Please fill in all required fields: Student Name, Email, Class, Parent Name, and Parent Phone.", 
-          variant: "destructive" 
+      if (
+        !formData.name ||
+        !formData.email ||
+        !formData.classId ||
+        !formData.parentName ||
+        !formData.parentPhone
+      ) {
+        toast({
+          title: "Validation Error",
+          description:
+            "Please fill in all required fields: Student Name, Email, Class, Parent Name, and Parent Phone.",
+          variant: "destructive",
         });
         return;
       }
-      
+
       if (student) {
-        onSave(formData as Student)
+        onSave(formData as Student);
       } else {
         // Directly create student without setting state first
-        const success = await createStudent(formData)
+        const success = await createStudent(formData);
         if (success) {
           // Reset form data after successful creation
-          setFormData({})
+          setFormData({});
         }
       }
-    }
+    };
 
     return (
       <Card>
@@ -773,7 +1107,9 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                 <Label>Student Name *</Label>
                 <Input
                   value={formData.name || ""}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
                   placeholder="Student Full Name"
                   required
                 />
@@ -782,15 +1118,22 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                 <Label>Admission Number</Label>
                 <Input
                   value={formData.admissionNumber || ""}
-                  onChange={(e) => setFormData({ ...formData, admissionNumber: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      admissionNumber: e.target.value,
+                    })
+                  }
                   placeholder="ADM001"
                 />
               </div>
               <div className="space-y-2">
                 <Label>Class/Grade *</Label>
                 <Select
-                  value={formData.className || ""}
-                  onValueChange={(value) => setFormData({ ...formData, className: value })}
+                  value={formData.classId || ""}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, classId: value })
+                  }
                   required
                 >
                   <SelectTrigger>
@@ -798,22 +1141,10 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                   </SelectTrigger>
                   <SelectContent>
                     {classes.map((cls) => (
-                      <SelectItem key={cls.id} value={cls.name}>
+                      <SelectItem key={cls.id} value={cls.id}>
                         {cls.name}
                       </SelectItem>
                     ))}
-                    <SelectItem value="Grade 1">Grade 1</SelectItem>
-                    <SelectItem value="Grade 2">Grade 2</SelectItem>
-                    <SelectItem value="Grade 3">Grade 3</SelectItem>
-                    <SelectItem value="Grade 4">Grade 4</SelectItem>
-                    <SelectItem value="Grade 5">Grade 5</SelectItem>
-                    <SelectItem value="Grade 6">Grade 6</SelectItem>
-                    <SelectItem value="Grade 7">Grade 7</SelectItem>
-                    <SelectItem value="Grade 8">Grade 8</SelectItem>
-                    <SelectItem value="Form 1">Form 1</SelectItem>
-                    <SelectItem value="Form 2">Form 2</SelectItem>
-                    <SelectItem value="Form 3">Form 3</SelectItem>
-                    <SelectItem value="Form 4">Form 4</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -824,14 +1155,18 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                 <Input
                   type="date"
                   value={formData.dateOfBirth || ""}
-                  onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, dateOfBirth: e.target.value })
+                  }
                 />
               </div>
               <div className="space-y-2">
                 <Label>Gender</Label>
                 <Select
                   value={formData.gender || ""}
-                  onValueChange={(value: any) => setFormData({ ...formData, gender: value })}
+                  onValueChange={(value: any) =>
+                    setFormData({ ...formData, gender: value })
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select gender" />
@@ -847,7 +1182,9 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                 <Input
                   type="email"
                   value={formData.email || ""}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, email: e.target.value })
+                  }
                   placeholder="student@email.com"
                   required
                 />
@@ -856,7 +1193,9 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                 <Label>Student Phone</Label>
                 <Input
                   value={formData.phone || ""}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, phone: e.target.value })
+                  }
                   placeholder="+254 700 000 000"
                 />
               </div>
@@ -866,7 +1205,9 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                 <Label>Parent/Guardian Name *</Label>
                 <Input
                   value={formData.parentName || ""}
-                  onChange={(e) => setFormData({ ...formData, parentName: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, parentName: e.target.value })
+                  }
                   placeholder="Parent Full Name"
                   required
                 />
@@ -875,7 +1216,9 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                 <Label>Parent Phone *</Label>
                 <Input
                   value={formData.parentPhone || ""}
-                  onChange={(e) => setFormData({ ...formData, parentPhone: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, parentPhone: e.target.value })
+                  }
                   placeholder="+254 700 000 000"
                   required
                 />
@@ -885,7 +1228,9 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                 <Input
                   type="email"
                   value={formData.parentEmail || ""}
-                  onChange={(e) => setFormData({ ...formData, parentEmail: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, parentEmail: e.target.value })
+                  }
                   placeholder="parent@email.com"
                 />
               </div>
@@ -894,7 +1239,9 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
               <Label>Home Address</Label>
               <Textarea
                 value={formData.address || ""}
-                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, address: e.target.value })
+                }
                 placeholder="Student's home address"
                 rows={2}
               />
@@ -903,15 +1250,266 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
               <Button type="button" variant="outline" onClick={onCancel}>
                 Cancel
               </Button>
-              <Button type="submit" style={{ backgroundColor: schoolData.colorTheme }}>
+              <Button
+                type="submit"
+                style={{ backgroundColor: schoolData.colorTheme }}
+              >
                 {student ? "Update Student" : "Add Student"}
               </Button>
             </div>
           </form>
         </CardContent>
       </Card>
-    )
-  }
+    );
+  };
+
+  // Function to map className + gradeName to classId
+  const mapClassToId = (className: string, gradeName: string) => {
+    // Find the grade first
+    const grade = grades.find(g => g.name === gradeName);
+    if (!grade) {
+      throw new Error(`Grade not found: ${gradeName}`);
+    }
+    
+    // Find the class with matching name and gradeId
+    const classObj = classes.find(cls => 
+      cls.name === className && cls.gradeId === grade.id
+    );
+    
+    if (!classObj) {
+      throw new Error(`Class not found: ${className} (${gradeName})`);
+    }
+    
+    return classObj.id;
+  };
+
+  // Bulk import function
+  const bulkImportStudents = async (students: any[]) => {
+    setIsImporting(true);
+    try {
+      // Map className + gradeName to classId for each student
+      const mappedStudents = students.map((student) => {
+        const classId = mapClassToId(student.className, student.gradeName);
+        if (!classId) {
+          throw new Error(
+            `Class not found: ${student.className} (${student.gradeName})`
+          );
+        }
+        return {
+          ...student,
+          classId,
+          // Remove className and gradeName as backend expects classId
+          className: undefined,
+          gradeName: undefined,
+        };
+      });
+
+      const response = await fetch(
+        `/api/schools/${schoolData.schoolCode}/students/bulk`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ students: mappedStudents }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to import students");
+      }
+
+      const result = await response.json();
+      setImportResults(result.results);
+      setImportStep("results");
+
+      // Refresh students list
+      await fetchStudents();
+
+      toast({
+        title: "Import Complete!",
+        description: `Successfully imported ${
+          result.results.filter((r: any) => r.status === "success").length
+        } students.`,
+      });
+    } catch (error: any) {
+      console.error("Error importing students:", error);
+      toast({
+        title: "Import Error",
+        description: error.message || "Failed to import students.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  // File parsing function
+  const parseFile = (file: File) => {
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      let students: any[] = [];
+
+      // Helper to trim all keys and values in a row
+      const trimRow = (row: any) => {
+        const trimmed: any = {};
+        Object.keys(row).forEach((key) => {
+          const trimmedKey = key.trim();
+          let value = row[key];
+          if (typeof value === "string") value = value.trim();
+          trimmed[trimmedKey] = value;
+        });
+        return trimmed;
+      };
+
+      if (file.name.endsWith(".csv")) {
+        Papa.parse(content, {
+          header: true,
+          skipEmptyLines: true,
+          complete: (results) => {
+            students = results.data.map((row: any) => {
+              const tRow = trimRow(row);
+              return {
+                name: tRow.name || tRow.Name || tRow.NAME,
+                email: tRow.email || tRow.Email || tRow.EMAIL,
+                phone: tRow.phone || tRow.Phone || tRow.PHONE,
+                parentName:
+                  tRow.parentName ||
+                  tRow.ParentName ||
+                  tRow.PARENTNAME ||
+                  tRow.parent_name,
+                parentPhone:
+                  tRow.parentPhone ||
+                  tRow.ParentPhone ||
+                  tRow.PARENTPHONE ||
+                  tRow.parent_phone,
+                parentEmail:
+                  tRow.parentEmail ||
+                  tRow.ParentEmail ||
+                  tRow.PARENTEMAIL ||
+                  tRow.parent_email,
+                admissionNumber:
+                  tRow.admissionNumber ||
+                  tRow.AdmissionNumber ||
+                  tRow.ADMISSIONNUMBER ||
+                  tRow.admission_number,
+                className:
+                  tRow.className ||
+                  tRow.ClassName ||
+                  tRow.CLASSNAME ||
+                  tRow.class_name,
+                gradeName:
+                  tRow.gradeName ||
+                  tRow.GradeName ||
+                  tRow.GRADENAME ||
+                  tRow.grade_name,
+                dateOfBirth:
+                  tRow.dateOfBirth ||
+                  tRow.DateOfBirth ||
+                  tRow.DATEOFBIRTH ||
+                  tRow.date_of_birth,
+                dateAdmitted:
+                  tRow.dateAdmitted ||
+                  tRow.DateAdmitted ||
+                  tRow.DATEADMITTED ||
+                  tRow.date_admitted,
+                address: tRow.address || tRow.Address || tRow.ADDRESS,
+                gender: tRow.gender || tRow.Gender || tRow.GENDER,
+                status: tRow.status || tRow.Status || tRow.STATUS || "active",
+              };
+            });
+            setParsedStudents(students);
+            setImportStep("preview");
+          },
+          error: (error) => {
+            toast({
+              title: "CSV Parse Error",
+              description: error.message,
+              variant: "destructive",
+            });
+          },
+        });
+      } else if (file.name.endsWith(".xlsx") || file.name.endsWith(".xls")) {
+        try {
+          const workbook = XLSX.read(content, { type: "binary" });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet);
+          students = jsonData.map((row: any) => {
+            const tRow = trimRow(row);
+            return {
+              name: tRow.name || tRow.Name || tRow.NAME,
+              email: tRow.email || tRow.Email || tRow.EMAIL,
+              phone: tRow.phone || tRow.Phone || tRow.PHONE,
+              parentName:
+                tRow.parentName ||
+                tRow.ParentName ||
+                tRow.PARENTNAME ||
+                tRow.parent_name,
+              parentPhone:
+                tRow.parentPhone ||
+                tRow.ParentPhone ||
+                tRow.PARENTPHONE ||
+                tRow.parent_phone,
+              parentEmail:
+                tRow.parentEmail ||
+                tRow.ParentEmail ||
+                tRow.PARENTEMAIL ||
+                tRow.parent_email,
+              admissionNumber:
+                tRow.admissionNumber ||
+                tRow.AdmissionNumber ||
+                tRow.ADMISSIONNUMBER ||
+                tRow.admission_number,
+              className:
+                tRow.className ||
+                tRow.ClassName ||
+                tRow.CLASSNAME ||
+                tRow.class_name,
+              gradeName:
+                tRow.gradeName ||
+                tRow.GradeName ||
+                tRow.GRADENAME ||
+                tRow.grade_name,
+              dateOfBirth:
+                tRow.dateOfBirth ||
+                tRow.DateOfBirth ||
+                tRow.DATEOFBIRTH ||
+                tRow.date_of_birth,
+              dateAdmitted:
+                tRow.dateAdmitted ||
+                tRow.DateAdmitted ||
+                tRow.DATEADMITTED ||
+                tRow.date_admitted,
+              address: tRow.address || tRow.Address || tRow.ADDRESS,
+              gender: tRow.gender || tRow.Gender || tRow.GENDER,
+              status: tRow.status || tRow.Status || tRow.STATUS || "active",
+            };
+          });
+          setParsedStudents(students);
+          setImportStep("preview");
+        } catch (error: any) {
+          toast({
+            title: "Excel Parse Error",
+            description: error.message,
+            variant: "destructive",
+          });
+        }
+      }
+    };
+
+    reader.readAsBinaryString(file);
+  };
+
+  // Reset import dialog
+  const resetImportDialog = () => {
+    setShowBulkImportDialog(false);
+    setParsedStudents([]);
+    setImportResults([]);
+    setImportStep("upload");
+    setIsImporting(false);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -938,18 +1536,28 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                     borderColor: schoolData.colorTheme,
                   }}
                 >
-                  <School className="w-6 h-6" style={{ color: schoolData.colorTheme }} />
+                  <School
+                    className="w-6 h-6"
+                    style={{ color: schoolData.colorTheme }}
+                  />
                 </div>
               )}
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">{schoolData.name}</h1>
+                <h1 className="text-2xl font-bold text-gray-900">
+                  {schoolData.name}
+                </h1>
                 <p className="text-sm text-gray-600">
-                  Welcome, {schoolData.adminFirstName} {schoolData.adminLastName}
+                  Welcome, {schoolData.adminFirstName}{" "}
+                  {schoolData.adminLastName}
                 </p>
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <Badge variant={schoolData.status === "setup" ? "secondary" : "default"}>
+              <Badge
+                variant={
+                  schoolData.status === "setup" ? "secondary" : "default"
+                }
+              >
                 {schoolData.status === "setup" ? "Setup in Progress" : "Active"}
               </Badge>
               <Button variant="outline" onClick={onLogout}>
@@ -964,13 +1572,14 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="profile">School Profile</TabsTrigger>
             <TabsTrigger value="staff">Staff & Teachers</TabsTrigger>
             <TabsTrigger value="students">Students</TabsTrigger>
             <TabsTrigger value="subjects">Subjects & Classes</TabsTrigger>
             <TabsTrigger value="fees">Fee Management</TabsTrigger>
+            <TabsTrigger value="promotions">Promotions</TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -985,12 +1594,17 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                   <CheckCircle className="w-6 h-6 md:w-5 md:h-5 text-green-500 animate-bounce" />
                   <span>Setup Progress</span>
                 </CardTitle>
-                <CardDescription className="text-sm md:text-base">Complete these steps to fully activate your school management system</CardDescription>
+                <CardDescription className="text-sm md:text-base">
+                  Complete these steps to fully activate your school management
+                  system
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2">
-                    <span className="text-xs md:text-sm font-medium">Overall Progress</span>
+                    <span className="text-xs md:text-sm font-medium">
+                      Overall Progress
+                    </span>
                     <span className="text-xs md:text-sm text-gray-600">
                       {completedSteps}/{setupSteps.length} completed
                     </span>
@@ -1000,7 +1614,7 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                       className="h-3 rounded-full transition-all duration-500 animate-pulse"
                       style={{
                         width: `${progressPercentage}%`,
-                        background: `linear-gradient(90deg, ${schoolData.colorTheme}, #34d399, #6366f1)`
+                        background: `linear-gradient(90deg, ${schoolData.colorTheme}, #34d399, #6366f1)`,
                       }}
                     ></div>
                   </div>
@@ -1013,36 +1627,64 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
               {setupSteps.map((step) => (
                 <Card
                   key={step.id}
-                  className={
-                    `transition-all duration-300 border-0 shadow-xl bg-white/70 backdrop-blur-lg rounded-2xl active:scale-95 md:hover:scale-[1.02] md:hover:shadow-2xl ${step.completed ? "ring-2 ring-green-200 bg-green-50/80" : ""}`
-                  }
+                  className={`transition-all duration-300 border-0 shadow-xl bg-white/70 backdrop-blur-lg rounded-2xl active:scale-95 md:hover:scale-[1.02] md:hover:shadow-2xl ${
+                    step.completed ? "ring-2 ring-green-200 bg-green-50/80" : ""
+                  }`}
                 >
                   <CardHeader className="px-2 py-2 md:px-6 md:py-4">
                     <CardTitle className="flex items-center justify-between text-base md:text-lg">
                       <div className="flex items-center space-x-3">
                         <div
-                          className={`w-10 h-10 rounded-lg flex items-center justify-center shadow ${step.completed ? "bg-green-100 text-green-600" : "bg-gray-100 text-gray-600"}`}
+                          className={`w-10 h-10 rounded-lg flex items-center justify-center shadow ${
+                            step.completed
+                              ? "bg-green-100 text-green-600"
+                              : "bg-gray-100 text-gray-600"
+                          }`}
                         >
-                          {step.completed ? <CheckCircle className="w-5 h-5 animate-pulse" /> : <step.icon className="w-5 h-5" />}
+                          {step.completed ? (
+                            <CheckCircle className="w-5 h-5 animate-pulse" />
+                          ) : (
+                            <step.icon className="w-5 h-5" />
+                          )}
                         </div>
-                        <span className={step.completed ? "text-green-700 font-semibold" : "font-medium"}>{step.title}</span>
+                        <span
+                          className={
+                            step.completed
+                              ? "text-green-700 font-semibold"
+                              : "font-medium"
+                          }
+                        >
+                          {step.title}
+                        </span>
                       </div>
                       {step.completed ? (
-                        <Badge className="bg-green-100 text-green-800">Completed</Badge>
+                        <Badge className="bg-green-100 text-green-800">
+                          Completed
+                        </Badge>
                       ) : (
                         <Badge variant="outline">Pending</Badge>
                       )}
                     </CardTitle>
-                    <CardDescription className={step.completed ? "text-green-600" : ""}>
+                    <CardDescription
+                      className={step.completed ? "text-green-600" : ""}
+                    >
                       {step.description}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <Button
-                      onClick={() => setActiveTab(step.id === "profile" ? "profile" : step.id)}
+                      onClick={() =>
+                        setActiveTab(
+                          step.id === "profile" ? "profile" : step.id
+                        )
+                      }
                       className="w-full py-3 md:py-2 text-base md:text-sm rounded-xl md:rounded-lg"
                       variant={step.completed ? "outline" : "default"}
-                      style={!step.completed ? { backgroundColor: schoolData.colorTheme } : {}}
+                      style={
+                        !step.completed
+                          ? { backgroundColor: schoolData.colorTheme }
+                          : {}
+                      }
                     >
                       {step.completed ? "Review" : "Start Setup"}
                     </Button>
@@ -1057,7 +1699,9 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                 <CardContent className="p-4 md:p-6 flex items-center space-x-2">
                   <Users className="w-8 h-8 text-blue-500" />
                   <div>
-                    <p className="text-xl md:text-2xl font-bold">{teachers.length}</p>
+                    <p className="text-xl md:text-2xl font-bold">
+                      {teachers.length}
+                    </p>
                     <p className="text-xs md:text-sm text-gray-600">Teachers</p>
                   </div>
                 </CardContent>
@@ -1066,7 +1710,9 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                 <CardContent className="p-4 md:p-6 flex items-center space-x-2">
                   <GraduationCap className="w-8 h-8 text-green-500" />
                   <div>
-                    <p className="text-xl md:text-2xl font-bold">{students.length}</p>
+                    <p className="text-xl md:text-2xl font-bold">
+                      {students.length}
+                    </p>
                     <p className="text-xs md:text-sm text-gray-600">Students</p>
                   </div>
                 </CardContent>
@@ -1075,7 +1721,9 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                 <CardContent className="p-4 md:p-6 flex items-center space-x-2">
                   <BookOpen className="w-8 h-8 text-purple-500" />
                   <div>
-                    <p className="text-xl md:text-2xl font-bold">{subjects.length}</p>
+                    <p className="text-xl md:text-2xl font-bold">
+                      {subjects.length}
+                    </p>
                     <p className="text-xs md:text-sm text-gray-600">Subjects</p>
                   </div>
                 </CardContent>
@@ -1084,7 +1732,9 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                 <CardContent className="p-4 md:p-6 flex items-center space-x-2">
                   <School className="w-8 h-8 text-orange-500" />
                   <div>
-                    <p className="text-xl md:text-2xl font-bold">{classes.length}</p>
+                    <p className="text-xl md:text-2xl font-bold">
+                      {classes.length}
+                    </p>
                     <p className="text-xs md:text-sm text-gray-600">Classes</p>
                   </div>
                 </CardContent>
@@ -1093,8 +1743,12 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                 <CardContent className="p-4 md:p-6 flex items-center space-x-2">
                   <DollarSign className="w-8 h-8 text-emerald-500" />
                   <div>
-                    <p className="text-xl md:text-2xl font-bold">{feeStructures.length}</p>
-                    <p className="text-xs md:text-sm text-gray-600">Fee Structures</p>
+                    <p className="text-xl md:text-2xl font-bold">
+                      {feeStructures.length}
+                    </p>
+                    <p className="text-xs md:text-sm text-gray-600">
+                      Fee Structures
+                    </p>
                   </div>
                 </CardContent>
               </Card>
@@ -1112,37 +1766,63 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                     <Button
                       onClick={() => setIsEditingProfile(true)}
                       variant="outline"
-                      style={{ borderColor: schoolData.colorTheme, color: schoolData.colorTheme }}
+                      style={{
+                        borderColor: schoolData.colorTheme,
+                        color: schoolData.colorTheme,
+                      }}
                     >
                       <Edit className="w-4 h-4 mr-2" />
                       Edit Profile
                     </Button>
                   </CardTitle>
-                  <CardDescription>Your school's information and contact details</CardDescription>
+                  <CardDescription>
+                    Your school's information and contact details
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="grid md:grid-cols-2 gap-6">
                     <div className="space-y-4">
                       <div>
-                        <h4 className="font-semibold text-gray-900 mb-2">Contact Information</h4>
+                        <h4 className="font-semibold text-gray-900 mb-2">
+                          Contact Information
+                        </h4>
                         <div className="space-y-3">
                           <div>
-                            <Label className="text-sm font-medium text-gray-600">School Address</Label>
-                            <p className="text-gray-900 mt-1">{schoolProfile.address || "Not provided"}</p>
+                            <Label className="text-sm font-medium text-gray-600">
+                              School Address
+                            </Label>
+                            <p className="text-gray-900 mt-1">
+                              {schoolProfile.address || "Not provided"}
+                            </p>
                           </div>
                           <div>
-                            <Label className="text-sm font-medium text-gray-600">Phone Number</Label>
-                            <p className="text-gray-900 mt-1">{schoolProfile.phone || "Not provided"}</p>
+                            <Label className="text-sm font-medium text-gray-600">
+                              Phone Number
+                            </Label>
+                            <p className="text-gray-900 mt-1">
+                              {schoolProfile.phone || "Not provided"}
+                            </p>
                           </div>
                           <div>
-                            <Label className="text-sm font-medium text-gray-600">Email Address</Label>
-                            <p className="text-gray-900 mt-1">{schoolProfile.email || "Not provided"}</p>
+                            <Label className="text-sm font-medium text-gray-600">
+                              Email Address
+                            </Label>
+                            <p className="text-gray-900 mt-1">
+                              {schoolProfile.email || "Not provided"}
+                            </p>
                           </div>
                           <div>
-                            <Label className="text-sm font-medium text-gray-600">Website</Label>
+                            <Label className="text-sm font-medium text-gray-600">
+                              Website
+                            </Label>
                             <p className="text-gray-900 mt-1">
                               {schoolProfile.website ? (
-                                <a href={schoolProfile.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                                <a
+                                  href={schoolProfile.website}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:underline"
+                                >
                                   {schoolProfile.website}
                                 </a>
                               ) : (
@@ -1155,30 +1835,52 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                     </div>
                     <div className="space-y-4">
                       <div>
-                        <h4 className="font-semibold text-gray-900 mb-2">School Details</h4>
+                        <h4 className="font-semibold text-gray-900 mb-2">
+                          School Details
+                        </h4>
                         <div className="space-y-3">
                           <div>
-                            <Label className="text-sm font-medium text-gray-600">Principal/Head Teacher</Label>
-                            <p className="text-gray-900 mt-1">{schoolProfile.principalName || "Not provided"}</p>
+                            <Label className="text-sm font-medium text-gray-600">
+                              Principal/Head Teacher
+                            </Label>
+                            <p className="text-gray-900 mt-1">
+                              {schoolProfile.principalName || "Not provided"}
+                            </p>
                           </div>
                           <div>
-                            <Label className="text-sm font-medium text-gray-600">Year Established</Label>
-                            <p className="text-gray-900 mt-1">{schoolProfile.establishedYear || "Not provided"}</p>
+                            <Label className="text-sm font-medium text-gray-600">
+                              Year Established
+                            </Label>
+                            <p className="text-gray-900 mt-1">
+                              {schoolProfile.establishedYear || "Not provided"}
+                            </p>
                           </div>
                           <div>
-                            <Label className="text-sm font-medium text-gray-600">School Type</Label>
-                            <p className="text-gray-900 mt-1 capitalize">{schoolProfile.type || "Not provided"}</p>
+                            <Label className="text-sm font-medium text-gray-600">
+                              School Type
+                            </Label>
+                            <p className="text-gray-900 mt-1 capitalize">
+                              {schoolProfile.type || "Not provided"}
+                            </p>
                           </div>
                           <div>
-                            <Label className="text-sm font-medium text-gray-600">School Motto</Label>
-                            <p className="text-gray-900 mt-1 italic">"{schoolProfile.motto || "Not provided"}"</p>
+                            <Label className="text-sm font-medium text-gray-600">
+                              School Motto
+                            </Label>
+                            <p className="text-gray-900 mt-1 italic">
+                              "{schoolProfile.motto || "Not provided"}"
+                            </p>
                           </div>
                         </div>
                       </div>
                       {schoolProfile.description && (
                         <div>
-                          <h4 className="font-semibold text-gray-900 mb-2">Description</h4>
-                          <p className="text-gray-700 text-sm leading-relaxed">{schoolProfile.description}</p>
+                          <h4 className="font-semibold text-gray-900 mb-2">
+                            Description
+                          </h4>
+                          <p className="text-gray-700 text-sm leading-relaxed">
+                            {schoolProfile.description}
+                          </p>
                         </div>
                       )}
                     </div>
@@ -1196,7 +1898,9 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
-                    {profileSaved ? "Edit School Profile" : "School Profile Information"}
+                    {profileSaved
+                      ? "Edit School Profile"
+                      : "School Profile Information"}
                     {profileSaved && (
                       <Button
                         onClick={() => setIsEditingProfile(false)}
@@ -1208,7 +1912,9 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                     )}
                   </CardTitle>
                   <CardDescription>
-                    {profileSaved ? "Update your school's information and contact details" : "Complete your school's basic information and contact details"}
+                    {profileSaved
+                      ? "Update your school's information and contact details"
+                      : "Complete your school's basic information and contact details"}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -1218,7 +1924,12 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                       <Textarea
                         id="address"
                         value={schoolProfile.address}
-                        onChange={(e) => setSchoolProfile({ ...schoolProfile, address: e.target.value })}
+                        onChange={(e) =>
+                          setSchoolProfile({
+                            ...schoolProfile,
+                            address: e.target.value,
+                          })
+                        }
                         placeholder="Enter school address"
                       />
                     </div>
@@ -1227,7 +1938,12 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                       <Input
                         id="phone"
                         value={schoolProfile.phone}
-                        onChange={(e) => setSchoolProfile({ ...schoolProfile, phone: e.target.value })}
+                        onChange={(e) =>
+                          setSchoolProfile({
+                            ...schoolProfile,
+                            phone: e.target.value,
+                          })
+                        }
                         placeholder="+254 700 000 000"
                       />
                     </div>
@@ -1239,7 +1955,12 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                         id="email"
                         type="email"
                         value={schoolProfile.email}
-                        onChange={(e) => setSchoolProfile({ ...schoolProfile, email: e.target.value })}
+                        onChange={(e) =>
+                          setSchoolProfile({
+                            ...schoolProfile,
+                            email: e.target.value,
+                          })
+                        }
                         placeholder="info@school.edu"
                       />
                     </div>
@@ -1248,18 +1969,30 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                       <Input
                         id="website"
                         value={schoolProfile.website}
-                        onChange={(e) => setSchoolProfile({ ...schoolProfile, website: e.target.value })}
+                        onChange={(e) =>
+                          setSchoolProfile({
+                            ...schoolProfile,
+                            website: e.target.value,
+                          })
+                        }
                         placeholder="https://www.school.edu"
                       />
                     </div>
                   </div>
                   <div className="grid md:grid-cols-3 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="principal">Principal/Head Teacher *</Label>
+                      <Label htmlFor="principal">
+                        Principal/Head Teacher *
+                      </Label>
                       <Input
                         id="principal"
                         value={schoolProfile.principalName}
-                        onChange={(e) => setSchoolProfile({ ...schoolProfile, principalName: e.target.value })}
+                        onChange={(e) =>
+                          setSchoolProfile({
+                            ...schoolProfile,
+                            principalName: e.target.value,
+                          })
+                        }
                         placeholder="Enter principal's name"
                       />
                     </div>
@@ -1268,7 +2001,12 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                       <Input
                         id="established"
                         value={schoolProfile.establishedYear}
-                        onChange={(e) => setSchoolProfile({ ...schoolProfile, establishedYear: e.target.value })}
+                        onChange={(e) =>
+                          setSchoolProfile({
+                            ...schoolProfile,
+                            establishedYear: e.target.value,
+                          })
+                        }
                         placeholder="2000"
                       />
                     </div>
@@ -1276,15 +2014,23 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                       <Label htmlFor="type">School Type *</Label>
                       <Select
                         value={schoolProfile.type}
-                        onValueChange={(value: any) => setSchoolProfile({ ...schoolProfile, type: value })}
+                        onValueChange={(value: any) =>
+                          setSchoolProfile({ ...schoolProfile, type: value })
+                        }
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select type" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="primary">Primary School</SelectItem>
-                          <SelectItem value="secondary">Secondary School</SelectItem>
-                          <SelectItem value="mixed">Mixed (Primary & Secondary)</SelectItem>
+                          <SelectItem value="primary">
+                            Primary School
+                          </SelectItem>
+                          <SelectItem value="secondary">
+                            Secondary School
+                          </SelectItem>
+                          <SelectItem value="mixed">
+                            Mixed (Primary & Secondary)
+                          </SelectItem>
                           <SelectItem value="college">College</SelectItem>
                         </SelectContent>
                       </Select>
@@ -1295,7 +2041,12 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                     <Input
                       id="motto"
                       value={schoolProfile.motto}
-                      onChange={(e) => setSchoolProfile({ ...schoolProfile, motto: e.target.value })}
+                      onChange={(e) =>
+                        setSchoolProfile({
+                          ...schoolProfile,
+                          motto: e.target.value,
+                        })
+                      }
                       placeholder="Enter school motto"
                     />
                   </div>
@@ -1304,13 +2055,23 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                     <Textarea
                       id="description"
                       value={schoolProfile.description}
-                      onChange={(e) => setSchoolProfile({ ...schoolProfile, description: e.target.value })}
+                      onChange={(e) =>
+                        setSchoolProfile({
+                          ...schoolProfile,
+                          description: e.target.value,
+                        })
+                      }
                       placeholder="Brief description of the school..."
                       rows={4}
                     />
                   </div>
-                  <Button onClick={saveSchoolProfile} style={{ backgroundColor: schoolData.colorTheme }}>
-                    {profileSaved ? "Update School Profile" : "Save School Profile"}
+                  <Button
+                    onClick={saveSchoolProfile}
+                    style={{ backgroundColor: schoolData.colorTheme }}
+                  >
+                    {profileSaved
+                      ? "Update School Profile"
+                      : "Save School Profile"}
                   </Button>
                 </CardContent>
               </Card>
@@ -1322,15 +2083,17 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
             {viewMode.staff === "form" ? (
               <TeacherForm
                 onSave={updateTeacher}
-                onCancel={() => setViewMode((prev) => ({ ...prev, staff: "list" }))}
+                onCancel={() =>
+                  setViewMode((prev) => ({ ...prev, staff: "list" }))
+                }
               />
             ) : editingItem ? (
               <TeacherForm
                 teacher={editingItem}
                 onSave={updateTeacher}
                 onCancel={() => {
-                  setEditingItem(null)
-                  setViewMode((prev) => ({ ...prev, staff: "list" }))
+                  setEditingItem(null);
+                  setViewMode((prev) => ({ ...prev, staff: "list" }));
                 }}
               />
             ) : (
@@ -1339,20 +2102,27 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                   <CardTitle className="flex items-center justify-between">
                     Teachers ({teachers.length})
                     <Button
-                      onClick={() => setViewMode((prev) => ({ ...prev, staff: "form" }))}
+                      onClick={() =>
+                        setViewMode((prev) => ({ ...prev, staff: "form" }))
+                      }
                       style={{ backgroundColor: schoolData.colorTheme }}
                     >
                       <Plus className="w-4 h-4 mr-2" />
                       Add Teacher
                     </Button>
                   </CardTitle>
-                  <CardDescription>Manage your school's teaching staff</CardDescription>
+                  <CardDescription>
+                    Manage your school's teaching staff
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   {teachers.length === 0 ? (
                     <div className="text-center py-8">
                       <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-600">No teachers added yet. Click "Add Teacher" to get started.</p>
+                      <p className="text-gray-600">
+                        No teachers added yet. Click "Add Teacher" to get
+                        started.
+                      </p>
                     </div>
                   ) : (
                     <div className="overflow-x-auto">
@@ -1371,40 +2141,78 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                         <TableBody>
                           {teachers.map((teacher) => (
                             <TableRow key={teacher.id}>
-                              <TableCell className="font-medium">{teacher.name}</TableCell>
+                              <TableCell className="font-medium">
+                                {teacher.name}
+                              </TableCell>
                               <TableCell>{teacher.email}</TableCell>
                               <TableCell>{teacher.phone}</TableCell>
-                              <TableCell>{teacher.teacherProfile?.qualification || "-"}</TableCell>
-                              <TableCell>{teacher.teacherProfile?.dateJoined ? new Date(teacher.teacherProfile.dateJoined).toLocaleDateString() : "-"}</TableCell>
                               <TableCell>
-                                <Badge variant={teacher.status === "active" ? "default" : "secondary"}>
+                                {teacher.teacherProfile?.qualification || "-"}
+                              </TableCell>
+                              <TableCell>
+                                {teacher.teacherProfile?.dateJoined
+                                  ? new Date(
+                                      teacher.teacherProfile.dateJoined
+                                    ).toLocaleDateString()
+                                  : "-"}
+                              </TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant={
+                                    teacher.status === "active"
+                                      ? "default"
+                                      : "secondary"
+                                  }
+                                >
                                   {teacher.status}
                                 </Badge>
                               </TableCell>
                               <TableCell>
                                 <div className="flex space-x-2">
-                                  <Button variant="outline" size="sm" onClick={() => setViewingItem(teacher)}>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setViewingItem(teacher)}
+                                  >
                                     <Eye className="w-4 h-4" />
                                   </Button>
-                                  <Button variant="outline" size="sm" onClick={() => setEditingItem(teacher)}>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setEditingItem(teacher)}
+                                  >
                                     <Edit className="w-4 h-4" />
                                   </Button>
                                   <AlertDialog>
                                     <AlertDialogTrigger asChild>
-                                      <Button variant="outline" size="sm" className="text-red-600">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="text-red-600"
+                                      >
                                         <Trash2 className="w-4 h-4" />
                                       </Button>
                                     </AlertDialogTrigger>
                                     <AlertDialogContent>
                                       <AlertDialogHeader>
-                                        <AlertDialogTitle>Delete Teacher</AlertDialogTitle>
+                                        <AlertDialogTitle>
+                                          Delete Teacher
+                                        </AlertDialogTitle>
                                         <AlertDialogDescription>
-                                          Are you sure you want to delete {teacher.name}? This action cannot be undone.
+                                          Are you sure you want to delete{" "}
+                                          {teacher.name}? This action cannot be
+                                          undone.
                                         </AlertDialogDescription>
                                       </AlertDialogHeader>
                                       <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => deleteTeacher(teacher.id)}>
+                                        <AlertDialogCancel>
+                                          Cancel
+                                        </AlertDialogCancel>
+                                        <AlertDialogAction
+                                          onClick={() =>
+                                            deleteTeacher(teacher.id)
+                                          }
+                                        >
                                           Delete
                                         </AlertDialogAction>
                                       </AlertDialogFooter>
@@ -1423,61 +2231,108 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
             )}
 
             {/* Teacher View Dialog */}
-            <Dialog open={!!viewingItem} onOpenChange={() => setViewingItem(null)}>
+            <Dialog
+              open={!!viewingItem}
+              onOpenChange={() => setViewingItem(null)}
+            >
               <DialogContent className="max-w-2xl">
                 <DialogHeader>
                   <DialogTitle>Teacher Details</DialogTitle>
-                  <DialogDescription>Complete information for {viewingItem?.name}</DialogDescription>
+                  <DialogDescription>
+                    Complete information for {viewingItem?.name}
+                  </DialogDescription>
                 </DialogHeader>
                 {viewingItem && (
                   <div className="space-y-4">
                     <div className="grid md:grid-cols-2 gap-4">
                       <div>
-                        <Label className="text-sm font-medium text-gray-600">Full Name</Label>
+                        <Label className="text-sm font-medium text-gray-600">
+                          Full Name
+                        </Label>
                         <p className="text-sm">{viewingItem.name}</p>
                       </div>
                       <div>
-                        <Label className="text-sm font-medium text-gray-600">Employee ID</Label>
+                        <Label className="text-sm font-medium text-gray-600">
+                          Employee ID
+                        </Label>
                         <p className="text-sm">{viewingItem.employeeId}</p>
                       </div>
                     </div>
                     <div className="grid md:grid-cols-2 gap-4">
                       <div>
-                        <Label className="text-sm font-medium text-gray-600">Email</Label>
+                        <Label className="text-sm font-medium text-gray-600">
+                          Email
+                        </Label>
                         <p className="text-sm">{viewingItem.email}</p>
                       </div>
                       <div>
-                        <Label className="text-sm font-medium text-gray-600">Phone</Label>
+                        <Label className="text-sm font-medium text-gray-600">
+                          Phone
+                        </Label>
                         <p className="text-sm">{viewingItem.phone}</p>
                       </div>
                     </div>
                     <div className="grid md:grid-cols-2 gap-4">
                       <div>
-                        <Label className="text-sm font-medium text-gray-600">Qualification</Label>
-                        <p className="text-sm">{viewingItem.teacherProfile?.qualification || "-"}</p>
+                        <Label className="text-sm font-medium text-gray-600">
+                          Qualification
+                        </Label>
+                        <p className="text-sm">
+                          {viewingItem.teacherProfile?.qualification || "-"}
+                        </p>
                       </div>
                       <div>
-                        <Label className="text-sm font-medium text-gray-600">Date Joined</Label>
-                        <p className="text-sm">{viewingItem.teacherProfile?.dateJoined ? new Date(viewingItem.teacherProfile.dateJoined).toLocaleDateString() : "-"}</p>
+                        <Label className="text-sm font-medium text-gray-600">
+                          Date Joined
+                        </Label>
+                        <p className="text-sm">
+                          {viewingItem.teacherProfile?.dateJoined
+                            ? new Date(
+                                viewingItem.teacherProfile.dateJoined
+                              ).toLocaleDateString()
+                            : "-"}
+                        </p>
                       </div>
                     </div>
                     <div>
-                      <Label className="text-sm font-medium text-gray-600">Status</Label>
-                      <Badge variant={viewingItem.status === "active" ? "default" : "secondary"}>
+                      <Label className="text-sm font-medium text-gray-600">
+                        Status
+                      </Label>
+                      <Badge
+                        variant={
+                          viewingItem.status === "active"
+                            ? "default"
+                            : "secondary"
+                        }
+                      >
                         {viewingItem.status}
                       </Badge>
                     </div>
                     <div className="flex flex-col md:flex-row gap-4 mt-6 justify-end">
                       <Button asChild variant="default">
-                        <Link href={`/schools/${schoolData.schoolCode}/teachers/login?email=${encodeURIComponent(viewingItem.email)}&password=${encodeURIComponent(viewingItem.teacherProfile?.tempPassword || "")}`}>
+                        <Link
+                          href={`/schools/${
+                            schoolData.schoolCode
+                          }/teachers/login?email=${encodeURIComponent(
+                            viewingItem.email
+                          )}&password=${encodeURIComponent(
+                            viewingItem.teacherProfile?.tempPassword || ""
+                          )}`}
+                        >
                           Go to Teacher Dashboard
                         </Link>
                       </Button>
                       <Button
                         variant="secondary"
                         onClick={async () => {
-                          await fetch(`/api/schools/${schoolData.schoolCode}/teachers/${viewingItem.id}/send-credentials`, { method: "POST" });
-                          toast({ title: "Credentials sent (simulated)", description: `Credentials sent to ${viewingItem.email}` });
+                          await fetch(
+                            `/api/schools/${schoolData.schoolCode}/teachers/${viewingItem.id}/send-credentials`,
+                            { method: "POST" }
+                          );
+                          toast({
+                            title: "Credentials sent (simulated)",
+                            description: `Credentials sent to ${viewingItem.email}`,
+                          });
                         }}
                       >
                         Simulate Send Credentials
@@ -1494,15 +2349,17 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
             {viewMode.students === "form" ? (
               <StudentForm
                 onSave={updateStudent}
-                onCancel={() => setViewMode((prev) => ({ ...prev, students: "list" }))}
+                onCancel={() =>
+                  setViewMode((prev) => ({ ...prev, students: "list" }))
+                }
               />
             ) : editingItem ? (
               <StudentForm
                 student={editingItem}
                 onSave={updateStudent}
                 onCancel={() => {
-                  setEditingItem(null)
-                  setViewMode((prev) => ({ ...prev, students: "list" }))
+                  setEditingItem(null);
+                  setViewMode((prev) => ({ ...prev, students: "list" }));
                 }}
               />
             ) : (
@@ -1510,22 +2367,62 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                 <CardHeader className="px-2 py-2 md:px-6 md:py-4">
                   <CardTitle className="flex items-center justify-between text-base md:text-lg">
                     <span>Students ({students.length})</span>
-                    <Button
-                      onClick={() => setViewMode((prev) => ({ ...prev, students: "form" }))}
-                      style={{ backgroundColor: schoolData.colorTheme }}
-                      className="w-full md:w-auto py-3 md:py-2 text-base md:text-sm rounded-xl md:rounded-lg"
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Student
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => setShowBulkImportDialog(true)}
+                        variant="outline"
+                        className="w-full md:w-auto py-3 md:py-2 text-base md:text-sm rounded-xl md:rounded-lg"
+                      >
+                        <Upload className="w-4 h-4 mr-2" />
+                        Import CSV/Excel
+                      </Button>
+                      <Button
+                        onClick={() =>
+                          setViewMode((prev) => ({ ...prev, students: "form" }))
+                        }
+                        style={{ backgroundColor: schoolData.colorTheme }}
+                        className="w-full md:w-auto py-3 md:py-2 text-base md:text-sm rounded-xl md:rounded-lg"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Student
+                      </Button>
+                    </div>
                   </CardTitle>
-                  <CardDescription>Manage your school's student records</CardDescription>
+                  <CardDescription>
+                    Manage your school's student records
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {students.length === 0 ? (
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-4">
+                    <Input
+                      type="text"
+                      placeholder="Search students..."
+                      value={studentSearch}
+                      onChange={(e) => setStudentSearch(e.target.value)}
+                      className="md:w-1/3"
+                    />
+                    <Select
+                      value={studentClassFilter}
+                      onValueChange={setStudentClassFilter}
+                    >
+                      <SelectTrigger className="md:w-48">
+                        <SelectValue placeholder="Filter by class" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {classOptions.map((cls) => (
+                          <SelectItem key={cls} value={cls}>
+                            {cls}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {filteredStudents.length === 0 ? (
                     <div className="text-center py-8">
                       <GraduationCap className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-600">No students added yet. Click "Add Student" to get started.</p>
+                      <p className="text-gray-600">
+                        No students found. Try adjusting your search or filter.
+                      </p>
                     </div>
                   ) : (
                     <div className="overflow-x-auto">
@@ -1535,6 +2432,7 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                             <TableHead>Name</TableHead>
                             <TableHead>Admission No.</TableHead>
                             <TableHead>Class</TableHead>
+                            <TableHead>Grade</TableHead>
                             <TableHead>Parent Name</TableHead>
                             <TableHead>Parent Phone</TableHead>
                             <TableHead>Status</TableHead>
@@ -1542,42 +2440,90 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {students.map((student) => (
-                            <TableRow key={student.id} className="hover:bg-blue-50/30 transition-colors duration-200">
-                              <TableCell className="font-medium">{student.name}</TableCell>
+                          {filteredStudents.map((student) => (
+                            <TableRow
+                              key={student.id}
+                              className="hover:bg-blue-50/30 transition-colors duration-200"
+                            >
+                              <TableCell className="font-medium">
+                                {student.name}
+                              </TableCell>
                               <TableCell>{student.admissionNumber}</TableCell>
-                              <TableCell>{student.className}</TableCell>
-                              <TableCell>{student.parentName}</TableCell>
-                              <TableCell>{student.parentPhone}</TableCell>
                               <TableCell>
-                                <Badge variant={student.status === "active" ? "default" : "secondary"}>
+                                {student.className || (
+                                  <span className="text-red-500">Missing</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {student.gradeName || (
+                                  <span className="text-red-500">Missing</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {student.parentName || "N/A"}
+                              </TableCell>
+                              <TableCell>
+                                {student.parentPhone || "N/A"}
+                              </TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant={
+                                    student.status === "active"
+                                      ? "default"
+                                      : "secondary"
+                                  }
+                                >
                                   {student.status}
                                 </Badge>
                               </TableCell>
                               <TableCell>
                                 <div className="flex space-x-2">
-                                  <Button variant="outline" size="sm" onClick={() => setViewingItem(student)} className="hover:bg-blue-100 active:scale-95">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setViewingItem(student)}
+                                    className="hover:bg-blue-100 active:scale-95"
+                                  >
                                     View Details
                                   </Button>
-                                  <Button variant="outline" size="sm" onClick={() => setEditingItem(student)} className="hover:bg-green-100 active:scale-95">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setEditingItem(student)}
+                                    className="hover:bg-green-100 active:scale-95"
+                                  >
                                     <Edit className="w-4 h-4" />
                                   </Button>
                                   <AlertDialog>
                                     <AlertDialogTrigger asChild>
-                                      <Button variant="outline" size="sm" className="text-red-600 hover:bg-red-100 active:scale-95">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="text-red-600 hover:bg-red-100 active:scale-95"
+                                      >
                                         <Trash2 className="w-4 h-4" />
                                       </Button>
                                     </AlertDialogTrigger>
                                     <AlertDialogContent>
                                       <AlertDialogHeader>
-                                        <AlertDialogTitle>Delete Student</AlertDialogTitle>
+                                        <AlertDialogTitle>
+                                          Delete Student
+                                        </AlertDialogTitle>
                                         <AlertDialogDescription>
-                                          Are you sure you want to delete {student.name}? This action cannot be undone.
+                                          Are you sure you want to delete{" "}
+                                          {student.name}? This action cannot be
+                                          undone.
                                         </AlertDialogDescription>
                                       </AlertDialogHeader>
                                       <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => deleteStudent(student.id)}>
+                                        <AlertDialogCancel>
+                                          Cancel
+                                        </AlertDialogCancel>
+                                        <AlertDialogAction
+                                          onClick={() =>
+                                            deleteStudent(student.id)
+                                          }
+                                        >
                                           Delete
                                         </AlertDialogAction>
                                       </AlertDialogFooter>
@@ -1591,45 +2537,78 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                       </Table>
                       {/* Mobile Card List */}
                       <div className="md:hidden space-y-4">
-                        {students.map((student) => (
-                          <div key={student.id} className="bg-white/90 rounded-xl shadow-md p-4 flex flex-col gap-2 border border-gray-100">
+                        {filteredStudents.map((student) => (
+                          <div
+                            key={student.id}
+                            className="bg-white/90 rounded-xl shadow-md p-4 flex flex-col gap-2 border border-gray-100"
+                          >
                             <div className="flex items-center justify-between">
-                              <div className="font-bold text-lg text-gray-800">{student.name}</div>
-                              <Badge variant={student.status === "active" ? "default" : "secondary"}>
+                              <div className="font-bold text-lg text-gray-800">
+                                {student.name}
+                              </div>
+                              <Badge
+                                variant={
+                                  student.status === "active"
+                                    ? "default"
+                                    : "secondary"
+                                }
+                              >
                                 {student.status}
                               </Badge>
                             </div>
                             <div className="flex flex-wrap gap-2 text-xs text-gray-600">
                               <span>Adm: {student.admissionNumber}</span>
-                              <span>Class: {student.className}</span>
+                              <span>Class: {student.className || "N/A"}</span>
                             </div>
                             <div className="flex flex-wrap gap-2 text-xs text-gray-600">
-                              <span>Parent: {student.parentName}</span>
-                              <span>Phone: {student.parentPhone}</span>
+                              <span>Parent: {student.parentName || "N/A"}</span>
+                              <span>Phone: {student.parentPhone || "N/A"}</span>
                             </div>
                             <div className="flex gap-2 pt-2">
-                              <Button variant="outline" size="sm" onClick={() => setViewingItem(student)} className="flex-1 active:scale-95">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setViewingItem(student)}
+                                className="flex-1 active:scale-95"
+                              >
                                 View
                               </Button>
-                              <Button variant="outline" size="sm" onClick={() => setEditingItem(student)} className="flex-1 active:scale-95">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setEditingItem(student)}
+                                className="flex-1 active:scale-95"
+                              >
                                 <Edit className="w-4 h-4" />
                               </Button>
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
-                                  <Button variant="outline" size="sm" className="flex-1 text-red-600 active:scale-95">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="flex-1 text-red-600 active:scale-95"
+                                  >
                                     <Trash2 className="w-4 h-4" />
                                   </Button>
                                 </AlertDialogTrigger>
                                 <AlertDialogContent className="max-w-full px-2">
                                   <AlertDialogHeader>
-                                    <AlertDialogTitle>Delete Student</AlertDialogTitle>
+                                    <AlertDialogTitle>
+                                      Delete Student
+                                    </AlertDialogTitle>
                                     <AlertDialogDescription>
-                                      Are you sure you want to delete {student.name}? This action cannot be undone.
+                                      Are you sure you want to delete{" "}
+                                      {student.name}? This action cannot be
+                                      undone.
                                     </AlertDialogDescription>
                                   </AlertDialogHeader>
                                   <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => deleteStudent(student.id)}>
+                                    <AlertDialogCancel>
+                                      Cancel
+                                    </AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => deleteStudent(student.id)}
+                                    >
                                       Delete
                                     </AlertDialogAction>
                                   </AlertDialogFooter>
@@ -1645,80 +2624,146 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
               </Card>
             )}
             {/* Student View Dialog - make full width and mobile friendly */}
-            <Dialog open={!!viewingItem && activeTab === "students"} onOpenChange={() => setViewingItem(null)}>
+            <Dialog
+              open={!!viewingItem && activeTab === "students"}
+              onOpenChange={() => setViewingItem(null)}
+            >
               <DialogContent className="max-w-full md:max-w-4xl px-2 py-4 rounded-2xl">
                 <DialogHeader>
-                  <DialogTitle className="text-lg md:text-2xl">Student Details</DialogTitle>
-                  <DialogDescription>Complete information for {viewingItem?.name}</DialogDescription>
+                  <DialogTitle className="text-lg md:text-2xl">
+                    Student Details
+                  </DialogTitle>
+                  <DialogDescription>
+                    Complete information for {viewingItem?.name}
+                  </DialogDescription>
                 </DialogHeader>
                 {viewingItem && (
                   <div className="space-y-4 text-base md:text-sm">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
-                        <Label className="text-xs font-medium text-gray-600">Full Name</Label>
+                        <Label className="text-xs font-medium text-gray-600">
+                          Full Name
+                        </Label>
                         <p className="text-gray-800">{viewingItem.name}</p>
                       </div>
                       <div>
-                        <Label className="text-xs font-medium text-gray-600">Admission Number</Label>
-                        <p className="text-gray-800">{viewingItem.admissionNumber}</p>
+                        <Label className="text-xs font-medium text-gray-600">
+                          Admission Number
+                        </Label>
+                        <p className="text-gray-800">
+                          {viewingItem.admissionNumber}
+                        </p>
                       </div>
                       <div>
-                        <Label className="text-xs font-medium text-gray-600">Class</Label>
-                        <p className="text-gray-800">{viewingItem.className}</p>
+                        <Label className="text-xs font-medium text-gray-600">
+                          Class
+                        </Label>
+                        <p className="text-gray-800">
+                          {viewingItem.classId || "N/A"}
+                        </p>
                       </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
-                        <Label className="text-xs font-medium text-gray-600">Date of Birth</Label>
-                        <p className="text-gray-800">{viewingItem.dateOfBirth}</p>
+                        <Label className="text-xs font-medium text-gray-600">
+                          Date of Birth
+                        </Label>
+                        <p className="text-gray-800">
+                          {viewingItem.dateOfBirth}
+                        </p>
                       </div>
                       <div>
-                        <Label className="text-xs font-medium text-gray-600">Gender</Label>
+                        <Label className="text-xs font-medium text-gray-600">
+                          Gender
+                        </Label>
                         <p className="text-gray-800">{viewingItem.gender}</p>
                       </div>
                       <div>
-                        <Label className="text-xs font-medium text-gray-600">Date Admitted</Label>
-                        <p className="text-gray-800">{viewingItem.dateAdmitted}</p>
+                        <Label className="text-xs font-medium text-gray-600">
+                          Date Admitted
+                        </Label>
+                        <p className="text-gray-800">
+                          {viewingItem.dateAdmitted}
+                        </p>
                       </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <Label className="text-xs font-medium text-gray-600">Student Email</Label>
-                        <p className="text-gray-800">{viewingItem.email || "Not provided"}</p>
+                        <Label className="text-xs font-medium text-gray-600">
+                          Student Email
+                        </Label>
+                        <p className="text-gray-800">
+                          {viewingItem.email || "Not provided"}
+                        </p>
                       </div>
                       <div>
-                        <Label className="text-xs font-medium text-gray-600">Student Phone</Label>
-                        <p className="text-gray-800">{viewingItem.phone || "Not provided"}</p>
+                        <Label className="text-xs font-medium text-gray-600">
+                          Student Phone
+                        </Label>
+                        <p className="text-gray-800">
+                          {viewingItem.phone || "Not provided"}
+                        </p>
                       </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
-                        <Label className="text-xs font-medium text-gray-600">Parent Name</Label>
-                        <p className="text-gray-800">{viewingItem.parentName}</p>
+                        <Label className="text-xs font-medium text-gray-600">
+                          Parent Name
+                        </Label>
+                        <p className="text-gray-800">
+                          {viewingItem.parentName || "N/A"}
+                        </p>
                       </div>
                       <div>
-                        <Label className="text-xs font-medium text-gray-600">Parent Phone</Label>
-                        <p className="text-gray-800">{viewingItem.parentPhone}</p>
+                        <Label className="text-xs font-medium text-gray-600">
+                          Parent Phone
+                        </Label>
+                        <p className="text-gray-800">
+                          {viewingItem.parentPhone || "N/A"}
+                        </p>
                       </div>
                       <div>
-                        <Label className="text-xs font-medium text-gray-600">Parent Email</Label>
-                        <p className="text-gray-800">{viewingItem.parentEmail || "Not provided"}</p>
+                        <Label className="text-xs font-medium text-gray-600">
+                          Parent Email
+                        </Label>
+                        <p className="text-gray-800">
+                          {viewingItem.parentEmail || "Not provided"}
+                        </p>
                       </div>
                     </div>
                     {viewingItem.parent && (
                       <div className="space-y-2 mt-4">
-                        <div className="font-bold">Parent Login Credentials</div>
-                        <div><strong>Email:</strong> {viewingItem.parent.email}</div>
-                        <div><strong>Temporary Password:</strong> {viewingItem.parent.tempPassword || "N/A"}</div>
+                        <div className="font-bold">
+                          Parent Login Credentials
+                        </div>
+                        <div>
+                          <strong>Email:</strong> {viewingItem.parent.email}
+                        </div>
+                        <div>
+                          <strong>Temporary Password:</strong>{" "}
+                          {viewingItem.parent.tempPassword || "N/A"}
+                        </div>
                       </div>
                     )}
                     <div>
-                      <Label className="text-xs font-medium text-gray-600">Home Address</Label>
-                      <p className="text-gray-800">{viewingItem.address || "Not provided"}</p>
+                      <Label className="text-xs font-medium text-gray-600">
+                        Home Address
+                      </Label>
+                      <p className="text-gray-800">
+                        {viewingItem.address || "Not provided"}
+                      </p>
                     </div>
                     <div>
-                      <Label className="text-xs font-medium text-gray-600">Status</Label>
-                      <Badge variant={viewingItem.status === "active" ? "default" : "secondary"}>
+                      <Label className="text-xs font-medium text-gray-600">
+                        Status
+                      </Label>
+                      <Badge
+                        variant={
+                          viewingItem.status === "active"
+                            ? "default"
+                            : "secondary"
+                        }
+                      >
                         {viewingItem.status}
                       </Badge>
                     </div>
@@ -1746,7 +2791,10 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                     Subjects ({subjects.length})
                     <Dialog>
                       <DialogTrigger asChild>
-                        <Button size="sm" style={{ backgroundColor: schoolData.colorTheme }}>
+                        <Button
+                          size="sm"
+                          style={{ backgroundColor: schoolData.colorTheme }}
+                        >
                           <Plus className="w-4 h-4 mr-2" />
                           Add Subject
                         </Button>
@@ -1754,14 +2802,21 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                       <DialogContent>
                         <DialogHeader>
                           <DialogTitle>Add New Subject</DialogTitle>
-                          <DialogDescription>Create a new subject for your school</DialogDescription>
+                          <DialogDescription>
+                            Create a new subject for your school
+                          </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4">
                           <div className="space-y-2">
                             <Label>Subject Name *</Label>
                             <Input
                               value={newSubject.name || ""}
-                              onChange={(e) => setNewSubject({ ...newSubject, name: e.target.value })}
+                              onChange={(e) =>
+                                setNewSubject({
+                                  ...newSubject,
+                                  name: e.target.value,
+                                })
+                              }
                               placeholder="e.g., Mathematics"
                             />
                           </div>
@@ -1769,7 +2824,12 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                             <Label>Subject Code *</Label>
                             <Input
                               value={newSubject.code || ""}
-                              onChange={(e) => setNewSubject({ ...newSubject, code: e.target.value })}
+                              onChange={(e) =>
+                                setNewSubject({
+                                  ...newSubject,
+                                  code: e.target.value,
+                                })
+                              }
                               placeholder="e.g., MATH101"
                             />
                           </div>
@@ -1777,14 +2837,22 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                             <Label>Assigned Teacher</Label>
                             <Select
                               value={newSubject.teacherId || ""}
-                              onValueChange={(value) => setNewSubject({ ...newSubject, teacherId: value })}
+                              onValueChange={(value) =>
+                                setNewSubject({
+                                  ...newSubject,
+                                  teacherId: value,
+                                })
+                              }
                             >
                               <SelectTrigger>
                                 <SelectValue placeholder="Select teacher" />
                               </SelectTrigger>
                               <SelectContent>
                                 {teachers.map((teacher) => (
-                                  <SelectItem key={teacher.id} value={teacher.id}>
+                                  <SelectItem
+                                    key={teacher.id}
+                                    value={teacher.id}
+                                  >
                                     {teacher.name}
                                   </SelectItem>
                                 ))}
@@ -1795,7 +2863,12 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                             <Label>Description</Label>
                             <Textarea
                               value={newSubject.description || ""}
-                              onChange={(e) => setNewSubject({ ...newSubject, description: e.target.value })}
+                              onChange={(e) =>
+                                setNewSubject({
+                                  ...newSubject,
+                                  description: e.target.value,
+                                })
+                              }
                               placeholder="Brief description of the subject"
                               rows={2}
                             />
@@ -1811,7 +2884,9 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                       </DialogContent>
                     </Dialog>
                   </CardTitle>
-                  <CardDescription>Configure subjects taught in your school</CardDescription>
+                  <CardDescription>
+                    Configure subjects taught in your school
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   {subjects.length === 0 ? (
@@ -1822,7 +2897,10 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                   ) : (
                     <div className="space-y-2">
                       {subjects.map((subject) => (
-                        <div key={subject.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div
+                          key={subject.id}
+                          className="flex items-center justify-between p-3 border rounded-lg"
+                        >
                           <div>
                             <h5 className="font-medium">{subject.name}</h5>
                             <p className="text-sm text-gray-600">
@@ -1830,21 +2908,32 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                             </p>
                             {subject.teacherId && (
                               <p className="text-xs text-gray-500">
-                                Teacher: {teachers.find((t) => t.id === subject.teacherId)?.name}
+                                Teacher:{" "}
+                                {
+                                  teachers.find(
+                                    (t) => t.id === subject.teacherId
+                                  )?.name
+                                }
                               </p>
                             )}
                           </div>
                           <div className="flex space-x-2">
                             <Dialog>
                               <DialogTrigger asChild>
-                                <Button variant="outline" size="sm" onClick={() => setEditingItem(subject)}>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setEditingItem(subject)}
+                                >
                                   <Edit className="w-4 h-4" />
                                 </Button>
                               </DialogTrigger>
                               <DialogContent>
                                 <DialogHeader>
                                   <DialogTitle>Edit Subject</DialogTitle>
-                                  <DialogDescription>Update subject information</DialogDescription>
+                                  <DialogDescription>
+                                    Update subject information
+                                  </DialogDescription>
                                 </DialogHeader>
                                 {editingItem && (
                                   <div className="space-y-4">
@@ -1852,7 +2941,12 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                                       <Label>Subject Name *</Label>
                                       <Input
                                         value={editingItem.name || ""}
-                                        onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
+                                        onChange={(e) =>
+                                          setEditingItem({
+                                            ...editingItem,
+                                            name: e.target.value,
+                                          })
+                                        }
                                         placeholder="e.g., Mathematics"
                                       />
                                     </div>
@@ -1860,7 +2954,12 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                                       <Label>Subject Code *</Label>
                                       <Input
                                         value={editingItem.code || ""}
-                                        onChange={(e) => setEditingItem({ ...editingItem, code: e.target.value })}
+                                        onChange={(e) =>
+                                          setEditingItem({
+                                            ...editingItem,
+                                            code: e.target.value,
+                                          })
+                                        }
                                         placeholder="e.g., MATH101"
                                       />
                                     </div>
@@ -1868,14 +2967,22 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                                       <Label>Assigned Teacher</Label>
                                       <Select
                                         value={editingItem.teacherId || ""}
-                                        onChange={(value) => setEditingItem({ ...editingItem, teacherId: value })}
+                                        onValueChange={(value) =>
+                                          setEditingItem({
+                                            ...editingItem,
+                                            teacherId: value,
+                                          })
+                                        }
                                       >
                                         <SelectTrigger>
                                           <SelectValue placeholder="Select teacher" />
                                         </SelectTrigger>
                                         <SelectContent>
                                           {teachers.map((teacher) => (
-                                            <SelectItem key={teacher.id} value={teacher.id}>
+                                            <SelectItem
+                                              key={teacher.id}
+                                              value={teacher.id}
+                                            >
                                               {teacher.name}
                                             </SelectItem>
                                           ))}
@@ -1887,7 +2994,10 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                                       <Textarea
                                         value={editingItem.description || ""}
                                         onChange={(e) =>
-                                          setEditingItem({ ...editingItem, description: e.target.value })
+                                          setEditingItem({
+                                            ...editingItem,
+                                            description: e.target.value,
+                                          })
                                         }
                                         placeholder="Brief description of the subject"
                                         rows={2}
@@ -1896,7 +3006,9 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                                     <Button
                                       onClick={() => updateSubject(editingItem)}
                                       className="w-full"
-                                      style={{ backgroundColor: schoolData.colorTheme }}
+                                      style={{
+                                        backgroundColor: schoolData.colorTheme,
+                                      }}
                                     >
                                       Update Subject
                                     </Button>
@@ -1906,20 +3018,30 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                             </Dialog>
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
-                                <Button variant="outline" size="sm" className="text-red-600">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-red-600"
+                                >
                                   <Trash2 className="w-4 h-4" />
                                 </Button>
                               </AlertDialogTrigger>
                               <AlertDialogContent>
                                 <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete Subject</AlertDialogTitle>
+                                  <AlertDialogTitle>
+                                    Delete Subject
+                                  </AlertDialogTitle>
                                   <AlertDialogDescription>
-                                    Are you sure you want to delete {subject.name}? This action cannot be undone.
+                                    Are you sure you want to delete{" "}
+                                    {subject.name}? This action cannot be
+                                    undone.
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
                                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => deleteSubject(subject.id)}>
+                                  <AlertDialogAction
+                                    onClick={() => deleteSubject(subject.id)}
+                                  >
                                     Delete
                                   </AlertDialogAction>
                                 </AlertDialogFooter>
@@ -1940,7 +3062,16 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                     Classes ({classes.length})
                     <Dialog>
                       <DialogTrigger asChild>
-                        <Button size="sm" style={{ backgroundColor: schoolData.colorTheme }}>
+                        <Button
+                          size="sm"
+                          style={{ backgroundColor: schoolData.colorTheme }}
+                          onClick={() =>
+                            setNewClass({
+                              ...newClass,
+                              academicYear: new Date().getFullYear().toString(),
+                            })
+                          }
+                        >
                           <Plus className="w-4 h-4 mr-2" />
                           Add Class
                         </Button>
@@ -1948,29 +3079,61 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                       <DialogContent>
                         <DialogHeader>
                           <DialogTitle>Add New Class</DialogTitle>
-                          <DialogDescription>Create a new class for your school</DialogDescription>
+                          <DialogDescription>
+                            Create a new class for your school
+                          </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4">
                           <div className="space-y-2">
                             <Label>Class Name *</Label>
                             <Input
                               value={newClass.name || ""}
-                              onChange={(e) => setNewClass({ ...newClass, name: e.target.value })}
+                              onChange={(e) =>
+                                setNewClass({
+                                  ...newClass,
+                                  name: e.target.value,
+                                })
+                              }
                               placeholder="e.g., Grade 5A"
                             />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Grade *</Label>
+                            <Select
+                              value={newClass.gradeId || ""}
+                              onValueChange={(value) =>
+                                setNewClass({ ...newClass, gradeId: value })
+                              }
+                              required
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select grade" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {grades.map((grade) => (
+                                  <SelectItem key={grade.id} value={grade.id}>
+                                    {grade.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </div>
                           <div className="space-y-2">
                             <Label>Level *</Label>
                             <Select
                               value={newClass.level || ""}
-                              onValueChange={(value) => setNewClass({ ...newClass, level: value })}
+                              onValueChange={(value) =>
+                                setNewClass({ ...newClass, level: value })
+                              }
                             >
                               <SelectTrigger>
                                 <SelectValue placeholder="Select level" />
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="Primary">Primary</SelectItem>
-                                <SelectItem value="Secondary">Secondary</SelectItem>
+                                <SelectItem value="Secondary">
+                                  Secondary
+                                </SelectItem>
                                 <SelectItem value="College">College</SelectItem>
                               </SelectContent>
                             </Select>
@@ -1981,7 +3144,11 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                               type="number"
                               value={newClass.capacity || ""}
                               onChange={(e) =>
-                                setNewClass({ ...newClass, capacity: Number.parseInt(e.target.value) || 0 })
+                                setNewClass({
+                                  ...newClass,
+                                  capacity:
+                                    Number.parseInt(e.target.value) || 0,
+                                })
                               }
                               placeholder="30"
                             />
@@ -1990,19 +3157,44 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                             <Label>Class Teacher</Label>
                             <Select
                               value={newClass.classTeacherId || ""}
-                              onValueChange={(value) => setNewClass({ ...newClass, classTeacherId: value })}
+                              onValueChange={(value) =>
+                                setNewClass({
+                                  ...newClass,
+                                  classTeacherId: value,
+                                })
+                              }
                             >
                               <SelectTrigger>
                                 <SelectValue placeholder="Select class teacher" />
                               </SelectTrigger>
                               <SelectContent>
                                 {teachers.map((teacher) => (
-                                  <SelectItem key={teacher.id} value={teacher.id}>
+                                  <SelectItem
+                                    key={teacher.id}
+                                    value={teacher.id}
+                                  >
                                     {teacher.name}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Academic Year *</Label>
+                            <Input
+                              type="number"
+                              value={
+                                newClass.academicYear ||
+                                new Date().getFullYear().toString()
+                              }
+                              onChange={(e) =>
+                                setNewClass({
+                                  ...newClass,
+                                  academicYear: e.target.value,
+                                })
+                              }
+                              placeholder="e.g., 2024"
+                            />
                           </div>
                           <Button
                             onClick={createClass}
@@ -2015,7 +3207,9 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                       </DialogContent>
                     </Dialog>
                   </CardTitle>
-                  <CardDescription>Set up classes and their structure</CardDescription>
+                  <CardDescription>
+                    Set up classes and their structure
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   {classes.length === 0 ? (
@@ -2026,7 +3220,10 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                   ) : (
                     <div className="space-y-2">
                       {classes.map((cls) => (
-                        <div key={cls.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div
+                          key={cls.id}
+                          className="flex items-center justify-between p-3 border rounded-lg"
+                        >
                           <div>
                             <h5 className="font-medium">{cls.name}</h5>
                             <p className="text-sm text-gray-600">
@@ -2034,21 +3231,32 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                             </p>
                             {cls.classTeacherId && (
                               <p className="text-xs text-gray-500">
-                                Teacher: {teachers.find((t) => t.id === cls.classTeacherId)?.name}
+                                Teacher:{" "}
+                                {
+                                  teachers.find(
+                                    (t) => t.id === cls.classTeacherId
+                                  )?.name
+                                }
                               </p>
                             )}
                           </div>
                           <div className="flex space-x-2">
                             <Dialog>
                               <DialogTrigger asChild>
-                                <Button variant="outline" size="sm" onClick={() => setEditingItem(cls)}>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setEditingItem(cls)}
+                                >
                                   <Edit className="w-4 h-4" />
                                 </Button>
                               </DialogTrigger>
                               <DialogContent>
                                 <DialogHeader>
                                   <DialogTitle>Edit Class</DialogTitle>
-                                  <DialogDescription>Update class information</DialogDescription>
+                                  <DialogDescription>
+                                    Update class information
+                                  </DialogDescription>
                                 </DialogHeader>
                                 {editingItem && (
                                   <div className="space-y-4">
@@ -2056,7 +3264,12 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                                       <Label>Class Name *</Label>
                                       <Input
                                         value={editingItem.name || ""}
-                                        onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
+                                        onChange={(e) =>
+                                          setEditingItem({
+                                            ...editingItem,
+                                            name: e.target.value,
+                                          })
+                                        }
                                         placeholder="e.g., Grade 5A"
                                       />
                                     </div>
@@ -2064,15 +3277,26 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                                       <Label>Level *</Label>
                                       <Select
                                         value={editingItem.level || ""}
-                                        onChange={(e) => setEditingItem({ ...editingItem, level: e.target.value })}
+                                        onValueChange={(value) =>
+                                          setEditingItem({
+                                            ...editingItem,
+                                            level: value,
+                                          })
+                                        }
                                       >
                                         <SelectTrigger>
                                           <SelectValue placeholder="Select level" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                          <SelectItem value="Primary">Primary</SelectItem>
-                                          <SelectItem value="Secondary">Secondary</SelectItem>
-                                          <SelectItem value="College">College</SelectItem>
+                                          <SelectItem value="Primary">
+                                            Primary
+                                          </SelectItem>
+                                          <SelectItem value="Secondary">
+                                            Secondary
+                                          </SelectItem>
+                                          <SelectItem value="College">
+                                            College
+                                          </SelectItem>
                                         </SelectContent>
                                       </Select>
                                     </div>
@@ -2084,7 +3308,9 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                                         onChange={(e) =>
                                           setEditingItem({
                                             ...editingItem,
-                                            capacity: Number.parseInt(e.target.value) || 0,
+                                            capacity:
+                                              Number.parseInt(e.target.value) ||
+                                              0,
                                           })
                                         }
                                         placeholder="30"
@@ -2094,8 +3320,11 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                                       <Label>Class Teacher</Label>
                                       <Select
                                         value={editingItem.classTeacherId || ""}
-                                        onChange={(e) =>
-                                          setEditingItem({ ...editingItem, classTeacherId: e.target.value })
+                                        onValueChange={(value) =>
+                                          setEditingItem({
+                                            ...editingItem,
+                                            classTeacherId: value,
+                                          })
                                         }
                                       >
                                         <SelectTrigger>
@@ -2103,7 +3332,10 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                                         </SelectTrigger>
                                         <SelectContent>
                                           {teachers.map((teacher) => (
-                                            <SelectItem key={teacher.id} value={teacher.id}>
+                                            <SelectItem
+                                              key={teacher.id}
+                                              value={teacher.id}
+                                            >
                                               {teacher.name}
                                             </SelectItem>
                                           ))}
@@ -2113,7 +3345,9 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                                     <Button
                                       onClick={() => updateClass(editingItem)}
                                       className="w-full"
-                                      style={{ backgroundColor: schoolData.colorTheme }}
+                                      style={{
+                                        backgroundColor: schoolData.colorTheme,
+                                      }}
                                     >
                                       Update Class
                                     </Button>
@@ -2123,20 +3357,31 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
                             </Dialog>
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
-                                <Button variant="outline" size="sm" className="text-red-600">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-red-600"
+                                >
                                   <Trash2 className="w-4 h-4" />
                                 </Button>
                               </AlertDialogTrigger>
                               <AlertDialogContent>
                                 <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete Class</AlertDialogTitle>
+                                  <AlertDialogTitle>
+                                    Delete Class
+                                  </AlertDialogTitle>
                                   <AlertDialogDescription>
-                                    Are you sure you want to delete {cls.name}? This action cannot be undone.
+                                    Are you sure you want to delete {cls.name}?
+                                    This action cannot be undone.
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
                                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => deleteClass(cls.id)}>Delete</AlertDialogAction>
+                                  <AlertDialogAction
+                                    onClick={() => deleteClass(cls.id)}
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
                                 </AlertDialogFooter>
                               </AlertDialogContent>
                             </AlertDialog>
@@ -2152,47 +3397,202 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
 
           {/* Fee Management Tab */}
           <TabsContent value="fees" className="space-y-6">
-            <FeeManagement 
+            <FeeManagement
               schoolCode={schoolData.schoolCode}
               colorTheme={schoolData.colorTheme}
               onGoBack={() => setActiveTab("overview")}
               onFeeStructureCreated={() => {
                 // Update the fee management step as completed
-                setSetupSteps(prev => prev.map(step => 
-                  step.id === "fees" ? { ...step, completed: true } : step
-                ));
+                setSetupSteps((prev) =>
+                  prev.map((step) =>
+                    step.id === "fees" ? { ...step, completed: true } : step
+                  )
+                );
               }}
             />
+          </TabsContent>
+
+          {/* Promotions Tab */}
+          <TabsContent value="promotions" className="space-y-6">
+            <Card className="bg-white/70 backdrop-blur-lg rounded-2xl shadow-xl border-0 px-2 py-2 md:px-8 md:py-6">
+              <CardHeader className="px-2 py-2 md:px-6 md:py-4">
+                <CardTitle className="flex items-center justify-between text-base md:text-lg">
+                  <span className="flex items-center gap-2">
+                    <GraduationCap className="w-5 h-5" />
+                    Student Promotion Management
+                  </span>
+                  <Button
+                    asChild
+                    className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                  >
+                    <Link
+                      href={`/schools/${schoolData.schoolCode}/admin/promotions`}
+                    >
+                      <ArrowRight className="w-4 h-4 mr-2" />
+                      Manage Promotions
+                    </Link>
+                  </Button>
+                </CardTitle>
+                <CardDescription>
+                  Manage bulk student promotions with individual exclusions
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Card className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-blue-100 rounded-lg">
+                          <Users className="w-6 h-6 text-blue-600" />
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold">
+                            {students.length}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            Total Students
+                          </p>
+                        </div>
+                      </div>
+                    </Card>
+
+                    <Card className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-green-100 rounded-lg">
+                          <CheckCircle className="w-6 h-6 text-green-600" />
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold">
+                            {
+                              students.filter((s) => s.status === "active")
+                                .length
+                            }
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            Active Students
+                          </p>
+                        </div>
+                      </div>
+                    </Card>
+
+                    <Card className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-purple-100 rounded-lg">
+                          <GraduationCap className="w-6 h-6 text-purple-600" />
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold">
+                            {new Set(students.map((s) => s.className)).size}
+                          </p>
+                          <p className="text-sm text-gray-600">Class Levels</p>
+                        </div>
+                      </div>
+                    </Card>
+                  </div>
+
+                  <div className="flex gap-4">
+                    <Button
+                      asChild
+                      className="bg-gradient-to-r from-blue-600 to-purple-600"
+                    >
+                      <Link
+                        href={`/schools/${schoolData.schoolCode}/admin/promotions`}
+                      >
+                        <ArrowRight className="w-4 h-4 mr-2" />
+                        Manage Promotions
+                      </Link>
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      onClick={() => setActiveTab("students")}
+                    >
+                      <Users className="w-4 h-4 mr-2" />
+                      View All Students
+                    </Button>
+                  </div>
+
+                  <div className="mt-8">
+                    <h3 className="text-lg font-semibold mb-4">
+                      Recent Promotion Activity
+                    </h3>
+                    <div className="space-y-2">
+                      <p className="text-gray-600">
+                        No recent promotion activity
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        Promotion history will appear here once you start
+                        managing promotions.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+                    <h4 className="font-semibold text-blue-800 mb-2">
+                      How Bulk Promotion Works
+                    </h4>
+                    <ul className="text-sm text-blue-700 space-y-1">
+                      <li>• Select a class to promote students from</li>
+                      <li>• Review all eligible students automatically</li>
+                      <li>• Exclude individual students with reasons</li>
+                      <li>• Confirm and execute bulk promotion</li>
+                      <li>• Track promotion history and exclusions</li>
+                    </ul>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>
 
       {/* Add a modal/dialog to show credentials after adding a teacher */}
-      <Dialog open={showTeacherCredentials} onOpenChange={setShowTeacherCredentials}>
+      <Dialog
+        open={showTeacherCredentials}
+        onOpenChange={setShowTeacherCredentials}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Teacher Credentials</DialogTitle>
             <DialogDescription>
-              Share these credentials with the teacher. They will use them to log in for the first time.
+              Share these credentials with the teacher. They will use them to
+              log in for the first time.
             </DialogDescription>
           </DialogHeader>
           {lastTeacherCredentials && (
             <div className="space-y-2">
-              <div><strong>Email:</strong> {lastTeacherCredentials.email}</div>
-              <div><strong>Temporary Password:</strong> {lastTeacherCredentials.tempPassword}</div>
+              <div>
+                <strong>Email:</strong> {lastTeacherCredentials.email}
+              </div>
+              <div>
+                <strong>Temporary Password:</strong>{" "}
+                {lastTeacherCredentials.tempPassword}
+              </div>
             </div>
           )}
-          <Button onClick={() => setShowTeacherCredentials(false)} className="mt-4">Close</Button>
+          <Button
+            onClick={() => setShowTeacherCredentials(false)}
+            className="mt-4"
+          >
+            Close
+          </Button>
         </DialogContent>
       </Dialog>
 
       {/* Student Credentials Modal */}
-      <Dialog open={showStudentCredentials} onOpenChange={setShowStudentCredentials}>
+      <Dialog
+        open={showStudentCredentials}
+        onOpenChange={setShowStudentCredentials}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Student Login Credentials</DialogTitle>
             <DialogDescription>
               Share these credentials with the student for their first login.
+              <br />
+              <span className="text-blue-700 font-semibold">
+                Default password for all new students is <b>student123</b>.
+              </span>
             </DialogDescription>
           </DialogHeader>
           {lastStudentCredentials && (
@@ -2200,49 +3600,79 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
               <div className="bg-gray-50 p-4 rounded-lg space-y-2">
                 <div className="flex justify-between items-center">
                   <strong>Admission Number:</strong>
-                  <span className="font-mono">{lastStudentCredentials.admissionNumber}</span>
+                  <span className="font-mono">
+                    {lastStudentCredentials.admissionNumber}
+                  </span>
                 </div>
                 {lastStudentCredentials.email && (
                   <div className="flex justify-between items-center">
                     <strong>Email:</strong>
-                    <span className="font-mono">{lastStudentCredentials.email}</span>
+                    <span className="font-mono">
+                      {lastStudentCredentials.email}
+                    </span>
                   </div>
                 )}
                 <div className="flex justify-between items-center">
-                  <strong>Temporary Password:</strong>
-                  <span className="font-mono">{lastStudentCredentials.tempPassword}</span>
+                  <strong>Password:</strong>
+                  <span className="font-mono text-blue-700">student123</span>
                 </div>
               </div>
-              
+
               <div className="flex flex-col gap-2">
-                <Button asChild className="w-full bg-green-600 hover:bg-green-700">
-                  <Link 
-                    href={`/schools/${encodeURIComponent(schoolData.schoolCode)}/students/login?admissionNumber=${encodeURIComponent(lastStudentCredentials.admissionNumber)}&email=${encodeURIComponent(lastStudentCredentials.email || '')}&password=${encodeURIComponent(lastStudentCredentials.tempPassword)}`}
+                <Button
+                  asChild
+                  className="w-full bg-green-600 hover:bg-green-700"
+                >
+                  <Link
+                    href={`/schools/${encodeURIComponent(
+                      schoolData.schoolCode
+                    )}/students/login?admissionNumber=${encodeURIComponent(
+                      lastStudentCredentials.admissionNumber
+                    )}&email=${encodeURIComponent(
+                      lastStudentCredentials.email || ""
+                    )}&password=${encodeURIComponent(
+                      lastStudentCredentials.tempPassword
+                    )}`}
                   >
                     🚀 Quick Login (Auto-fill)
                   </Link>
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="w-full"
                   onClick={() => {
-                    const credentials = `Admission Number: ${lastStudentCredentials.admissionNumber}\nEmail: ${lastStudentCredentials.email || 'N/A'}\nPassword: ${lastStudentCredentials.tempPassword}`;
+                    const credentials = `Admission Number: ${
+                      lastStudentCredentials.admissionNumber
+                    }\nEmail: ${
+                      lastStudentCredentials.email || "N/A"
+                    }\nPassword: ${lastStudentCredentials.tempPassword}`;
                     navigator.clipboard.writeText(credentials);
-                    toast({ title: "Copied!", description: "Credentials copied to clipboard", variant: "default" });
+                    toast({
+                      title: "Copied!",
+                      description: "Credentials copied to clipboard",
+                      variant: "default",
+                    });
                   }}
                 >
                   📋 Copy Credentials
                 </Button>
                 <Button asChild variant="outline" className="w-full">
-                  <Link href={`/schools/${schoolData.schoolCode}/students/login`}>
+                  <Link
+                    href={`/schools/${schoolData.schoolCode}/students/login`}
+                  >
                     📝 Manual Login
                   </Link>
                 </Button>
               </div>
-              
+
               <div className="text-xs text-gray-500 text-center">
-                💡 Tip: Use "Quick Login" to automatically fill the login form with these credentials<br />
-                <span className="text-orange-600">⚠️ Note: Credentials are only shown immediately after creation for security reasons</span>
+                💡 Tip: Use "Quick Login" to automatically fill the login form
+                with these credentials
+                <br />
+                <span className="text-orange-600">
+                  ⚠️ Note: Credentials are only shown immediately after creation
+                  for security reasons
+                </span>
               </div>
             </div>
           )}
@@ -2253,78 +3683,139 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
       {showParentCredentials && lastParentCredentials && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
           <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
-            <h2 className="text-2xl font-bold text-blue-700 mb-4">Parent Login Credentials</h2>
+            <h2 className="text-2xl font-bold text-blue-700 mb-4">
+              Parent Login Credentials
+            </h2>
             <div className="mb-4 text-gray-700 text-sm">
-              Share these credentials with the parent for their first login.<br />
-              (Simulated for now. In the future, this can be sent via SMS/email.)
+              Share these credentials with the parent for their first login.
+              <br />
+              <span className="text-blue-700 font-semibold">
+                Default password for all new parents is <b>parent123</b>.
+              </span>
             </div>
             <div className="bg-gray-100 rounded p-4 text-left text-xs mb-4 space-y-2">
               <div className="flex justify-between">
                 <b>Admission Number:</b>
-                <span className="font-mono">{lastParentCredentials.admissionNumber}</span>
+                <span className="font-mono">
+                  {lastParentCredentials.admissionNumber}
+                </span>
               </div>
               <div className="flex justify-between">
                 <b>Parent Phone:</b>
-                <span className="font-mono">{lastParentCredentials.parentPhone}</span>
+                <span className="font-mono">
+                  {lastParentCredentials.parentPhone}
+                </span>
               </div>
               {lastParentCredentials.parentEmail && (
                 <div className="flex justify-between">
                   <b>Parent Email:</b>
-                  <span className="font-mono">{lastParentCredentials.parentEmail}</span>
+                  <span className="font-mono">
+                    {lastParentCredentials.parentEmail}
+                  </span>
                 </div>
               )}
               <div className="flex justify-between">
-                <b>Temporary Password:</b>
-                <span className="font-mono">{lastParentCredentials.tempPassword}</span>
+                <b>Password:</b>
+                <span className="font-mono text-blue-700">parent123</span>
               </div>
             </div>
             <div className="flex flex-col gap-2 mb-4">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="w-full"
                 onClick={() => {
-                  console.log('Parent credentials debug:', lastParentCredentials);
-                  const url = `/schools/${schoolData.schoolCode}/parent/login?phone=${encodeURIComponent(lastParentCredentials.parentPhone)}&password=${encodeURIComponent(lastParentCredentials.tempPassword)}`;
-                  console.log('Generated URL:', url);
-                  console.log('Phone value:', lastParentCredentials.parentPhone);
-                  console.log('Password value:', lastParentCredentials.tempPassword);
+                  console.log(
+                    "Parent credentials debug:",
+                    lastParentCredentials
+                  );
+                  const url = `/schools/${
+                    schoolData.schoolCode
+                  }/parent/login?phone=${encodeURIComponent(
+                    lastParentCredentials.parentPhone
+                  )}&password=${encodeURIComponent(
+                    lastParentCredentials.tempPassword
+                  )}`;
+                  console.log("Generated URL:", url);
+                  console.log(
+                    "Phone value:",
+                    lastParentCredentials.parentPhone
+                  );
+                  console.log(
+                    "Password value:",
+                    lastParentCredentials.tempPassword
+                  );
                 }}
               >
                 🔍 Debug Parent Credentials
               </Button>
-              <Button asChild className="w-full bg-green-600 hover:bg-green-700">
-                <Link 
-                  href={`/schools/${schoolData.schoolCode}/parent/login?phone=${encodeURIComponent(lastParentCredentials.parentPhone)}&password=${encodeURIComponent(lastParentCredentials.tempPassword)}`}
+              <Button
+                asChild
+                className="w-full bg-green-600 hover:bg-green-700"
+              >
+                <Link
+                  href={`/schools/${
+                    schoolData.schoolCode
+                  }/parent/login?phone=${encodeURIComponent(
+                    lastParentCredentials.parentPhone
+                  )}&password=${encodeURIComponent(
+                    lastParentCredentials.tempPassword
+                  )}`}
                 >
                   🚀 Quick Parent Login (Auto-fill)
                 </Link>
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="w-full"
                 onClick={() => {
-                  console.log('Parent credentials for copy:', lastParentCredentials);
-                  const credentials = `Admission Number: ${lastParentCredentials.admissionNumber}\nParent Phone: ${lastParentCredentials.parentPhone}\nParent Email: ${lastParentCredentials.parentEmail || 'N/A'}\nPassword: ${lastParentCredentials.tempPassword}`;
+                  console.log(
+                    "Parent credentials for copy:",
+                    lastParentCredentials
+                  );
+                  const credentials = `Admission Number: ${
+                    lastParentCredentials.admissionNumber
+                  }\nParent Phone: ${
+                    lastParentCredentials.parentPhone
+                  }\nParent Email: ${
+                    lastParentCredentials.parentEmail || "N/A"
+                  }\nPassword: ${lastParentCredentials.tempPassword}`;
                   navigator.clipboard.writeText(credentials);
-                  toast({ title: "Copied!", description: "Parent credentials copied to clipboard", variant: "default" });
+                  toast({
+                    title: "Copied!",
+                    description: "Parent credentials copied to clipboard",
+                    variant: "default",
+                  });
                 }}
               >
                 📋 Copy Parent Credentials
               </Button>
-              <Link href={`/schools/${schoolData.schoolCode}/parent/login`} legacyBehavior>
-                <a className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition">📝 Manual Parent Login</a>
+              <Link
+                href={`/schools/${schoolData.schoolCode}/parent/login`}
+                legacyBehavior
+              >
+                <a className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition">
+                  📝 Manual Parent Login
+                </a>
               </Link>
-              <Link href={`/schools/${schoolData.schoolCode}/students/login`} legacyBehavior>
-                <a className="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition">📚 Go to Student Login</a>
+              <Link
+                href={`/schools/${schoolData.schoolCode}/students/login`}
+                legacyBehavior
+              >
+                <a className="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition">
+                  📚 Go to Student Login
+                </a>
               </Link>
             </div>
             <div className="text-xs text-gray-500 mb-4">
-              💡 Tip: Use "Quick Parent Login" to automatically fill the parent login form
+              💡 Tip: Use "Quick Parent Login" to automatically fill the parent
+              login form
             </div>
             <a
               href="#"
               className="text-blue-600 underline mb-4 block"
-              onClick={e => { e.preventDefault(); /* future: trigger SMS/email */ }}
+              onClick={(e) => {
+                e.preventDefault(); /* future: trigger SMS/email */
+              }}
             >
               Parent Access (future: send via SMS/email)
             </a>
@@ -2337,6 +3828,274 @@ export function SchoolSetupDashboard({ schoolData: initialSchoolData, onLogout }
           </div>
         </div>
       )}
+
+      {/* Bulk Import Dialog */}
+      <Dialog
+        open={showBulkImportDialog}
+        onOpenChange={setShowBulkImportDialog}
+      >
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Bulk Import Students</DialogTitle>
+            <DialogDescription>
+              Import multiple students from a CSV or Excel file
+            </DialogDescription>
+          </DialogHeader>
+
+          {importStep === "upload" && (
+            <div className="space-y-4">
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  Upload CSV or Excel File
+                </h3>
+                <p className="text-gray-600 mb-4">
+                  Supported formats: .csv, .xlsx, .xls
+                </p>
+                <input
+                  type="file"
+                  accept=".csv,.xlsx,.xls"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      parseFile(file);
+                    }
+                  }}
+                  className="hidden"
+                  id="file-upload"
+                />
+                <label
+                  htmlFor="file-upload"
+                  className="cursor-pointer bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+                >
+                  Choose File
+                </label>
+              </div>
+
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <h4 className="font-medium text-blue-900 mb-2">
+                  Required Columns:
+                </h4>
+                <div className="grid grid-cols-2 gap-2 text-sm text-blue-800">
+                  <div>• name (Student Name)</div>
+                  <div>• email (Student Email)</div>
+                  <div>• parentName (Parent Name)</div>
+                  <div>• parentPhone (Parent Phone)</div>
+                  <div>• className (Class Name)</div>
+                  <div>• gradeName (Grade Name)</div>
+                </div>
+                <div className="mt-2 text-xs text-blue-600">
+                  Other columns: phone, parentEmail, dateOfBirth, dateAdmitted,
+                  address, gender, status
+                </div>
+                <div className="mt-2 text-xs text-orange-600">
+                  Note: Use className and gradeName instead of classId. Example:
+                  className="Grade 1A", gradeName="Grade 1"
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <Button variant="outline" onClick={resetImportDialog}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {importStep === "preview" && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-medium">
+                  Preview ({parsedStudents.length} students)
+                </h3>
+                <Button
+                  variant="outline"
+                  onClick={() => setImportStep("upload")}
+                >
+                  Back to Upload
+                </Button>
+              </div>
+
+              <div className="max-h-96 overflow-y-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Class</TableHead>
+                      <TableHead>Grade</TableHead>
+                      <TableHead>Parent Name</TableHead>
+                      <TableHead>Parent Phone</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {parsedStudents.map((student, index) => (
+                      <TableRow key={index}>
+                        <TableCell className="font-medium">
+                          {student.name || (
+                            <span className="text-red-500">Missing</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {student.email || (
+                            <span className="text-red-500">Missing</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {student.classId || (
+                            <span className="text-red-500">Missing</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {student.gradeName || (
+                            <span className="text-red-500">Missing</span>
+                          )}
+                        </TableCell>
+                        <TableCell>{student.parentName || "N/A"}</TableCell>
+                        <TableCell>{student.parentPhone || "N/A"}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              student.name &&
+                              student.email &&
+                              student.className &&
+                              student.gradeName &&
+                              student.parentName &&
+                              student.parentPhone
+                                ? "default"
+                                : "destructive"
+                            }
+                          >
+                            {student.name &&
+                            student.email &&
+                            student.className &&
+                            student.gradeName &&
+                            student.parentName &&
+                            student.parentPhone
+                              ? "Valid"
+                              : "Invalid"}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <div className="text-sm text-gray-600">
+                  {
+                    parsedStudents.filter(
+                      (s) =>
+                        s.name &&
+                        s.email &&
+                        s.className &&
+                        s.gradeName &&
+                        s.parentName &&
+                        s.parentPhone
+                    ).length
+                  }{" "}
+                  of {parsedStudents.length} students are valid
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setImportStep("upload")}
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    onClick={() => bulkImportStudents(parsedStudents)}
+                    disabled={
+                      isImporting ||
+                      parsedStudents.filter(
+                        (s) =>
+                          s.name &&
+                          s.email &&
+                          s.className &&
+                          s.gradeName &&
+                          s.parentName &&
+                          s.parentPhone
+                      ).length === 0
+                    }
+                    style={{ backgroundColor: schoolData.colorTheme }}
+                  >
+                    {isImporting ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Importing...
+                      </>
+                    ) : (
+                      "Import Students"
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {importStep === "results" && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-medium">Import Results</h3>
+                <Button variant="outline" onClick={resetImportDialog}>
+                  Close
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4 mb-4">
+                <div className="bg-green-50 p-4 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-green-600">
+                    {importResults.filter((r) => r.status === "success").length}
+                  </div>
+                  <div className="text-sm text-green-700">
+                    Successfully Imported
+                  </div>
+                </div>
+                <div className="bg-red-50 p-4 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-red-600">
+                    {importResults.filter((r) => r.status === "error").length}
+                  </div>
+                  <div className="text-sm text-red-700">Failed</div>
+                </div>
+                <div className="bg-blue-50 p-4 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-blue-600">
+                    {importResults.length}
+                  </div>
+                  <div className="text-sm text-blue-700">Total</div>
+                </div>
+              </div>
+
+              {importResults.filter((r) => r.status === "error").length > 0 && (
+                <div className="max-h-64 overflow-y-auto">
+                  <h4 className="font-medium text-red-900 mb-2">
+                    Failed Imports:
+                  </h4>
+                  <div className="space-y-2">
+                    {importResults
+                      .filter((r) => r.status === "error")
+                      .map((result, index) => (
+                        <div key={index} className="bg-red-50 p-3 rounded-lg">
+                          <div className="font-medium text-red-900">
+                            {result.admissionNumber || "Unknown"}
+                          </div>
+                          <div className="text-sm text-red-700">
+                            {result.error}
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end">
+                <Button onClick={resetImportDialog}>Done</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
-  )
+  );
 }
