@@ -47,7 +47,11 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       },
       include: {
         user: true,
-        class: true
+        class: {
+          include: {
+            grade: true
+          }
+        }
       }
     });
 
@@ -66,10 +70,11 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
         phone: student.parentPhone,
         email: student.user.email,
         avatarUrl: student.avatarUrl,
-        className: student.className || student.class?.name,
-        classLevel: student.classLevel,
-        classSection: student.classSection,
-        academicYear: student.academicYear || student.class?.academicYear,
+        className: student.class?.name || 'Not Assigned',
+        classId: student.classId,
+        gradeId: student.class?.gradeId,
+        gradeName: student.class?.grade?.name || 'Not Assigned',
+        academicYear: student.class?.academicYear || 'Not Assigned',
         dateOfBirth: student.dateOfBirth,
         dateAdmitted: student.dateAdmitted,
         parentName: student.parentName,

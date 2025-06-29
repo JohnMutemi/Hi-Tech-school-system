@@ -64,7 +64,8 @@ interface FeeStructure {
   id: string;
   term: string;
   year: number;
-  classLevel: string;
+  gradeId: string;
+  gradeName: string;
   totalAmount: number;
   breakdown: Record<string, number>;
   isActive: boolean;
@@ -78,16 +79,17 @@ interface FeeStructure {
 
 function ChildOverview({
   child,
+  outstandingFees = 0,
   feeStructure,
 }: {
   child: any;
+  outstandingFees?: number;
   feeStructure?: any;
 }) {
   if (!child) return null;
   // Mock data for grade and attendance (replace with real data if available)
   const recentGrade = child.recentGrade || "B+";
   const attendance = child.attendance || 96;
-  const outstandingFees = feeStructure ? feeStructure.totalAmount : 0;
   return (
     <div className="mb-8 flex flex-col md:flex-row gap-6 items-stretch">
       <div className="flex-1 bg-white rounded-lg shadow p-6 flex flex-col md:flex-row gap-6 items-center">
@@ -103,7 +105,7 @@ function ChildOverview({
             {child.fullName || child.name}
           </div>
           <div className="text-blue-700 font-semibold text-sm">
-            {child.className || child.classLevel}
+            {child.gradeName}
           </div>
           <div className="text-xs text-gray-500">
             Adm: {child.admissionNumber}
@@ -140,6 +142,14 @@ function ChildOverview({
       </div>
     </div>
   );
+}
+
+// Helper to extract grade from class name (e.g., 'Grade 1A' -> 'Grade 1')
+function extractGrade(classNameOrLevel: string) {
+  if (!classNameOrLevel) return "";
+  // Match 'Grade X' or 'Form X' at the start
+  const match = classNameOrLevel.match(/^(Grade|Form) \d+/i);
+  return match ? match[0] : classNameOrLevel;
 }
 
 export function ParentDashboard({
@@ -189,6 +199,8 @@ export function ParentDashboard({
     { label: "Performance", icon: BarChart2, section: "performance" },
     { label: "Settings", icon: Key, section: "settings" },
   ];
+
+  const [studentFeeSummaries, setStudentFeeSummaries] = useState<any>({});
 
   useEffect(() => {
     async function fetchSession() {
@@ -244,9 +256,6 @@ export function ParentDashboard({
           setParent(data.parent);
           setStudents(data.students);
         }
-
-        // Fetch fee structures for all students
-        await fetchFeeStructures(students);
       } catch (error) {
         console.error("ParentDashboard: Failed to fetch session:", error);
         router.replace(`/schools/${schoolCode}/parent/login`);
@@ -256,6 +265,13 @@ export function ParentDashboard({
     }
     fetchSession();
   }, [schoolCode, parentId]);
+
+  // NEW: Fetch fee structures after students are loaded
+  useEffect(() => {
+    if (students.length > 0) {
+      fetchFeeStructures(students);
+    }
+  }, [students]);
 
   // Listen for fee structure updates from admin panel
   useEffect(() => {
@@ -305,52 +321,54 @@ export function ParentDashboard({
   const fetchFeeStructures = async (studentList: any[]) => {
     try {
       setLoadingFees(true);
-      const classLevels = [
+      // Get unique grade IDs from students
+      const gradeIds = [
         ...new Set(
-          studentList.map((student) => student.className || student.classLevel)
+          studentList
+            .map((student) => student.gradeId)
+            .filter((gradeId) => gradeId) // Filter out null/undefined values
         ),
       ];
 
-      console.log("Fetching fee structures for class levels:", classLevels);
+      console.log("Fetching fee structures for grade IDs:", gradeIds);
 
-      // Get current term
+      // Get current year
       const currentDate = new Date();
       const currentYear = currentDate.getFullYear();
-      const currentMonth = currentDate.getMonth();
 
-      let currentTerm = "Term 1";
-      if (currentMonth >= 4 && currentMonth <= 7) currentTerm = "Term 2";
-      else if (currentMonth >= 8) currentTerm = "Term 3";
+      console.log(`Fetching fee structures for year: ${currentYear}`);
 
-      console.log(`Current term: ${currentTerm}, Year: ${currentYear}`);
-
-      // Fetch fee structures for each class level using the same logic as student dashboard
-      const feePromises = classLevels.map(async (classLevel) => {
-        const response = await fetch(
-          `/api/schools/${schoolCode}/fee-structure?term=${currentTerm}&year=${currentYear}&classLevel=${encodeURIComponent(
-            classLevel
-          )}`
-        );
-        if (response.ok) {
-          const data = await response.json();
-          console.log(`Fee structures for ${classLevel}:`, data);
-
-          // Find active fee structure (same logic as student dashboard)
-          const activeFeeStructure = data.find((fee: any) => fee.isActive);
-          console.log(
-            `Active fee structure for ${classLevel}:`,
-            activeFeeStructure
+      // Fetch fee structures for all terms (Term 1, Term 2, Term 3) for each grade ID
+      const feePromises = gradeIds.flatMap((gradeId) => {
+        const terms = ["Term 1", "Term 2", "Term 3"];
+        return terms.map(async (term) => {
+          const response = await fetch(
+            `/api/schools/${schoolCode}/fee-structure?term=${term}&year=${currentYear}&gradeId=${gradeId}`
           );
+          if (response.ok) {
+            const data = await response.json();
+            console.log(
+              `Fee structures for grade ID ${gradeId}, ${term}:`,
+              data
+            );
 
-          return activeFeeStructure || null;
-        } else {
-          console.error(
-            `Failed to fetch fee structures for ${classLevel}:`,
-            response.status,
-            response.statusText
-          );
-          return null;
-        }
+            // Find active fee structure
+            const activeFeeStructure = data.find((fee: any) => fee.isActive);
+            console.log(
+              `Active fee structure for grade ID ${gradeId}, ${term}:`,
+              activeFeeStructure
+            );
+
+            return activeFeeStructure || null;
+          } else {
+            console.error(
+              `Failed to fetch fee structures for grade ID ${gradeId}, ${term}:`,
+              response.status,
+              response.statusText
+            );
+            return null;
+          }
+        });
       });
 
       const feeResults = await Promise.all(feePromises);
@@ -364,8 +382,8 @@ export function ParentDashboard({
     }
   };
 
-  // Get fee structure for a specific student (updated to match student dashboard logic)
-  const getStudentFeeStructure = (studentClass: string) => {
+  // Get fee structure for a specific student (updated to use gradeId)
+  const getStudentFeeStructure = (studentGradeId: string) => {
     const currentDate = new Date();
     const currentYear = currentDate.getFullYear();
     const currentMonth = currentDate.getMonth();
@@ -374,10 +392,37 @@ export function ParentDashboard({
     if (currentMonth >= 4 && currentMonth <= 7) currentTerm = "Term 2";
     else if (currentMonth >= 8) currentTerm = "Term 3";
 
+    // First try to find the current term's fee structure
+    const currentTermFee = feeStructures.find(
+      (fee) =>
+        fee.gradeId === studentGradeId &&
+        fee.term === currentTerm &&
+        fee.year === currentYear &&
+        fee.isActive
+    );
+
+    // If current term fee structure exists, return it
+    if (currentTermFee) {
+      return currentTermFee;
+    }
+
+    // Otherwise, return the first available fee structure for this student
     return feeStructures.find(
       (fee) =>
-        fee.classLevel === studentClass &&
-        fee.term === currentTerm &&
+        fee.gradeId === studentGradeId &&
+        fee.year === currentYear &&
+        fee.isActive
+    );
+  };
+
+  // Get all fee structures for a specific student
+  const getStudentAllFeeStructures = (studentGradeId: string) => {
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+
+    return feeStructures.filter(
+      (fee) =>
+        fee.gradeId === studentGradeId &&
         fee.year === currentYear &&
         fee.isActive
     );
@@ -385,9 +430,7 @@ export function ParentDashboard({
 
   // Handle payment modal opening
   const handleOpenPaymentModal = (student: any) => {
-    const feeStructure = getStudentFeeStructure(
-      student.className || student.classLevel
-    );
+    const feeStructure = getStudentFeeStructure(student.gradeId);
     if (!feeStructure) {
       toast({
         title: "Error",
@@ -431,24 +474,48 @@ export function ParentDashboard({
   // Fetch receipts
   const fetchReceipts = async () => {
     try {
-      // This would fetch actual receipts from your API
-      // For now, we'll use placeholder data
-      const mockReceipts = students.map((student, index) => ({
-        id: `receipt-${index}`,
-        student: {
-          name: student.name,
-          className: student.className,
-          admissionNumber: student.admissionNumber,
-        },
-        receiptNumber: `RCP-${Date.now()}-${index}`,
-        paymentDate: new Date().toISOString(),
-        amount: 5000,
-        paymentMethod: "mobile_money",
-        description: "School fees payment",
-      }));
-      setReceipts(mockReceipts);
+      if (students.length === 0) return;
+
+      const currentStudent =
+        students.find((c) => c.id === focusedChildId) || students[0];
+
+      // Fetch real payment history from API
+      const response = await fetch(
+        `/api/schools/${schoolCode}/payments?studentId=${currentStudent.id}`
+      );
+
+      if (response.ok) {
+        const payments = await response.json();
+
+        // Transform payments to receipt format
+        const realReceipts = payments.map((payment: any) => ({
+          id: payment.id,
+          student: {
+            name: payment.student?.user?.name || currentStudent.name,
+            className: payment.student?.class?.name || currentStudent.className,
+            admissionNumber:
+              payment.student?.admissionNumber ||
+              currentStudent.admissionNumber,
+          },
+          receiptNumber: payment.receiptNumber,
+          paymentDate: payment.paymentDate,
+          amount: payment.amount,
+          paymentMethod: payment.paymentMethod,
+          description: payment.description,
+          referenceNumber: payment.referenceNumber,
+          balance: payment.receipt?.balance || 0,
+          balanceCarriedForward: payment.receipt?.balanceCarriedForward || 0,
+        }));
+
+        setReceipts(realReceipts);
+      } else {
+        console.error("Failed to fetch receipts:", response.status);
+        // Fallback to empty array
+        setReceipts([]);
+      }
     } catch (error) {
       console.error("Failed to fetch receipts:", error);
+      setReceipts([]);
     }
   };
 
@@ -573,7 +640,7 @@ Payment Details:
 ${receipt.phoneNumber ? `- Phone Number: ${receipt.phoneNumber}` : ""}
 ${receipt.transactionId ? `- Transaction ID: ${receipt.transactionId}` : ""}
 - Reference: ${receipt.reference}
-- Status: ${receipt.status.toUpperCase()}
+- Status: ${(receipt.status || "completed").toUpperCase()}
 
 Total Amount: ${receipt.currency || "KES"} ${receipt.amount.toLocaleString()}
 
@@ -601,6 +668,45 @@ Thank you for your payment!
       variant: "default",
     });
   };
+
+  // Fetch receipts when focused child changes
+  useEffect(() => {
+    if (students.length > 0 && focusedChildId) {
+      fetchReceipts();
+    }
+  }, [focusedChildId, students]);
+
+  // Fetch receipts when receipts section is selected
+  useEffect(() => {
+    if (selectedSection === "receipts" && students.length > 0) {
+      fetchReceipts();
+    }
+  }, [selectedSection, students]);
+
+  // Fetch student fee summary for all students
+  useEffect(() => {
+    async function fetchStudentFeeSummaries() {
+      if (students.length === 0) return;
+      const summaries: any = {};
+      await Promise.all(
+        students.map(async (student) => {
+          try {
+            const res = await fetch(
+              `/api/schools/${schoolCode}/students/${student.id}/fees`
+            );
+            if (res.ok) {
+              const data = await res.json();
+              summaries[student.id] = data;
+            }
+          } catch (e) {
+            // ignore
+          }
+        })
+      );
+      setStudentFeeSummaries(summaries);
+    }
+    fetchStudentFeeSummaries();
+  }, [students, schoolCode]);
 
   if (isLoading) {
     return (
@@ -755,37 +861,400 @@ Thank you for your payment!
                 </div>
               )}
               {/* Child Overview Panel */}
-              {students.length > 0 && (
-                <ChildOverview
-                  child={
-                    students.find((c) => c.id === focusedChildId) || students[0]
+              {students.length > 0 &&
+                (() => {
+                  const child =
+                    students.find((c) => c.id === focusedChildId) ||
+                    students[0];
+                  // Find the current term
+                  const currentDate = new Date();
+                  const currentYear = currentDate.getFullYear();
+                  const currentMonth = currentDate.getMonth();
+                  let currentTerm = "Term 1";
+                  if (currentMonth >= 4 && currentMonth <= 7)
+                    currentTerm = "Term 2";
+                  else if (currentMonth >= 8) currentTerm = "Term 3";
+                  // Get the outstanding balance for the current term
+                  let outstandingFees = 0;
+                  const feeSummary =
+                    studentFeeSummaries[child.id]?.feeSummary || [];
+                  const currentTermSummary = feeSummary.find(
+                    (f: any) => f.term === currentTerm && f.year === currentYear
+                  );
+                  if (currentTermSummary) {
+                    outstandingFees = currentTermSummary.balance;
                   }
-                  feeStructure={getStudentFeeStructure(
-                    (
-                      students.find((c) => c.id === focusedChildId) ||
-                      students[0]
-                    ).className ||
-                      (
-                        students.find((c) => c.id === focusedChildId) ||
-                        students[0]
-                      ).classLevel
-                  )}
-                />
-              )}
+                  return (
+                    <ChildOverview
+                      child={child}
+                      outstandingFees={outstandingFees}
+                      feeStructure={getStudentFeeStructure(child.gradeId)}
+                    />
+                  );
+                })()}
             </div>
           )}
           {selectedSection === "fees" && (
-            <div>
-              {focusedChildId
-                ? `Fees for child ID: ${focusedChildId}`
-                : "Select a child to view fees."}
+            <div className="max-w-4xl mx-auto">
+              <h2 className="text-2xl font-bold mb-6 text-center">
+                Fee Structure
+              </h2>
+              {students.length === 0 ? (
+                <Card className="mb-6">
+                  <CardContent>No children found.</CardContent>
+                </Card>
+              ) : (
+                (() => {
+                  const child =
+                    students.find((c) => c.id === focusedChildId) ||
+                    students[0];
+                  // Use the real-time fee summary from the backend
+                  const feeSummary =
+                    studentFeeSummaries[child.id]?.feeSummary || [];
+                  const currentDate = new Date();
+                  const currentMonth = currentDate.getMonth();
+                  let currentTerm = "Term 1";
+                  if (currentMonth >= 4 && currentMonth <= 7)
+                    currentTerm = "Term 2";
+                  else if (currentMonth >= 8) currentTerm = "Term 3";
+
+                  return (
+                    <div className="space-y-6">
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>
+                            Fee Details for {child.fullName || child.name}
+                          </CardTitle>
+                          <CardDescription>
+                            {feeSummary.length > 0
+                              ? `${feeSummary.length} fee structure(s) available for ${child.gradeName}`
+                              : "No fee structures found."}
+                          </CardDescription>
+                        </CardHeader>
+                      </Card>
+
+                      {feeSummary.length > 0 ? (
+                        <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3">
+                          {feeSummary.map((fee) => (
+                            <Card
+                              key={fee.term + fee.year}
+                              className={`$
+                                {fee.term === currentTerm
+                                  ? "ring-2 ring-blue-500 bg-blue-50"
+                                  : ""
+                              }`}
+                            >
+                              <CardHeader>
+                                <CardTitle className="flex items-center justify-between">
+                                  <span>{fee.term}</span>
+                                  {fee.term === currentTerm && (
+                                    <Badge
+                                      variant="default"
+                                      className="bg-blue-600"
+                                    >
+                                      Current
+                                    </Badge>
+                                  )}
+                                </CardTitle>
+                                <CardDescription>
+                                  {fee.year} - {child.gradeName}
+                                </CardDescription>
+                              </CardHeader>
+                              <CardContent>
+                                <div className="space-y-2">
+                                  <div className="flex justify-between items-center">
+                                    <span className="font-semibold">
+                                      Total Fee
+                                    </span>
+                                    <span className="text-blue-700 font-bold">
+                                      KES {fee.totalAmount.toLocaleString()}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="font-semibold">Paid</span>
+                                    <span className="text-green-700 font-bold">
+                                      KES{" "}
+                                      {(fee.totalPaid || 0).toLocaleString()}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="font-semibold">
+                                      Outstanding
+                                    </span>
+                                    <span className="text-red-600 font-bold">
+                                      KES {fee.balance.toLocaleString()}
+                                    </span>
+                                  </div>
+                                  {fee.carryForward > 0 && (
+                                    <div className="flex justify-between items-center">
+                                      <span className="font-semibold">
+                                        Carry Forward
+                                      </span>
+                                      <span className="text-orange-600 font-bold">
+                                        KES {fee.carryForward.toLocaleString()}
+                                      </span>
+                                    </div>
+                                  )}
+                                  <div className="flex justify-between items-center mt-2">
+                                    <span className="font-semibold text-sm">
+                                      Status
+                                    </span>
+                                    <span
+                                      className={
+                                        fee.balance === 0
+                                          ? "text-green-600 font-bold text-sm"
+                                          : fee.totalPaid > 0
+                                          ? "text-orange-600 font-bold text-sm"
+                                          : "text-red-600 font-bold text-sm"
+                                      }
+                                    >
+                                      {fee.balance === 0
+                                        ? "Paid"
+                                        : fee.totalPaid > 0
+                                        ? "Partial"
+                                        : "Outstanding"}
+                                    </span>
+                                  </div>
+                                  {/* Payment History */}
+                                  {fee.payments && fee.payments.length > 0 && (
+                                    <div className="mt-2">
+                                      <div className="font-semibold text-xs mb-1">
+                                        Payment History
+                                      </div>
+                                      <ul className="text-xs text-gray-700 space-y-1">
+                                        {fee.payments.map(
+                                          (p: any, idx: number) => (
+                                            <li
+                                              key={p.id || idx}
+                                              className="flex justify-between"
+                                            >
+                                              <span>
+                                                {new Date(
+                                                  p.paymentDate
+                                                ).toLocaleDateString()}{" "}
+                                                -{" "}
+                                                {p.paymentMethod.replace(
+                                                  "_",
+                                                  " "
+                                                )}
+                                              </span>
+                                              <span className="font-bold">
+                                                KES {p.amount.toLocaleString()}
+                                              </span>
+                                            </li>
+                                          )
+                                        )}
+                                      </ul>
+                                    </div>
+                                  )}
+                                  {/* Pay Button */}
+                                  <div className="mt-4">
+                                    {fee.balance === 0 ? (
+                                      <Badge className="bg-green-600">
+                                        Paid
+                                      </Badge>
+                                    ) : (
+                                      <Button
+                                        className="w-full"
+                                        onClick={() => {
+                                          setSelectedStudent(child);
+                                          setSelectedFeeStructure({
+                                            ...fee,
+                                            totalAmount: fee.balance, // Only allow payment of outstanding
+                                          });
+                                          setPaymentModalOpen(true);
+                                        }}
+                                        disabled={fee.balance === 0}
+                                      >
+                                        Pay KES {fee.balance.toLocaleString()}
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      ) : (
+                        <Card>
+                          <CardContent>
+                            <div className="text-gray-500 text-center py-8">
+                              No fee structures available for this child.
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                  );
+                })()
+              )}
             </div>
           )}
           {selectedSection === "receipts" && (
-            <div>
-              {focusedChildId
-                ? `Receipts for child ID: ${focusedChildId}`
-                : "Select a child to view receipts."}
+            <div className="max-w-4xl mx-auto">
+              <h2 className="text-2xl font-bold mb-6 text-center">
+                Payment History & Receipts
+              </h2>
+              {students.length === 0 ? (
+                <Card className="mb-6">
+                  <CardContent>No children found.</CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-6">
+                  {/* Payment Summary Card */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Payment Summary</CardTitle>
+                      <CardDescription>
+                        Payment history for{" "}
+                        {students.find((c) => c.id === focusedChildId)
+                          ?.fullName || students[0].fullName}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="text-center p-4 bg-blue-50 rounded-lg">
+                          <div className="text-2xl font-bold text-blue-600">
+                            {receipts.length}
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            Total Payments
+                          </div>
+                        </div>
+                        <div className="text-center p-4 bg-green-50 rounded-lg">
+                          <div className="text-2xl font-bold text-green-600">
+                            KES{" "}
+                            {receipts
+                              .reduce((sum, receipt) => sum + receipt.amount, 0)
+                              .toLocaleString()}
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            Total Paid
+                          </div>
+                        </div>
+                        <div className="text-center p-4 bg-orange-50 rounded-lg">
+                          <div className="text-2xl font-bold text-orange-600">
+                            {receipts.length > 0
+                              ? new Date(
+                                  receipts[0].paymentDate
+                                ).toLocaleDateString()
+                              : "N/A"}
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            Last Payment
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Payment History Table */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Payment History</CardTitle>
+                      <CardDescription>
+                        Recent payments and receipts
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {receipts.length > 0 ? (
+                        <div className="space-y-4">
+                          {receipts.map((receipt) => (
+                            <div
+                              key={receipt.id}
+                              className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                            >
+                              <div className="flex justify-between items-start mb-2">
+                                <div>
+                                  <h4 className="font-semibold text-lg">
+                                    Receipt #{receipt.receiptNumber}
+                                  </h4>
+                                  <p className="text-sm text-gray-600">
+                                    {receipt.description}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-lg font-bold text-green-600">
+                                    KES {receipt.amount.toLocaleString()}
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    {new Date(
+                                      receipt.paymentDate
+                                    ).toLocaleDateString()}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                <div>
+                                  <span className="font-medium">
+                                    Payment Method:
+                                  </span>
+                                  <p className="capitalize">
+                                    {receipt.paymentMethod.replace("_", " ")}
+                                  </p>
+                                </div>
+                                <div>
+                                  <span className="font-medium">
+                                    Reference:
+                                  </span>
+                                  <p className="text-xs">
+                                    {receipt.referenceNumber}
+                                  </p>
+                                </div>
+                                <div>
+                                  <span className="font-medium">
+                                    Balance After:
+                                  </span>
+                                  <p className="text-red-600">
+                                    KES {receipt.balance.toLocaleString()}
+                                  </p>
+                                </div>
+                                <div>
+                                  <span className="font-medium">
+                                    Balance Before:
+                                  </span>
+                                  <p className="text-gray-600">
+                                    KES{" "}
+                                    {receipt.balanceCarriedForward.toLocaleString()}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="mt-3 flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleDownloadReceipt(receipt)}
+                                >
+                                  <Download className="w-4 h-4 mr-2" />
+                                  Download Receipt
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setSelectedReceipt(receipt)}
+                                >
+                                  <Receipt className="w-4 h-4 mr-2" />
+                                  View Receipt
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-gray-500">
+                          <Receipt className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                          <p>No payment history found for this student.</p>
+                          <p className="text-sm">
+                            Payments will appear here once made.
+                          </p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
             </div>
           )}
           {selectedSection === "performance" && (
