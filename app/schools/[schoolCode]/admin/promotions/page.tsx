@@ -72,6 +72,7 @@ interface Student {
     totalFees: number;
     totalPaid: number;
   };
+  carryForwardArrears?: number;
 }
 
 interface PromotionExclusion {
@@ -481,53 +482,80 @@ export default function PromotionsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {eligibleStudents.map((student) => (
-                      <TableRow key={student.id}>
-                        <TableCell>
-                          <Checkbox
-                            checked={selectedStudents.includes(student.id)}
-                            onCheckedChange={() => toggleStudent(student.id)}
-                          />
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          {student.name}
-                        </TableCell>
-                        <TableCell>{student.admissionNumber}</TableCell>
-                        <TableCell>
-                          <div>
-                            <div className="font-medium">
-                              {student.className}
+                    {eligibleStudents.map((student) => {
+                      // Support multi-year arrears if present
+                      const carryForwardArrears =
+                        student.carryForwardArrears || 0;
+                      const totalOutstanding =
+                        (student.eligibility?.outstandingBalance || 0) +
+                        carryForwardArrears;
+                      return (
+                        <TableRow key={student.id}>
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedStudents.includes(student.id)}
+                              onCheckedChange={() => toggleStudent(student.id)}
+                            />
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {student.name}
+                          </TableCell>
+                          <TableCell>{student.admissionNumber}</TableCell>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium">
+                                {student.className}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                {student.classLevel}
+                              </div>
                             </div>
-                            <div className="text-sm text-gray-500">
-                              {student.classLevel}
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>{getEligibilityBadge(student)}</TableCell>
-                        <TableCell>
-                          {student.eligibility.outstandingBalance > 0 ? (
-                            <div className="text-red-600 font-medium">
-                              KES{" "}
-                              {student.eligibility.outstandingBalance.toLocaleString()}
-                            </div>
-                          ) : (
-                            <div className="text-green-600 font-medium">
-                              No Balance
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => excludeStudent(student)}
-                            disabled={!selectedStudents.includes(student.id)}
-                          >
-                            <XCircle className="w-4 h-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                          </TableCell>
+                          <TableCell>
+                            {totalOutstanding > 0 ? (
+                              <Badge
+                                variant="destructive"
+                                className="bg-red-100 text-red-800"
+                              >
+                                Arrears: KES {totalOutstanding.toLocaleString()}
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-green-100 text-green-800">
+                                Fully Paid
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {totalOutstanding > 0 ? (
+                              <div className="text-red-600 font-medium">
+                                KES {totalOutstanding.toLocaleString()}
+                                {carryForwardArrears > 0 && (
+                                  <div className="text-xs text-yellow-700 mt-1">
+                                    (Includes KES{" "}
+                                    {carryForwardArrears.toLocaleString()} from
+                                    previous years)
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="text-green-600 font-medium">
+                                No Balance
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => excludeStudent(student)}
+                              disabled={!selectedStudents.includes(student.id)}
+                            >
+                              <XCircle className="w-4 h-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>

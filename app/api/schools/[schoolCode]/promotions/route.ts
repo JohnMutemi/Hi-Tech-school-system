@@ -124,6 +124,17 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
     const currentYear = new Date().getFullYear().toString();
     const nextYear = (parseInt(currentYear) + 1).toString();
 
+    let realPromotedBy = promotedBy;
+    if (!realPromotedBy || realPromotedBy === "admin") {
+      const adminUser = await prisma.user.findFirst({
+        where: { role: "admin", schoolId: school.id },
+      });
+      if (!adminUser) {
+        return NextResponse.json({ error: "No admin user found for this school" }, { status: 400 });
+      }
+      realPromotedBy = adminUser.id;
+    }
+
     // Start a transaction
     const result = await prisma.$transaction(async (tx) => {
       const promotionLogs = [];
@@ -152,7 +163,10 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
         );
         
         const totalPaid = currentYearPayments.reduce((sum, payment) => sum + payment.amount, 0);
-        
+
+        // Always define outstandingBalance
+        let outstandingBalance = 0;
+
         // Get fee structure for current grade to calculate total fees
         const currentGrade = student.class?.grade;
         if (currentGrade) {
@@ -165,7 +179,7 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
           });
           
           const totalFees = feeStructures.reduce((sum, fs) => sum + Number(fs.totalAmount), 0);
-          const outstandingBalance = Math.max(0, totalFees - totalPaid);
+          outstandingBalance = Math.max(0, totalFees - totalPaid);
 
           // Create carry-forward entry if there's outstanding balance
           if (outstandingBalance > 0) {
@@ -178,7 +192,7 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
                 referenceNumber: `CF-${currentYear}-${nextYear}`,
                 receiptNumber: `CF-${studentId}-${Date.now()}`,
                 description: `Fee Balance Carried Forward from ${currentYear} to ${nextYear}`,
-                receivedBy: promotedBy,
+                receivedBy: realPromotedBy,
               },
             });
             carryForwardEntries.push(carryForwardEntry);
@@ -218,7 +232,7 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
             toClass,
             fromYear: currentYear,
             toYear: nextYear,
-            promotedBy,
+            promotedBy: realPromotedBy,
             criteria: { 
               type: 'bulk_promotion',
               outstandingBalance: outstandingBalance || 0,

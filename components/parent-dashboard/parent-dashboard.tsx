@@ -996,6 +996,10 @@ Thank you for your payment!
                   // Use the real-time fee summary from the backend
                   const feeSummary =
                     studentFeeSummaries[child.id]?.feeSummary || [];
+                  const carryForwardArrears =
+                    studentFeeSummaries[child.id]?.carryForwardArrears || 0;
+                  const carryForwardBreakdown =
+                    studentFeeSummaries[child.id]?.carryForwardBreakdown || [];
                   const currentDate = new Date();
                   const currentMonth = currentDate.getMonth();
                   let currentTerm = "Term 1";
@@ -1017,6 +1021,34 @@ Thank you for your payment!
                           </CardDescription>
                         </CardHeader>
                       </Card>
+
+                      {/* Multi-year arrears/carry-forward alert */}
+                      {carryForwardArrears > 0 && (
+                        <div className="p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded-lg mb-4">
+                          <div className="font-semibold text-yellow-800 mb-1">
+                            Outstanding from Previous Years:{" "}
+                            <span className="text-red-600 font-bold">
+                              KES {carryForwardArrears.toLocaleString()}
+                            </span>
+                          </div>
+                          {carryForwardBreakdown.length > 0 && (
+                            <ul className="text-sm text-yellow-700 ml-4 list-disc">
+                              {carryForwardBreakdown.map((item: any) => (
+                                <li key={item.year}>
+                                  {item.year}:{" "}
+                                  <span className="font-bold">
+                                    KES {item.outstanding.toLocaleString()}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                          <div className="text-xs text-yellow-700 mt-2">
+                            This amount must be cleared in addition to current
+                            year fees.
+                          </div>
+                        </div>
+                      )}
 
                       {feeSummary.length > 0 ? (
                         <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3">

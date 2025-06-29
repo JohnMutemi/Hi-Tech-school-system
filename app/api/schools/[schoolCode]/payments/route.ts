@@ -174,11 +174,11 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
     }
 
     // --- Carry-Forward Payment Logic ---
-    // 1. Fetch all unpaid or partially paid terms for the student, ordered by year and term
+    // 1. Fetch all unpaid or partially paid terms for the student, ordered by year and term (oldest first)
     const allTermStructures = await prisma.termlyFeeStructure.findMany({
       where: {
         gradeId: student.class?.gradeId,
-        year: { gte: parseInt(academicYear) }, // current and future years
+        year: { lte: parseInt(academicYear) }, // all years up to and including current
         isActive: true
       },
       orderBy: [

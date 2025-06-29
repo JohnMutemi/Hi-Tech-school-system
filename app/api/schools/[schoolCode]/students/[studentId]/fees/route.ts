@@ -129,6 +129,60 @@ export async function GET(
       carryForward = carryToNext;
     }
 
+    // Fetch all term fee structures for this grade (all years)
+    const allTermStructures = await prisma.termlyFeeStructure.findMany({
+      where: {
+        gradeId: student.class?.gradeId,
+        isActive: true
+      },
+      orderBy: {
+        year: 'asc',
+      }
+    });
+
+    // Group fee structures by year
+    const feeStructuresByYear = {};
+    for (const fs of allTermStructures) {
+      if (!feeStructuresByYear[fs.year]) feeStructuresByYear[fs.year] = [];
+      feeStructuresByYear[fs.year].push(fs);
+    }
+
+    // Group payments by year
+    const paymentsByYear = {};
+    for (const payment of payments) {
+      // Try to extract year from description
+      let yearMatch = payment.description?.match(/\d{4}/);
+      let year = yearMatch ? parseInt(yearMatch[0]) : new Date(payment.paymentDate).getFullYear();
+      if (!paymentsByYear[year]) paymentsByYear[year] = [];
+      paymentsByYear[year].push(payment);
+    }
+
+    // Calculate arrears for all years before current year
+    let carryForwardArrears = 0;
+    let carryForwardBreakdown = [];
+    for (const yearStr of Object.keys(feeStructuresByYear)) {
+      const year = parseInt(yearStr);
+      if (year >= currentYear) continue;
+      const yearFeeStructures = feeStructuresByYear[year];
+      const yearPayments = paymentsByYear[year] || [];
+      let yearOutstanding = 0;
+      for (const fs of yearFeeStructures) {
+        const termPayments = yearPayments.filter(payment =>
+          payment.description?.includes(fs.term) && payment.description?.includes(fs.year.toString())
+        );
+        const totalPaidForTerm = termPayments.reduce((sum, payment) => sum + payment.amount, 0);
+        const totalAmount = parseFloat(fs.totalAmount.toString());
+        let balance = totalAmount - totalPaidForTerm;
+        if (balance > 0) {
+          yearOutstanding += balance;
+        }
+      }
+      if (yearOutstanding > 0) {
+        carryForwardArrears += yearOutstanding;
+        carryForwardBreakdown.push({ year, outstanding: yearOutstanding });
+      }
+    }
+
     return NextResponse.json({
       student: {
         id: student.id,
@@ -139,6 +193,8 @@ export async function GET(
       },
       feeSummary,
       totalOutstanding,
+      carryForwardArrears,
+      carryForwardBreakdown,
       paymentHistory: payments.map(payment => ({
         id: payment.id,
         amount: payment.amount,
