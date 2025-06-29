@@ -43,6 +43,8 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
       return NextResponse.json({ error: 'School not found' }, { status: 404 });
     }
 
+    const schoolName = school.name;
+
     console.log('School found:', school.id);
 
     // Find the student
@@ -252,7 +254,22 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
     return NextResponse.json({
       success: true,
       message: 'Payment processed successfully',
-      payment: payment,
+      payment: {
+        ...payment,
+        studentId: student.id,
+        studentName: student.user.name,
+        className: student.class?.name,
+        admissionNumber: student.admissionNumber,
+        term,
+        academicYear,
+        referenceNumber: payment.referenceNumber,
+        receiptNumber: payment.receiptNumber,
+        paymentMethod: payment.paymentMethod,
+        amount: payment.amount,
+        paymentDate: payment.paymentDate,
+        description: payment.description,
+        schoolName,
+      },
       updatedTerms,
       carryForward
     }, { status: 201 });
@@ -285,6 +302,8 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       return NextResponse.json({ error: 'School not found' }, { status: 404 });
     }
 
+    const schoolName = school.name;
+
     // Fetch payments for the student
     const payments = await prisma.payment.findMany({
       where: {
@@ -311,7 +330,22 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       }
     });
 
-    return NextResponse.json(payments);
+    return NextResponse.json(payments.map(payment => ({
+      ...payment,
+      studentId: payment.student?.id,
+      studentName: payment.student?.user?.name,
+      className: payment.student?.class?.name,
+      admissionNumber: payment.student?.admissionNumber,
+      term: payment.description?.match(/Term \d/)?[0] : undefined,
+      academicYear: payment.description?.match(/\d{4}/)?[0] : undefined,
+      referenceNumber: payment.referenceNumber,
+      receiptNumber: payment.receiptNumber,
+      paymentMethod: payment.paymentMethod,
+      amount: payment.amount,
+      paymentDate: payment.paymentDate,
+      description: payment.description,
+      schoolName,
+    })));
 
   } catch (error) {
     console.error('Error fetching payments:', error);

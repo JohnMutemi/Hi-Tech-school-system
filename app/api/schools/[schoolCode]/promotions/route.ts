@@ -357,6 +357,7 @@ async function getEligibleStudents(schoolId: string, classLevel: string) {
     throw new Error(`Class ${classLevel} not found`);
   }
 
+  const currentYear = new Date().getFullYear();
   const students = await prisma.student.findMany({
     where: {
       schoolId,
@@ -372,7 +373,10 @@ async function getEligibleStudents(schoolId: string, classLevel: string) {
       },
       payments: {
         where: {
-          description: { in: ['Term 1', 'Term 2', 'Term 3'] },
+          paymentDate: {
+            gte: new Date(`${currentYear}-01-01`),
+            lte: new Date(`${currentYear}-12-31`),
+          },
         },
       },
     },
@@ -388,7 +392,6 @@ async function getEligibleStudents(schoolId: string, classLevel: string) {
   });
 
   // Get fee structures for the current grade and year
-  const currentYear = new Date().getFullYear();
   const feeStructures = await prisma.termlyFeeStructure.findMany({
     where: {
       gradeId: targetClass.grade.id,
@@ -397,16 +400,41 @@ async function getEligibleStudents(schoolId: string, classLevel: string) {
     },
   });
 
+  // Sort fee structures by term order
+  const termOrder = { 'Term 1': 1, 'Term 2': 2, 'Term 3': 3 };
+  const sortedFeeStructures = [...feeStructures].sort((a, b) => termOrder[a.term] - termOrder[b.term]);
+
   return students.map(student => {
     const paidTerms = student.payments.map(p => p.description);
     const allTermsPaid = ['Term 1', 'Term 2', 'Term 3'].every(term => 
       paidTerms.includes(term)
     );
 
-    // Calculate total fees and outstanding balance
-    const totalFees = feeStructures.reduce((sum, fs) => sum + Number(fs.totalAmount), 0);
+    // Carry-forward aware outstanding calculation
+    let carryForward = 0;
+    let totalOutstanding = 0;
+    for (const fs of sortedFeeStructures) {
+      const termPayments = student.payments.filter(p =>
+        p.description?.includes(fs.term) && p.description?.includes(fs.year.toString())
+      );
+      // Debug log
+      console.log(`Student: ${student.user?.name}, Term: ${fs.term} ${fs.year}`);
+      console.log('  All payment descriptions:', student.payments.map(p => p.description));
+      console.log('  Matched payments for this term:', termPayments.map(p => ({ amount: p.amount, description: p.description })));
+      const totalPaidForTerm = termPayments.reduce((sum, p) => sum + p.amount, 0);
+      const totalPaid = totalPaidForTerm + carryForward;
+      let balance = Number(fs.totalAmount) - totalPaid;
+      if (balance < 0) {
+        carryForward = -balance;
+        balance = 0;
+      } else {
+        carryForward = 0;
+      }
+      totalOutstanding += Math.max(balance, 0);
+    }
+
+    const totalFees = sortedFeeStructures.reduce((sum, fs) => sum + Number(fs.totalAmount), 0);
     const totalPaid = student.payments.reduce((sum, payment) => sum + payment.amount, 0);
-    const outstandingBalance = Math.max(0, totalFees - totalPaid);
 
     return {
       ...student,
@@ -418,7 +446,7 @@ async function getEligibleStudents(schoolId: string, classLevel: string) {
         feeStatus: allTermsPaid ? 'paid' : 'unpaid',
         allTermsPaid,
         meetsCriteria: !criteria || (allTermsPaid && (!criteria.minGrade || true)), // Simplified for now
-        outstandingBalance,
+        outstandingBalance: totalOutstanding,
         totalFees,
         totalPaid,
       },

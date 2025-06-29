@@ -87,29 +87,47 @@ export async function GET(
     });
 
     // Map fee structures to payment history for better display
-    const feeSummary = currentTermStructures.map(structure => {
+    // Sort terms chronologically (by year, then Term 1, 2, 3)
+    const termOrder = { 'Term 1': 1, 'Term 2': 2, 'Term 3': 3 };
+    const sortedTermStructures = currentTermStructures.sort((a, b) => {
+      if (a.year !== b.year) return a.year - b.year;
+      return termOrder[a.term] - termOrder[b.term];
+    });
+
+    let carryForward = 0;
+    const feeSummary = [];
+    for (const structure of sortedTermStructures) {
       // Find payments for this term
       const termPayments = payments.filter(payment => 
-        payment.description?.includes(structure.term) || 
+        payment.description?.includes(structure.term) &&
         payment.description?.includes(structure.year.toString())
       );
-      
-      const totalPaid = termPayments.reduce((sum, payment) => sum + payment.amount, 0);
+      const totalPaidForTerm = termPayments.reduce((sum, payment) => sum + payment.amount, 0);
       const totalAmount = parseFloat(structure.totalAmount.toString());
-      const balance = Math.max(0, totalAmount - totalPaid);
-      
-      return {
+      // Add carryForward from previous term
+      const totalPaid = totalPaidForTerm + carryForward;
+      let balance = totalAmount - totalPaid;
+      let carryToNext = 0;
+      if (balance < 0) {
+        carryToNext = -balance; // overpaid, carry forward
+        balance = 0;
+      } else {
+        carryToNext = 0;
+      }
+      feeSummary.push({
         term: structure.term,
         year: structure.year,
         totalAmount: totalAmount,
         breakdown: structure.breakdown,
         dueDate: structure.dueDate,
-        totalPaid: totalPaid,
-        balance: balance,
-        status: balance === 0 ? 'paid' : balance < totalAmount ? 'partial' : 'pending',
+        totalPaid: Math.min(totalPaid, totalAmount),
+        balance: Math.max(balance, 0),
+        carryForward: carryToNext,
+        status: balance === 0 ? 'paid' : totalPaid > 0 ? 'partial' : 'pending',
         payments: termPayments
-      };
-    });
+      });
+      carryForward = carryToNext;
+    }
 
     return NextResponse.json({
       student: {

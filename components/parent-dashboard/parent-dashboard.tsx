@@ -445,8 +445,30 @@ export function ParentDashboard({
     setPaymentModalOpen(true);
   };
 
+  // Fetch student fee summary for all students
+  async function fetchStudentFeeSummaries() {
+    if (students.length === 0) return;
+    const summaries: any = {};
+    await Promise.all(
+      students.map(async (student) => {
+        try {
+          const res = await fetch(
+            `/api/schools/${schoolCode}/students/${student.id}/fees`
+          );
+          if (res.ok) {
+            const data = await res.json();
+            summaries[student.id] = data;
+          }
+        } catch (e) {
+          // ignore
+        }
+      })
+    );
+    setStudentFeeSummaries(summaries);
+  }
+
   // Handle payment success
-  const handlePaymentSuccess = (payment: any) => {
+  const handlePaymentSuccess = async (payment: any) => {
     toast({
       title: "Payment Successful",
       description: `Payment of KES ${
@@ -455,6 +477,9 @@ export function ParentDashboard({
       } has been processed successfully.`,
       variant: "default",
     });
+
+    // Refresh student fee summaries to ensure receipt uses up-to-date data
+    await fetchStudentFeeSummaries();
 
     // Close modal
     setPaymentModalOpen(false);
@@ -505,6 +530,7 @@ export function ParentDashboard({
           referenceNumber: payment.referenceNumber,
           balance: payment.receipt?.balance || 0,
           balanceCarriedForward: payment.receipt?.balanceCarriedForward || 0,
+          schoolName: payment.schoolName,
         }));
 
         setReceipts(realReceipts);
@@ -621,33 +647,113 @@ export function ParentDashboard({
   };
 
   const handleDownloadReceipt = (receipt: any) => {
+    // Fallbacks for missing fields
+    const studentId =
+      receipt.student?.admissionNumber || receipt.studentId || "N/A";
+    const studentName = receipt.student?.name || receipt.studentName || "N/A";
+    const className = receipt.student?.className || receipt.className || "N/A";
+    // Try to extract term and year from description if missing
+    let term = receipt.term;
+    let academicYear = receipt.academicYear;
+    if (!term || !academicYear) {
+      const desc = receipt.description || "";
+      const termMatch = desc.match(/Term \d/);
+      const yearMatch = desc.match(/\d{4}/);
+      if (!term && termMatch) term = termMatch[0];
+      if (!academicYear && yearMatch) academicYear = yearMatch[0];
+    }
+    const reference = receipt.referenceNumber || receipt.reference || "N/A";
+    const receiptNumber = receipt.receiptNumber || "N/A";
+    const paymentMethod = (receipt.paymentMethod || "").toUpperCase();
+    const amount = receipt.amount || 0;
+    const paymentDate = receipt.paymentDate || receipt.issuedAt;
+    const status = (receipt.status || "completed").toUpperCase();
+    const schoolName = receipt.schoolName || "Demo School";
+    const issuedBy = receipt.issuedBy || "School System";
+    const currency = receipt.currency || "KES";
+
+    // Use real-time fee summary for this student and term
+    let feeSummary = studentFeeSummaries?.[studentId]?.feeSummary || [];
+    let termSummary = feeSummary.find(
+      (f: any) => f.term === term && String(f.year) === String(academicYear)
+    );
+    const balance = termSummary ? termSummary.balance : receipt.balance ?? 0;
+    const carryForward = termSummary
+      ? termSummary.carryForward
+      : receipt.carryForward ?? receipt.balanceCarriedForward ?? 0;
+
+    // Outstanding balance display logic for receipt
+    let outstandingDisplay = "";
+    if (typeof balance === "number" && balance < 0) {
+      outstandingDisplay = `0 (KES ${Math.abs(
+        balance
+      ).toLocaleString()} Carry Forward)`;
+    } else {
+      outstandingDisplay = `${currency} ${balance.toLocaleString()}`;
+    }
+
+    // Historical balance after this payment (from receipt/payment)
+    let historicalBalance = receipt.balance;
+    let historicalDisplay = "";
+    if (typeof historicalBalance === "number" && historicalBalance < 0) {
+      historicalDisplay = `0 (KES ${Math.abs(
+        historicalBalance
+      ).toLocaleString()} Carry Forward)`;
+    } else {
+      historicalDisplay = `${currency} ${
+        historicalBalance?.toLocaleString?.() ?? "0"
+      }`;
+    }
+
+    // Fee breakdown for the term (if available)
+    let breakdownDisplay = "";
+    if (termSummary && termSummary.breakdown) {
+      breakdownDisplay = "\nFee Breakdown:";
+      Object.entries(termSummary.breakdown).forEach(([key, value]) => {
+        if (Number(value) > 0) {
+          breakdownDisplay += `\n- ${
+            key.charAt(0).toUpperCase() + key.slice(1)
+          }: KES ${(value as number).toLocaleString()}`;
+        }
+      });
+    }
+
+    // Fee status for the term (if available)
+    const statusDisplay = termSummary
+      ? termSummary.status.charAt(0).toUpperCase() + termSummary.status.slice(1)
+      : "N/A";
+
     const receiptContent = `
 Payment Receipt
 
-School: ${receipt.schoolName || "Demo School"}
-Receipt #: ${receipt.receiptNumber}
+School: ${schoolName}
+Receipt #: ${receiptNumber}
 
 Student Information:
-- Student ID: ${receipt.studentId}
-- Student Name: ${receipt.student.name}
-- Class: ${receipt.student.className}
+- Student ID: ${studentId}
+- Student Name: ${studentName}
+- Class: ${className}
 
 Payment Details:
 - Fee Type: ${receipt.feeType || receipt.description}
-- Term: ${receipt.term}
-- Academic Year: ${receipt.academicYear}
-- Payment Method: ${receipt.paymentMethod.toUpperCase()}
-${receipt.phoneNumber ? `- Phone Number: ${receipt.phoneNumber}` : ""}
-${receipt.transactionId ? `- Transaction ID: ${receipt.transactionId}` : ""}
-- Reference: ${receipt.reference}
-- Status: ${(receipt.status || "completed").toUpperCase()}
+- Term: ${term}
+- Academic Year: ${academicYear}
+- Payment Method: ${paymentMethod}
+- Reference: ${reference}
+- Status: ${status}
 
-Total Amount: ${receipt.currency || "KES"} ${receipt.amount.toLocaleString()}
+${breakdownDisplay}
 
-Issued on: ${new Date(
-      receipt.paymentDate || receipt.issuedAt
-    ).toLocaleDateString()}
-Issued by: ${receipt.issuedBy || "School System"}
+Fee Status: ${statusDisplay}
+
+Total Amount: ${currency} ${amount.toLocaleString()}
+Outstanding Balance After This Payment: ${historicalDisplay}
+Current Outstanding Balance: ${outstandingDisplay}
+
+Note: 'Outstanding Balance After This Payment' shows the balance immediately after this payment. 'Current Outstanding Balance' reflects all payments to date for this term.
+
+Issued on: ${new Date(paymentDate).toLocaleDateString()}
+Issued by: ${issuedBy}
 
 Thank you for your payment!
     `;
@@ -656,7 +762,7 @@ Thank you for your payment!
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `receipt-${receipt.receiptNumber}.txt`;
+    a.download = `receipt-${receiptNumber}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -683,28 +789,7 @@ Thank you for your payment!
     }
   }, [selectedSection, students]);
 
-  // Fetch student fee summary for all students
   useEffect(() => {
-    async function fetchStudentFeeSummaries() {
-      if (students.length === 0) return;
-      const summaries: any = {};
-      await Promise.all(
-        students.map(async (student) => {
-          try {
-            const res = await fetch(
-              `/api/schools/${schoolCode}/students/${student.id}/fees`
-            );
-            if (res.ok) {
-              const data = await res.json();
-              summaries[student.id] = data;
-            }
-          } catch (e) {
-            // ignore
-          }
-        })
-      );
-      setStudentFeeSummaries(summaries);
-    }
     fetchStudentFeeSummaries();
   }, [students, schoolCode]);
 
