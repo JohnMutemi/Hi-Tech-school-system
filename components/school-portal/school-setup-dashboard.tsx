@@ -218,7 +218,15 @@ export function SchoolSetupDashboard({
         );
         if (res.ok) {
           const data = await res.json();
-          setClasses(data);
+          // Map the API data to frontend format
+          const mappedClasses = data.map((cls: any) => ({
+            ...cls,
+            classTeacherId: cls.teacherId, // Map teacherId to classTeacherId
+            level: cls.level || "Primary", // Default level if not provided
+            capacity: cls.capacity || 30, // Default capacity if not provided
+            currentStudents: cls.currentStudents || 0, // Default currentStudents if not provided
+          }));
+          setClasses(mappedClasses);
         }
       } catch (error) {
         console.error("Failed to fetch classes", error);
@@ -397,7 +405,7 @@ export function SchoolSetupDashboard({
       const refreshedData = await getSchool(schoolData.schoolCode);
       if (refreshedData) {
         setSchoolData(refreshedData);
-        setTeachers(refreshedData.teachers || []);
+        // setTeachers(refreshedData.teachers || []); // Only update teachers from the API, not from local storage
         // setStudents(refreshedData.students || []); // Only update students from the API, not from local storage
         setSubjects(refreshedData.subjects || []);
         setClasses(refreshedData.classes || []);
@@ -839,12 +847,21 @@ export function SchoolSetupDashboard({
       return;
     }
     try {
+      // Map the frontend fields to the correct database fields
+      const apiData = {
+        name: newClass.name,
+        academicYear:
+          newClass.academicYear || new Date().getFullYear().toString(),
+        teacherId: newClass.classTeacherId, // Map classTeacherId to teacherId
+        gradeId: newClass.gradeId,
+      };
+
       const response = await fetch(
         `/api/schools/${schoolData.schoolCode}/classes`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...newClass, gradeId: newClass.gradeId }),
+          body: JSON.stringify(apiData),
         }
       );
       if (!response.ok) {
@@ -852,7 +869,16 @@ export function SchoolSetupDashboard({
         throw new Error(errorData.error || "Failed to create class");
       }
       const createdClass = await response.json();
-      setClasses([...classes, createdClass]);
+
+      // Map the returned data back to the frontend format
+      const mappedClass = {
+        ...createdClass,
+        classTeacherId: createdClass.teacherId, // Map teacherId back to classTeacherId
+        level: newClass.level, // Keep the level from the original data
+        capacity: newClass.capacity, // Keep the capacity from the original data
+      };
+
+      setClasses([...classes, mappedClass]);
       setNewClass({});
       handleStepComplete("subjects");
       toast({
@@ -870,12 +896,25 @@ export function SchoolSetupDashboard({
 
   const updateClass = async (updatedClass: SchoolClass) => {
     try {
+      // Map the frontend fields to the correct database fields
+      const apiData = {
+        id: updatedClass.id,
+        name: updatedClass.name,
+        academicYear:
+          updatedClass.academicYear || new Date().getFullYear().toString(),
+        teacherId: updatedClass.classTeacherId, // Map classTeacherId to teacherId
+        gradeId: updatedClass.gradeId,
+      };
+
+      console.log("Updating class with data:", apiData);
+      console.log("Original class data:", updatedClass);
+
       const response = await fetch(
         `/api/schools/${schoolData.schoolCode}/classes`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(updatedClass),
+          body: JSON.stringify(apiData),
         }
       );
       if (!response.ok) {
@@ -883,8 +922,21 @@ export function SchoolSetupDashboard({
         throw new Error(errorData.error || "Failed to update class");
       }
       const returnedClass = await response.json();
+
+      console.log("API returned class:", returnedClass);
+
+      // Map the returned data back to the frontend format
+      const mappedClass = {
+        ...returnedClass,
+        classTeacherId: returnedClass.teacherId, // Map teacherId back to classTeacherId
+        level: updatedClass.level, // Keep the level from the original data
+        capacity: updatedClass.capacity, // Keep the capacity from the original data
+      };
+
+      console.log("Mapped class for frontend:", mappedClass);
+
       setClasses(
-        classes.map((c) => (c.id === returnedClass.id ? returnedClass : c))
+        classes.map((c) => (c.id === mappedClass.id ? mappedClass : c))
       );
       setEditingItem(null);
       toast({
@@ -892,6 +944,7 @@ export function SchoolSetupDashboard({
         description: "Class updated successfully!",
       });
     } catch (error: any) {
+      console.error("Error updating class:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to update class.",
@@ -2437,12 +2490,12 @@ export function SchoolSetupDashboard({
                                 {student.name}
                               </TableCell>
                               <TableCell>{student.admissionNumber}</TableCell>
-                              <TableCell>
+                              <TableCell className="whitespace-nowrap">
                                 {student.className || (
                                   <span className="text-red-500">Missing</span>
                                 )}
                               </TableCell>
-                              <TableCell>
+                              <TableCell className="whitespace-nowrap">
                                 {student.gradeName || (
                                   <span className="text-red-500">Missing</span>
                                 )}
@@ -2450,7 +2503,7 @@ export function SchoolSetupDashboard({
                               <TableCell>
                                 {student.parentName || "N/A"}
                               </TableCell>
-                              <TableCell>
+                              <TableCell className="whitespace-nowrap">
                                 {student.parentPhone || "N/A"}
                               </TableCell>
                               <TableCell>
@@ -3229,6 +3282,13 @@ export function SchoolSetupDashboard({
                             )}
                           </div>
                           <div className="flex space-x-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setViewingItem(cls)}
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
                             <Dialog>
                               <DialogTrigger asChild>
                                 <Button
@@ -3534,6 +3594,255 @@ export function SchoolSetupDashboard({
         </Tabs>
       </div>
 
+      {/* Class View Dialog */}
+      <Dialog
+        open={!!viewingItem && activeTab === "subjects"}
+        onOpenChange={() => setViewingItem(null)}
+      >
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <School className="w-5 h-5 text-blue-600" />
+              Class Details
+            </DialogTitle>
+            <DialogDescription>
+              Complete information for {viewingItem?.name}
+            </DialogDescription>
+          </DialogHeader>
+          {viewingItem && (
+            <div className="space-y-6">
+              {/* Class Basic Information */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <h4 className="font-semibold text-blue-900 mb-2">
+                    Class Information
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Class Name:</span>
+                      <span className="font-medium">{viewingItem.name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Level:</span>
+                      <span className="font-medium">{viewingItem.level}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Academic Year:</span>
+                      <span className="font-medium">
+                        {viewingItem.academicYear}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Status:</span>
+                      <Badge
+                        variant={viewingItem.isActive ? "default" : "secondary"}
+                      >
+                        {viewingItem.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <h4 className="font-semibold text-green-900 mb-2">
+                    Student Statistics
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Current Students:</span>
+                      <span className="font-medium text-green-700">
+                        {
+                          students.filter((s) => s.classId === viewingItem.id)
+                            .length
+                        }
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Capacity:</span>
+                      <span className="font-medium">
+                        {viewingItem.capacity || "Unlimited"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Available Spots:</span>
+                      <span className="font-medium text-blue-700">
+                        {viewingItem.capacity
+                          ? Math.max(
+                              0,
+                              viewingItem.capacity -
+                                students.filter(
+                                  (s) => s.classId === viewingItem.id
+                                ).length
+                            )
+                          : "Unlimited"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Utilization:</span>
+                      <span className="font-medium">
+                        {viewingItem.capacity
+                          ? `${Math.round(
+                              (students.filter(
+                                (s) => s.classId === viewingItem.id
+                              ).length /
+                                viewingItem.capacity) *
+                                100
+                            )}%`
+                          : "N/A"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-purple-50 p-4 rounded-lg">
+                  <h4 className="font-semibold text-purple-900 mb-2">
+                    Class Teacher
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    {viewingItem.classTeacherId ? (
+                      <>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Teacher:</span>
+                          <span className="font-medium">
+                            {viewingItem.teacher?.name ||
+                              teachers.find(
+                                (t) => t.id === viewingItem.classTeacherId
+                              )?.name ||
+                              "Unknown"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Email:</span>
+                          <span className="font-medium text-purple-700">
+                            {viewingItem.teacher?.email ||
+                              teachers.find(
+                                (t) => t.id === viewingItem.classTeacherId
+                              )?.email ||
+                              "N/A"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Phone:</span>
+                          <span className="font-medium">
+                            {viewingItem.teacher?.phone ||
+                              teachers.find(
+                                (t) => t.id === viewingItem.classTeacherId
+                              )?.phone ||
+                              "N/A"}
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-center text-gray-500 py-2">
+                        <Users className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                        <p>No teacher assigned</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Students List */}
+              <div className="bg-white border rounded-lg">
+                <div className="p-4 border-b bg-gray-50">
+                  <h4 className="font-semibold text-gray-900 flex items-center gap-2">
+                    <GraduationCap className="w-4 h-4" />
+                    Students in {viewingItem.name}
+                    <Badge variant="outline" className="ml-2">
+                      {
+                        students.filter((s) => s.classId === viewingItem.id)
+                          .length
+                      }{" "}
+                      students
+                    </Badge>
+                  </h4>
+                </div>
+                <div className="p-4">
+                  {students.filter((s) => s.classId === viewingItem.id)
+                    .length === 0 ? (
+                    <div className="text-center py-8">
+                      <GraduationCap className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-600">
+                        No students assigned to this class yet.
+                      </p>
+                      <p className="text-sm text-gray-500 mt-2">
+                        Students will appear here when they are assigned to this
+                        class.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Admission No.</TableHead>
+                            <TableHead>Parent Name</TableHead>
+                            <TableHead>Parent Phone</TableHead>
+                            <TableHead>Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {students
+                            .filter((s) => s.classId === viewingItem.id)
+                            .map((student) => (
+                              <TableRow key={student.id}>
+                                <TableCell className="font-medium">
+                                  {student.name}
+                                </TableCell>
+                                <TableCell>{student.admissionNumber}</TableCell>
+                                <TableCell>
+                                  {student.parentName || "N/A"}
+                                </TableCell>
+                                <TableCell>
+                                  {student.parentPhone || "N/A"}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge
+                                    variant={
+                                      student.status === "active"
+                                        ? "default"
+                                        : "secondary"
+                                    }
+                                  >
+                                    {student.status}
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="flex gap-4 justify-end pt-4 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setViewingItem(null);
+                    setActiveTab("students");
+                  }}
+                >
+                  <Users className="w-4 h-4 mr-2" />
+                  Manage Students
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setEditingItem(viewingItem)}
+                >
+                  <Edit className="w-4 h-4 mr-2" />
+                  Edit Class
+                </Button>
+                <Button onClick={() => setViewingItem(null)}>Close</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Add a modal/dialog to show credentials after adding a teacher */}
       <Dialog
         open={showTeacherCredentials}
@@ -3668,154 +3977,144 @@ export function SchoolSetupDashboard({
       </Dialog>
 
       {/* Parent Credentials Modal */}
-      {showParentCredentials && lastParentCredentials && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
-            <h2 className="text-2xl font-bold text-blue-700 mb-4">
+      <Dialog
+        open={showParentCredentials}
+        onOpenChange={setShowParentCredentials}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-blue-700">
               Parent Login Credentials
-            </h2>
-            <div className="mb-4 text-gray-700 text-sm">
+            </DialogTitle>
+            <DialogDescription>
               Share these credentials with the parent for their first login.
               <br />
               <span className="text-blue-700 font-semibold">
                 Default password for all new parents is <b>parent123</b>.
               </span>
-            </div>
-            <div className="bg-gray-100 rounded p-4 text-left text-xs mb-4 space-y-2">
-              <div className="flex justify-between">
-                <b>Admission Number:</b>
-                <span className="font-mono">
-                  {lastParentCredentials.admissionNumber}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <b>Parent Phone:</b>
-                <span className="font-mono">
-                  {lastParentCredentials.parentPhone}
-                </span>
-              </div>
-              {lastParentCredentials.parentEmail && (
+            </DialogDescription>
+          </DialogHeader>
+          {lastParentCredentials && (
+            <div className="space-y-4">
+              <div className="bg-gray-100 rounded p-4 text-left text-xs space-y-2">
                 <div className="flex justify-between">
-                  <b>Parent Email:</b>
+                  <b>Admission Number:</b>
                   <span className="font-mono">
-                    {lastParentCredentials.parentEmail}
+                    {lastParentCredentials.admissionNumber}
                   </span>
                 </div>
-              )}
-              <div className="flex justify-between">
-                <b>Password:</b>
-                <span className="font-mono text-blue-700">parent123</span>
+                <div className="flex justify-between">
+                  <b>Parent Phone:</b>
+                  <span className="font-mono">
+                    {lastParentCredentials.parentPhone}
+                  </span>
+                </div>
+                {lastParentCredentials.parentEmail && (
+                  <div className="flex justify-between">
+                    <b>Parent Email:</b>
+                    <span className="font-mono">
+                      {lastParentCredentials.parentEmail}
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <b>Password:</b>
+                  <span className="font-mono text-blue-700">parent123</span>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    console.log(
+                      "Parent credentials debug:",
+                      lastParentCredentials
+                    );
+                    const url = `/schools/${
+                      schoolData.schoolCode
+                    }/parent/login?phone=${encodeURIComponent(
+                      lastParentCredentials.parentPhone
+                    )}&password=${encodeURIComponent(
+                      lastParentCredentials.tempPassword
+                    )}`;
+                    console.log("Generated URL:", url);
+                    console.log(
+                      "Phone value:",
+                      lastParentCredentials.parentPhone
+                    );
+                    console.log(
+                      "Password value:",
+                      lastParentCredentials.tempPassword
+                    );
+                  }}
+                >
+                  🔍 Debug Parent Credentials
+                </Button>
+                <Button
+                  asChild
+                  className="w-full bg-green-600 hover:bg-green-700"
+                >
+                  <Link
+                    href={`/schools/${
+                      schoolData.schoolCode
+                    }/parent/login?phone=${encodeURIComponent(
+                      lastParentCredentials.parentPhone
+                    )}&password=${encodeURIComponent(
+                      lastParentCredentials.tempPassword
+                    )}`}
+                  >
+                    🚀 Quick Parent Login (Auto-fill)
+                  </Link>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    console.log(
+                      "Parent credentials for copy:",
+                      lastParentCredentials
+                    );
+                    const credentials = `Admission Number: ${
+                      lastParentCredentials.admissionNumber
+                    }\nParent Phone: ${
+                      lastParentCredentials.parentPhone
+                    }\nParent Email: ${
+                      lastParentCredentials.parentEmail || "N/A"
+                    }\nPassword: ${lastParentCredentials.tempPassword}`;
+                    navigator.clipboard.writeText(credentials);
+                    toast({
+                      title: "Copied!",
+                      description: "Parent credentials copied to clipboard",
+                      variant: "default",
+                    });
+                  }}
+                >
+                  📋 Copy Parent Credentials
+                </Button>
+                <Button asChild variant="outline" className="w-full">
+                  <Link href={`/schools/${schoolData.schoolCode}/parent/login`}>
+                    📝 Manual Parent Login
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" className="w-full">
+                  <Link
+                    href={`/schools/${schoolData.schoolCode}/students/login`}
+                  >
+                    📚 Go to Student Login
+                  </Link>
+                </Button>
+              </div>
+
+              <div className="text-xs text-gray-500 text-center">
+                💡 Tip: Use "Quick Parent Login" to automatically fill the
+                parent login form
               </div>
             </div>
-            <div className="flex flex-col gap-2 mb-4">
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => {
-                  console.log(
-                    "Parent credentials debug:",
-                    lastParentCredentials
-                  );
-                  const url = `/schools/${
-                    schoolData.schoolCode
-                  }/parent/login?phone=${encodeURIComponent(
-                    lastParentCredentials.parentPhone
-                  )}&password=${encodeURIComponent(
-                    lastParentCredentials.tempPassword
-                  )}`;
-                  console.log("Generated URL:", url);
-                  console.log(
-                    "Phone value:",
-                    lastParentCredentials.parentPhone
-                  );
-                  console.log(
-                    "Password value:",
-                    lastParentCredentials.tempPassword
-                  );
-                }}
-              >
-                🔍 Debug Parent Credentials
-              </Button>
-              <Button
-                asChild
-                className="w-full bg-green-600 hover:bg-green-700"
-              >
-                <Link
-                  href={`/schools/${
-                    schoolData.schoolCode
-                  }/parent/login?phone=${encodeURIComponent(
-                    lastParentCredentials.parentPhone
-                  )}&password=${encodeURIComponent(
-                    lastParentCredentials.tempPassword
-                  )}`}
-                >
-                  🚀 Quick Parent Login (Auto-fill)
-                </Link>
-              </Button>
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => {
-                  console.log(
-                    "Parent credentials for copy:",
-                    lastParentCredentials
-                  );
-                  const credentials = `Admission Number: ${
-                    lastParentCredentials.admissionNumber
-                  }\nParent Phone: ${
-                    lastParentCredentials.parentPhone
-                  }\nParent Email: ${
-                    lastParentCredentials.parentEmail || "N/A"
-                  }\nPassword: ${lastParentCredentials.tempPassword}`;
-                  navigator.clipboard.writeText(credentials);
-                  toast({
-                    title: "Copied!",
-                    description: "Parent credentials copied to clipboard",
-                    variant: "default",
-                  });
-                }}
-              >
-                📋 Copy Parent Credentials
-              </Button>
-              <Link
-                href={`/schools/${schoolData.schoolCode}/parent/login`}
-                legacyBehavior
-              >
-                <a className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition">
-                  📝 Manual Parent Login
-                </a>
-              </Link>
-              <Link
-                href={`/schools/${schoolData.schoolCode}/students/login`}
-                legacyBehavior
-              >
-                <a className="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition">
-                  📚 Go to Student Login
-                </a>
-              </Link>
-            </div>
-            <div className="text-xs text-gray-500 mb-4">
-              💡 Tip: Use "Quick Parent Login" to automatically fill the parent
-              login form
-            </div>
-            <a
-              href="#"
-              className="text-blue-600 underline mb-4 block"
-              onClick={(e) => {
-                e.preventDefault(); /* future: trigger SMS/email */
-              }}
-            >
-              Parent Access (future: send via SMS/email)
-            </a>
-            <button
-              className="mt-2 px-4 py-2 bg-gray-300 text-gray-800 rounded"
-              onClick={() => setShowParentCredentials(false)}
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Bulk Import Dialog */}
       <Dialog
@@ -3919,21 +4218,35 @@ export function SchoolSetupDashboard({
                   </TableHeader>
                   <TableBody>
                     {parsedStudents.map((student, index) => {
-                      const classObj = classes.find((cls) => cls.name === student.className);
-                      const gradeObj = classObj && grades.find((g) => g.id === classObj.gradeId);
+                      const classObj = classes.find(
+                        (cls) => cls.name === student.className
+                      );
+                      const gradeObj =
+                        classObj &&
+                        grades.find((g) => g.id === classObj.gradeId);
                       return (
                         <TableRow key={index}>
                           <TableCell className="font-medium">
-                            {student.name || <span className="text-red-500">Missing</span>}
+                            {student.name || (
+                              <span className="text-red-500">Missing</span>
+                            )}
                           </TableCell>
                           <TableCell>
-                            {student.email || <span className="text-red-500">Missing</span>}
+                            {student.email || (
+                              <span className="text-red-500">Missing</span>
+                            )}
                           </TableCell>
                           <TableCell>
-                            {student.className || <span className="text-red-500">Missing</span>}
+                            {student.className || (
+                              <span className="text-red-500">Missing</span>
+                            )}
                           </TableCell>
                           <TableCell>
-                            {gradeObj ? gradeObj.name : <span className="text-gray-400">Unknown</span>}
+                            {gradeObj ? (
+                              gradeObj.name
+                            ) : (
+                              <span className="text-gray-400">Unknown</span>
+                            )}
                           </TableCell>
                           <TableCell>{student.parentName || "N/A"}</TableCell>
                           <TableCell>{student.parentPhone || "N/A"}</TableCell>
@@ -3976,7 +4289,7 @@ export function SchoolSetupDashboard({
                         s.parentName &&
                         s.parentPhone
                     ).length
-                  }{' '}
+                  }{" "}
                   of {parsedStudents.length} students are valid
                 </div>
                 <div className="flex gap-2">
