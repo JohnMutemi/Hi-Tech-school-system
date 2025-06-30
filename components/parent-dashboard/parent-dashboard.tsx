@@ -152,6 +152,19 @@ function extractGrade(classNameOrLevel: string) {
   return match ? match[0] : classNameOrLevel;
 }
 
+// Helper to get the next unpaid/current term for a student
+function getCurrentTermForStudent(feeSummary: any[]) {
+  const termOrder = ["Term 1", "Term 2", "Term 3"];
+  // Sort by year and then by term order
+  const sorted = [...feeSummary].sort((a, b) => {
+    if (a.year !== b.year) return a.year - b.year;
+    return termOrder.indexOf(a.term) - termOrder.indexOf(b.term);
+  });
+  // Find the first term with balance > 0
+  const current = sorted.find((f) => f.balance > 0);
+  return current || sorted[sorted.length - 1]; // If all paid, return last term
+}
+
 export function ParentDashboard({
   schoolCode,
   parentId,
@@ -161,6 +174,7 @@ export function ParentDashboard({
 }) {
   const [parent, setParent] = useState<any>(null);
   const [students, setStudents] = useState<any[]>([]);
+  const [schoolName, setSchoolName] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("children");
   const [avatarUploading, setAvatarUploading] = useState(false);
@@ -209,6 +223,13 @@ export function ParentDashboard({
           schoolCode,
           parentId,
         });
+
+        // Fetch school name
+        const schoolRes = await fetch(`/api/schools/${schoolCode}`);
+        if (schoolRes.ok) {
+          const schoolData = await schoolRes.json();
+          setSchoolName(schoolData.name);
+        }
 
         // If parentId is provided, fetch specific parent data
         if (parentId) {
@@ -453,7 +474,8 @@ export function ParentDashboard({
       students.map(async (student) => {
         try {
           const res = await fetch(
-            `/api/schools/${schoolCode}/students/${student.id}/fees`
+            `/api/schools/${schoolCode}/students/${student.id}/fees`,
+            { cache: 'no-store' } // Prevent caching
           );
           if (res.ok) {
             const data = await res.json();
@@ -464,7 +486,8 @@ export function ParentDashboard({
         }
       })
     );
-    setStudentFeeSummaries(summaries);
+    // Force a re-render by creating a new object reference
+    setStudentFeeSummaries({ ...summaries });
   }
 
   // Handle payment success
@@ -478,10 +501,11 @@ export function ParentDashboard({
       variant: "default",
     });
 
-    // Refresh student fee summaries to ensure receipt uses up-to-date data
+    // Refresh student fee summaries and receipts
     await fetchStudentFeeSummaries();
+    await fetchReceipts();
 
-    // Close modal
+    // Close modal and reset state
     setPaymentModalOpen(false);
     setSelectedStudent(null);
     setSelectedFeeStructure(null);
@@ -506,7 +530,8 @@ export function ParentDashboard({
 
       // Fetch real payment history from API
       const response = await fetch(
-        `/api/schools/${schoolCode}/payments?studentId=${currentStudent.id}`
+        `/api/schools/${schoolCode}/payments?studentId=${currentStudent.id}`,
+        { cache: 'no-store' } // Prevent caching
       );
 
       if (response.ok) {
@@ -517,7 +542,7 @@ export function ParentDashboard({
           id: payment.id,
           student: {
             name: payment.student?.user?.name || currentStudent.name,
-            className: payment.student?.class?.name || currentStudent.className,
+            className: payment.student?.class?.name || currentStudent.gradeName,
             admissionNumber:
               payment.student?.admissionNumber ||
               currentStudent.admissionNumber,
@@ -528,12 +553,15 @@ export function ParentDashboard({
           paymentMethod: payment.paymentMethod,
           description: payment.description,
           referenceNumber: payment.referenceNumber,
-          balance: payment.receipt?.balance || 0,
-          balanceCarriedForward: payment.receipt?.balanceCarriedForward || 0,
+          balance: payment.receipt?.balance,
+          balanceCarriedForward: payment.receipt?.balanceCarriedForward,
           schoolName: payment.schoolName,
+          term: payment.term,
+          academicYear: payment.academicYear,
         }));
 
-        setReceipts(realReceipts);
+        // Force a re-render by creating a new array reference
+        setReceipts([...realReceipts]);
       } else {
         console.error("Failed to fetch receipts:", response.status);
         // Fallback to empty array
@@ -647,132 +675,112 @@ export function ParentDashboard({
   };
 
   const handleDownloadReceipt = (receipt: any) => {
-    // Fallbacks for missing fields
-    const studentId =
-      receipt.student?.admissionNumber || receipt.studentId || "N/A";
-    const studentName = receipt.student?.name || receipt.studentName || "N/A";
-    const className = receipt.student?.className || receipt.className || "N/A";
-    // Try to extract term and year from description if missing
-    let term = receipt.term;
-    let academicYear = receipt.academicYear;
-    if (!term || !academicYear) {
-      const desc = receipt.description || "";
-      const termMatch = desc.match(/Term \d/);
-      const yearMatch = desc.match(/\d{4}/);
-      if (!term && termMatch) term = termMatch[0];
-      if (!academicYear && yearMatch) academicYear = yearMatch[0];
-    }
-    const reference = receipt.referenceNumber || receipt.reference || "N/A";
+    // --- Direct Data Extraction ---
+    const schoolName = receipt.schoolName || "School Name";
     const receiptNumber = receipt.receiptNumber || "N/A";
-    const paymentMethod = (receipt.paymentMethod || "").toUpperCase();
-    const amount = receipt.amount || 0;
-    const paymentDate = receipt.paymentDate || receipt.issuedAt;
-    const status = (receipt.status || "completed").toUpperCase();
-    const schoolName = receipt.schoolName || "Demo School";
-    const issuedBy = receipt.issuedBy || "School System";
-    const currency = receipt.currency || "KES";
+    const studentName = receipt.student?.name || "N/A";
+    const admissionNumber = receipt.student?.admissionNumber || "N/A";
+    const className = receipt.student?.className || "N/A";
+    
+    // Use the direct properties from the receipt object
+    const term = receipt.term || "N/A";
+    const academicYear = receipt.academicYear || "N/A";
+    const cleanDescription = (receipt.description || "Fee Payment").split(' - ')[0];
 
-    // Use real-time fee summary for this student and term
-    let feeSummary = studentFeeSummaries?.[studentId]?.feeSummary || [];
-    let termSummary = feeSummary.find(
-      (f: any) => f.term === term && String(f.year) === String(academicYear)
-    );
-    const balance = termSummary ? termSummary.balance : receipt.balance ?? 0;
-    const carryForward = termSummary
-      ? termSummary.carryForward
-      : receipt.carryForward ?? receipt.balanceCarriedForward ?? 0;
+    const paymentDate = new Date(receipt.paymentDate).toLocaleDateString();
+    const paymentMethod = (receipt.paymentMethod || "").replace("_", " ");
+    const referenceNumber = receipt.referenceNumber || "N/A";
+    const balanceBefore = receipt.balanceCarriedForward;
+    const amountPaid = receipt.amount;
+    const balanceAfter = receipt.balance;
 
-    // Outstanding balance display logic for receipt
-    let outstandingDisplay = "";
-    if (typeof balance === "number" && balance < 0) {
-      outstandingDisplay = `0 (KES ${Math.abs(
-        balance
-      ).toLocaleString()} Carry Forward)`;
-    } else {
-      outstandingDisplay = `${currency} ${balance.toLocaleString()}`;
-    }
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Receipt #${receiptNumber}</title>
+          <style>
+              body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f4f5; }
+              .receipt-container { max-width: 800px; margin: auto; background: #fff; border: 1px solid #e2e8f0; padding: 20px 40px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); }
+              .header { text-align: center; border-bottom: 2px solid #1e293b; padding-bottom: 15px; margin-bottom: 25px; }
+              .header h1 { margin: 0; font-size: 2em; color: #1e293b; }
+              .header p { margin: 5px 0 0; color: #475569; }
+              h3 { font-size: 1.1em; color: #334155; border-bottom: 1px solid #cbd5e1; padding-bottom: 5px; margin-top: 30px; }
+              .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 20px; font-size: 0.9em; }
+              .details-grid div { padding: 4px 0; }
+              .details-grid .label { font-weight: 600; color: #475569; }
+              .summary { margin-top: 30px; border-top: 2px solid #1e293b; padding-top: 15px; }
+              .summary-item { display: flex; justify-content: space-between; padding: 8px 0; font-size: 1em; }
+              .summary-item .label { font-weight: 600; }
+              .total { font-size: 1.2em; font-weight: bold; color: #1e293b; }
+              .footer { text-align: center; margin-top: 40px; font-size: 0.8em; color: #64748b; }
+              .print-button { display: block; width: 100%; padding: 12px; margin-top: 30px; background-color: #2563eb; color: white; border: none; border-radius: 6px; font-size: 1em; cursor: pointer; }
+              @media print {
+                  body { margin: 0; padding: 0; background-color: #fff; }
+                  .receipt-container { box-shadow: none; border: none; margin: 0; padding: 0; }
+                  .print-button { display: none; }
+              }
+          </style>
+      </head>
+      <body>
+          <div class="receipt-container">
+              <div class="header">
+                  <h1>${schoolName}</h1>
+                  <p>Payment Receipt</p>
+                  <p><strong>Receipt #:</strong> ${receiptNumber}</p>
+              </div>
 
-    // Historical balance after this payment (from receipt/payment)
-    let historicalBalance = receipt.balance;
-    let historicalDisplay = "";
-    if (typeof historicalBalance === "number" && historicalBalance < 0) {
-      historicalDisplay = `0 (KES ${Math.abs(
-        historicalBalance
-      ).toLocaleString()} Carry Forward)`;
-    } else {
-      historicalDisplay = `${currency} ${
-        historicalBalance?.toLocaleString?.() ?? "0"
-      }`;
-    }
+              <h3>Student Information</h3>
+              <div class="details-grid">
+                  <div><span class="label">Student Name:</span> ${studentName}</div>
+                  <div><span class="label">Admission No:</span> ${admissionNumber}</div>
+                  <div><span class="label">Class:</span> ${className}</div>
+              </div>
 
-    // Fee breakdown for the term (if available)
-    let breakdownDisplay = "";
-    if (termSummary && termSummary.breakdown) {
-      breakdownDisplay = "\nFee Breakdown:";
-      Object.entries(termSummary.breakdown).forEach(([key, value]) => {
-        if (Number(value) > 0) {
-          breakdownDisplay += `\n- ${
-            key.charAt(0).toUpperCase() + key.slice(1)
-          }: KES ${(value as number).toLocaleString()}`;
-        }
-      });
-    }
+              <h3>Payment Details</h3>
+              <div class="details-grid">
+                   <div><span class="label">Description:</span> ${cleanDescription}</div>
+                   <div><span class="label">Term:</span> ${term}</div>
+                   <div><span class="label">Year:</span> ${academicYear}</div>
+                   <div><span class="label">Payment Date:</span> ${paymentDate}</div>
+                   <div><span class="label">Payment Method:</span> ${paymentMethod}</div>
+                   <div><span class="label">Reference:</span> ${referenceNumber}</div>
+              </div>
 
-    // Fee status for the term (if available)
-    const statusDisplay = termSummary
-      ? termSummary.status.charAt(0).toUpperCase() + termSummary.status.slice(1)
-      : "N/A";
+              <div class="summary">
+                  <div class="summary-item">
+                      <span class="label">Term Balance Before Payment:</span>
+                      <span>KES ${balanceBefore != null ? balanceBefore.toLocaleString() : '0.00'}</span>
+                  </div>
+                  <div class="summary-item">
+                      <span class="label">Amount Paid:</span>
+                      <span style="font-weight: bold;">KES ${amountPaid != null ? amountPaid.toLocaleString() : '0.00'}</span>
+                  </div>
+                  <div class="summary-item total">
+                      <span>Term Balance After Payment:</span>
+                      <span>KES ${balanceAfter != null ? balanceAfter.toLocaleString() : '0.00'}</span>
+                  </div>
+              </div>
 
-    const receiptContent = `
-Payment Receipt
-
-School: ${schoolName}
-Receipt #: ${receiptNumber}
-
-Student Information:
-- Student ID: ${studentId}
-- Student Name: ${studentName}
-- Class: ${className}
-
-Payment Details:
-- Fee Type: ${receipt.feeType || receipt.description}
-- Term: ${term}
-- Academic Year: ${academicYear}
-- Payment Method: ${paymentMethod}
-- Reference: ${reference}
-- Status: ${status}
-
-${breakdownDisplay}
-
-Fee Status: ${statusDisplay}
-
-Total Amount: ${currency} ${amount.toLocaleString()}
-Outstanding Balance After This Payment: ${historicalDisplay}
-Current Outstanding Balance: ${outstandingDisplay}
-
-Note: 'Outstanding Balance After This Payment' shows the balance immediately after this payment. 'Current Outstanding Balance' reflects all payments to date for this term.
-
-Issued on: ${new Date(paymentDate).toLocaleDateString()}
-Issued by: ${issuedBy}
-
-Thank you for your payment!
+              <div class="footer">
+                  <p>Issued by School System on ${new Date().toLocaleDateString()}</p>
+                  <p>Thank you for your payment!</p>
+              </div>
+              <button class="print-button" onclick="window.print()">Print or Save as PDF</button>
+          </div>
+      </body>
+      </html>
     `;
 
-    const blob = new Blob([receiptContent], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `receipt-${receiptNumber}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    toast({
-      title: "Receipt Downloaded",
-      description: "Receipt has been downloaded successfully.",
-      variant: "default",
-    });
+    const receiptWindow = window.open('', '_blank');
+    if (receiptWindow) {
+        receiptWindow.document.write(htmlContent);
+        receiptWindow.document.close();
+    } else {
+        toast({ title: "Popup Blocked", description: "Please allow popups to view the receipt." });
+    }
   };
 
   // Fetch receipts when focused child changes
@@ -951,24 +959,9 @@ Thank you for your payment!
                   const child =
                     students.find((c) => c.id === focusedChildId) ||
                     students[0];
-                  // Find the current term
-                  const currentDate = new Date();
-                  const currentYear = currentDate.getFullYear();
-                  const currentMonth = currentDate.getMonth();
-                  let currentTerm = "Term 1";
-                  if (currentMonth >= 4 && currentMonth <= 7)
-                    currentTerm = "Term 2";
-                  else if (currentMonth >= 8) currentTerm = "Term 3";
-                  // Get the outstanding balance for the current term
-                  let outstandingFees = 0;
-                  const feeSummary =
-                    studentFeeSummaries[child.id]?.feeSummary || [];
-                  const currentTermSummary = feeSummary.find(
-                    (f: any) => f.term === currentTerm && f.year === currentYear
-                  );
-                  if (currentTermSummary) {
-                    outstandingFees = currentTermSummary.balance;
-                  }
+                  const feeSummary = studentFeeSummaries[child.id]?.feeSummary || [];
+                  const currentTermSummary = getCurrentTermForStudent(feeSummary);
+                  const outstandingFees = currentTermSummary ? currentTermSummary.balance : 0;
                   return (
                     <ChildOverview
                       child={child}
@@ -1051,8 +1044,9 @@ Thank you for your payment!
                       )}
 
                       {feeSummary.length > 0 ? (
+                        <>
                         <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3">
-                          {feeSummary.map((fee) => (
+                          {feeSummary.map((fee: any) => (
                             <Card
                               key={fee.term + fee.year}
                               className={`$
@@ -1064,14 +1058,6 @@ Thank you for your payment!
                               <CardHeader>
                                 <CardTitle className="flex items-center justify-between">
                                   <span>{fee.term}</span>
-                                  {fee.term === currentTerm && (
-                                    <Badge
-                                      variant="default"
-                                      className="bg-blue-600"
-                                    >
-                                      Current
-                                    </Badge>
-                                  )}
                                 </CardTitle>
                                 <CardDescription>
                                   {fee.year} - {child.gradeName}
@@ -1148,9 +1134,7 @@ Thank you for your payment!
                                               <span>
                                                 {new Date(
                                                   p.paymentDate
-                                                ).toLocaleDateString()}{" "}
-                                                -{" "}
-                                                {p.paymentMethod.replace(
+                                                ).toLocaleDateString()} {"-"} {p.paymentMethod.replace(
                                                   "_",
                                                   " "
                                                 )}
@@ -1166,24 +1150,18 @@ Thank you for your payment!
                                   )}
                                   {/* Pay Button */}
                                   <div className="mt-4">
-                                    {fee.balance === 0 ? (
-                                      <Badge className="bg-green-600">
-                                        Paid
-                                      </Badge>
+                                    {fee.balance <= 0 ? (
+                                      <span className="text-green-600 font-bold">Paid in Full</span>
                                     ) : (
                                       <Button
-                                        className="w-full"
+                                        variant="outline"
                                         onClick={() => {
                                           setSelectedStudent(child);
-                                          setSelectedFeeStructure({
-                                            ...fee,
-                                            totalAmount: fee.balance, // Only allow payment of outstanding
-                                          });
+                                          setSelectedFeeStructure(fee);
                                           setPaymentModalOpen(true);
                                         }}
-                                        disabled={fee.balance === 0}
                                       >
-                                        Pay KES {fee.balance.toLocaleString()}
+                                        Pay Now
                                       </Button>
                                     )}
                                   </div>
@@ -1192,6 +1170,16 @@ Thank you for your payment!
                             </Card>
                           ))}
                         </div>
+                        {/* Total Outstanding (This Year) */}
+                        <div className="flex justify-end mt-4">
+                          <div className="bg-gray-100 rounded-lg px-6 py-3 text-right">
+                            <span className="font-semibold mr-2">Total Outstanding (This Year):</span>
+                            <span className="text-red-600 font-bold">
+                              KES {feeSummary.reduce((sum: number, fee: any) => sum + (fee.balance || 0), 0).toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                        </>
                       ) : (
                         <Card>
                           <CardContent>
@@ -1292,7 +1280,7 @@ Thank you for your payment!
                                 </div>
                                 <div className="text-right">
                                   <div className="text-lg font-bold text-green-600">
-                                    KES {receipt.amount.toLocaleString()}
+                                    KES {receipt.amount != null ? receipt.amount.toLocaleString() : '0'}
                                   </div>
                                   <div className="text-xs text-gray-500">
                                     {new Date(
@@ -1324,7 +1312,7 @@ Thank you for your payment!
                                     Balance After:
                                   </span>
                                   <p className="text-red-600">
-                                    KES {receipt.balance.toLocaleString()}
+                                    KES {receipt.balance != null ? receipt.balance.toLocaleString() : '0'}
                                   </p>
                                 </div>
                                 <div>
@@ -1332,8 +1320,7 @@ Thank you for your payment!
                                     Balance Before:
                                   </span>
                                   <p className="text-gray-600">
-                                    KES{" "}
-                                    {receipt.balanceCarriedForward.toLocaleString()}
+                                    KES {receipt.balanceCarriedForward != null ? receipt.balanceCarriedForward.toLocaleString() : '0'}
                                   </p>
                                 </div>
                               </div>
@@ -1401,6 +1388,26 @@ Thank you for your payment!
           term={selectedFeeStructure.term}
           academicYear={selectedFeeStructure.year.toString()}
           onReceiptGenerated={handleReceiptGenerated}
+        />
+      )}
+
+      {selectedReceipt && (
+        <ReceiptView
+          receipt={selectedReceipt}
+          studentName={
+            students.find((s) => s.id === selectedReceipt.studentId)?.user
+              ?.name || "N/A"
+          }
+          studentClass={
+            students.find((s) => s.id === selectedReceipt.studentId)?.class
+              ?.name || "N/A"
+          }
+          admissionNumber={
+            students.find((s) => s.id === selectedReceipt.studentId)
+              ?.admissionNumber || "N/A"
+          }
+          schoolName={schoolName}
+          onClose={() => setSelectedReceipt(null)}
         />
       )}
     </div>

@@ -144,6 +144,9 @@ model Payment {
   receivedBy      String
   createdAt       DateTime @default(now())
 
+  term            String
+  academicYear    Int
+
   student Student  @relation(fields: [studentId], references: [id])
   receipt Receipt?
 }

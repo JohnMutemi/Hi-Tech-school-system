@@ -81,200 +81,99 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
 
     console.log('Creating payment record...');
 
-    // Create payment record
-    const payment = await prisma.payment.create({
+    // Create the payment record
+    const newPayment = await prisma.payment.create({
       data: {
         studentId: student.id,
         amount: parseFloat(amount),
         paymentDate: new Date(),
         paymentMethod: paymentMethod === 'mpesa' ? 'mobile_money' : paymentMethod,
         referenceNumber: referenceNumber || `PAY-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        receiptNumber,
+        receiptNumber: `RCP-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
         description: description || `${feeType} - ${term} ${academicYear}`,
-        receivedBy: 'Parent Portal' // In a real system, this would be the logged-in user
-      }
-    });
-
-    console.log('Payment created:', payment.id);
-
-    console.log('Creating receipt record...');
-
-    // Create receipt record
-    const receipt = await prisma.receipt.create({
-      data: {
-        paymentId: payment.id,
-        studentId: student.id,
-        receiptNumber,
-        amount: parseFloat(amount),
-        balance: 0, // This will be calculated based on fee structure
-        balanceCarriedForward: 0, // This will be calculated based on previous balance
-        paymentDate: new Date(),
-        format: 'A4'
-      }
-    });
-
-    console.log('Receipt created:', receipt.id);
-
-    // Update or create student fee record
-    // First, find the fee structure for this student's grade and term
-    console.log('Looking for fee structure:', {
-      gradeId: student.class?.gradeId,
-      term,
-      year: parseInt(academicYear)
-    });
-
-    const feeStructure = await prisma.termlyFeeStructure.findFirst({
-      where: {
-        gradeId: student.class?.gradeId,
+        receivedBy: 'Parent Portal',
         term,
-        year: parseInt(academicYear),
-        isActive: true
+        academicYear: parseInt(academicYear, 10),
       }
     });
 
-    if (feeStructure) {
-      console.log('Fee structure found:', {
-        id: feeStructure.id,
-        term: feeStructure.term,
-        year: feeStructure.year,
-        totalAmount: feeStructure.totalAmount
-      });
+    console.log('Payment created:', newPayment.id);
+    
+    // --- New Payment Allocation & Receipt Logic ---
 
-      // For now, we'll skip the StudentFee creation since it references the wrong model
-      // We'll update the receipt with the fee structure information
-      const totalAmount = parseFloat(feeStructure.totalAmount.toString());
-      const newBalance = Math.max(0, totalAmount - parseFloat(amount));
-
-      console.log('Calculating balance:', {
-        totalAmount,
-        paymentAmount: parseFloat(amount),
-        newBalance
-      });
-
-      // Update receipt with correct balance
-      await prisma.receipt.update({
-        where: { id: receipt.id },
-        data: {
-          balance: newBalance,
-          balanceCarriedForward: totalAmount
-        }
-      });
-
-      console.log(`Payment processed: Amount ${amount}, Total Fee ${totalAmount}, New Balance ${newBalance}`);
-    } else {
-      console.log('No fee structure found for this student/term combination');
-      // Update receipt with basic information
-      await prisma.receipt.update({
-        where: { id: receipt.id },
-        data: {
-          balance: 0,
-          balanceCarriedForward: parseFloat(amount)
-        }
-      });
-    }
-
-    // --- Carry-Forward Payment Logic ---
-    // 1. Fetch all unpaid or partially paid terms for the student, ordered by year and term (oldest first)
+    // 1. Fetch all applicable term structures for the student's grade
     const allTermStructures = await prisma.termlyFeeStructure.findMany({
-      where: {
-        gradeId: student.class?.gradeId,
-        year: { lte: parseInt(academicYear) }, // all years up to and including current
-        isActive: true
-      },
-      orderBy: [
-        { year: 'asc' },
-        { term: 'asc' },
-      ]
+        where: { gradeId: student.class?.gradeId, isActive: true },
+        orderBy: [{ year: 'asc' }, { term: 'asc' }],
     });
 
-    // Get all payments for this student for the relevant years
+    // 2. Fetch all payments for the student (including the new one)
     const allPayments = await prisma.payment.findMany({
-      where: {
-        studentId: student.id,
-        paymentDate: { gte: new Date(`${academicYear}-01-01`) }
-      }
+        where: { studentId: student.id },
+        orderBy: { paymentDate: 'asc' },
     });
 
-    // Calculate paid and outstanding for each term
-    let paymentLeft = parseFloat(amount);
-    let carryForward = 0;
-    let updatedReceipts = [];
-    let updatedTerms = [];
-    for (const termStruct of allTermStructures) {
-      const termPayments = allPayments.filter(p =>
-        p.description?.includes(termStruct.term) &&
-        p.description?.includes(termStruct.year.toString())
-      );
-      const paid = termPayments.reduce((sum, p) => sum + p.amount, 0);
-      const total = parseFloat(termStruct.totalAmount.toString());
-      let outstanding = Math.max(0, total - paid);
-      let applied = 0;
-      if (paymentLeft > 0 && outstanding > 0) {
-        applied = Math.min(paymentLeft, outstanding);
-        outstanding -= applied;
-        paymentLeft -= applied;
-      }
-      // If this is the term being paid now, update the receipt
-      if (termStruct.term === term && termStruct.year === parseInt(academicYear)) {
-        await prisma.receipt.update({
-          where: { id: receipt.id },
-          data: {
-            balance: outstanding,
-            balanceCarriedForward: total - outstanding
-          }
-        });
-        updatedReceipts.push({ term: termStruct.term, year: termStruct.year, balance: outstanding });
-      }
-      updatedTerms.push({
-        term: termStruct.term,
-        year: termStruct.year,
-        total,
-        paid: paid + applied,
-        outstanding,
-        status: outstanding === 0 ? 'paid' : (paid + applied > 0 ? 'partial' : 'pending'),
-        carryForward: 0 // will update below
-      });
-    }
-    // Handle carry-forward for overpayment
-    if (paymentLeft > 0 && updatedTerms.length > 0) {
-      for (let i = 0; i < updatedTerms.length; i++) {
-        if (updatedTerms[i].outstanding === 0) continue;
-        const apply = Math.min(paymentLeft, updatedTerms[i].outstanding);
-        updatedTerms[i].paid += apply;
-        updatedTerms[i].outstanding -= apply;
-        updatedTerms[i].status = updatedTerms[i].outstanding === 0 ? 'paid' : (updatedTerms[i].paid > 0 ? 'partial' : 'pending');
-        paymentLeft -= apply;
-        if (paymentLeft <= 0) break;
-      }
-      carryForward = paymentLeft;
-    }
-    // Update receipts for all terms if needed (optional: create new receipts for carry-forward payments)
-    // ...
-    // Return updated fee summary
-    return NextResponse.json({
-      success: true,
-      message: 'Payment processed successfully',
-      payment: {
-        ...payment,
-        studentId: student.id,
-        studentName: student.user.name,
-        className: student.class?.name,
-        admissionNumber: student.admissionNumber,
-        term,
-        academicYear,
-        referenceNumber: payment.referenceNumber,
-        receiptNumber: payment.receiptNumber,
-        paymentMethod: payment.paymentMethod,
-        amount: payment.amount,
-        paymentDate: payment.paymentDate,
-        description: payment.description,
-        schoolName,
-      },
-      updatedTerms,
-      carryForward
-    }, { status: 201 });
+    // 3. Define a function to allocate payments and get term balances
+    const calculateTermBalances = (payments: typeof allPayments, structures: typeof allTermStructures) => {
+        let totalPaidPool = payments.reduce((sum, p) => sum + p.amount, 0);
+        
+        const termBalances = structures.map(s => ({
+            term: s.term,
+            year: s.year,
+            due: parseFloat(s.totalAmount.toString()),
+            paid: 0,
+            balance: parseFloat(s.totalAmount.toString()),
+        }));
 
-  } catch (error) {
+        for (const term of termBalances) {
+            if (totalPaidPool <= 0) break;
+            const amountToPay = Math.min(totalPaidPool, term.balance);
+            term.paid += amountToPay;
+            term.balance -= amountToPay;
+            totalPaidPool -= amountToPay;
+        }
+        
+        // If there's a credit balance, represent it as a negative balance on the last term
+        if (totalPaidPool > 0 && termBalances.length > 0) {
+            termBalances[termBalances.length - 1].balance -= totalPaidPool;
+        }
+
+        return termBalances;
+    };
+
+    // 4. Calculate balance BEFORE this payment (for the specific term)
+    const paymentsBefore = allPayments.filter(p => p.id !== newPayment.id);
+    const balancesBefore = calculateTermBalances(paymentsBefore, allTermStructures);
+    const termStateBefore = balancesBefore.find(b => b.term === term && b.year === parseInt(academicYear));
+    const balanceBeforePayment = termStateBefore ? termStateBefore.balance : 0;
+
+    // 5. Calculate balance AFTER this payment (for the specific term)
+    const balancesAfter = calculateTermBalances(allPayments, allTermStructures);
+    const termStateAfter = balancesAfter.find(b => b.term === term && b.year === parseInt(academicYear));
+    const balanceAfterPayment = termStateAfter ? termStateAfter.balance : 0;
+
+    // 6. Create the receipt with correct, snapshot-in-time data
+    const receipt = await prisma.receipt.create({
+        data: {
+            paymentId: newPayment.id,
+            studentId: student.id,
+            receiptNumber: newPayment.receiptNumber,
+            amount: newPayment.amount,
+            balance: balanceAfterPayment,
+            balanceCarriedForward: balanceBeforePayment,
+            paymentDate: newPayment.paymentDate,
+            format: 'A4'
+        }
+    });
+
+    console.log('Receipt created with accurate balances:', receipt.id);
+
+    return NextResponse.json({
+      message: 'Payment processed successfully',
+      payment: { ...newPayment, receipt }
+    }, { status: 201 });
+    
+  } catch (error: any) {
     console.error('Error processing payment:', error);
     console.error('Error stack:', error.stack);
     return NextResponse.json({ error: 'Failed to process payment' }, { status: 500 });
@@ -283,72 +182,37 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
 
 // GET: Fetch payments for a student
 export async function GET(request: NextRequest, { params }: { params: { schoolCode: string } }) {
-  try {
-    const schoolCode = params.schoolCode.toLowerCase();
-    const { searchParams } = new URL(request.url);
-    
-    const studentId = searchParams.get('studentId');
+    try {
+        const { searchParams } = new URL(request.url);
+        const studentId = searchParams.get('studentId');
 
-    if (!studentId) {
-      return NextResponse.json({ error: 'Student ID is required' }, { status: 400 });
-    }
-
-    // Find the school
-    const school = await prisma.school.findUnique({
-      where: { code: schoolCode }
-    });
-
-    if (!school) {
-      return NextResponse.json({ error: 'School not found' }, { status: 404 });
-    }
-
-    const schoolName = school.name;
-
-    // Fetch payments for the student
-    const payments = await prisma.payment.findMany({
-      where: {
-        studentId,
-        student: {
-          schoolId: school.id
+        if (!studentId) {
+            return NextResponse.json({ error: 'studentId is required' }, { status: 400 });
         }
-      },
-      include: {
-        receipt: true,
-        student: {
-          include: {
-            user: true,
-            class: {
-              include: {
-                grade: true
-              }
-            }
-          }
-        }
-      },
-      orderBy: {
-        paymentDate: 'desc'
-      }
-    });
+        
+        const payments = await prisma.payment.findMany({
+            where: { studentId },
+            include: {
+                student: { include: { user: true, class: true } },
+                receipt: true,
+            },
+            orderBy: {
+                paymentDate: 'desc',
+            },
+        });
 
-    return NextResponse.json(payments.map(payment => ({
-      ...payment,
-      studentId: payment.student?.id,
-      studentName: payment.student?.user?.name,
-      className: payment.student?.class?.name,
-      admissionNumber: payment.student?.admissionNumber,
-      term: payment.description?.match(/Term \d/)?[0] : undefined,
-      academicYear: payment.description?.match(/\d{4}/)?[0] : undefined,
-      referenceNumber: payment.referenceNumber,
-      receiptNumber: payment.receiptNumber,
-      paymentMethod: payment.paymentMethod,
-      amount: payment.amount,
-      paymentDate: payment.paymentDate,
-      description: payment.description,
-      schoolName,
-    })));
+        // Ensure term and academicYear are always returned as part of the main object
+        const formattedPayments = payments.map(p => ({
+            ...p,
+            term: p.term,
+            academicYear: p.academicYear,
+        }));
 
-  } catch (error) {
-    console.error('Error fetching payments:', error);
-    return NextResponse.json({ error: 'Failed to fetch payments' }, { status: 500 });
-  }
+        return NextResponse.json(formattedPayments);
+
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+        console.error("Failed to fetch payments:", errorMessage);
+        return NextResponse.json({ error: 'Failed to fetch payments', details: errorMessage }, { status: 500 });
+    }
 } 

@@ -42,145 +42,92 @@ export async function GET(
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
 
-    // Fetch student fee records
-    const studentFees = await prisma.studentFee.findMany({
-      where: {
-        studentId: student.id
-      },
-      include: {
-        feeStructure: true
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
-
-    // Fetch payment history
-    const payments = await prisma.payment.findMany({
-      where: {
-        studentId: student.id
-      },
-      include: {
-        receipt: true
-      },
-      orderBy: {
-        paymentDate: 'desc'
-      }
-    });
-
-    // Calculate total outstanding balance from receipts
-    const totalOutstanding = payments.reduce((sum, payment) => {
-      return sum + (payment.receipt?.balance || 0);
-    }, 0);
-
-    // Get current term fee structures for the student's grade
     const currentYear = new Date().getFullYear();
-    const currentTermStructures = await prisma.termlyFeeStructure.findMany({
-      where: {
-        gradeId: student.class?.gradeId,
-        year: currentYear,
-        isActive: true
-      },
-      orderBy: {
-        term: 'asc'
-      }
+    const studentAdmissionYear = student.dateAdmitted ? new Date(student.dateAdmitted).getFullYear() : currentYear;
+
+    // Fetch ALL payments for the student
+    const allPayments = await prisma.payment.findMany({
+      where: { studentId: student.id },
+      orderBy: { paymentDate: 'asc' },
     });
 
-    // Map fee structures to payment history for better display
-    // Sort terms chronologically (by year, then Term 1, 2, 3)
-    const termOrder = { 'Term 1': 1, 'Term 2': 2, 'Term 3': 3 };
-    const sortedTermStructures = currentTermStructures.sort((a, b) => {
-      if (a.year !== b.year) return a.year - b.year;
-      return termOrder[a.term] - termOrder[b.term];
-    });
-
-    let carryForward = 0;
-    const feeSummary = [];
-    for (const structure of sortedTermStructures) {
-      // Find payments for this term
-      const termPayments = payments.filter(payment => 
-        payment.description?.includes(structure.term) &&
-        payment.description?.includes(structure.year.toString())
-      );
-      const totalPaidForTerm = termPayments.reduce((sum, payment) => sum + payment.amount, 0);
-      const totalAmount = parseFloat(structure.totalAmount.toString());
-      // Add carryForward from previous term
-      const totalPaid = totalPaidForTerm + carryForward;
-      let balance = totalAmount - totalPaid;
-      let carryToNext = 0;
-      if (balance < 0) {
-        carryToNext = -balance; // overpaid, carry forward
-        balance = 0;
-      } else {
-        carryToNext = 0;
-      }
-      feeSummary.push({
-        term: structure.term,
-        year: structure.year,
-        totalAmount: totalAmount,
-        breakdown: structure.breakdown,
-        dueDate: structure.dueDate,
-        totalPaid: Math.min(totalPaid, totalAmount),
-        balance: Math.max(balance, 0),
-        carryForward: carryToNext,
-        status: balance === 0 ? 'paid' : totalPaid > 0 ? 'partial' : 'pending',
-        payments: termPayments
-      });
-      carryForward = carryToNext;
-    }
-
-    // Fetch all term fee structures for this grade (all years)
+    // Fetch ALL applicable termly fee structures for the student's grade
     const allTermStructures = await prisma.termlyFeeStructure.findMany({
       where: {
         gradeId: student.class?.gradeId,
-        isActive: true
+        isActive: true,
       },
-      orderBy: {
-        year: 'asc',
-      }
+      orderBy: [{ year: 'asc' }, { term: 'asc' }],
     });
 
-    // Group fee structures by year
-    const feeStructuresByYear = {};
-    for (const fs of allTermStructures) {
-      if (!feeStructuresByYear[fs.year]) feeStructuresByYear[fs.year] = [];
-      feeStructuresByYear[fs.year].push(fs);
-    }
+    let totalPaid = allPayments.reduce((sum, p) => sum + p.amount, 0);
 
-    // Group payments by year
-    const paymentsByYear = {};
-    for (const payment of payments) {
-      // Try to extract year from description
-      let yearMatch = payment.description?.match(/\d{4}/);
-      let year = yearMatch ? parseInt(yearMatch[0]) : new Date(payment.paymentDate).getFullYear();
-      if (!paymentsByYear[year]) paymentsByYear[year] = [];
-      paymentsByYear[year].push(payment);
+    // Calculate arrears from previous years, considering student's admission date
+    const previousYearsStructures = allTermStructures.filter(s => s.year < currentYear && s.year >= studentAdmissionYear);
+    const previousYearsTotalDue = previousYearsStructures.reduce((sum, s) => sum + parseFloat(s.totalAmount.toString()), 0);
+    
+    let amountPaidTowardsPreviousYears = 0;
+    if (previousYearsTotalDue > 0) {
+        amountPaidTowardsPreviousYears = Math.min(totalPaid, previousYearsTotalDue);
     }
+    const carryForwardArrears = previousYearsTotalDue - amountPaidTowardsPreviousYears;
+    
+    let remainingPaidPool = totalPaid - amountPaidTowardsPreviousYears;
 
-    // Calculate arrears for all years before current year
-    let carryForwardArrears = 0;
-    let carryForwardBreakdown = [];
-    for (const yearStr of Object.keys(feeStructuresByYear)) {
-      const year = parseInt(yearStr);
-      if (year >= currentYear) continue;
-      const yearFeeStructures = feeStructuresByYear[year];
-      const yearPayments = paymentsByYear[year] || [];
-      let yearOutstanding = 0;
-      for (const fs of yearFeeStructures) {
-        const termPayments = yearPayments.filter(payment =>
-          payment.description?.includes(fs.term) && payment.description?.includes(fs.year.toString())
-        );
-        const totalPaidForTerm = termPayments.reduce((sum, payment) => sum + payment.amount, 0);
-        const totalAmount = parseFloat(fs.totalAmount.toString());
-        let balance = totalAmount - totalPaidForTerm;
-        if (balance > 0) {
-          yearOutstanding += balance;
+    // Calculate breakdown of arrears by year
+    const carryForwardBreakdown: { year: number; outstanding: number }[] = [];
+    let tempPaidPool = allPayments.reduce((sum, p) => sum + p.amount, 0);
+
+    const structuresByYear = previousYearsStructures.reduce((acc, s) => {
+        if (!acc[s.year]) {
+            acc[s.year] = [];
         }
-      }
-      if (yearOutstanding > 0) {
-        carryForwardArrears += yearOutstanding;
-        carryForwardBreakdown.push({ year, outstanding: yearOutstanding });
-      }
+        acc[s.year].push(s);
+        return acc;
+    }, {} as Record<number, typeof previousYearsStructures>);
+
+    for (const yearStr of Object.keys(structuresByYear).sort()) {
+        const year = parseInt(yearStr, 10);
+        const yearDue = structuresByYear[year].reduce((sum, s) => sum + parseFloat(s.totalAmount.toString()), 0);
+        const yearPaid = Math.min(tempPaidPool, yearDue);
+        const yearBalance = yearDue - yearPaid;
+        if (yearBalance > 0) {
+            carryForwardBreakdown.push({ year, outstanding: yearBalance });
+        }
+        tempPaidPool -= yearPaid;
+    }
+
+
+    // Calculate current year's fee summary
+    const currentYearStructures = allTermStructures.filter(s => s.year === currentYear);
+    const feeSummary = currentYearStructures.map(structure => {
+      const totalAmount = parseFloat(structure.totalAmount.toString());
+      const paidForTerm = Math.min(remainingPaidPool, totalAmount);
+      const balance = totalAmount - paidForTerm;
+      
+      remainingPaidPool -= paidForTerm; // Reduce the pool for the next term
+
+      const termPayments = allPayments.filter(p => p.academicYear === structure.year && p.term === structure.term);
+
+      return {
+        term: structure.term,
+        year: structure.year,
+        totalAmount: totalAmount,
+        totalPaid: totalAmount - balance,
+        balance: balance,
+        carryForward: 0, // This logic is now handled globally
+        status: balance <= 0 ? 'paid' : (paidForTerm > 0 ? 'partial' : 'pending'),
+        payments: termPayments, // Note: This shows payments made for this term specifically
+        breakdown: structure.breakdown,
+        dueDate: structure.dueDate,
+      };
+    });
+    
+    // If there is any remaining pool (overpayment), show it as a negative balance on the last term
+    if (remainingPaidPool > 0 && feeSummary.length > 0) {
+        const lastTerm = feeSummary[feeSummary.length - 1];
+        lastTerm.balance -= remainingPaidPool;
+        lastTerm.totalPaid += remainingPaidPool;
     }
 
     return NextResponse.json({
@@ -192,18 +139,9 @@ export async function GET(
         className: student.class?.name || 'Not Assigned'
       },
       feeSummary,
-      totalOutstanding,
       carryForwardArrears,
       carryForwardBreakdown,
-      paymentHistory: payments.map(payment => ({
-        id: payment.id,
-        amount: payment.amount,
-        paymentDate: payment.paymentDate,
-        paymentMethod: payment.paymentMethod,
-        description: payment.description,
-        receiptNumber: payment.receiptNumber,
-        referenceNumber: payment.referenceNumber
-      }))
+      paymentHistory: allPayments,
     });
 
   } catch (error) {
