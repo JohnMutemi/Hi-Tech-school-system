@@ -132,78 +132,80 @@ Thank you for your payment!
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[380px] p-4 rounded-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Pay School Fees</DialogTitle>
+          <DialogTitle className="text-base">Pay School Fees</DialogTitle>
         </DialogHeader>
-        <div className="mt-4 space-y-4">
+        <div className="mt-1 space-y-2">
           {/* Amount Selection */}
-          <div className="space-y-2">
-            <Label>Payment Amount</Label>
-            <div className="flex gap-2">
+          <div className="space-y-0.5">
+            <Label className="text-xs">Payment Amount</Label>
+            <div className="flex gap-1">
               <Button
                 variant={!showCustomAmount ? "default" : "outline"}
                 onClick={() => setShowCustomAmount(false)}
-                className="flex-1"
+                className="flex-1 h-8 px-2 text-xs"
               >
-                Full Amount: KES {amount.toLocaleString()}
+                Full: KES {amount.toLocaleString()}
               </Button>
               <Button
                 variant={showCustomAmount ? "default" : "outline"}
                 onClick={() => setShowCustomAmount(true)}
-                className="flex-1"
+                className="flex-1 h-8 px-2 text-xs"
               >
-                Custom Amount
+                Custom
               </Button>
             </div>
-            
             {showCustomAmount && (
-              <div className="space-y-2">
-                <Label htmlFor="customAmount">Enter Amount (KES)</Label>
+              <div className="space-y-0.5">
+                <Label htmlFor="customAmount" className="text-xs">Enter Amount (KES)</Label>
                 <Input
                   id="customAmount"
                   type="number"
                   value={customAmount}
                   onChange={(e) => setCustomAmount(Number(e.target.value))}
-                  placeholder="Enter amount"
+                  placeholder="Amount"
                   min="1"
                   max={amount}
+                  className="h-8 px-2 text-xs"
                 />
-                <p className="text-sm text-gray-500">
-                  Maximum amount: KES {amount.toLocaleString()}
+                <p className="text-xs text-gray-400">
+                  Max: KES {amount.toLocaleString()}
                 </p>
               </div>
             )}
           </div>
 
           {/* Payment Form */}
-          <PaymentForm
-            studentId={studentId}
-            schoolCode={schoolCode}
-            amount={customAmount}
-            feeType={feeType}
-            term={term}
-            academicYear={academicYear}
-            onSuccess={handlePaymentSuccess}
-            onError={handlePaymentError}
-            onStart={handlePaymentStart}
-            onComplete={handlePaymentComplete}
-            isProcessing={isProcessing}
-          />
+          <div className="pt-0.5">
+            <PaymentForm
+              studentId={studentId}
+              schoolCode={schoolCode}
+              amount={customAmount}
+              feeType={feeType}
+              term={term}
+              academicYear={academicYear}
+              onPaymentSuccess={handlePaymentSuccess}
+              onPaymentError={handlePaymentError}
+              onStart={handlePaymentStart}
+              onComplete={handlePaymentComplete}
+              isProcessing={isProcessing}
+            />
+          </div>
 
           {/* Receipt Download */}
           {generatedReceipt && (
-            <div className="border-t pt-4">
-              <div className="bg-green-50 p-4 rounded-lg">
-                <div className="flex items-center gap-2 mb-2">
-                  <Receipt className="w-5 h-5 text-green-600" />
-                  <h4 className="font-medium text-green-800">Payment Completed!</h4>
+            <div className="border-t pt-2 mt-2">
+              <div className="bg-green-50 p-2 rounded-md">
+                <div className="flex items-center gap-1 mb-1">
+                  <Receipt className="w-4 h-4 text-green-600" />
+                  <h4 className="font-medium text-green-800 text-sm">Payment Completed!</h4>
                 </div>
-                <p className="text-sm text-green-700 mb-3">
+                <p className="text-xs text-green-700 mb-2">
                   Receipt #: {generatedReceipt.receiptNumber}
                 </p>
-                <Button onClick={handleDownloadReceipt} className="w-full">
-                  <Download className="w-4 h-4 mr-2" />
+                <Button onClick={handleDownloadReceipt} className="w-full h-8 text-xs">
+                  <Download className="w-3 h-3 mr-1" />
                   Download Receipt
                 </Button>
               </div>

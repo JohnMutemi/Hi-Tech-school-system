@@ -107,6 +107,7 @@ model Student {
   status          String    @default("active")
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+  academicYear    Int?      @default(2025)
 
   tempPassword    String?
   parentName      String?
@@ -143,6 +144,9 @@ model Payment {
   description     String
   receivedBy      String
   createdAt       DateTime @default(now())
+
+  term            String
+  academicYear    Int
 
   student Student  @relation(fields: [studentId], references: [id])
   receipt Receipt?

@@ -19,7 +19,17 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     if (!teacherUser) {
       return NextResponse.json({ error: "Teacher not found" }, { status: 404 })
     }
-    return NextResponse.json(teacherUser)
+    // Fetch all classes where this teacher is the class teacher
+    const classes = await prisma.class.findMany({
+      where: {
+        teacherId: teacherId,
+        school: { code: schoolCode },
+      },
+      include: {
+        grade: true,
+      },
+    })
+    return NextResponse.json({ ...teacherUser, classes })
   } catch (error) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }

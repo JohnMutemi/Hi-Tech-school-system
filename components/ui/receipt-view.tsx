@@ -8,6 +8,7 @@ interface ReceiptViewProps {
   studentName: string
   studentClass: string
   admissionNumber: string
+  schoolName: string
   onClose: () => void
 }
 
@@ -16,6 +17,7 @@ export function ReceiptView({
   studentName,
   studentClass,
   admissionNumber,
+  schoolName,
   onClose,
 }: ReceiptViewProps) {
   const handlePrint = () => {
@@ -65,7 +67,7 @@ Description: ${receipt.description}
           <h2 className="text-2xl font-bold text-green-700 mb-2 flex items-center gap-2">
             <Receipt className="w-6 h-6" /> Fees Payment Receipt
           </h2>
-          <div className="text-gray-600">School Management System</div>
+          <div className="text-gray-600">{schoolName}</div>
           <div className="text-gray-600 mb-2">Official Receipt</div>
         </div>
 

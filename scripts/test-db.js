@@ -21,6 +21,16 @@ async function debugClassesAndGrades(schoolCode) {
   }
 }
 
+async function printParentUsers(schoolCode) {
+  const baseUrl = 'http://localhost:3000';
+  console.log(`\n--- Fetching Parent Users for schoolCode=${schoolCode} ---`);
+  const usersRes = await fetch(`${baseUrl}/api/schools/${schoolCode}/users?role=parent`);
+  const users = await usersRes.json();
+  users.forEach(user => {
+    console.log(`Parent: name='${user.name}', phone='${user.phone}', email='${user.email}', role='${user.role}'`);
+  });
+}
+
 // Change this to your actual school code
 const schoolCode = 'alliance';
-debugClassesAndGrades(schoolCode); 
+debugClassesAndGrades(schoolCode).then(() => printParentUsers(schoolCode)); 

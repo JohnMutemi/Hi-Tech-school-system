@@ -14,7 +14,25 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     const gradeId = searchParams.get('gradeId');
     const whereClause: any = { schoolId: school.id };
     if (gradeId) whereClause.gradeId = gradeId;
-    const classes = await prisma.class.findMany({ where: whereClause });
+    const classes = await prisma.class.findMany({ 
+      where: whereClause,
+      include: {
+        teacher: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+          }
+        },
+        grade: {
+          select: {
+            id: true,
+            name: true,
+          }
+        }
+      }
+    });
     return NextResponse.json(classes);
   } catch (error) {
     return NextResponse.json({ error: "Failed to fetch classes" }, { status: 500 });
@@ -41,6 +59,22 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
         schoolId: school.id,
         gradeId: gradeId,
       },
+      include: {
+        teacher: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+          }
+        },
+        grade: {
+          select: {
+            id: true,
+            name: true,
+          }
+        }
+      }
     });
     return NextResponse.json(newClass, { status: 201 });
   } catch (error) {
@@ -69,6 +103,22 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
         teacherId: teacherId || null,
         gradeId: gradeId,
       },
+      include: {
+        teacher: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+          }
+        },
+        grade: {
+          select: {
+            id: true,
+            name: true,
+          }
+        }
+      }
     });
     return NextResponse.json(updatedClass);
   } catch (error) {

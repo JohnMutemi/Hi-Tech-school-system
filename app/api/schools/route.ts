@@ -148,6 +148,23 @@ export async function POST(request: NextRequest) {
       }
     });
 
+    // Automatically seed grades for the new school
+    const defaultGrades = [
+      { name: 'Grade 1', schoolId: school.id },
+      { name: 'Grade 2', schoolId: school.id },
+      { name: 'Grade 3', schoolId: school.id },
+      { name: 'Grade 4', schoolId: school.id },
+      { name: 'Grade 5', schoolId: school.id },
+      { name: 'Grade 6', schoolId: school.id },
+      { name: 'Grade 7', schoolId: school.id },
+      { name: 'Grade 8', schoolId: school.id },
+    ];
+
+    await prisma.grade.createMany({
+      data: defaultGrades,
+      skipDuplicates: true, // Just in case
+    });
+
     // Hash the admin password before saving
     const hashedPassword = await bcrypt.hash(adminPassword, 12);
 

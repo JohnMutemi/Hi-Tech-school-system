@@ -1,26 +1,45 @@
-"use client"
+"use client";
 
-import { useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useToast } from '@/hooks/use-toast'
-import { Phone, CreditCard, Upload, CheckCircle, AlertCircle, Receipt } from 'lucide-react'
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Phone,
+  CreditCard,
+  Upload,
+  CheckCircle,
+  AlertCircle,
+  Receipt,
+} from "lucide-react";
 
 interface PaymentFormProps {
-  schoolCode: string
-  studentId: string
-  amount: number
-  feeType: string
-  term: string
-  academicYear: string
-  onPaymentSuccess?: (payment: any) => void
-  onPaymentError?: (error: string) => void
-  onStart?: () => void
-  onComplete?: () => void
-  isProcessing?: boolean
+  schoolCode: string;
+  studentId: string;
+  amount: number;
+  feeType: string;
+  term: string;
+  academicYear: string;
+  onPaymentSuccess?: (payment: any) => void;
+  onPaymentError?: (error: string) => void;
+  onStart?: () => void;
+  onComplete?: () => void;
+  isProcessing?: boolean;
 }
 
 interface ReceiptData {
@@ -44,10 +63,10 @@ interface ReceiptData {
   currency: string;
 }
 
-export function PaymentForm({ 
-  schoolCode, 
-  studentId, 
-  amount, 
+export function PaymentForm({
+  schoolCode,
+  studentId,
+  amount,
   feeType,
   term,
   academicYear,
@@ -55,46 +74,91 @@ export function PaymentForm({
   onPaymentError,
   onStart,
   onComplete,
-  isProcessing = false
+  isProcessing = false,
 }: PaymentFormProps) {
-  const { toast } = useToast()
-  const [paymentMethod, setPaymentMethod] = useState<'mpesa' | 'manual'>('mpesa')
-  const [phoneNumber, setPhoneNumber] = useState('')
-  const [transactionId, setTransactionId] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const [showReceipt, setShowReceipt] = useState(false)
-  const [receiptData, setReceiptData] = useState<ReceiptData | null>(null)
+  const { toast } = useToast();
+  const [paymentMethod, setPaymentMethod] = useState<"mpesa" | "manual">(
+    "mpesa"
+  );
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [transactionId, setTransactionId] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [showReceipt, setShowReceipt] = useState(false);
+  const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
 
   const handlePayment = async () => {
     if (isProcessing) return;
-    
-    setIsLoading(true)
-    onStart?.()
+
+    // Validate required fields
+    if (paymentMethod === "mpesa" && !phoneNumber.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Phone number is required for M-Pesa payments",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (paymentMethod === "manual" && !transactionId.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Transaction ID is required for manual payments",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    onStart?.();
 
     try {
-      // Simulate payment processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Call the real payment API
+      const response = await fetch(`/api/schools/${schoolCode}/payments`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          studentId,
+          amount,
+          paymentMethod,
+          feeType,
+          term,
+          academicYear,
+          phoneNumber: paymentMethod === "mpesa" ? phoneNumber : undefined,
+          transactionId: paymentMethod === "manual" ? transactionId : undefined,
+          description: `${feeType} - ${term} ${academicYear}`,
+        }),
+      });
 
-      // Generate receipt data
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Payment failed");
+      }
+
+      const result = await response.json();
+      const paymentData = result.payment;
+
+      // Generate receipt data from the API response
       const receipt: ReceiptData = {
-        receiptNumber: `RCP-${Date.now()}`,
-        paymentId: `pay_${Date.now()}`,
-        studentId,
+        receiptNumber: paymentData.receiptNumber,
+        paymentId: paymentData.id,
+        studentId: paymentData.studentId,
         schoolCode,
-        amount,
-        paymentMethod,
+        amount: paymentData.amount,
+        paymentMethod: paymentData.paymentMethod,
         feeType,
         term,
         academicYear,
-        reference: `PAY-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        phoneNumber: paymentMethod === 'mpesa' ? phoneNumber : undefined,
-        transactionId: paymentMethod === 'manual' ? transactionId : undefined,
-        status: 'completed',
-        issuedAt: new Date(),
-        issuedBy: 'School System',
-        schoolName: 'Demo School',
-        studentName: 'Demo Student',
-        currency: 'KES'
+        reference: paymentData.referenceNumber,
+        phoneNumber: paymentMethod === "mpesa" ? phoneNumber : undefined,
+        transactionId: paymentMethod === "manual" ? transactionId : undefined,
+        status: "completed",
+        issuedAt: new Date(paymentData.paymentDate),
+        issuedBy: "School System",
+        schoolName: "Demo School",
+        studentName: paymentData.student?.user?.name || "Student",
+        currency: "KES",
       };
 
       setReceiptData(receipt);
@@ -102,38 +166,48 @@ export function PaymentForm({
 
       toast({
         title: "Payment Successful!",
-        description: "Payment completed successfully. Receipt generated.",
-      })
+        description: `Payment of KES ${amount.toLocaleString()} processed successfully. Receipt #${
+          receipt.receiptNumber
+        }`,
+      });
 
-      onPaymentSuccess?.(receipt)
+      onPaymentSuccess?.(receipt);
     } catch (error) {
-      console.error('Payment error:', error)
+      console.error("Payment error:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Payment processing failed";
+
       toast({
         title: "Payment Failed",
-        description: "An error occurred while processing payment",
+        description: errorMessage,
         variant: "destructive",
-      })
-      onPaymentError?.('Payment processing failed')
+      });
+
+      onPaymentError?.(errorMessage);
     } finally {
-      setIsLoading(false)
-      onComplete?.()
+      setIsLoading(false);
+      onComplete?.();
     }
-  }
+  };
 
   const handleCloseReceipt = () => {
-    setShowReceipt(false)
-    setReceiptData(null)
-  }
+    setShowReceipt(false);
+    setReceiptData(null);
+  };
 
   if (showReceipt && receiptData) {
     return (
       <Card className="w-full max-w-md mx-auto">
         <CardHeader className="text-center border-b">
-          <CardTitle className="text-xl font-bold">{receiptData.schoolName}</CardTitle>
+          <CardTitle className="text-xl font-bold">
+            {receiptData.schoolName}
+          </CardTitle>
           <p className="text-sm text-gray-600">Payment Receipt</p>
-          <p className="text-xs text-gray-500">Receipt #: {receiptData.receiptNumber}</p>
+          <p className="text-xs text-gray-500">
+            Receipt #: {receiptData.receiptNumber}
+          </p>
         </CardHeader>
-        
+
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-2 text-sm">
             <div>
@@ -178,14 +252,18 @@ export function PaymentForm({
             </div>
             <div>
               <span className="font-medium">Status:</span>
-              <p className="uppercase font-bold text-green-600">{receiptData.status}</p>
+              <p className="uppercase font-bold text-green-600">
+                {receiptData.status}
+              </p>
             </div>
           </div>
 
           <div className="border-t pt-4">
             <div className="flex justify-between items-center text-lg font-bold">
               <span>Total Amount:</span>
-              <span>{receiptData.currency} {receiptData.amount.toLocaleString()}</span>
+              <span>
+                {receiptData.currency} {receiptData.amount.toLocaleString()}
+              </span>
             </div>
           </div>
 
@@ -210,15 +288,18 @@ export function PaymentForm({
           <CreditCard className="w-5 h-5" />
           Make Payment
         </CardTitle>
-        <CardDescription>
-          Amount: KES {amount.toLocaleString()}
-        </CardDescription>
+        <CardDescription>Amount: KES {amount.toLocaleString()}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Payment Method Selection */}
         <div className="space-y-2">
           <Label>Payment Method</Label>
-          <Select value={paymentMethod} onValueChange={(value: 'mpesa' | 'manual') => setPaymentMethod(value)}>
+          <Select
+            value={paymentMethod}
+            onValueChange={(value: "mpesa" | "manual") =>
+              setPaymentMethod(value)
+            }
+          >
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -240,7 +321,7 @@ export function PaymentForm({
         </div>
 
         {/* Payment Method Specific Fields */}
-        {paymentMethod === 'mpesa' ? (
+        {paymentMethod === "mpesa" ? (
           <div className="space-y-2">
             <Label htmlFor="phoneNumber">Phone Number (M-Pesa)</Label>
             <Input
@@ -296,8 +377,8 @@ export function PaymentForm({
         </div>
 
         {/* Submit Button */}
-        <Button 
-          onClick={handlePayment} 
+        <Button
+          onClick={handlePayment}
           disabled={isLoading || isProcessing}
           className="w-full"
         >
@@ -321,5 +402,5 @@ export function PaymentForm({
         )}
       </CardContent>
     </Card>
-  )
-} 
+  );
+}
