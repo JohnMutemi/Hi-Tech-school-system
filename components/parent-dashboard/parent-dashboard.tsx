@@ -409,55 +409,54 @@ export function ParentDashboard({
     }
   };
 
-  // Get fee structure for a specific student (updated to use gradeId)
-  const getStudentFeeStructure = (studentGradeId: string) => {
-    const currentDate = new Date();
-    const currentYear = currentDate.getFullYear();
-    const currentMonth = currentDate.getMonth();
-
-    let currentTerm = "Term 1";
-    if (currentMonth >= 4 && currentMonth <= 7) currentTerm = "Term 2";
-    else if (currentMonth >= 8) currentTerm = "Term 3";
-
-    // First try to find the current term's fee structure
-    const currentTermFee = feeStructures.find(
-      (fee) =>
-        fee.gradeId === studentGradeId &&
-        fee.term === currentTerm &&
-        fee.year === currentYear &&
-        fee.isActive
+  // Fetch student fee summary for all students
+  const fetchStudentFeeSummaries = async () => {
+    if (students.length === 0) return;
+    const summaries: any = {};
+    await Promise.all(
+      students.map(async (student) => {
+        try {
+          const res = await fetch(
+            `/api/schools/${schoolCode}/students/${student.id}/fees`,
+            { cache: 'no-store' }
+          );
+          if (res.ok) {
+            const data = await res.json();
+            // Flatten all terms for the current year into an array
+            const currentYear = new Date().getFullYear();
+            const yearTerms = data.feesByYear?.[currentYear]?.terms || [];
+            summaries[student.id] = yearTerms;
+          }
+        } catch (e) {
+          // ignore
+        }
+      })
     );
+    setStudentFeeData({ ...summaries });
+  };
 
-    // If current term fee structure exists, return it
-    if (currentTermFee) {
-      return currentTermFee;
+  // Call fetchStudentFeeSummaries when students change
+  useEffect(() => {
+    if (students.length > 0) {
+      fetchStudentFeeSummaries();
     }
+  }, [students]);
 
-    // Otherwise, return the first available fee structure for this student
-    return feeStructures.find(
-      (fee) =>
-        fee.gradeId === studentGradeId &&
-        fee.year === currentYear &&
-        fee.isActive
-    );
+  // Update getStudentFeeStructure to use studentFeeData
+  const getStudentFeeStructure = (studentId: string) => {
+    const termOrder = ["Term 1", "Term 2", "Term 3"];
+    const terms = studentFeeData[studentId] || [];
+    // Sort by term order
+    const sortedTerms = [...terms].sort((a, b) => termOrder.indexOf(a.term) - termOrder.indexOf(b.term));
+    // Find the first unpaid term (balance > 0)
+    const firstUnpaid = sortedTerms.find(term => term.balance > 0);
+    // Return the first unpaid, or the first available if all are paid
+    return firstUnpaid || sortedTerms[0];
   };
 
-  // Get all fee structures for a specific student
-  const getStudentAllFeeStructures = (studentGradeId: string) => {
-    const currentDate = new Date();
-    const currentYear = currentDate.getFullYear();
-
-    return feeStructures.filter(
-      (fee) =>
-        fee.gradeId === studentGradeId &&
-        fee.year === currentYear &&
-        fee.isActive
-    );
-  };
-
-  // Handle payment modal opening
+  // Update handleOpenPaymentModal to use student.id
   const handleOpenPaymentModal = (student: any) => {
-    const feeStructure = getStudentFeeStructure(student.gradeId);
+    const feeStructure = getStudentFeeStructure(student.id);
     if (!feeStructure) {
       toast({
         title: "Error",
@@ -466,35 +465,10 @@ export function ParentDashboard({
       });
       return;
     }
-
     setSelectedStudent(student);
     setSelectedFeeStructure(feeStructure);
     setPaymentModalOpen(true);
   };
-
-  // Fetch student fee summary for all students
-  async function fetchStudentFeeSummaries() {
-    if (students.length === 0) return;
-    const summaries: any = {};
-    await Promise.all(
-      students.map(async (student) => {
-        try {
-          const res = await fetch(
-            `/api/schools/${schoolCode}/students/${student.id}/fees`,
-            { cache: 'no-store' } // Prevent caching
-          );
-          if (res.ok) {
-            const data = await res.json();
-            summaries[student.id] = data;
-          }
-        } catch (e) {
-          // ignore
-        }
-      })
-    );
-    // Force a re-render by creating a new object reference
-    setStudentFeeData({ ...summaries });
-  }
 
   // Handle payment success
   const handlePaymentSuccess = async (payment: any) => {
@@ -803,10 +777,6 @@ export function ParentDashboard({
     }
   }, [selectedSection, students]);
 
-  useEffect(() => {
-    fetchStudentFeeSummaries();
-  }, [students, schoolCode]);
-
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -965,14 +935,14 @@ export function ParentDashboard({
                   const child =
                     students.find((c) => c.id === focusedChildId) ||
                     students[0];
-                  const feeSummary = studentFeeData[child.id]?.feeSummary || [];
+                  const feeSummary = studentFeeData[child.id] || [];
                   const currentTermSummary = getCurrentTermForStudent(feeSummary);
                   const outstandingFees = currentTermSummary ? currentTermSummary.balance : 0;
                   return (
                     <ChildOverview
                       child={child}
                       outstandingFees={outstandingFees}
-                      feeStructure={getStudentFeeStructure(child.gradeId)}
+                      feeStructure={getStudentFeeStructure(child.id)}
                     />
                   );
                 })()}
