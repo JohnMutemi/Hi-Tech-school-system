@@ -12,46 +12,26 @@ export async function GET(
     const { schoolCode, studentId } = params;
     const decodedSchoolCode = decodeURIComponent(schoolCode);
 
-    // Find the school
-    const school = await prisma.school.findUnique({
-      where: { code: decodedSchoolCode }
-    });
-
+    const school = await prisma.school.findUnique({ where: { code: decodedSchoolCode } });
     if (!school) {
       return NextResponse.json({ error: 'School not found' }, { status: 404 });
     }
 
-    // Find the student
     const student = await prisma.student.findFirst({
-      where: {
-        id: studentId,
-        schoolId: school.id,
-        isActive: true
-      },
-      include: {
-        user: true,
-        class: {
-          include: {
-            grade: true
-          }
-        }
-      }
+      where: { id: studentId, schoolId: school.id, isActive: true },
+      include: { user: true, class: { include: { grade: true } } }
     });
-
     if (!student) {
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
 
-    const currentYear = new Date().getFullYear();
-    const studentAdmissionYear = student.dateAdmitted ? new Date(student.dateAdmitted).getFullYear() : currentYear;
+    const studentAdmissionYear = student.dateAdmitted ? new Date(student.dateAdmitted).getFullYear() : new Date().getFullYear();
 
-    // Fetch ALL payments for the student
     const allPayments = await prisma.payment.findMany({
       where: { studentId: student.id },
-      orderBy: { paymentDate: 'asc' },
+      orderBy: [{ academicYear: 'asc' }, { paymentDate: 'asc' }],
     });
 
-    // Fetch ALL applicable termly fee structures for the student's grade
     const allTermStructures = await prisma.termlyFeeStructure.findMany({
       where: {
         gradeId: student.class?.gradeId,
@@ -59,76 +39,72 @@ export async function GET(
       },
       orderBy: [{ year: 'asc' }, { term: 'asc' }],
     });
-
-    let totalPaid = allPayments.reduce((sum, p) => sum + p.amount, 0);
-
-    // Calculate arrears from previous years, considering student's admission date
-    const previousYearsStructures = allTermStructures.filter(s => s.year < currentYear && s.year >= studentAdmissionYear);
-    const previousYearsTotalDue = previousYearsStructures.reduce((sum, s) => sum + parseFloat(s.totalAmount.toString()), 0);
     
-    let amountPaidTowardsPreviousYears = 0;
-    if (previousYearsTotalDue > 0) {
-        amountPaidTowardsPreviousYears = Math.min(totalPaid, previousYearsTotalDue);
-    }
-    const carryForwardArrears = previousYearsTotalDue - amountPaidTowardsPreviousYears;
-    
-    let remainingPaidPool = totalPaid - amountPaidTowardsPreviousYears;
+    const paymentsByYear = allPayments.reduce((acc, p) => {
+      const year = p.academicYear;
+      if (!acc[year]) acc[year] = [];
+      acc[year].push(p);
+      return acc;
+    }, {} as Record<number, typeof allPayments>);
 
-    // Calculate breakdown of arrears by year
-    const carryForwardBreakdown: { year: number; outstanding: number }[] = [];
-    let tempPaidPool = allPayments.reduce((sum, p) => sum + p.amount, 0);
+    const structuresByYear = allTermStructures.reduce((acc, s) => {
+      const year = s.year;
+      if (!acc[year]) acc[year] = [];
+      acc[year].push(s);
+      return acc;
+    }, {} as Record<number, typeof allTermStructures>);
 
-    const structuresByYear = previousYearsStructures.reduce((acc, s) => {
-        if (!acc[s.year]) {
-            acc[s.year] = [];
-        }
-        acc[s.year].push(s);
-        return acc;
-    }, {} as Record<number, typeof previousYearsStructures>);
+    const feesByYear: any = {};
+    let carryForward = 0;
+    const sortedYears = [...new Set([...Object.keys(structuresByYear).map(Number), ...Object.keys(paymentsByYear).map(Number)])].sort();
 
-    for (const yearStr of Object.keys(structuresByYear).sort()) {
-        const year = parseInt(yearStr, 10);
-        const yearDue = structuresByYear[year].reduce((sum, s) => sum + parseFloat(s.totalAmount.toString()), 0);
-        const yearPaid = Math.min(tempPaidPool, yearDue);
-        const yearBalance = yearDue - yearPaid;
-        if (yearBalance > 0) {
-            carryForwardBreakdown.push({ year, outstanding: yearBalance });
-        }
-        tempPaidPool -= yearPaid;
-    }
+    for (const year of sortedYears) {
+      if (year < studentAdmissionYear) continue;
 
-
-    // Calculate current year's fee summary
-    const currentYearStructures = allTermStructures.filter(s => s.year === currentYear);
-    const feeSummary = currentYearStructures.map(structure => {
-      const totalAmount = parseFloat(structure.totalAmount.toString());
-      const paidForTerm = Math.min(remainingPaidPool, totalAmount);
-      const balance = totalAmount - paidForTerm;
+      const yearStructures = structuresByYear[year] || [];
+      const yearPayments = paymentsByYear[year] || [];
       
-      remainingPaidPool -= paidForTerm; // Reduce the pool for the next term
+      const yearTotalDue = yearStructures.reduce((sum, s) => sum + parseFloat(s.totalAmount.toString()), 0);
+      const totalDueWithCarryForward = yearTotalDue + carryForward;
+      
+      const yearTotalPaid = yearPayments.filter(p => p.paymentMethod !== 'CARRY_FORWARD').reduce((sum, p) => sum + p.amount, 0);
 
-      const termPayments = allPayments.filter(p => p.academicYear === structure.year && p.term === structure.term);
+      let yearBalance = totalDueWithCarryForward - yearTotalPaid;
 
-      return {
-        term: structure.term,
-        year: structure.year,
-        totalAmount: totalAmount,
-        totalPaid: totalAmount - balance,
-        balance: balance,
-        carryForward: 0, // This logic is now handled globally
-        status: balance <= 0 ? 'paid' : (paidForTerm > 0 ? 'partial' : 'pending'),
-        payments: termPayments, // Note: This shows payments made for this term specifically
-        breakdown: structure.breakdown,
-        dueDate: structure.dueDate,
+      // Distribute this year's payments across its terms
+      let remainingPaidForYear = yearTotalPaid;
+      const terms = yearStructures.map(structure => {
+          const termTotalAmount = parseFloat(structure.totalAmount.toString());
+          const paidForTerm = Math.min(remainingPaidForYear, termTotalAmount);
+          remainingPaidForYear -= paidForTerm;
+          const termBalance = termTotalAmount - paidForTerm;
+          
+          return {
+              term: structure.term,
+              year: structure.year,
+              totalAmount: termTotalAmount,
+              totalPaid: paidForTerm,
+              balance: termBalance,
+              status: termBalance <= 0 ? 'paid' : (paidForTerm > 0 ? 'partial' : 'pending'),
+              payments: yearPayments.filter(p => p.term === structure.term),
+              breakdown: structure.breakdown,
+              dueDate: structure.dueDate,
+          };
+      });
+
+      feesByYear[year] = {
+        terms,
+        yearTotal: yearTotalDue,
+        yearPaid: yearTotalPaid,
+        yearBalance: yearBalance,
+        carryForwardIn: carryForward,
       };
-    });
-    
-    // If there is any remaining pool (overpayment), show it as a negative balance on the last term
-    if (remainingPaidPool > 0 && feeSummary.length > 0) {
-        const lastTerm = feeSummary[feeSummary.length - 1];
-        lastTerm.balance -= remainingPaidPool;
-        lastTerm.totalPaid += remainingPaidPool;
+      
+      // The new carry-forward for next year is this year's balance
+      carryForward = yearBalance > 0 ? yearBalance : 0;
     }
+    
+    const finalBalance = carryForward; // The final carry-forward is the total outstanding
 
     return NextResponse.json({
       student: {
@@ -138,14 +114,13 @@ export async function GET(
         gradeName: student.class?.grade?.name || 'Not Assigned',
         className: student.class?.name || 'Not Assigned'
       },
-      feeSummary,
-      carryForwardArrears,
-      carryForwardBreakdown,
+      feesByYear,
+      totalOutstanding: finalBalance,
       paymentHistory: allPayments,
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching student fees:', error);
     return NextResponse.json({ error: 'Failed to fetch student fees' }, { status: 500 });
   }
-} 
+}

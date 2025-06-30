@@ -107,6 +107,7 @@ model Student {
   status          String    @default("active")
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+  academicYear    Int?      @default(2025)
 
   tempPassword    String?
   parentName      String?
