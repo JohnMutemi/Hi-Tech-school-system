@@ -1,7 +1,7 @@
 "use client"
 
 import { useParams } from "next/navigation"
-import { ParentDashboard } from "../components/parent-dashboard"
+import { ParentDashboard } from "@/components/parent-dashboard/parent-dashboard"
 
 export default function ParentDashboardPage() {
   const params = useParams()
