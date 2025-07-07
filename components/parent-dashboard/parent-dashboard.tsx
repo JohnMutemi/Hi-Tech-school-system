@@ -27,6 +27,7 @@ import {
   Trash2,
   RefreshCw,
   Download,
+  ChevronDown,
 } from "lucide-react";
 import { ReceiptView } from "@/components/ui/receipt-view";
 import { Badge } from "@/components/ui/badge";
@@ -59,6 +60,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { PaymentModal } from "@/components/payment/payment-modal";
+import { ParentFeesPanel } from "./ParentFeesPanel";
 
 interface FeeStructure {
   id: string;
@@ -201,6 +203,25 @@ export function ParentDashboard({
   ];
 
   const [studentFeeSummaries, setStudentFeeSummaries] = useState<any>({});
+
+  // Add state for current academic year and term
+  const [currentAcademicYear, setCurrentAcademicYear] = useState<any>(null);
+  const [currentTerm, setCurrentTerm] = useState<any>(null);
+  const [loadingAcademicInfo, setLoadingAcademicInfo] = useState(true);
+  const [academicInfoError, setAcademicInfoError] = useState("");
+
+  // Add state for academic year/term filters
+  const [academicYears, setAcademicYears] = useState<any[]>([]);
+  const [terms, setTerms] = useState<any[]>([]);
+  const [selectedYearId, setSelectedYearId] = useState<string>("");
+  const [selectedTermId, setSelectedTermId] = useState<string>("");
+  const [filterLoading, setFilterLoading] = useState(true);
+  const [filterError, setFilterError] = useState("");
+  const [loadingReceipts, setLoadingReceipts] = useState(false);
+  const [receiptsError, setReceiptsError] = useState("");
+
+  // Add state for search
+  const [receiptSearch, setReceiptSearch] = useState("");
 
   useEffect(() => {
     async function fetchSession() {
@@ -496,52 +517,27 @@ export function ParentDashboard({
     });
   };
 
-  // Fetch receipts
+  // Fetch receipts from backend (directly from receipt table)
   const fetchReceipts = async () => {
+    setLoadingReceipts(true);
+    setReceiptsError("");
     try {
       if (students.length === 0) return;
-
       const currentStudent =
         students.find((c) => c.id === focusedChildId) || students[0];
-
-      // Fetch real payment history from API
-      const response = await fetch(
-        `/api/schools/${schoolCode}/payments?studentId=${currentStudent.id}`
-      );
-
-      if (response.ok) {
-        const payments = await response.json();
-
-        // Transform payments to receipt format
-        const realReceipts = payments.map((payment: any) => ({
-          id: payment.id,
-          student: {
-            name: payment.student?.user?.name || currentStudent.name,
-            className: payment.student?.class?.name || currentStudent.className,
-            admissionNumber:
-              payment.student?.admissionNumber ||
-              currentStudent.admissionNumber,
-          },
-          receiptNumber: payment.receiptNumber,
-          paymentDate: payment.paymentDate,
-          amount: payment.amount,
-          paymentMethod: payment.paymentMethod,
-          description: payment.description,
-          referenceNumber: payment.referenceNumber,
-          balance: payment.receipt?.balance || 0,
-          balanceCarriedForward: payment.receipt?.balanceCarriedForward || 0,
-          schoolName: payment.schoolName,
-        }));
-
-        setReceipts(realReceipts);
-      } else {
-        console.error("Failed to fetch receipts:", response.status);
-        // Fallback to empty array
-        setReceipts([]);
-      }
-    } catch (error) {
-      console.error("Failed to fetch receipts:", error);
-      setReceipts([]);
+      let url = `/api/schools/${schoolCode}/students/${currentStudent.id}/receipts`;
+      const params = [];
+      if (selectedYearId) params.push(`academicYearId=${selectedYearId}`);
+      if (selectedTermId) params.push(`termId=${selectedTermId}`);
+      if (params.length > 0) url += `?${params.join("&")}`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Failed to fetch receipts");
+      const data = await response.json();
+      setReceipts(data);
+    } catch (err: any) {
+      setReceiptsError(err.message || "Failed to load receipts");
+    } finally {
+      setLoadingReceipts(false);
     }
   };
 
@@ -646,21 +642,48 @@ export function ParentDashboard({
     });
   };
 
-  const handleDownloadReceipt = (receipt: any) => {
-    // Fallbacks for missing fields
-    const studentId =
-      receipt.student?.admissionNumber || receipt.studentId || "N/A";
-    const studentName = receipt.student?.name || receipt.studentName || "N/A";
-    const className = receipt.student?.className || receipt.className || "N/A";
-    // Try to extract term and year from description if missing
-    let term = receipt.term;
+  const handleDownloadReceipt = async (receipt: any) => {
+    // Try to get student details from receipt or fallback to students array
+    let studentId = receipt.studentId || receipt.student?.id;
+    let studentName = receipt.studentName || receipt.student?.name;
+    let admissionNumber =
+      receipt.admissionNumber || receipt.student?.admissionNumber;
+    let className = receipt.className || receipt.student?.className;
+    if (
+      (!studentName || !admissionNumber || !className) &&
+      Array.isArray(students)
+    ) {
+      const found = students.find((s) => s.id === studentId);
+      if (found) {
+        studentName = studentName || found.fullName || found.name;
+        admissionNumber = admissionNumber || found.admissionNumber;
+        className = className || found.className;
+      }
+    }
+    // Academic year and term
     let academicYear = receipt.academicYear;
-    if (!term || !academicYear) {
-      const desc = receipt.description || "";
-      const termMatch = desc.match(/Term \d/);
-      const yearMatch = desc.match(/\d{4}/);
+    let term = receipt.term;
+    // Try to get from description if missing
+    if ((!academicYear || !term) && receipt.description) {
+      const termMatch = receipt.description.match(/Term \d/);
+      const yearMatch = receipt.description.match(/\d{4}/);
       if (!term && termMatch) term = termMatch[0];
       if (!academicYear && yearMatch) academicYear = yearMatch[0];
+    }
+    // Try to get from academicYearId/termId if still missing
+    if (
+      (!academicYear || !term) &&
+      receipt.academicYearId &&
+      receipt.termId &&
+      terms.length > 0 &&
+      academicYears.length > 0
+    ) {
+      const yearObj = academicYears.find(
+        (y) => y.id === receipt.academicYearId
+      );
+      if (yearObj) academicYear = academicYear || yearObj.name;
+      const termObj = terms.find((t) => t.id === receipt.termId);
+      if (termObj) term = term || termObj.name;
     }
     const reference = receipt.referenceNumber || receipt.reference || "N/A";
     const receiptNumber = receipt.receiptNumber || "N/A";
@@ -671,57 +694,8 @@ export function ParentDashboard({
     const schoolName = receipt.schoolName || "Demo School";
     const issuedBy = receipt.issuedBy || "School System";
     const currency = receipt.currency || "KES";
-
-    // Use real-time fee summary for this student and term
-    let feeSummary = studentFeeSummaries?.[studentId]?.feeSummary || [];
-    let termSummary = feeSummary.find(
-      (f: any) => f.term === term && String(f.year) === String(academicYear)
-    );
-    const balance = termSummary ? termSummary.balance : receipt.balance ?? 0;
-    const carryForward = termSummary
-      ? termSummary.carryForward
-      : receipt.carryForward ?? receipt.balanceCarriedForward ?? 0;
-
-    // Outstanding balance display logic for receipt
-    let outstandingDisplay = "";
-    if (typeof balance === "number" && balance < 0) {
-      outstandingDisplay = `0 (KES ${Math.abs(
-        balance
-      ).toLocaleString()} Carry Forward)`;
-    } else {
-      outstandingDisplay = `${currency} ${balance.toLocaleString()}`;
-    }
-
-    // Historical balance after this payment (from receipt/payment)
-    let historicalBalance = receipt.balance;
-    let historicalDisplay = "";
-    if (typeof historicalBalance === "number" && historicalBalance < 0) {
-      historicalDisplay = `0 (KES ${Math.abs(
-        historicalBalance
-      ).toLocaleString()} Carry Forward)`;
-    } else {
-      historicalDisplay = `${currency} ${
-        historicalBalance?.toLocaleString?.() ?? "0"
-      }`;
-    }
-
-    // Fee breakdown for the term (if available)
-    let breakdownDisplay = "";
-    if (termSummary && termSummary.breakdown) {
-      breakdownDisplay = "\nFee Breakdown:";
-      Object.entries(termSummary.breakdown).forEach(([key, value]) => {
-        if (Number(value) > 0) {
-          breakdownDisplay += `\n- ${
-            key.charAt(0).toUpperCase() + key.slice(1)
-          }: KES ${(value as number).toLocaleString()}`;
-        }
-      });
-    }
-
-    // Fee status for the term (if available)
-    const statusDisplay = termSummary
-      ? termSummary.status.charAt(0).toUpperCase() + termSummary.status.slice(1)
-      : "N/A";
+    const outstandingBefore = receipt.academicYearOutstandingBefore ?? "N/A";
+    const outstandingAfter = receipt.academicYearOutstandingAfter ?? "N/A";
 
     const receiptContent = `
 Payment Receipt
@@ -730,27 +704,24 @@ School: ${schoolName}
 Receipt #: ${receiptNumber}
 
 Student Information:
-- Student ID: ${studentId}
-- Student Name: ${studentName}
-- Class: ${className}
+- Student Name: ${studentName || "N/A"}
+- Admission No.: ${admissionNumber || "N/A"}
+- Class: ${className || "N/A"}
 
 Payment Details:
-- Fee Type: ${receipt.feeType || receipt.description}
-- Term: ${term}
-- Academic Year: ${academicYear}
+- Academic Year: ${academicYear || "N/A"}
+- Term: ${term || "N/A"}
 - Payment Method: ${paymentMethod}
 - Reference: ${reference}
-- Status: ${status}
+- Status: ${status} 
 
-${breakdownDisplay}
-
-Fee Status: ${statusDisplay}
-
-Total Amount: ${currency} ${amount.toLocaleString()}
-Outstanding Balance After This Payment: ${historicalDisplay}
-Current Outstanding Balance: ${outstandingDisplay}
-
-Note: 'Outstanding Balance After This Payment' shows the balance immediately after this payment. 'Current Outstanding Balance' reflects all payments to date for this term.
+Total Amount Paid: ${currency} ${amount.toLocaleString()}
+Outstanding Before Pay (Academic Year): ${currency} ${
+      outstandingBefore.toLocaleString?.() ?? outstandingBefore
+    }
+Outstanding After Pay (Academic Year): ${currency} ${
+      outstandingAfter.toLocaleString?.() ?? outstandingAfter
+    }
 
 Issued on: ${new Date(paymentDate).toLocaleDateString()}
 Issued by: ${issuedBy}
@@ -792,6 +763,231 @@ Thank you for your payment!
   useEffect(() => {
     fetchStudentFeeSummaries();
   }, [students, schoolCode]);
+
+  // Fetch current academic year and term on mount
+  useEffect(() => {
+    async function fetchAcademicInfo() {
+      setLoadingAcademicInfo(true);
+      setAcademicInfoError("");
+      try {
+        const [yearRes, termRes] = await Promise.all([
+          fetch(`/api/schools/${schoolCode}?action=current-academic-year`),
+          fetch(`/api/schools/${schoolCode}?action=current-term`),
+        ]);
+        if (!yearRes.ok) throw new Error("Failed to fetch academic year");
+        if (!termRes.ok) throw new Error("Failed to fetch term");
+        const yearData = await yearRes.json();
+        const termData = await termRes.json();
+        setCurrentAcademicYear(yearData);
+        setCurrentTerm(termData);
+      } catch (err: any) {
+        setAcademicInfoError(err.message || "Failed to load academic info");
+      } finally {
+        setLoadingAcademicInfo(false);
+      }
+    }
+    fetchAcademicInfo();
+  }, [schoolCode]);
+
+  // Fetch academic years and terms
+  useEffect(() => {
+    async function fetchYearsAndTerms() {
+      try {
+        const res = await fetch(`/api/schools/${schoolCode}/academic-years`);
+        if (!res.ok) throw new Error("Failed to fetch academic years");
+        const years = await res.json();
+        setAcademicYears(years);
+        const current = years.find((y: any) => y.isCurrent);
+        const defaultYearId = current?.id || years[0]?.id || "";
+        setSelectedYearId(defaultYearId);
+        if (defaultYearId) {
+          const tRes = await fetch(
+            `/api/schools/${schoolCode}/terms?yearId=${defaultYearId}`
+          );
+          if (!tRes.ok) throw new Error("Failed to fetch terms");
+          const t = await tRes.json();
+          setTerms(t);
+          const currentTerm = t.find((term: any) => term.isCurrent);
+          setSelectedTermId(currentTerm?.id || t[0]?.id || "");
+        }
+      } catch (err: any) {
+        // Optionally handle error
+      }
+    }
+    if (schoolCode) fetchYearsAndTerms();
+  }, [schoolCode]);
+
+  // When year changes, fetch terms
+  useEffect(() => {
+    async function fetchTerms() {
+      if (!selectedYearId) return;
+      try {
+        const tRes = await fetch(
+          `/api/schools/${schoolCode}/terms?yearId=${selectedYearId}`
+        );
+        if (!tRes.ok) throw new Error("Failed to fetch terms");
+        const t = await tRes.json();
+        setTerms(t);
+        const currentTerm = t.find((term: any) => term.isCurrent);
+        setSelectedTermId(currentTerm?.id || t[0]?.id || "");
+      } catch (err: any) {
+        // Optionally handle error
+      }
+    }
+    fetchTerms();
+  }, [selectedYearId, schoolCode]);
+
+  // Update fee summary and quick stats when filters change
+  useEffect(() => {
+    if (!selectedYearId || !selectedTermId || students.length === 0) return;
+    const child = students.find((c) => c.id === focusedChildId) || students[0];
+    if (!child) return;
+    // Fetch fee summary for the selected student, year, and term
+    async function fetchFilteredFeeSummary() {
+      try {
+        const res = await fetch(
+          `/api/schools/${schoolCode}/students/${child.id}/fees`
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        // Find the summary for the selected year and term (by ID)
+        let feeSummary = data.feeSummary || [];
+        // If backend returns termId/academicYearId, filter by those; else fallback to term/year
+        let filteredSummary = feeSummary;
+        if (
+          feeSummary.length > 0 &&
+          (feeSummary[0].termId || feeSummary[0].academicYearId)
+        ) {
+          filteredSummary = feeSummary.filter(
+            (f: any) =>
+              f.termId === selectedTermId && f.academicYearId === selectedYearId
+          );
+        } else {
+          // fallback: try to match by term/year name if IDs missing
+          const selectedYear = academicYears.find(
+            (y) => y.id === selectedYearId
+          );
+          const selectedTerm = terms.find((t) => t.id === selectedTermId);
+          filteredSummary = feeSummary.filter(
+            (f: any) =>
+              f.term === selectedTerm?.name &&
+              String(f.year) === selectedYear?.name
+          );
+        }
+        setStudentFeeSummaries((prev: any) => ({
+          ...prev,
+          [child.id]: { ...data, filteredSummary },
+        }));
+      } catch {}
+    }
+    fetchFilteredFeeSummary();
+  }, [
+    selectedYearId,
+    selectedTermId,
+    focusedChildId,
+    students,
+    schoolCode,
+    academicYears,
+    terms,
+  ]);
+
+  // UI for search
+  const renderReceiptSearch = () => (
+    <div className="mb-4">
+      <input
+        type="text"
+        placeholder="Search receipts..."
+        value={receiptSearch}
+        onChange={(e) => setReceiptSearch(e.target.value)}
+        className="border rounded px-3 py-2 w-full max-w-xs"
+      />
+    </div>
+  );
+
+  // Filter receipts by search
+  const filteredReceipts = receipts.filter((receipt: any) => {
+    const search = receiptSearch.toLowerCase();
+    return (
+      receipt.receiptNumber?.toLowerCase().includes(search) ||
+      receipt.amount?.toString().includes(search) ||
+      receipt.paymentMethod?.toLowerCase().includes(search) ||
+      receipt.description?.toLowerCase().includes(search) ||
+      receipt.academicYearId?.toLowerCase?.().includes(search) ||
+      receipt.termId?.toLowerCase?.().includes(search)
+    );
+  });
+
+  // Render receipts table
+  const renderReceiptsTable = () => (
+    <div className="w-full">
+      {renderReceiptSearch()}
+      {loadingReceipts ? (
+        <div>Loading receipts...</div>
+      ) : receiptsError ? (
+        <div className="text-red-600">{receiptsError}</div>
+      ) : (
+        <table className="min-w-full text-sm border">
+          <thead>
+            <tr className="bg-gray-100">
+              <th className="px-4 py-2 border">Receipt No</th>
+              <th className="px-4 py-2 border">Date</th>
+              <th className="px-4 py-2 border">Amount</th>
+              <th className="px-4 py-2 border">Method</th>
+              <th className="px-4 py-2 border">Description</th>
+              <th className="px-4 py-2 border">Outstanding Before</th>
+              <th className="px-4 py-2 border">Outstanding After</th>
+              <th className="px-4 py-2 border">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredReceipts.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="text-center py-8 text-gray-500">
+                  No receipts found for this search.
+                </td>
+              </tr>
+            ) : (
+              filteredReceipts.map((receipt: any) => (
+                <tr key={receipt.id}>
+                  <td className="px-4 py-2 border">{receipt.receiptNumber}</td>
+                  <td className="px-4 py-2 border">
+                    {new Date(receipt.paymentDate).toLocaleDateString()}
+                  </td>
+                  <td className="px-4 py-2 border">
+                    {receipt.amount.toLocaleString()}
+                  </td>
+                  <td className="px-4 py-2 border">
+                    {(receipt.paymentMethod || "")
+                      .replace("_", " ")
+                      .toUpperCase()}
+                  </td>
+                  <td className="px-4 py-2 border">{receipt.description}</td>
+                  <td className="px-4 py-2 border">
+                    {receipt.academicYearOutstandingBefore?.toLocaleString?.() ??
+                      receipt.academicYearOutstandingBefore}
+                  </td>
+                  <td className="px-4 py-2 border">
+                    {receipt.academicYearOutstandingAfter?.toLocaleString?.() ??
+                      receipt.academicYearOutstandingAfter}
+                  </td>
+                  <td className="px-4 py-2 border">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleDownloadReceipt(receipt)}
+                      className="flex items-center gap-1"
+                    >
+                      <Receipt className="w-4 h-4" /> Download
+                    </Button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
 
   if (isLoading) {
     return (
@@ -910,6 +1106,126 @@ Thank you for your payment!
         <main className="flex-grow p-4 md:p-6">
           {selectedSection === "children" && (
             <div>
+              {/* Academic Year & Term Info - Beautiful Glassmorphism Card */}
+              <div className="mb-6">
+                {loadingAcademicInfo ? (
+                  <div className="rounded-2xl bg-gradient-to-r from-blue-100/60 via-purple-100/60 to-pink-100/60 shadow-lg p-6 flex items-center justify-center min-h-[80px]">
+                    <span className="text-blue-700 font-semibold animate-pulse">
+                      Loading academic year and term...
+                    </span>
+                  </div>
+                ) : academicInfoError ? (
+                  <div className="rounded-2xl bg-gradient-to-r from-red-100/60 to-pink-100/60 shadow-lg p-6 flex items-center justify-center min-h-[80px]">
+                    <span className="text-red-600 font-semibold">
+                      {academicInfoError}
+                    </span>
+                  </div>
+                ) : currentAcademicYear && currentTerm ? (
+                  <div className="rounded-2xl bg-gradient-to-r from-blue-100/60 via-purple-100/60 to-pink-100/60 shadow-xl p-6 flex flex-col md:flex-row items-center justify-between gap-4 backdrop-blur-md border border-white/40">
+                    <div className="flex items-center gap-4">
+                      <div className="bg-white/60 rounded-full p-3 shadow-md flex items-center justify-center">
+                        <Calendar className="w-8 h-8 text-blue-500" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1">
+                          Academic Year
+                        </div>
+                        <div className="text-2xl md:text-3xl font-bold text-blue-700 drop-shadow-sm">
+                          {currentAcademicYear.name}
+                          <span className="ml-3 text-base font-medium text-gray-500">
+                            (
+                            {new Date(
+                              currentAcademicYear.startDate
+                            ).toLocaleDateString()}{" "}
+                            -{" "}
+                            {new Date(
+                              currentAcademicYear.endDate
+                            ).toLocaleDateString()}
+                            )
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="w-full h-[1px] bg-gradient-to-r from-blue-200/40 via-purple-200/40 to-pink-200/40 my-4 md:hidden" />
+                    <div className="flex items-center gap-4">
+                      <div className="bg-white/60 rounded-full p-3 shadow-md flex items-center justify-center">
+                        <Calendar className="w-8 h-8 text-purple-500" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1">
+                          Current Term
+                        </div>
+                        <div className="text-2xl md:text-3xl font-bold text-purple-700 drop-shadow-sm">
+                          {currentTerm.name}
+                          <span className="ml-3 text-base font-medium text-gray-500">
+                            (
+                            {new Date(
+                              currentTerm.startDate
+                            ).toLocaleDateString()}{" "}
+                            -{" "}
+                            {new Date(currentTerm.endDate).toLocaleDateString()}
+                            )
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+              {/* Academic Year & Term Filters */}
+              {academicYears.length > 0 && terms.length > 0 && (
+                <div className="flex flex-wrap gap-4 mb-6 items-center">
+                  <div>
+                    <label className="block text-xs font-semibold mb-1 text-gray-700">
+                      Academic Year
+                    </label>
+                    <div className="relative">
+                      <select
+                        className="appearance-none border rounded-lg px-4 py-2 pr-8 bg-white shadow focus:outline-none focus:ring-2 focus:ring-blue-200"
+                        value={selectedYearId}
+                        onChange={(e) => setSelectedYearId(e.target.value)}
+                        disabled={filterLoading || academicYears.length === 0}
+                      >
+                        {academicYears.map((year: any) => (
+                          <option key={year.id} value={year.id}>
+                            {year.name}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                        size={18}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold mb-1 text-gray-700">
+                      Term
+                    </label>
+                    <div className="relative">
+                      <select
+                        className="appearance-none border rounded-lg px-4 py-2 pr-8 bg-white shadow focus:outline-none focus:ring-2 focus:ring-blue-200"
+                        value={selectedTermId}
+                        onChange={(e) => setSelectedTermId(e.target.value)}
+                        disabled={filterLoading || terms.length === 0}
+                      >
+                        {terms.map((term: any) => (
+                          <option key={term.id} value={term.id}>
+                            {term.name}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                        size={18}
+                      />
+                    </div>
+                  </div>
+                  {filterError && (
+                    <div className="text-red-600 mb-2">{filterError}</div>
+                  )}
+                </div>
+              )}
               {/* Children summary at the top */}
               {students.length > 0 && (
                 <Card className="mb-6">
@@ -951,24 +1267,14 @@ Thank you for your payment!
                   const child =
                     students.find((c) => c.id === focusedChildId) ||
                     students[0];
-                  // Find the current term
-                  const currentDate = new Date();
-                  const currentYear = currentDate.getFullYear();
-                  const currentMonth = currentDate.getMonth();
-                  let currentTerm = "Term 1";
-                  if (currentMonth >= 4 && currentMonth <= 7)
-                    currentTerm = "Term 2";
-                  else if (currentMonth >= 8) currentTerm = "Term 3";
-                  // Get the outstanding balance for the current term
-                  let outstandingFees = 0;
-                  const feeSummary =
-                    studentFeeSummaries[child.id]?.feeSummary || [];
-                  const currentTermSummary = feeSummary.find(
-                    (f: any) => f.term === currentTerm && f.year === currentYear
+                  // Use new logic for outstandingFees
+                  const termBalances =
+                    studentFeeSummaries[child.id]?.termBalances || [];
+                  const currentTermId = currentTerm?.id;
+                  const currentTermSummary = termBalances.find(
+                    (f: any) => f.termId === currentTermId
                   );
-                  if (currentTermSummary) {
-                    outstandingFees = currentTermSummary.balance;
-                  }
+                  const outstandingFees = currentTermSummary?.balance || 0;
                   return (
                     <ChildOverview
                       child={child}
@@ -980,400 +1286,15 @@ Thank you for your payment!
             </div>
           )}
           {selectedSection === "fees" && (
-            <div className="max-w-4xl mx-auto">
-              <h2 className="text-2xl font-bold mb-6 text-center">
-                Fee Structure
-              </h2>
-              {students.length === 0 ? (
-                <Card className="mb-6">
-                  <CardContent>No children found.</CardContent>
-                </Card>
-              ) : (
-                (() => {
-                  const child =
-                    students.find((c) => c.id === focusedChildId) ||
-                    students[0];
-                  // Use the real-time fee summary from the backend
-                  const feeSummary =
-                    studentFeeSummaries[child.id]?.feeSummary || [];
-                  const carryForwardArrears =
-                    studentFeeSummaries[child.id]?.carryForwardArrears || 0;
-                  const carryForwardBreakdown =
-                    studentFeeSummaries[child.id]?.carryForwardBreakdown || [];
-                  const currentDate = new Date();
-                  const currentMonth = currentDate.getMonth();
-                  let currentTerm = "Term 1";
-                  if (currentMonth >= 4 && currentMonth <= 7)
-                    currentTerm = "Term 2";
-                  else if (currentMonth >= 8) currentTerm = "Term 3";
-
-                  return (
-                    <div className="space-y-6">
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>
-                            Fee Details for {child.fullName || child.name}
-                          </CardTitle>
-                          <CardDescription>
-                            {feeSummary.length > 0
-                              ? `${feeSummary.length} fee structure(s) available for ${child.gradeName}`
-                              : "No fee structures found."}
-                          </CardDescription>
-                        </CardHeader>
-                      </Card>
-
-                      {/* Multi-year arrears/carry-forward alert */}
-                      {carryForwardArrears > 0 && (
-                        <div className="p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded-lg mb-4">
-                          <div className="font-semibold text-yellow-800 mb-1">
-                            Outstanding from Previous Years:{" "}
-                            <span className="text-red-600 font-bold">
-                              KES {carryForwardArrears.toLocaleString()}
-                            </span>
-                          </div>
-                          {carryForwardBreakdown.length > 0 && (
-                            <ul className="text-sm text-yellow-700 ml-4 list-disc">
-                              {carryForwardBreakdown.map((item: any) => (
-                                <li key={item.year}>
-                                  {item.year}:{" "}
-                                  <span className="font-bold">
-                                    KES {item.outstanding.toLocaleString()}
-                                  </span>
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                          <div className="text-xs text-yellow-700 mt-2">
-                            This amount must be cleared in addition to current
-                            year fees.
-                          </div>
-                        </div>
-                      )}
-
-                      {feeSummary.length > 0 ? (
-                        <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3">
-                          {feeSummary.map((fee) => (
-                            <Card
-                              key={fee.term + fee.year}
-                              className={`$
-                                {fee.term === currentTerm
-                                  ? "ring-2 ring-blue-500 bg-blue-50"
-                                  : ""
-                              }`}
-                            >
-                              <CardHeader>
-                                <CardTitle className="flex items-center justify-between">
-                                  <span>{fee.term}</span>
-                                  {fee.term === currentTerm && (
-                                    <Badge
-                                      variant="default"
-                                      className="bg-blue-600"
-                                    >
-                                      Current
-                                    </Badge>
-                                  )}
-                                </CardTitle>
-                                <CardDescription>
-                                  {fee.year} - {child.gradeName}
-                                </CardDescription>
-                              </CardHeader>
-                              <CardContent>
-                                <div className="space-y-2">
-                                  <div className="flex justify-between items-center">
-                                    <span className="font-semibold">
-                                      Total Fee
-                                    </span>
-                                    <span className="text-blue-700 font-bold">
-                                      KES {fee.totalAmount.toLocaleString()}
-                                    </span>
-                                  </div>
-                                  <div className="flex justify-between items-center">
-                                    <span className="font-semibold">Paid</span>
-                                    <span className="text-green-700 font-bold">
-                                      KES{" "}
-                                      {(fee.totalPaid || 0).toLocaleString()}
-                                    </span>
-                                  </div>
-                                  <div className="flex justify-between items-center">
-                                    <span className="font-semibold">
-                                      Outstanding
-                                    </span>
-                                    <span className="text-red-600 font-bold">
-                                      KES {fee.balance.toLocaleString()}
-                                    </span>
-                                  </div>
-                                  {fee.carryForward > 0 && (
-                                    <div className="flex justify-between items-center">
-                                      <span className="font-semibold">
-                                        Carry Forward
-                                      </span>
-                                      <span className="text-orange-600 font-bold">
-                                        KES {fee.carryForward.toLocaleString()}
-                                      </span>
-                                    </div>
-                                  )}
-                                  <div className="flex justify-between items-center mt-2">
-                                    <span className="font-semibold text-sm">
-                                      Status
-                                    </span>
-                                    <span
-                                      className={
-                                        fee.balance === 0
-                                          ? "text-green-600 font-bold text-sm"
-                                          : fee.totalPaid > 0
-                                          ? "text-orange-600 font-bold text-sm"
-                                          : "text-red-600 font-bold text-sm"
-                                      }
-                                    >
-                                      {fee.balance === 0
-                                        ? "Paid"
-                                        : fee.totalPaid > 0
-                                        ? "Partial"
-                                        : "Outstanding"}
-                                    </span>
-                                  </div>
-                                  {/* Payment History */}
-                                  {fee.payments && fee.payments.length > 0 && (
-                                    <div className="mt-2">
-                                      <div className="font-semibold text-xs mb-1">
-                                        Payment History
-                                      </div>
-                                      <ul className="text-xs text-gray-700 space-y-1">
-                                        {fee.payments.map(
-                                          (p: any, idx: number) => (
-                                            <li
-                                              key={p.id || idx}
-                                              className="flex justify-between"
-                                            >
-                                              <span>
-                                                {new Date(
-                                                  p.paymentDate
-                                                ).toLocaleDateString()}{" "}
-                                                -{" "}
-                                                {p.paymentMethod.replace(
-                                                  "_",
-                                                  " "
-                                                )}
-                                              </span>
-                                              <span className="font-bold">
-                                                KES {p.amount.toLocaleString()}
-                                              </span>
-                                            </li>
-                                          )
-                                        )}
-                                      </ul>
-                                    </div>
-                                  )}
-                                  {/* Pay Button */}
-                                  <div className="mt-4">
-                                    {fee.balance === 0 ? (
-                                      <Badge className="bg-green-600">
-                                        Paid
-                                      </Badge>
-                                    ) : (
-                                      <Button
-                                        className="w-full"
-                                        onClick={() => {
-                                          setSelectedStudent(child);
-                                          setSelectedFeeStructure({
-                                            ...fee,
-                                            totalAmount: fee.balance, // Only allow payment of outstanding
-                                          });
-                                          setPaymentModalOpen(true);
-                                        }}
-                                        disabled={fee.balance === 0}
-                                      >
-                                        Pay KES {fee.balance.toLocaleString()}
-                                      </Button>
-                                    )}
-                                  </div>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          ))}
-                        </div>
-                      ) : (
-                        <Card>
-                          <CardContent>
-                            <div className="text-gray-500 text-center py-8">
-                              No fee structures available for this child.
-                            </div>
-                          </CardContent>
-                        </Card>
-                      )}
-                    </div>
-                  );
-                })()
-              )}
-            </div>
+            <ParentFeesPanel
+              schoolCode={schoolCode}
+              students={students}
+              focusedChildId={focusedChildId}
+              studentFeeSummaries={studentFeeSummaries}
+              refreshFeeData={fetchStudentFeeSummaries}
+            />
           )}
-          {selectedSection === "receipts" && (
-            <div className="max-w-4xl mx-auto">
-              <h2 className="text-2xl font-bold mb-6 text-center">
-                Payment History & Receipts
-              </h2>
-              {students.length === 0 ? (
-                <Card className="mb-6">
-                  <CardContent>No children found.</CardContent>
-                </Card>
-              ) : (
-                <div className="space-y-6">
-                  {/* Payment Summary Card */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Payment Summary</CardTitle>
-                      <CardDescription>
-                        Payment history for{" "}
-                        {students.find((c) => c.id === focusedChildId)
-                          ?.fullName || students[0].fullName}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="text-center p-4 bg-blue-50 rounded-lg">
-                          <div className="text-2xl font-bold text-blue-600">
-                            {receipts.length}
-                          </div>
-                          <div className="text-sm text-gray-600">
-                            Total Payments
-                          </div>
-                        </div>
-                        <div className="text-center p-4 bg-green-50 rounded-lg">
-                          <div className="text-2xl font-bold text-green-600">
-                            KES{" "}
-                            {receipts
-                              .reduce((sum, receipt) => sum + receipt.amount, 0)
-                              .toLocaleString()}
-                          </div>
-                          <div className="text-sm text-gray-600">
-                            Total Paid
-                          </div>
-                        </div>
-                        <div className="text-center p-4 bg-orange-50 rounded-lg">
-                          <div className="text-2xl font-bold text-orange-600">
-                            {receipts.length > 0
-                              ? new Date(
-                                  receipts[0].paymentDate
-                                ).toLocaleDateString()
-                              : "N/A"}
-                          </div>
-                          <div className="text-sm text-gray-600">
-                            Last Payment
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Payment History Table */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Payment History</CardTitle>
-                      <CardDescription>
-                        Recent payments and receipts
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {receipts.length > 0 ? (
-                        <div className="space-y-4">
-                          {receipts.map((receipt) => (
-                            <div
-                              key={receipt.id}
-                              className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
-                            >
-                              <div className="flex justify-between items-start mb-2">
-                                <div>
-                                  <h4 className="font-semibold text-lg">
-                                    Receipt #{receipt.receiptNumber}
-                                  </h4>
-                                  <p className="text-sm text-gray-600">
-                                    {receipt.description}
-                                  </p>
-                                </div>
-                                <div className="text-right">
-                                  <div className="text-lg font-bold text-green-600">
-                                    KES {receipt.amount.toLocaleString()}
-                                  </div>
-                                  <div className="text-xs text-gray-500">
-                                    {new Date(
-                                      receipt.paymentDate
-                                    ).toLocaleDateString()}
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                <div>
-                                  <span className="font-medium">
-                                    Payment Method:
-                                  </span>
-                                  <p className="capitalize">
-                                    {receipt.paymentMethod.replace("_", " ")}
-                                  </p>
-                                </div>
-                                <div>
-                                  <span className="font-medium">
-                                    Reference:
-                                  </span>
-                                  <p className="text-xs">
-                                    {receipt.referenceNumber}
-                                  </p>
-                                </div>
-                                <div>
-                                  <span className="font-medium">
-                                    Balance After:
-                                  </span>
-                                  <p className="text-red-600">
-                                    KES {receipt.balance.toLocaleString()}
-                                  </p>
-                                </div>
-                                <div>
-                                  <span className="font-medium">
-                                    Balance Before:
-                                  </span>
-                                  <p className="text-gray-600">
-                                    KES{" "}
-                                    {receipt.balanceCarriedForward.toLocaleString()}
-                                  </p>
-                                </div>
-                              </div>
-
-                              <div className="mt-3 flex gap-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleDownloadReceipt(receipt)}
-                                >
-                                  <Download className="w-4 h-4 mr-2" />
-                                  Download Receipt
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => setSelectedReceipt(receipt)}
-                                >
-                                  <Receipt className="w-4 h-4 mr-2" />
-                                  View Receipt
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-center py-8 text-gray-500">
-                          <Receipt className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                          <p>No payment history found for this student.</p>
-                          <p className="text-sm">
-                            Payments will appear here once made.
-                          </p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
-            </div>
-          )}
+          {selectedSection === "receipts" && renderReceiptsTable()}
           {selectedSection === "performance" && (
             <div>
               {focusedChildId

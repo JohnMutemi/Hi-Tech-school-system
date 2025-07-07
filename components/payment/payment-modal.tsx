@@ -1,7 +1,12 @@
 "use client";
 
 import React, { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,31 +44,9 @@ export function PaymentModal({
 
   const handlePaymentSuccess = (paymentData: any) => {
     toast.success("Payment processed successfully!");
-    
-    // Generate receipt data
-    const receipt = {
-      receiptNumber: `RCP-${Date.now()}`,
-      paymentId: paymentData.paymentId || `pay_${Date.now()}`,
-      studentId,
-      schoolCode,
-      amount: customAmount,
-      paymentMethod: paymentData.paymentMethod || 'mpesa',
-      feeType,
-      term,
-      academicYear,
-      reference: paymentData.reference || `PAY-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      phoneNumber: paymentData.phoneNumber,
-      transactionId: paymentData.transactionId,
-      status: 'completed',
-      issuedAt: new Date(),
-      issuedBy: 'School System',
-      schoolName: 'Demo School',
-      studentName: 'Demo Student',
-      currency: 'KES'
-    };
-
-    setGeneratedReceipt(receipt);
-    onReceiptGenerated?.(receipt);
+    // Use only backend-provided receipt data
+    setGeneratedReceipt(paymentData);
+    onReceiptGenerated?.(paymentData);
   };
 
   const handlePaymentError = (error: string) => {
@@ -85,36 +68,52 @@ export function PaymentModal({
     const receiptContent = `
 Payment Receipt
 
-School: ${generatedReceipt.schoolName}
-Receipt #: ${generatedReceipt.receiptNumber}
+School: ${generatedReceipt.schoolName || "N/A"}
+Receipt #: ${generatedReceipt.receiptNumber || "N/A"}
 
 Student Information:
-- Student ID: ${generatedReceipt.studentId}
-- Student Name: ${generatedReceipt.studentName}
+- Student ID: ${generatedReceipt.studentId || "N/A"}
+- Student Name: ${generatedReceipt.studentName || "N/A"}
 
 Payment Details:
-- Fee Type: ${generatedReceipt.feeType}
-- Term: ${generatedReceipt.term}
-- Academic Year: ${generatedReceipt.academicYear}
-- Payment Method: ${generatedReceipt.paymentMethod.toUpperCase()}
-${generatedReceipt.phoneNumber ? `- Phone Number: ${generatedReceipt.phoneNumber}` : ''}
-${generatedReceipt.transactionId ? `- Transaction ID: ${generatedReceipt.transactionId}` : ''}
-- Reference: ${generatedReceipt.reference}
-- Status: ${generatedReceipt.status.toUpperCase()}
+- Fee Type: ${generatedReceipt.feeType || generatedReceipt.description || "N/A"}
+- Term: ${generatedReceipt.term || "N/A"}
+- Academic Year: ${generatedReceipt.academicYear || "N/A"}
+- Payment Method: ${(generatedReceipt.paymentMethod || "").toUpperCase()}
+${
+  generatedReceipt.phoneNumber
+    ? `- Phone Number: ${generatedReceipt.phoneNumber}`
+    : ""
+}
+${
+  generatedReceipt.transactionId
+    ? `- Transaction ID: ${generatedReceipt.transactionId}`
+    : ""
+}
+- Reference: ${
+      generatedReceipt.reference || generatedReceipt.referenceNumber || "N/A"
+    }
+- Status: ${(generatedReceipt.status || "").toUpperCase()}
 
-Total Amount: ${generatedReceipt.currency} ${generatedReceipt.amount.toLocaleString()}
+Total Amount: ${generatedReceipt.currency || "KES"} ${(
+      generatedReceipt.amount || 0
+    ).toLocaleString()}
 
-Issued on: ${generatedReceipt.issuedAt.toLocaleDateString()}
-Issued by: ${generatedReceipt.issuedBy}
+Issued on: ${
+      generatedReceipt.issuedAt
+        ? new Date(generatedReceipt.issuedAt).toLocaleDateString()
+        : "N/A"
+    }
+Issued by: ${generatedReceipt.issuedBy || "N/A"}
 
 Thank you for your payment!
     `;
 
-    const blob = new Blob([receiptContent], { type: 'text/plain' });
+    const blob = new Blob([receiptContent], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    a.download = `receipt-${generatedReceipt.receiptNumber}.txt`;
+    a.download = `receipt-${generatedReceipt.receiptNumber || "N/A"}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -156,7 +155,7 @@ Thank you for your payment!
                 Custom Amount
               </Button>
             </div>
-            
+
             {showCustomAmount && (
               <div className="space-y-2">
                 <Label htmlFor="customAmount">Enter Amount (KES)</Label>
@@ -197,10 +196,12 @@ Thank you for your payment!
               <div className="bg-green-50 p-4 rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
                   <Receipt className="w-5 h-5 text-green-600" />
-                  <h4 className="font-medium text-green-800">Payment Completed!</h4>
+                  <h4 className="font-medium text-green-800">
+                    Payment Completed!
+                  </h4>
                 </div>
                 <p className="text-sm text-green-700 mb-3">
-                  Receipt #: {generatedReceipt.receiptNumber}
+                  Receipt #: {generatedReceipt.receiptNumber || "N/A"}
                 </p>
                 <Button onClick={handleDownloadReceipt} className="w-full">
                   <Download className="w-4 h-4 mr-2" />
@@ -213,4 +214,4 @@ Thank you for your payment!
       </DialogContent>
     </Dialog>
   );
-} 
+}

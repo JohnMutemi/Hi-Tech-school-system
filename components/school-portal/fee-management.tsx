@@ -57,6 +57,13 @@ import {
   Shield,
   Clock,
 } from "lucide-react";
+import {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+} from "@/components/ui/accordion";
+import Papa from "papaparse";
 
 interface FeeStructure {
   id: string;
@@ -83,6 +90,8 @@ interface FeeStructure {
     details: any;
   }>;
   gradeName: string;
+  academicYearId: string;
+  termId: string;
 }
 
 interface FeeManagementProps {
@@ -107,6 +116,10 @@ export function FeeManagement({
   const [grades, setGrades] = useState<any[]>([]);
   const [loadingGrades, setLoadingGrades] = useState(false);
 
+  // New: Academic year and term state
+  const [academicYearId, setAcademicYearId] = useState<string>("");
+  const [termId, setTermId] = useState<string>("");
+
   // Form state
   const [formData, setFormData] = useState({
     term: "",
@@ -121,16 +134,38 @@ export function FeeManagement({
       transport: "",
       other: "",
     },
+    academicYearId: "",
+    termId: "",
   });
 
-  const [breakdownItems, setBreakdownItems] = useState([
-    { key: "tuition", label: "Tuition Fee", icon: "🎓" },
-    { key: "books", label: "Books & Materials", icon: "📚" },
-    { key: "lunch", label: "Lunch Program", icon: "🍽️" },
-    { key: "uniform", label: "School Uniform", icon: "👔" },
-    { key: "transport", label: "Transportation", icon: "🚌" },
-    { key: "other", label: "Other Fees", icon: "📋" },
-  ]);
+  // Replace breakdown and breakdownItems state with a dynamic array
+  const [breakdown, setBreakdown] = useState([{ name: "", value: "" }]);
+
+  // CSV import handler
+  const handleCSVImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    Papa.parse(file, {
+      header: true,
+      complete: (results: Papa.ParseResult<any>) => {
+        const imported = results.data
+          .filter((row: any) => row["Breakdown Name"] && row["Amount"])
+          .map((row: any) => ({
+            name: row["Breakdown Name"],
+            value: row["Amount"].toString(),
+          }));
+        setBreakdown(imported.length ? imported : [{ name: "", value: "" }]);
+      },
+    });
+  };
+
+  // Calculate total from breakdown
+  const calculateTotal = () => {
+    return breakdown.reduce(
+      (sum, item) => sum + (parseFloat(item.value) || 0),
+      0
+    );
+  };
 
   // Get current term and year
   const currentDate = new Date();
@@ -141,11 +176,42 @@ export function FeeManagement({
   if (currentMonth >= 4 && currentMonth <= 7) currentTerm = "Term 2";
   else if (currentMonth >= 8) currentTerm = "Term 3";
 
+  // Fetch current academic year and term
+  useEffect(() => {
+    async function fetchCurrentAcademicYearAndTerm() {
+      try {
+        const res = await fetch(
+          `/api/schools/${schoolCode}?action=current-academic-year`
+        );
+        if (res.ok) {
+          const year = await res.json();
+          setAcademicYearId(year?.id || "");
+          const currentTerm = year?.terms?.find((t: any) => t.isCurrent);
+          setTermId(currentTerm?.id || "");
+          // Default form fields if not editing
+          setFormData((prev) => ({
+            ...prev,
+            academicYearId: year?.id || "",
+            termId: currentTerm?.id || "",
+          }));
+        }
+      } catch {}
+    }
+    if (schoolCode) fetchCurrentAcademicYearAndTerm();
+  }, [schoolCode]);
+
   // Fetch fee structures
   const fetchFeeStructures = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/schools/${schoolCode}/fee-structure`);
+      // Show all fee structures by default (no filters)
+      let url = `/api/schools/${schoolCode}/fee-structure`;
+      // If you add filter UI later, add params here
+      // const params = [];
+      // if (academicYearId) params.push(`academicYearId=${academicYearId}`);
+      // if (termId) params.push(`termId=${termId}`);
+      // if (params.length) url += `?${params.join("&")}`;
+      const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
         setFeeStructures(data);
@@ -169,7 +235,7 @@ export function FeeManagement({
 
   useEffect(() => {
     fetchFeeStructures();
-  }, [schoolCode]);
+  }, [schoolCode, academicYearId, termId]);
 
   useEffect(() => {
     async function fetchGrades() {
@@ -183,24 +249,86 @@ export function FeeManagement({
     if (schoolCode) fetchGrades();
   }, [schoolCode]);
 
+  // Add state for available terms in the current academic year
+  const [availableTerms, setAvailableTerms] = useState<any[]>([]);
+
+  // Fetch available terms for the current academic year
+  useEffect(() => {
+    async function fetchTerms() {
+      if (!academicYearId) return;
+      try {
+        const res = await fetch(
+          `/api/schools/${schoolCode}/terms?yearId=${academicYearId}`
+        );
+        if (!res.ok) throw new Error("Failed to fetch terms");
+        const terms = await res.json();
+        setAvailableTerms(terms);
+      } catch {
+        setAvailableTerms([]);
+      }
+    }
+    fetchTerms();
+  }, [schoolCode, academicYearId]);
+
+  // Add state for available academic years
+  const [availableYears, setAvailableYears] = useState<any[]>([]);
+
+  // Fetch available academic years
+  useEffect(() => {
+    async function fetchYears() {
+      try {
+        const res = await fetch(`/api/schools/${schoolCode}/academic-years`);
+        if (!res.ok) throw new Error("Failed to fetch academic years");
+        const years = await res.json();
+        setAvailableYears(years);
+        // Set default year if not editing
+        if (!editingFee && years.length > 0) {
+          setAcademicYearId(years[0].id);
+          setFormData((prev) => ({ ...prev, academicYearId: years[0].id }));
+        }
+      } catch {
+        setAvailableYears([]);
+      }
+    }
+    fetchYears();
+  }, [schoolCode, editingFee]);
+
+  // When academic year changes, fetch terms
+  useEffect(() => {
+    async function fetchTerms() {
+      if (!academicYearId) return;
+      try {
+        const res = await fetch(
+          `/api/schools/${schoolCode}/terms?yearId=${academicYearId}`
+        );
+        if (!res.ok) throw new Error("Failed to fetch terms");
+        const terms = await res.json();
+        setAvailableTerms(terms);
+        // Set default term if not editing
+        if (!editingFee && terms.length > 0) {
+          setTermId(terms[0].id);
+          setFormData((prev) => ({ ...prev, termId: terms[0].id }));
+        }
+      } catch {
+        setAvailableTerms([]);
+      }
+    }
+    fetchTerms();
+  }, [schoolCode, academicYearId, editingFee]);
+
+  // Handle form submit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    // Calculate total from breakdown
-    const total = Object.values(formData.breakdown).reduce(
-      (sum, value) => sum + (parseFloat(value) || 0),
-      0
-    );
-
+    const total = calculateTotal();
     const feeData = {
       ...formData,
       totalAmount: total,
-      breakdown: Object.fromEntries(
-        Object.entries(formData.breakdown).map(([key, value]) => [
-          key,
-          parseFloat(value) || 0,
-        ])
-      ),
+      academicYearId: formData.academicYearId || academicYearId,
+      termId: formData.termId || termId,
+      breakdown: breakdown.map((item) => ({
+        name: item.name,
+        value: parseFloat(item.value) || 0,
+      })),
     };
 
     try {
@@ -235,7 +363,10 @@ export function FeeManagement({
             transport: "",
             other: "",
           },
+          academicYearId: academicYearId,
+          termId: termId,
         });
+        setBreakdown([{ name: "", value: "" }]);
 
         // Refresh the fee structures list
         await fetchFeeStructures();
@@ -268,6 +399,7 @@ export function FeeManagement({
     }
   };
 
+  // Handle edit
   const handleEdit = (fee: FeeStructure) => {
     setEditingFee(fee);
     setFormData({
@@ -275,18 +407,24 @@ export function FeeManagement({
       year: fee.year.toString(),
       gradeId: fee.gradeId,
       totalAmount: fee.totalAmount.toString(),
-      breakdown: {
-        tuition: fee.breakdown.tuition?.toString() || "",
-        books: fee.breakdown.books?.toString() || "",
-        lunch: fee.breakdown.lunch?.toString() || "",
-        uniform: fee.breakdown.uniform?.toString() || "",
-        transport: fee.breakdown.transport?.toString() || "",
-        other: fee.breakdown.other?.toString() || "",
-      },
+      academicYearId: fee.academicYearId || academicYearId,
+      termId: fee.termId || termId,
     });
+    setBreakdown(
+      Array.isArray(fee.breakdown)
+        ? fee.breakdown.map((item: any) => ({
+            name: item.name,
+            value: item.value.toString(),
+          }))
+        : Object.entries(fee.breakdown || {}).map(([name, value]) => ({
+            name,
+            value: value.toString(),
+          }))
+    );
     setShowForm(true);
   };
 
+  // Handle close form
   const handleCloseForm = () => {
     setShowForm(false);
     setEditingFee(null);
@@ -303,15 +441,30 @@ export function FeeManagement({
         transport: "",
         other: "",
       },
+      academicYearId: academicYearId,
+      termId: termId,
     });
+    setBreakdown([{ name: "", value: "" }]);
   };
 
-  const calculateTotal = () => {
-    return Object.values(formData.breakdown).reduce(
-      (sum, value) => sum + (parseFloat(value) || 0),
-      0
+  // Add search state
+  const [search, setSearch] = useState("");
+
+  // Filtered fee structures based on search
+  const filteredFeeStructures = feeStructures.filter((fee) => {
+    const searchText = search.toLowerCase();
+    return (
+      (fee.term && fee.term.toLowerCase().includes(searchText)) ||
+      (fee.year && fee.year.toString().includes(searchText)) ||
+      (fee.gradeName && fee.gradeName.toLowerCase().includes(searchText)) ||
+      (fee.totalAmount && fee.totalAmount.toString().includes(searchText)) ||
+      (fee.isActive ? "active" : "inactive").includes(searchText) ||
+      (fee.creator?.name &&
+        fee.creator.name.toLowerCase().includes(searchText)) ||
+      (fee.creator?.email &&
+        fee.creator.email.toLowerCase().includes(searchText))
     );
-  };
+  });
 
   return (
     <div className="space-y-8">
@@ -440,13 +593,26 @@ export function FeeManagement({
       {/* Enhanced Fee Structures Table */}
       <Card className="rounded-3xl border-0 shadow-2xl overflow-hidden bg-gradient-to-br from-white to-gray-50">
         <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
-          <CardTitle className="text-2xl font-bold text-gray-800 flex items-center gap-3">
-            <TrendingUp className="w-6 h-6 text-blue-600" />
-            Fee Structures Overview
-          </CardTitle>
-          <CardDescription className="text-gray-600">
-            Manage and monitor all fee structures for your school
-          </CardDescription>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <CardTitle className="text-2xl font-bold text-gray-800 flex items-center gap-3">
+                <TrendingUp className="w-6 h-6 text-blue-600" />
+                Fee Structures Overview
+              </CardTitle>
+              <CardDescription className="text-gray-600">
+                Manage and monitor all fee structures for your school
+              </CardDescription>
+            </div>
+            <div className="w-full md:w-72">
+              <input
+                type="text"
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                placeholder="Search by term, year, grade, status, creator..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {loading ? (
@@ -456,16 +622,18 @@ export function FeeManagement({
                 Loading fee structures...
               </span>
             </div>
-          ) : feeStructures.length === 0 ? (
+          ) : filteredFeeStructures.length === 0 ? (
             <div className="text-center py-12">
               <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <FileText className="w-10 h-10 text-gray-400" />
               </div>
               <h3 className="text-lg font-semibold text-gray-700 mb-2">
-                No fee structures yet
+                No fee structures found
               </h3>
               <p className="text-gray-500 mb-6">
-                Create your first fee structure to get started
+                {search
+                  ? "Try a different search term or clear the filter."
+                  : "Create your first fee structure to get started"}
               </p>
               <Button
                 onClick={() => setShowForm(true)}
@@ -504,7 +672,7 @@ export function FeeManagement({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {feeStructures.map((fee) => (
+                  {filteredFeeStructures.map((fee) => (
                     <TableRow
                       key={fee.id}
                       className="hover:bg-gray-50/50 transition-colors duration-200"
@@ -636,38 +804,52 @@ export function FeeManagement({
             <div className="grid md:grid-cols-3 gap-6">
               <div className="space-y-2">
                 <Label className="text-sm font-semibold text-gray-700">
-                  Term *
+                  Academic Year *
                 </Label>
-                <Select
-                  value={formData.term}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, term: value })
-                  }
+                <select
+                  className="border rounded px-3 py-2 w-full"
+                  value={formData.academicYearId}
+                  onChange={(e) => {
+                    setAcademicYearId(e.target.value);
+                    setFormData({
+                      ...formData,
+                      academicYearId: e.target.value,
+                      termId: "",
+                    });
+                  }}
+                  required
                 >
-                  <SelectTrigger className="rounded-xl border-gray-200 focus:border-blue-500 focus:ring-blue-500">
-                    <SelectValue placeholder="Select term" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Term 1">Term 1</SelectItem>
-                    <SelectItem value="Term 2">Term 2</SelectItem>
-                    <SelectItem value="Term 3">Term 3</SelectItem>
-                  </SelectContent>
-                </Select>
+                  <option value="">Select Academic Year</option>
+                  {availableYears.map((year: any) => (
+                    <option key={year.id} value={year.id}>
+                      {year.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="space-y-2">
                 <Label className="text-sm font-semibold text-gray-700">
-                  Year *
+                  Term *
                 </Label>
-                <Input
-                  type="number"
-                  value={formData.year}
+                <select
+                  className="border rounded px-3 py-2 w-full"
+                  value={formData.termId}
                   onChange={(e) =>
-                    setFormData({ ...formData, year: e.target.value })
+                    setFormData({ ...formData, termId: e.target.value })
                   }
-                  className="rounded-xl border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-                  placeholder="2024"
-                />
+                  required
+                  disabled={
+                    !formData.academicYearId || availableTerms.length === 0
+                  }
+                >
+                  <option value="">Select Term</option>
+                  {availableTerms.map((term: any) => (
+                    <option key={term.id} value={term.id}>
+                      {term.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="space-y-2">
@@ -711,35 +893,58 @@ export function FeeManagement({
                   </div>
                 </div>
               </div>
-
-              <div className="grid md:grid-cols-2 gap-4">
-                {breakdownItems.map((item) => (
-                  <div key={item.key} className="group relative">
-                    <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-2">
-                      <span className="text-lg">{item.icon}</span>
-                      {item.label}
-                    </Label>
+              <div className="flex flex-col gap-2">
+                {breakdown.map((item, idx) => (
+                  <div key={idx} className="flex gap-2 items-center">
+                    <Input
+                      type="text"
+                      placeholder="Breakdown Name"
+                      value={item.name}
+                      onChange={(e) => {
+                        const updated = [...breakdown];
+                        updated[idx].name = e.target.value;
+                        setBreakdown(updated);
+                      }}
+                      className="flex-1"
+                    />
                     <Input
                       type="number"
-                      value={
-                        formData.breakdown[
-                          item.key as keyof typeof formData.breakdown
-                        ]
-                      }
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          breakdown: {
-                            ...formData.breakdown,
-                            [item.key]: e.target.value,
-                          },
-                        })
-                      }
-                      className="rounded-xl border-gray-200 focus:border-blue-500 focus:ring-blue-500 group-hover:border-blue-300 transition-colors duration-200"
-                      placeholder="0"
+                      placeholder="Amount"
+                      value={item.value}
+                      onChange={(e) => {
+                        const updated = [...breakdown];
+                        updated[idx].value = e.target.value;
+                        setBreakdown(updated);
+                      }}
+                      className="w-32"
                     />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() =>
+                        setBreakdown(breakdown.filter((_, i) => i !== idx))
+                      }
+                      disabled={breakdown.length === 1}
+                    >
+                      Remove
+                    </Button>
                   </div>
                 ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    setBreakdown([...breakdown, { name: "", value: "" }])
+                  }
+                >
+                  Add Breakdown
+                </Button>
+                <div className="pt-2">
+                  <input type="file" accept=".csv" onChange={handleCSVImport} />
+                  <span className="text-xs text-gray-500 ml-2">
+                    Import from CSV (columns: Breakdown Name, Amount)
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -827,25 +1032,33 @@ export function FeeManagement({
                 <div className="rounded-xl border border-gray-200 max-h-48 overflow-y-auto">
                   <Table>
                     <TableBody>
-                      {Object.entries(viewingFee.breakdown).map(
-                        ([key, value]) =>
-                          value > 0 && (
-                            <TableRow key={key}>
-                              <TableCell className="font-medium capitalize py-2 text-sm flex items-center gap-2">
-                                <span>
-                                  {
-                                    breakdownItems.find((i) => i.key === key)
-                                      ?.icon
-                                  }
-                                </span>
-                                {key.replace(/([A-Z])/g, " $1").trim()}
-                              </TableCell>
-                              <TableCell className="text-right font-semibold py-2 text-sm">
-                                KES {value?.toLocaleString() || "0"}
-                              </TableCell>
-                            </TableRow>
+                      {Array.isArray(viewingFee.breakdown)
+                        ? viewingFee.breakdown.map(
+                            (item, idx) =>
+                              item.value > 0 && (
+                                <TableRow key={item.name + idx}>
+                                  <TableCell className="font-medium capitalize py-2 text-sm">
+                                    {item.name}
+                                  </TableCell>
+                                  <TableCell className="text-right font-semibold py-2 text-sm">
+                                    KES {Number(item.value).toLocaleString()}
+                                  </TableCell>
+                                </TableRow>
+                              )
                           )
-                      )}
+                        : Object.entries(viewingFee.breakdown || {}).map(
+                            ([key, value]) =>
+                              value > 0 && (
+                                <TableRow key={key}>
+                                  <TableCell className="font-medium capitalize py-2 text-sm">
+                                    {key.replace(/([A-Z])/g, " $1").trim()}
+                                  </TableCell>
+                                  <TableCell className="text-right font-semibold py-2 text-sm">
+                                    KES {value?.toLocaleString() || "0"}
+                                  </TableCell>
+                                </TableRow>
+                              )
+                          )}
                     </TableBody>
                   </Table>
                 </div>
@@ -874,17 +1087,17 @@ export function FeeManagement({
                   value="history"
                   className="space-y-2 mt-2 max-h-48 overflow-y-auto"
                 >
-                  <div className="space-y-2">
-                    {viewingFee.logs.length > 0 ? (
-                      viewingFee.logs.map((log) => (
+                  {viewingFee.logs.length > 0 ? (
+                    <div className="space-y-2">
+                      {viewingFee.logs.map((log, idx) => (
                         <div
-                          key={log.id}
+                          key={log.id || idx}
                           className="flex items-center space-x-3 p-2 bg-gray-50 rounded-lg"
                         >
                           <div className="p-1 bg-blue-100 rounded-md">
                             <History className="w-4 h-4 text-blue-600" />
                           </div>
-                          <div className="flex-1">
+                          <div className="flex-1 text-left">
                             <p className="font-medium text-xs text-gray-900">
                               {log.action.charAt(0).toUpperCase() +
                                 log.action.slice(1)}{" "}
@@ -895,13 +1108,13 @@ export function FeeManagement({
                             </p>
                           </div>
                         </div>
-                      ))
-                    ) : (
-                      <p className="text-sm text-center text-gray-500 py-4">
-                        No history yet.
-                      </p>
-                    )}
-                  </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-center text-gray-500 py-4">
+                      No history yet.
+                    </p>
+                  )}
                 </TabsContent>
 
                 <TabsContent value="details" className="space-y-2 mt-2">

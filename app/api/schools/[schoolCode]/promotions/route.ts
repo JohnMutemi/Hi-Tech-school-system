@@ -107,6 +107,8 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
       excludedStudents,
       promotedBy,
       notes,
+      toAcademicYearId,
+      toTermId
     } = body;
 
     const school = await prisma.school.findUnique({
@@ -119,6 +121,21 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
 
     if (!fromClass || !toClass || !studentIds || studentIds.length === 0) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    let academicYearId = toAcademicYearId;
+    let termId = toTermId;
+    if (!academicYearId) {
+      const currentYear = await prisma.academicYear.findFirst({
+        where: { schoolId: school.id, isCurrent: true },
+      });
+      academicYearId = currentYear?.id;
+    }
+    if (!termId && academicYearId) {
+      const currentTerm = await prisma.term.findFirst({
+        where: { academicYearId, isCurrent: true },
+      });
+      termId = currentTerm?.id;
     }
 
     const currentYear = new Date().getFullYear().toString();
@@ -212,15 +229,13 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
           throw new Error(`Target class ${toClass} not found`);
         }
 
-        // Update student class and academic year
+        // Update student class and academic year/term
         await tx.student.update({
           where: { id: studentId },
           data: {
             classId: targetClass.id,
-            // Remove old fields that are no longer used
-            // classLevel: toClass,
-            // className: toClass,
-            // academicYear: nextYear,
+            currentAcademicYearId: academicYearId,
+            currentTermId: termId,
           },
         });
 
@@ -237,6 +252,8 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
               type: 'bulk_promotion',
               outstandingBalance: outstandingBalance || 0,
               carryForwardCreated: outstandingBalance > 0,
+              academicYearId,
+              termId,
             },
             notes: outstandingBalance > 0 
               ? `${notes} (Fee balance of KES ${outstandingBalance.toLocaleString()} carried forward)`

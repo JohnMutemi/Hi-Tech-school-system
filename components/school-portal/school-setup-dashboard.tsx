@@ -83,6 +83,7 @@ import { updateSchoolClasses, getSchool } from "@/lib/school-storage";
 import Link from "next/link";
 import { generateTempPassword } from "@/lib/utils/school-generator";
 import { FeeManagement } from "./fee-management";
+import { AcademicCalendarCrud } from "./AcademicCalendarCrud";
 
 interface SchoolSetupDashboardProps {
   schoolData: SchoolData;
@@ -1613,7 +1614,7 @@ export function SchoolSetupDashboard({
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-8">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="profile">School Profile</TabsTrigger>
             <TabsTrigger value="staff">Staff & Teachers</TabsTrigger>
@@ -1621,6 +1622,9 @@ export function SchoolSetupDashboard({
             <TabsTrigger value="subjects">Subjects & Classes</TabsTrigger>
             <TabsTrigger value="fees">Fee Management</TabsTrigger>
             <TabsTrigger value="promotions">Promotions</TabsTrigger>
+            <TabsTrigger value="academic-calendar">
+              Academic Calendar
+            </TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -3590,6 +3594,11 @@ export function SchoolSetupDashboard({
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Academic Calendar Tab */}
+          <TabsContent value="academic-calendar" className="space-y-6">
+            <AcademicCalendarCrud schoolCode={schoolData.schoolCode} />
           </TabsContent>
         </Tabs>
       </div>
