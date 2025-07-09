@@ -69,7 +69,7 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
     // Auto-generate portal URL when school name changes
     if (name === "name" && value) {
       const code = schoolData.code || generateSchoolCode(value)
-      setGeneratedPortalUrl(`https://app.yourdomain.com/schools/${code.toLowerCase()}`)
+      setGeneratedPortalUrl(`https://app.yourdomain.com/schools/${code.toUpperCase()}`)
     }
   }
 

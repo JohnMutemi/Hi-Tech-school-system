@@ -5,11 +5,23 @@ import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { generateNextAdmissionNumber } from '@/lib/utils/school-generator';
+
+function getNextAdmissionNumber(lastAdmissionNumber: string): string {
+  if (!lastAdmissionNumber) return '001';
+  const match = lastAdmissionNumber.match(/(\d+)(?!.*\d)/);
+  if (match) {
+    const number = match[1];
+    const next = (parseInt(number, 10) + 1).toString().padStart(number.length, '0');
+    return lastAdmissionNumber.replace(/(\d+)(?!.*\d)/, next);
+  }
+  return lastAdmissionNumber + '1';
+}
 
 export default function AddStudentPage() {
   const router = useRouter();
   const params = useParams();
-  const schoolCode = params.schoolCode as string;
+  const schoolCode = (params.schoolCode as string).toUpperCase();
   const [form, setForm] = useState({
     name: "",
     admissionNumber: "",
@@ -23,6 +35,8 @@ export default function AddStudentPage() {
   const [loadingSections, setLoadingSections] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [admissionSettings, setAdmissionSettings] = useState<any>(null);
+  const [admissionPreview, setAdmissionPreview] = useState("");
 
   useEffect(() => {
     async function fetchGrades() {
@@ -51,6 +65,29 @@ export default function AddStudentPage() {
     fetchSections();
   }, [form.gradeId, schoolCode]);
 
+  // Fetch admission number settings and suggest next admission number
+  useEffect(() => {
+    async function fetchAdmissionSettings() {
+      const res = await fetch(`/api/schools/${schoolCode}`);
+      if (res.ok) {
+        const data = await res.json();
+        setAdmissionSettings(data);
+        // Suggest next admission number using open format logic
+        const next = getNextAdmissionNumber(data.lastAdmissionNumber || '');
+        setAdmissionPreview(next);
+      }
+    }
+    if (schoolCode) fetchAdmissionSettings();
+  }, [schoolCode]);
+
+  // Update preview if admission number is changed manually
+  useEffect(() => {
+    if (admissionSettings && admissionSettings.lastAdmissionNumber !== undefined) {
+      const next = getNextAdmissionNumber(admissionSettings.lastAdmissionNumber || '');
+      setAdmissionPreview(next);
+    }
+  }, [admissionSettings]);
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
@@ -73,7 +110,22 @@ export default function AddStudentPage() {
       }),
     });
     if (res.ok) {
-      router.push(`/schools/${schoolCode}/students`);
+      // After adding, re-fetch the latest admission number and reset form
+      const schoolRes = await fetch(`/api/schools/${schoolCode}`);
+      let next = form.admissionNumber;
+      if (schoolRes.ok) {
+        const data = await schoolRes.json();
+        next = getNextAdmissionNumber(data.lastAdmissionNumber || '');
+        setAdmissionSettings(data);
+        setAdmissionPreview(next);
+      }
+      setForm({
+        name: "",
+        admissionNumber: next,
+        email: "",
+        gradeId: "",
+        classId: "",
+      });
     } else {
       setError("Failed to add student.");
     }
@@ -97,11 +149,21 @@ export default function AddStudentPage() {
             />
             <Input
               name="admissionNumber"
-              placeholder="Admission Number"
+              placeholder=""
               value={form.admissionNumber}
               onChange={handleChange}
-              required
+              required={false}
             />
+            {admissionPreview && (
+              <div className="text-xs text-gray-500 mb-2">
+                <span className="font-mono bg-gray-100 px-2 py-1 rounded cursor-pointer hover:bg-blue-100"
+                  onClick={() => setForm(f => ({ ...f, admissionNumber: admissionPreview }))}
+                  title="Click to autofill"
+                >
+                  Click to use: {admissionPreview}
+                </span>
+              </div>
+            )}
             <Input
               name="email"
               placeholder="Email"

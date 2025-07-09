@@ -84,6 +84,7 @@ import Link from "next/link";
 import { generateTempPassword } from "@/lib/utils/school-generator";
 import { FeeManagement } from "./fee-management";
 import { AcademicCalendarCrud } from "./AcademicCalendarCrud";
+import AdmissionNumberSettings from "./AdmissionNumberSettings";
 
 interface SchoolSetupDashboardProps {
   schoolData: SchoolData;
@@ -99,6 +100,18 @@ interface SetupStep {
 }
 
 type ViewMode = "list" | "form" | "view";
+
+// Add this utility at the top (or import if shared)
+function getNextAdmissionNumber(lastAdmissionNumber: string): string {
+  if (!lastAdmissionNumber) return '';
+  const match = lastAdmissionNumber.match(/(\d+)(?!.*\d)/);
+  if (match) {
+    const number = match[1];
+    const next = (parseInt(number, 10) + 1).toString().padStart(number.length, '0');
+    return lastAdmissionNumber.replace(/(\d+)(?!.*\d)/, next);
+  }
+  return lastAdmissionNumber + '1';
+}
 
 export function SchoolSetupDashboard({
   schoolData: initialSchoolData,
@@ -1110,11 +1123,29 @@ export function SchoolSetupDashboard({
     const [formData, setFormData] = useState<Partial<Student>>(
       student || newStudent
     );
+    const [admissionPreview, setAdmissionPreview] = useState('');
+    const [loadingAdmission, setLoadingAdmission] = useState(false);
 
+    // Fetch the latest lastAdmissionNumber when opening the form (for new student)
+    useEffect(() => {
+      if (!student) {
+        setLoadingAdmission(true);
+        fetch(`/api/schools/${schoolData.schoolCode}`)
+          .then(res => res.json())
+          .then(data => {
+            const next = getNextAdmissionNumber(data.lastAdmissionNumber || '');
+            setAdmissionPreview(next);
+            setFormData(f => ({ ...f, admissionNumber: f.admissionNumber || next }));
+            setLoadingAdmission(false);
+          })
+          .catch(() => setLoadingAdmission(false));
+      }
+    }, [student]);
+
+    // After adding a student, re-fetch and suggest the next admission number
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
-
-      // Additional validation for required fields
+      // ...existing validation...
       if (
         !formData.name ||
         !formData.email ||
@@ -1130,15 +1161,22 @@ export function SchoolSetupDashboard({
         });
         return;
       }
-
       if (student) {
         onSave(formData as Student);
       } else {
-        // Directly create student without setting state first
         const success = await createStudent(formData);
         if (success) {
-          // Reset form data after successful creation
-          setFormData({});
+          // Re-fetch the latest admission number and reset form for rapid entry
+          setLoadingAdmission(true);
+          fetch(`/api/schools/${schoolData.schoolCode}`)
+            .then(res => res.json())
+            .then(data => {
+              const next = getNextAdmissionNumber(data.lastAdmissionNumber || '');
+              setAdmissionPreview(next);
+              setFormData({ admissionNumber: next });
+              setLoadingAdmission(false);
+            })
+            .catch(() => setLoadingAdmission(false));
         }
       }
     };
@@ -1178,8 +1216,24 @@ export function SchoolSetupDashboard({
                       admissionNumber: e.target.value,
                     })
                   }
-                  placeholder="ADM001"
+                  placeholder=""
                 />
+                {admissionPreview && !formData.admissionNumber && (
+                  <div className="text-xs text-gray-500 mb-2">
+                    <span
+                      className="font-mono bg-gray-100 px-2 py-1 rounded cursor-pointer hover:bg-blue-100"
+                      onClick={() => setFormData(f => ({ ...f, admissionNumber: admissionPreview }))}
+                      title="Click to autofill"
+                    >
+                      Click to use: {admissionPreview}
+                    </span>
+                  </div>
+                )}
+                {!admissionPreview && !formData.admissionNumber && (
+                  <div className="text-xs text-yellow-600 bg-yellow-50 border border-yellow-200 rounded px-2 py-1 mt-2">
+                    Please set the <b>first admission number</b> in the <b>Settings</b> tab before adding students. This enables automatic admission number suggestions.
+                  </div>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>Class/Grade *</Label>
@@ -1614,7 +1668,7 @@ export function SchoolSetupDashboard({
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-8">
+          <TabsList className="grid w-full grid-cols-9">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="profile">School Profile</TabsTrigger>
             <TabsTrigger value="staff">Staff & Teachers</TabsTrigger>
@@ -1622,9 +1676,8 @@ export function SchoolSetupDashboard({
             <TabsTrigger value="subjects">Subjects & Classes</TabsTrigger>
             <TabsTrigger value="fees">Fee Management</TabsTrigger>
             <TabsTrigger value="promotions">Promotions</TabsTrigger>
-            <TabsTrigger value="academic-calendar">
-              Academic Calendar
-            </TabsTrigger>
+            <TabsTrigger value="academic-calendar">Academic Calendar</TabsTrigger>
+            <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -3599,6 +3652,12 @@ export function SchoolSetupDashboard({
           {/* Academic Calendar Tab */}
           <TabsContent value="academic-calendar" className="space-y-6">
             <AcademicCalendarCrud schoolCode={schoolData.schoolCode} />
+          </TabsContent>
+
+          {/* Settings Tab */}
+          <TabsContent value="settings" className="space-y-6">
+            {/* Admission Number Settings UI (moved from admin/settings/page.tsx) */}
+            <AdmissionNumberSettings schoolCode={schoolData.schoolCode} />
           </TabsContent>
         </Tabs>
       </div>

@@ -14,6 +14,9 @@ model School {
   address           String
   phone             String
   email             String
+  admissionNumberFormat      String?   // e.g., "{SCHOOL_CODE}-{YEAR}-{SEQ}"
+  lastAdmissionNumber        String?   // e.g., "ABC-2024-001"
+  admissionNumberAutoIncrement Boolean @default(true)
   logo              String?
   isActive          Boolean              @default(true)
   createdAt         DateTime             @default(now())
@@ -65,7 +68,6 @@ model TeacherProfile {
 model Grade {
   id         String               @id @default(uuid())
   name       String
-  schoolId   String
   classes    Class[]
   termlyFees TermlyFeeStructure[]
 }

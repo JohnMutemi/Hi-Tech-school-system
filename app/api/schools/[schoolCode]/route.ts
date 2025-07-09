@@ -8,8 +8,13 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
   const { searchParams } = new URL(request.url);
   const action = searchParams.get('action');
 
-  const school = await prisma.school.findUnique({
-    where: { code: params.schoolCode },
+  const school = await prisma.school.findFirst({
+    where: {
+      code: {
+        equals: params.schoolCode,
+        mode: 'insensitive',
+      },
+    },
   });
   if (!school) {
     return NextResponse.json({ error: 'School not found' }, { status: 404 });
@@ -31,10 +36,15 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
   }
 
   try {
-    const schoolCode = params.schoolCode.toLowerCase();
+    const schoolCode = params.schoolCode;
 
-    const schoolData = await prisma.school.findUnique({
-      where: { code: schoolCode },
+    const schoolData = await prisma.school.findFirst({
+      where: {
+        code: {
+          equals: schoolCode,
+          mode: 'insensitive',
+        },
+      },
       include: {
         users: {
           where: { role: 'admin' },
@@ -120,7 +130,11 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
         currentStudents: 0,
         classTeacherId: "",
         subjects: []
-      }))
+      })),
+      // Add admission number settings
+      admissionNumberFormat: schoolData.admissionNumberFormat || '{SCHOOL_CODE}-{YEAR}-{SEQ}',
+      lastAdmissionNumber: schoolData.lastAdmissionNumber || '',
+      admissionNumberAutoIncrement: schoolData.admissionNumberAutoIncrement ?? true,
     };
 
     return NextResponse.json(transformedSchool);
@@ -132,7 +146,7 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
 
 export async function PUT(request: NextRequest, { params }: { params: { schoolCode: string } }) {
   try {
-    const schoolCode = params.schoolCode.toLowerCase();
+    const schoolCode = params.schoolCode;
     const body = await request.json();
     
     const {
@@ -150,8 +164,13 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
     } = body;
 
     // Find the school
-    const school = await prisma.school.findUnique({
-      where: { code: schoolCode },
+    const school = await prisma.school.findFirst({
+      where: {
+        code: {
+          equals: schoolCode,
+          mode: 'insensitive',
+        },
+      },
       include: {
         users: {
           where: { role: 'admin' }
@@ -171,7 +190,8 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
         address: address || school.address,
         phone: phone || school.phone,
         email: email || school.email,
-        isActive: status !== 'suspended'
+        isActive: status !== 'suspended',
+        ...(body.lastAdmissionNumber !== undefined && { lastAdmissionNumber: body.lastAdmissionNumber })
       }
     });
 
@@ -187,8 +207,13 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
     }
 
     // Return updated school
-    const result = await prisma.school.findUnique({
-      where: { code: schoolCode },
+    const result = await prisma.school.findFirst({
+      where: {
+        code: {
+          equals: schoolCode,
+          mode: 'insensitive',
+        },
+      },
       include: {
         users: {
           where: { role: 'admin' },
@@ -247,11 +272,16 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
 
 export async function DELETE(request: NextRequest, { params }: { params: { schoolCode: string } }) {
   try {
-    const schoolCode = params.schoolCode.toLowerCase();
+    const schoolCode = params.schoolCode;
 
     // Check if school exists
-    const school = await prisma.school.findUnique({
-      where: { code: schoolCode }
+    const school = await prisma.school.findFirst({
+      where: {
+        code: {
+          equals: schoolCode,
+          mode: 'insensitive',
+        },
+      },
     });
 
     if (!school) {
@@ -260,7 +290,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { schoo
 
     // Delete school (this will cascade delete related records)
     await prisma.school.delete({
-      where: { code: schoolCode }
+      where: { code: schoolCode },
     });
 
     return NextResponse.json({ message: 'School deleted successfully' });
@@ -276,8 +306,13 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
   const action = searchParams.get('action');
   const body = await req.json();
 
-  const school = await prisma.school.findUnique({
-    where: { code: params.schoolCode },
+  const school = await prisma.school.findFirst({
+    where: {
+      code: {
+        equals: params.schoolCode,
+        mode: 'insensitive',
+      },
+    },
   });
   if (!school) {
     return NextResponse.json({ error: 'School not found' }, { status: 404 });
@@ -317,7 +352,11 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
 
 // Academic Year CRUD
 export async function academicYearsHandler(req: NextRequest, { params }: { params: { schoolCode: string } }) {
-  const school = await prisma.school.findUnique({ where: { code: params.schoolCode } });
+  const school = await prisma.school.findFirst({
+    where: { code: params.schoolCode, },
+    // @ts-ignore
+    mode: 'insensitive',
+  });
   if (!school) return NextResponse.json({ error: 'School not found' }, { status: 404 });
   const method = req.method;
   if (method === 'GET') {
@@ -344,7 +383,11 @@ export async function academicYearsHandler(req: NextRequest, { params }: { param
 
 // Term CRUD
 export async function termsHandler(req: NextRequest, { params }: { params: { schoolCode: string } }) {
-  const school = await prisma.school.findUnique({ where: { code: params.schoolCode } });
+  const school = await prisma.school.findFirst({
+    where: { code: params.schoolCode, },
+    // @ts-ignore
+    mode: 'insensitive',
+  });
   if (!school) return NextResponse.json({ error: 'School not found' }, { status: 404 });
   const method = req.method;
   const yearId = new URL(req.url).searchParams.get('yearId');
