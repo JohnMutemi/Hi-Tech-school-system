@@ -33,16 +33,22 @@ export default function SchoolsManagementPage() {
     try {
       const res = await fetch("/api/schools")
       const data = await res.json()
-      setSchools(data)
+      if (Array.isArray(data)) {
+        setSchools(data)
+      } else {
+        console.error("API did not return an array for schools:", data)
+        setSchools([])
+      }
     } catch (err) {
+      console.error("Failed to load schools", err)
       setSchools([])
     }
   }
 
   const filteredSchools = schools.filter(
     (school) =>
-      school.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      school.schoolCode.toLowerCase().includes(searchTerm.toLowerCase()),
+      (school.name && school.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (school.schoolCode && school.schoolCode.toLowerCase().includes(searchTerm.toLowerCase()))
   )
 
   const handleAutofillLogin = async (school: any) => {
@@ -248,59 +254,38 @@ export default function SchoolsManagementPage() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <span className="font-medium">{school.students?.length || 0}</span>
+                          <div className="flex items-center space-x-1">
+                            <Users className="w-4 h-4 text-gray-400" />
+                            <span>{school.students?.length || 0}</span>
+                          </div>
                         </TableCell>
                         <TableCell>
-                          <span className="font-medium">{school.teachers?.length || 0}</span>
+                          <div className="flex items-center space-x-1">
+                            <GraduationCap className="w-4 h-4 text-gray-400" />
+                            <span>{school.teachers?.length || 0}</span>
+                          </div>
                         </TableCell>
                         <TableCell>
                           <Badge
-                            variant={
-                              school.status === "active"
-                                ? "default"
-                                : school.status === "setup"
-                                  ? "secondary"
-                                  : "outline"
-                            }
+                            variant={school.status === "active" ? "default" : "destructive"}
+                            className={school.status === "active" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}
                           >
                             {school.status}
                           </Badge>
                         </TableCell>
+                        <TableCell>{new Date(school.createdAt).toLocaleDateString()}</TableCell>
                         <TableCell>
-                          <span className="text-sm text-gray-600">
-                            {new Date(school.createdAt).toLocaleDateString()}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex space-x-2">
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              onClick={() => handleAutofillLogin(school)}
-                              title="Login with autofilled credentials"
-                            >
+                          <div className="flex items-center space-x-2">
+                            <Button variant="ghost" size="icon" onClick={() => handleAutofillLogin(school)}>
                               <LogIn className="w-4 h-4" />
                             </Button>
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              onClick={() => window.open(school.portalUrl, "_blank")}
-                              title="View school portal"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              onClick={() => copyPortalUrl(school)}
-                              title="Copy portal URL"
-                            >
+                            <Button variant="ghost" size="icon" onClick={() => copyPortalUrl(school)}>
                               <Copy className="w-4 h-4" />
                             </Button>
-                            <Button variant="outline" size="sm" disabled>
+                            <Button variant="ghost" size="icon" disabled>
                               <Edit className="w-4 h-4" />
                             </Button>
-                            <Button variant="outline" size="sm" className="text-red-600" disabled>
+                            <Button variant="ghost" size="icon" disabled>
                               <Trash2 className="w-4 h-4" />
                             </Button>
                           </div>

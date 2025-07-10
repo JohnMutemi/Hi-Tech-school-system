@@ -93,42 +93,45 @@ model Student {
   classId               String?
   admissionNumber       String
   dateOfBirth           DateTime?
+  dateAdmitted          DateTime?
   parentId              String?
   isActive              Boolean              @default(true)
+  status                String               @default("active")
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt
-  address               String?
-  gender                String?
-  parentEmail           String?
+  academicYear          Int?                 @default(2025)
+  tempPassword          String?
   parentName            String?
   parentPhone           String?
-  tempPassword          String?
+  parentEmail           String?
+  address               String?
+  gender                String?
   avatarUrl             String?
-  dateAdmitted          DateTime?
   emergencyContact      String?
   medicalInfo           String?
   notes                 String?
-  status                String               @default("active")
   currentAcademicYearId String?
   currentTermId         String?
   joinedAcademicYearId  String?
   joinedTermId          String?
-  feeStatements         FeeStatement[]
-  payments              Payment[]
-  paymentRequests       PaymentRequest[]
-  promotionExclusions   PromotionExclusion[]
-  promotionLogs         PromotionLog[]
-  receipts              Receipt[]
+
+  user                  User                 @relation(fields: [userId], references: [id])
+  school                School               @relation(fields: [schoolId], references: [id])
   class                 Class?               @relation(fields: [classId], references: [id])
+  parent                User?                @relation("ParentStudents", fields: [parentId], references: [id])
   currentAcademicYear   AcademicYear?        @relation(fields: [currentAcademicYearId], references: [id])
   currentTerm           Term?                @relation(fields: [currentTermId], references: [id])
   joinedAcademicYear    AcademicYear?        @relation("JoinedAcademicYear", fields: [joinedAcademicYearId], references: [id])
   joinedTerm            Term?                @relation("JoinedTerm", fields: [joinedTermId], references: [id])
-  parent                User?                @relation("ParentStudents", fields: [parentId], references: [id])
-  school                School               @relation(fields: [schoolId], references: [id])
-  user                  User                 @relation(fields: [userId], references: [id])
-  studentArrears        StudentArrear[]
+
+  payments              Payment[]
+  paymentRequests       PaymentRequest[]
   studentFees           StudentFee[]
+  feeStatements         FeeStatement[]
+  promotionLogs         PromotionLog[]
+  promotionExclusions   PromotionExclusion[]
+  receipts              Receipt[]
+  studentArrears        StudentArrear[]
 }
 
 model Payment {
@@ -144,6 +147,7 @@ model Payment {
   createdAt       DateTime @default(now())
   academicYearId  String?
   termId          String?
+
   student         Student  @relation(fields: [studentId], references: [id])
   receipt         Receipt?
   academicYear    AcademicYear? @relation(fields: [academicYearId], references: [id])
@@ -164,6 +168,7 @@ model Receipt {
   termOutstandingAfter         Float?
   academicYearId               String?
   termId                       String?
+
   payment                     Payment  @relation(fields: [paymentId], references: [id])
   student                     Student  @relation(fields: [studentId], references: [id])
   academicYear                AcademicYear? @relation(fields: [academicYearId], references: [id])
@@ -201,6 +206,7 @@ model TermlyFeeStructure {
   gradeId        String
   academicYearId String?
   termId         String?
+
   logs           FeeStructureLog[]
   academicYear   AcademicYear?     @relation(fields: [academicYearId], references: [id])
   creator        User              @relation("UserCreatedTermlyFees", fields: [createdBy], references: [id])
@@ -261,6 +267,7 @@ model PaymentRequest {
   createdAt       DateTime @default(now())
   expiresAt       DateTime
   status          String
+
   school          School   @relation(fields: [schoolId], references: [id])
   student         Student  @relation(fields: [studentId], references: [id])
 }
@@ -275,6 +282,7 @@ model PromotionCriteria {
   isActive   Boolean  @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+
   school     School   @relation(fields: [schoolId], references: [id])
 
   @@unique([schoolId, classLevel])
@@ -289,6 +297,7 @@ model ClassProgression {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
   school    School   @relation(fields: [schoolId], references: [id])
 
   @@unique([schoolId, fromClass])
@@ -306,6 +315,7 @@ model PromotionLog {
   criteria      Json
   notes         String?
   promotionType String
+
   exclusions    PromotionExclusion[]
   user          User                 @relation("UserPromotions", fields: [promotedBy], references: [id])
   student       Student              @relation(fields: [studentId], references: [id])
@@ -319,6 +329,7 @@ model PromotionExclusion {
   notes          String?
   excludedBy     String
   excludedAt     DateTime     @default(now())
+
   user           User         @relation("UserExclusions", fields: [excludedBy], references: [id])
   promotionLog   PromotionLog @relation(fields: [promotionLogId], references: [id])
   student        Student      @relation(fields: [studentId], references: [id])
@@ -333,6 +344,7 @@ model AcademicYear {
   isCurrent          Boolean              @default(false)
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
+
   school             School               @relation(fields: [schoolId], references: [id])
   students           Student[]
   joinedStudents     Student[]            @relation("JoinedAcademicYear")
@@ -354,6 +366,7 @@ model Term {
   isCurrent          Boolean              @default(false)
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
+
   students           Student[]
   joinedStudents     Student[]            @relation("JoinedTerm")
   academicYear       AcademicYear         @relation(fields: [academicYearId], references: [id])
@@ -372,6 +385,7 @@ model StudentArrear {
   arrearAmount   Float
   dateRecorded   DateTime     @default(now())
   notes          String?
+
   academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
   school         School       @relation(fields: [schoolId], references: [id])
   student        Student      @relation(fields: [studentId], references: [id])

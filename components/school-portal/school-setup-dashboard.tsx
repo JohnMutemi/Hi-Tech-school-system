@@ -190,19 +190,20 @@ export function SchoolSetupDashboard({
   // Fetch grades from API on component mount
   useEffect(() => {
     async function fetchGrades() {
+      console.log("[Add Class] schoolCode:", schoolData.schoolCode);
       try {
         const res = await fetch(`/api/schools/${schoolData.schoolCode}/grades`);
         if (res.ok) {
           const data = await res.json();
+          console.log("[Add Class] Fetched grades:", data);
           setGrades(data);
+        } else {
+          console.error("[Add Class] Failed to fetch grades, status:", res.status);
+          setGrades([]);
         }
       } catch (error) {
-        console.error("Failed to fetch grades", error);
-        toast({
-          title: "Error",
-          description: "Could not load grades.",
-          variant: "destructive",
-        });
+        console.error("[Add Class] Error fetching grades:", error);
+        setGrades([]);
       }
     }
     if (schoolData.schoolCode) {
@@ -3142,27 +3143,31 @@ export function SchoolSetupDashboard({
                               placeholder="e.g., Grade 5A"
                             />
                           </div>
-                          <div className="space-y-2">
-                            <Label>Grade *</Label>
-                            <Select
-                              value={newClass.gradeId || ""}
-                              onValueChange={(value) =>
-                                setNewClass({ ...newClass, gradeId: value })
-                              }
-                              required
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select grade" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {grades.map((grade) => (
-                                  <SelectItem key={grade.id} value={grade.id}>
-                                    {grade.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
+
+                     <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="class-grade" className="text-right">
+                          Grade/Level
+                          </Label>
+                          <Select  
+                          value={newClass.gradeId}
+                          onValueChange={(value) =>
+                             setNewClass({ ...newClass, gradeId: value })
+    }
+  >
+    <SelectTrigger className="col-span-3">
+      <SelectValue placeholder="Select a grade" />
+    </SelectTrigger>
+    <SelectContent>
+      {grades.map((grade) => (
+        <SelectItem key={grade.id} value={grade.id}>
+          {grade.name}
+        </SelectItem>
+      ))}
+    </SelectContent>
+  </Select>
+</div>
+                        
+                         
                           <div className="space-y-2">
                             <Label>Level *</Label>
                             <Select
@@ -3314,7 +3319,7 @@ export function SchoolSetupDashboard({
                                   <div className="space-y-4">
                                     <div className="space-y-2">
                                       <Label>Class Name *</Label>
-                                      <Input
+                            <Input
                                         value={editingItem.name || ""}
                                         onChange={(e) =>
                                           setEditingItem({
@@ -3355,45 +3360,45 @@ export function SchoolSetupDashboard({
                                     <div className="space-y-2">
                                       <Label>Capacity</Label>
                                       <Input
-                                        type="number"
+                              type="number"
                                         value={editingItem.capacity || ""}
-                                        onChange={(e) =>
+                              onChange={(e) =>
                                           setEditingItem({
                                             ...editingItem,
-                                            capacity:
+                                  capacity:
                                               Number.parseInt(e.target.value) ||
                                               0,
-                                          })
-                                        }
-                                        placeholder="30"
-                                      />
-                                    </div>
+                                })
+                              }
+                              placeholder="30"
+                            />
+                          </div>
                                     <div className="space-y-2">
                                       <Label>Class Teacher</Label>
-                                      <Select
+                            <Select
                                         value={editingItem.classTeacherId || ""}
-                                        onValueChange={(value) =>
+                              onValueChange={(value) =>
                                           setEditingItem({
                                             ...editingItem,
-                                            classTeacherId: value,
-                                          })
-                                        }
-                                      >
+                                  classTeacherId: value,
+                                })
+                              }
+                            >
                                         <SelectTrigger>
-                                          <SelectValue placeholder="Select class teacher" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {teachers.map((teacher) => (
-                                            <SelectItem
-                                              key={teacher.id}
-                                              value={teacher.id}
-                                            >
-                                              {teacher.name}
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
+                                <SelectValue placeholder="Select class teacher" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {teachers.map((teacher) => (
+                                  <SelectItem
+                                    key={teacher.id}
+                                    value={teacher.id}
+                                  >
+                                    {teacher.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
                                     <Button
                                       onClick={() => updateClass(editingItem)}
                                       className="w-full"
@@ -3403,13 +3408,13 @@ export function SchoolSetupDashboard({
                                     >
                                       Update Class
                                     </Button>
-                                  </div>
+                        </div>
                                 )}
                               </DialogContent>
                             </Dialog>
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
-                                <Button
+                          <Button
                                   variant="outline"
                                   size="sm"
                                   className="text-red-600"
@@ -3945,7 +3950,7 @@ export function SchoolSetupDashboard({
                 </Button>
                 <Button
                   variant="outline"
-                  className="w-full"
+                            className="w-full"
                   onClick={() => {
                     const credentials = `Admission Number: ${
                       lastStudentCredentials.admissionNumber
@@ -4321,8 +4326,8 @@ export function SchoolSetupDashboard({
                           s.parentPhone
                       ).length === 0
                     }
-                    style={{ backgroundColor: schoolData.colorTheme }}
-                  >
+                            style={{ backgroundColor: schoolData.colorTheme }}
+                          >
                     {isImporting ? (
                       <>
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
@@ -4331,7 +4336,7 @@ export function SchoolSetupDashboard({
                     ) : (
                       "Import Students"
                     )}
-                  </Button>
+                          </Button>
                 </div>
               </div>
             </div>
@@ -4396,8 +4401,8 @@ export function SchoolSetupDashboard({
               </div>
             </div>
           )}
-        </DialogContent>
-      </Dialog>
+                      </DialogContent>
+                    </Dialog>
     </div>
   );
 }

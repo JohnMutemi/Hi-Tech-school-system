@@ -12,37 +12,19 @@ export async function GET(
     const { schoolCode, studentId } = params;
     const decodedSchoolCode = decodeURIComponent(schoolCode);
 
-    // Find the school
-    const school = await prisma.school.findUnique({
-      where: { code: decodedSchoolCode }
-    });
-
+    const school = await prisma.school.findUnique({ where: { code: decodedSchoolCode } });
     if (!school) {
       return NextResponse.json({ error: 'School not found' }, { status: 404 });
     }
 
-    // Find the student
     const student = await prisma.student.findFirst({
-      where: {
-        id: studentId,
-        schoolId: school.id,
-        isActive: true
-      },
-      include: {
-        user: true,
-        class: {
-          include: {
-            grade: true
-          }
-        }
-      }
+      where: { id: studentId, schoolId: school.id, isActive: true },
+      include: { user: true, class: { include: { grade: true } } }
     });
-
     if (!student) {
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
 
-    // Get all termly fee structures (charges/invoices) for this student/grade
     const feeStructures = await prisma.termlyFeeStructure.findMany({
       where: {
         gradeId: student.class?.gradeId,
@@ -54,7 +36,6 @@ export async function GET(
       }
     });
 
-    // Get all payments for this student (include academicYearId and termId)
     const payments = await prisma.payment.findMany({
       where: { studentId: student.id },
       orderBy: { paymentDate: 'asc' },
@@ -71,27 +52,21 @@ export async function GET(
         receivedBy: true,
         academicYearId: true,
         termId: true,
-        academicYear: {
-          select: { name: true }
-        },
-        term: {
-          select: { name: true }
-        }
+        academicYear: { select: { name: true } },
+        term: { select: { name: true } }
       }
     });
 
-    // Get join reference point
     const joinAcademicYearId = student.joinedAcademicYearId;
     const joinTermId = student.joinedTermId;
     const joinDate = student.dateAdmitted ? new Date(student.dateAdmitted) : null;
 
-    // Filter fee structures to only include those on or after the join point
     let filteredFeeStructures = feeStructures;
     if (joinAcademicYearId && joinTermId) {
-      // Find the join term's name
       const joinTermObj = feeStructures.find(t => t.termId === joinTermId);
       const joinTermName = joinTermObj?.term;
       const termOrder: Record<string, number> = { 'Term 1': 1, 'Term 2': 2, 'Term 3': 3 };
+
       filteredFeeStructures = filteredFeeStructures.filter(fs => {
         if (!fs.academicYearId || !fs.term) return false;
         if (fs.academicYearId < joinAcademicYearId) return false;
@@ -106,7 +81,6 @@ export async function GET(
       });
     }
 
-    // Filter payments to only include those on or after the join point
     let filteredPayments = payments;
     if (joinAcademicYearId && joinTermId) {
       filteredPayments = filteredPayments.filter(p => {
@@ -121,9 +95,8 @@ export async function GET(
       });
     }
 
-    // Build transactions: charges (debit), payments (credit)
     let transactions: any[] = [];
-    // Charges (invoices)
+
     for (const fs of filteredFeeStructures) {
       transactions.push({
         ref: fs.id,
@@ -138,7 +111,7 @@ export async function GET(
         academicYearName: fs.year ? fs.year.toString() : ''
       });
     }
-    // Payments (credits)
+
     for (const p of filteredPayments) {
       transactions.push({
         ref: p.receiptNumber || p.referenceNumber || p.id,
@@ -154,12 +127,10 @@ export async function GET(
       });
     }
 
-    // Sort all transactions by date
     transactions = transactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    // Calculate running balance
     let runningBalance = 0;
-    transactions = transactions.map((txn, idx) => {
+    transactions = transactions.map((txn) => {
       runningBalance += (txn.debit || 0) - (txn.credit || 0);
       return {
         ...txn,
@@ -167,17 +138,14 @@ export async function GET(
       };
     });
 
-    // Academic year outstanding is the last running balance
     const academicYearOutstanding = transactions.length > 0 ? transactions[transactions.length - 1].balance : 0;
 
-    // Build term balances with carry-forward logic
     let carryForward = 0;
     const termBalances = filteredFeeStructures.map((fs) => {
-      // Charges for this term
       const charges = transactions
         .filter(txn => txn.termId === fs.termId && txn.academicYearId === fs.academicYearId && txn.type === 'invoice')
         .reduce((sum, txn) => sum + (txn.debit || 0), 0);
-      // Payments for this term
+
       const paymentsForTerm = transactions
         .filter(txn => txn.termId === fs.termId && txn.academicYearId === fs.academicYearId && txn.type === 'payment')
         .reduce((sum, txn) => sum + (txn.credit || 0), 0);
@@ -185,7 +153,7 @@ export async function GET(
       let balance = charges - paymentsForTerm + carryForward;
       let carryToNext = 0;
       if (balance < 0) {
-        carryToNext = balance; // negative value to carry forward
+        carryToNext = balance;
         balance = 0;
       }
       const result = {
@@ -200,7 +168,6 @@ export async function GET(
       return result;
     });
 
-    // Filter StudentArrear records to only include those on or after joinAcademicYearId
     let arrearsRecords = await prisma.studentArrear.findMany({
       where: {
         studentId: student.id,
@@ -209,6 +176,7 @@ export async function GET(
         ...(joinAcademicYearId ? { academicYearId: { gte: joinAcademicYearId } } : {})
       }
     });
+
     const arrears = arrearsRecords.reduce((sum, record) => sum + record.arrearAmount, 0);
 
     return NextResponse.json({
@@ -236,8 +204,9 @@ export async function GET(
       }))
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching student fees:', error);
     return NextResponse.json({ error: 'Failed to fetch student fees' }, { status: 500 });
   }
-} 
+}
+    

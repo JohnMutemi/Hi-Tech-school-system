@@ -61,6 +61,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { PaymentModal } from "@/components/payment/payment-modal";
 import { ParentFeesPanel } from "./ParentFeesPanel";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 interface FeeStructure {
   id: string;
@@ -154,6 +160,19 @@ function extractGrade(classNameOrLevel: string) {
   return match ? match[0] : classNameOrLevel;
 }
 
+// Helper to get the next unpaid/current term for a student
+function getCurrentTermForStudent(feeSummary: any[]) {
+  const termOrder = ["Term 1", "Term 2", "Term 3"];
+  // Sort by year and then by term order
+  const sorted = [...feeSummary].sort((a, b) => {
+    if (a.year !== b.year) return a.year - b.year;
+    return termOrder.indexOf(a.term) - termOrder.indexOf(b.term);
+  });
+  // Find the first term with balance > 0
+  const current = sorted.find((f) => f.balance > 0);
+  return current || sorted[sorted.length - 1]; // If all paid, return last term
+}
+
 export function ParentDashboard({
   schoolCode,
   parentId,
@@ -163,6 +182,7 @@ export function ParentDashboard({
 }) {
   const [parent, setParent] = useState<any>(null);
   const [students, setStudents] = useState<any[]>([]);
+  const [schoolName, setSchoolName] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("children");
   const [avatarUploading, setAvatarUploading] = useState(false);
@@ -202,7 +222,7 @@ export function ParentDashboard({
     { label: "Settings", icon: Key, section: "settings" },
   ];
 
-  const [studentFeeSummaries, setStudentFeeSummaries] = useState<any>({});
+  const [studentFeeData, setStudentFeeData] = useState<any>({});
 
   // Add state for current academic year and term
   const [currentAcademicYear, setCurrentAcademicYear] = useState<any>(null);
@@ -230,6 +250,13 @@ export function ParentDashboard({
           schoolCode,
           parentId,
         });
+
+        // Fetch school name
+        const schoolRes = await fetch(`/api/schools/${schoolCode}`);
+        if (schoolRes.ok) {
+          const schoolData = await schoolRes.json();
+          setSchoolName(schoolData.name);
+        }
 
         // If parentId is provided, fetch specific parent data
         if (parentId) {
@@ -403,55 +430,54 @@ export function ParentDashboard({
     }
   };
 
-  // Get fee structure for a specific student (updated to use gradeId)
-  const getStudentFeeStructure = (studentGradeId: string) => {
-    const currentDate = new Date();
-    const currentYear = currentDate.getFullYear();
-    const currentMonth = currentDate.getMonth();
-
-    let currentTerm = "Term 1";
-    if (currentMonth >= 4 && currentMonth <= 7) currentTerm = "Term 2";
-    else if (currentMonth >= 8) currentTerm = "Term 3";
-
-    // First try to find the current term's fee structure
-    const currentTermFee = feeStructures.find(
-      (fee) =>
-        fee.gradeId === studentGradeId &&
-        fee.term === currentTerm &&
-        fee.year === currentYear &&
-        fee.isActive
+  // Fetch student fee summary for all students
+  const fetchStudentFeeSummaries = async () => {
+    if (students.length === 0) return;
+    const summaries: any = {};
+    await Promise.all(
+      students.map(async (student) => {
+        try {
+          const res = await fetch(
+            `/api/schools/${schoolCode}/students/${student.id}/fees`,
+            { cache: 'no-store' }
+          );
+          if (res.ok) {
+            const data = await res.json();
+            // Flatten all terms for the current year into an array
+            const currentYear = new Date().getFullYear();
+            const yearTerms = data.feesByYear?.[currentYear]?.terms || [];
+            summaries[student.id] = yearTerms;
+          }
+        } catch (e) {
+          // ignore
+        }
+      })
     );
+    setStudentFeeData({ ...summaries });
+  };
 
-    // If current term fee structure exists, return it
-    if (currentTermFee) {
-      return currentTermFee;
+  // Call fetchStudentFeeSummaries when students change
+  useEffect(() => {
+    if (students.length > 0) {
+      fetchStudentFeeSummaries();
     }
+  }, [students]);
 
-    // Otherwise, return the first available fee structure for this student
-    return feeStructures.find(
-      (fee) =>
-        fee.gradeId === studentGradeId &&
-        fee.year === currentYear &&
-        fee.isActive
-    );
+  // Update getStudentFeeStructure to use studentFeeData
+  const getStudentFeeStructure = (studentId: string) => {
+    const termOrder = ["Term 1", "Term 2", "Term 3"];
+    const terms = studentFeeData[studentId] || [];
+    // Sort by term order
+    const sortedTerms = [...terms].sort((a, b) => termOrder.indexOf(a.term) - termOrder.indexOf(b.term));
+    // Find the first unpaid term (balance > 0)
+    const firstUnpaid = sortedTerms.find(term => term.balance > 0);
+    // Return the first unpaid, or the first available if all are paid
+    return firstUnpaid || sortedTerms[0];
   };
 
-  // Get all fee structures for a specific student
-  const getStudentAllFeeStructures = (studentGradeId: string) => {
-    const currentDate = new Date();
-    const currentYear = currentDate.getFullYear();
-
-    return feeStructures.filter(
-      (fee) =>
-        fee.gradeId === studentGradeId &&
-        fee.year === currentYear &&
-        fee.isActive
-    );
-  };
-
-  // Handle payment modal opening
+  // Update handleOpenPaymentModal to use student.id
   const handleOpenPaymentModal = (student: any) => {
-    const feeStructure = getStudentFeeStructure(student.gradeId);
+    const feeStructure = getStudentFeeStructure(student.id);
     if (!feeStructure) {
       toast({
         title: "Error",
@@ -460,33 +486,10 @@ export function ParentDashboard({
       });
       return;
     }
-
     setSelectedStudent(student);
     setSelectedFeeStructure(feeStructure);
     setPaymentModalOpen(true);
   };
-
-  // Fetch student fee summary for all students
-  async function fetchStudentFeeSummaries() {
-    if (students.length === 0) return;
-    const summaries: any = {};
-    await Promise.all(
-      students.map(async (student) => {
-        try {
-          const res = await fetch(
-            `/api/schools/${schoolCode}/students/${student.id}/fees`
-          );
-          if (res.ok) {
-            const data = await res.json();
-            summaries[student.id] = data;
-          }
-        } catch (e) {
-          // ignore
-        }
-      })
-    );
-    setStudentFeeSummaries(summaries);
-  }
 
   // Handle payment success
   const handlePaymentSuccess = async (payment: any) => {
@@ -499,10 +502,11 @@ export function ParentDashboard({
       variant: "default",
     });
 
-    // Refresh student fee summaries to ensure receipt uses up-to-date data
+    // Refresh student fee summaries and receipts
     await fetchStudentFeeSummaries();
+    await fetchReceipts();
 
-    // Close modal
+    // Close modal and reset state
     setPaymentModalOpen(false);
     setSelectedStudent(null);
     setSelectedFeeStructure(null);
@@ -518,28 +522,59 @@ export function ParentDashboard({
   };
 
   // Fetch receipts from backend (directly from receipt table)
-  const fetchReceipts = async () => {
-    setLoadingReceipts(true);
-    setReceiptsError("");
-    try {
-      if (students.length === 0) return;
-      const currentStudent =
-        students.find((c) => c.id === focusedChildId) || students[0];
-      let url = `/api/schools/${schoolCode}/students/${currentStudent.id}/receipts`;
-      const params = [];
-      if (selectedYearId) params.push(`academicYearId=${selectedYearId}`);
-      if (selectedTermId) params.push(`termId=${selectedTermId}`);
-      if (params.length > 0) url += `?${params.join("&")}`;
-      const response = await fetch(url);
-      if (!response.ok) throw new Error("Failed to fetch receipts");
-      const data = await response.json();
-      setReceipts(data);
-    } catch (err: any) {
-      setReceiptsError(err.message || "Failed to load receipts");
-    } finally {
-      setLoadingReceipts(false);
-    }
-  };
+const fetchReceipts = async () => {
+  setLoadingReceipts(true);
+  setReceiptsError("");
+
+  try {
+    if (students.length === 0) return;
+
+    const currentStudent =
+      students.find((c) => c.id === focusedChildId) || students[0];
+
+    let url = `/api/schools/${schoolCode}/students/${currentStudent.id}/receipts`;
+    const params = [];
+
+    if (selectedYearId) params.push(`academicYearId=${selectedYearId}`);
+    if (selectedTermId) params.push(`termId=${selectedTermId}`);
+    if (params.length > 0) url += `?${params.join("&")}`;
+
+    const response = await fetch(url, { cache: 'no-store' });
+
+    if (!response.ok) throw new Error("Failed to fetch receipts");
+
+    const data = await response.json();
+
+    const formattedReceipts = data.map((payment: any) => ({
+      id: payment.id,
+      student: {
+        name: payment.student?.user?.name || currentStudent.name,
+        className: payment.student?.class?.name || currentStudent.gradeName,
+        admissionNumber: payment.student?.admissionNumber || currentStudent.admissionNumber,
+      },
+      receiptNumber: payment.receiptNumber,
+      paymentDate: payment.paymentDate,
+      amount: payment.amount,
+      paymentMethod: payment.paymentMethod,
+      description: payment.description,
+      referenceNumber: payment.referenceNumber,
+      balance: payment.receipt?.balance,
+      balanceCarriedForward: payment.receipt?.balanceCarriedForward,
+      schoolName: payment.schoolName,
+      term: payment.term,
+      academicYear: payment.academicYear,
+    }));
+
+    setReceipts([...formattedReceipts]);
+
+  } catch (err: any) {
+    console.error("Failed to fetch receipts:", err);
+    setReceiptsError(err.message || "Failed to load receipts");
+    setReceipts([]);
+  } finally {
+    setLoadingReceipts(false);
+  }
+};
 
   // Simulate profile image upload
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -641,109 +676,169 @@ export function ParentDashboard({
       variant: "default",
     });
   };
+const handleDownloadReceipt = async (receipt: any) => {
+  let studentId = receipt.studentId || receipt.student?.id;
+  let studentName = receipt.studentName || receipt.student?.name;
+  let admissionNumber =
+    receipt.admissionNumber || receipt.student?.admissionNumber;
+  let className = receipt.className || receipt.student?.className;
 
-  const handleDownloadReceipt = async (receipt: any) => {
-    // Try to get student details from receipt or fallback to students array
-    let studentId = receipt.studentId || receipt.student?.id;
-    let studentName = receipt.studentName || receipt.student?.name;
-    let admissionNumber =
-      receipt.admissionNumber || receipt.student?.admissionNumber;
-    let className = receipt.className || receipt.student?.className;
-    if (
-      (!studentName || !admissionNumber || !className) &&
-      Array.isArray(students)
-    ) {
-      const found = students.find((s) => s.id === studentId);
-      if (found) {
-        studentName = studentName || found.fullName || found.name;
-        admissionNumber = admissionNumber || found.admissionNumber;
-        className = className || found.className;
-      }
+  if (
+    (!studentName || !admissionNumber || !className) &&
+    Array.isArray(students)
+  ) {
+    const found = students.find((s) => s.id === studentId);
+    if (found) {
+      studentName = studentName || found.fullName || found.name;
+      admissionNumber = admissionNumber || found.admissionNumber;
+      className = className || found.className;
     }
-    // Academic year and term
-    let academicYear = receipt.academicYear;
-    let term = receipt.term;
-    // Try to get from description if missing
-    if ((!academicYear || !term) && receipt.description) {
-      const termMatch = receipt.description.match(/Term \d/);
-      const yearMatch = receipt.description.match(/\d{4}/);
-      if (!term && termMatch) term = termMatch[0];
-      if (!academicYear && yearMatch) academicYear = yearMatch[0];
-    }
-    // Try to get from academicYearId/termId if still missing
-    if (
-      (!academicYear || !term) &&
-      receipt.academicYearId &&
-      receipt.termId &&
-      terms.length > 0 &&
-      academicYears.length > 0
-    ) {
-      const yearObj = academicYears.find(
-        (y) => y.id === receipt.academicYearId
-      );
-      if (yearObj) academicYear = academicYear || yearObj.name;
-      const termObj = terms.find((t) => t.id === receipt.termId);
-      if (termObj) term = term || termObj.name;
-    }
-    const reference = receipt.referenceNumber || receipt.reference || "N/A";
-    const receiptNumber = receipt.receiptNumber || "N/A";
-    const paymentMethod = (receipt.paymentMethod || "").toUpperCase();
-    const amount = receipt.amount || 0;
-    const paymentDate = receipt.paymentDate || receipt.issuedAt;
-    const status = (receipt.status || "completed").toUpperCase();
-    const schoolName = receipt.schoolName || "Demo School";
-    const issuedBy = receipt.issuedBy || "School System";
-    const currency = receipt.currency || "KES";
-    const outstandingBefore = receipt.academicYearOutstandingBefore ?? "N/A";
-    const outstandingAfter = receipt.academicYearOutstandingAfter ?? "N/A";
+  }
 
-    const receiptContent = `
-Payment Receipt
+  let academicYear = receipt.academicYear;
+  let term = receipt.term;
 
-School: ${schoolName}
-Receipt #: ${receiptNumber}
+  if ((!academicYear || !term) && receipt.description) {
+    const termMatch = receipt.description.match(/Term \d/);
+    const yearMatch = receipt.description.match(/\d{4}/);
+    if (!term && termMatch) term = termMatch[0];
+    if (!academicYear && yearMatch) academicYear = yearMatch[0];
+  }
 
-Student Information:
-- Student Name: ${studentName || "N/A"}
-- Admission No.: ${admissionNumber || "N/A"}
-- Class: ${className || "N/A"}
+  if (
+    (!academicYear || !term) &&
+    receipt.academicYearId &&
+    receipt.termId &&
+    terms.length > 0 &&
+    academicYears.length > 0
+  ) {
+    const yearObj = academicYears.find((y) => y.id === receipt.academicYearId);
+    if (yearObj) academicYear = academicYear || yearObj.name;
+    const termObj = terms.find((t) => t.id === receipt.termId);
+    if (termObj) term = term || termObj.name;
+  }
 
-Payment Details:
-- Academic Year: ${academicYear || "N/A"}
-- Term: ${term || "N/A"}
-- Payment Method: ${paymentMethod}
-- Reference: ${reference}
-- Status: ${status} 
+  const reference = receipt.referenceNumber || receipt.reference || "N/A";
+  const receiptNumber = receipt.receiptNumber || "N/A";
+  const paymentMethod = (receipt.paymentMethod || "").replace("_", " ");
+  const amount = receipt.amount || 0;
+  const paymentDate = new Date(receipt.paymentDate || receipt.issuedAt).toLocaleDateString();
+  const status = (receipt.status || "completed").toUpperCase();
+  const schoolName = receipt.schoolName || "Demo School";
+  const issuedBy = receipt.issuedBy || "School System";
+  const currency = receipt.currency || "KES";
+  const outstandingBefore = receipt.academicYearOutstandingBefore ?? "N/A";
+  const outstandingAfter = receipt.academicYearOutstandingAfter ?? "N/A";
+  const cleanDescription = (receipt.description || "Fee Payment").split(" - ")[0];
 
-Total Amount Paid: ${currency} ${amount.toLocaleString()}
-Outstanding Before Pay (Academic Year): ${currency} ${
-      outstandingBefore.toLocaleString?.() ?? outstandingBefore
-    }
-Outstanding After Pay (Academic Year): ${currency} ${
-      outstandingAfter.toLocaleString?.() ?? outstandingAfter
-    }
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Receipt #${receiptNumber}</title>
+        <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f4f5; }
+            .receipt-container { max-width: 800px; margin: auto; background: #fff; border: 1px solid #e2e8f0; padding: 20px 40px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); }
+            .header { text-align: center; border-bottom: 2px solid #1e293b; padding-bottom: 15px; margin-bottom: 25px; }
+            .header h1 { margin: 0; font-size: 2em; color: #1e293b; }
+            .header p { margin: 5px 0 0; color: #475569; }
+            h3 { font-size: 1.1em; color: #334155; border-bottom: 1px solid #cbd5e1; padding-bottom: 5px; margin-top: 30px; }
+            .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 20px; font-size: 0.9em; }
+            .details-grid div { padding: 4px 0; }
+            .details-grid .label { font-weight: 600; color: #475569; }
+            .summary { margin-top: 30px; border-top: 2px solid #1e293b; padding-top: 15px; }
+            .summary-item { display: flex; justify-content: space-between; padding: 8px 0; font-size: 1em; }
+            .summary-item .label { font-weight: 600; }
+            .total { font-size: 1.2em; font-weight: bold; color: #1e293b; }
+            .footer { text-align: center; margin-top: 40px; font-size: 0.8em; color: #64748b; }
+            .print-button { display: block; width: 100%; padding: 12px; margin-top: 30px; background-color: #2563eb; color: white; border: none; border-radius: 6px; font-size: 1em; cursor: pointer; }
+            @media print {
+                body { margin: 0; padding: 0; background-color: #fff; }
+                .receipt-container { box-shadow: none; border: none; margin: 0; padding: 0; }
+                .print-button { display: none; }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="receipt-container">
+            <div class="header">
+                <h1>${schoolName}</h1>
+                <p>Payment Receipt</p>
+                <p><strong>Receipt #:</strong> ${receiptNumber}</p>
+            </div>
 
-Issued on: ${new Date(paymentDate).toLocaleDateString()}
-Issued by: ${issuedBy}
+            <h3>Student Information</h3>
+            <div class="details-grid">
+                <div><span class="label">Student Name:</span> ${studentName || "N/A"}</div>
+                <div><span class="label">Admission No:</span> ${admissionNumber || "N/A"}</div>
+                <div><span class="label">Class:</span> ${className || "N/A"}</div>
+            </div>
 
-Thank you for your payment!
+            <h3>Payment Details</h3>
+            <div class="details-grid">
+                <div><span class="label">Description:</span> ${cleanDescription}</div>
+                <div><span class="label">Term:</span> ${term || "N/A"}</div>
+                <div><span class="label">Year:</span> ${academicYear || "N/A"}</div>
+                <div><span class="label">Payment Date:</span> ${paymentDate}</div>
+                <div><span class="label">Payment Method:</span> ${paymentMethod}</div>
+                <div><span class="label">Reference:</span> ${reference}</div>
+                <div><span class="label">Status:</span> ${status}</div>
+            </div>
+
+            <div class="summary">
+                <div class="summary-item total"><span class="label">Total Paid:</span> ${currency} ${amount.toLocaleString()}</div>
+                <div class="summary-item"><span class="label">Outstanding Before (Academic Year):</span> ${currency} ${outstandingBefore.toLocaleString?.() ?? outstandingBefore}</div>
+                <div class="summary-item"><span class="label">Outstanding After (Academic Year):</span> ${currency} ${outstandingAfter.toLocaleString?.() ?? outstandingAfter}</div>
+            </div>
+
+            <div class="footer">Issued by ${issuedBy}</div>
+            <button class="print-button" onclick="window.print()">Print Receipt</button>
+        </div>
+    </body>
+    </html>
+  `;
+
+  const blob = new Blob([htmlContent], { type: "text/html" });
+  const url = URL.createObjectURL(blob);
+  const newWindow = window.open(url, "_blank");
+  if (newWindow) newWindow.focus();
+};
+
+
+              <div class="summary">
+                  <div class="summary-item">
+                      <span class="label">Term Balance Before Payment:</span>
+                      <span>KES ${balanceBefore != null ? balanceBefore.toLocaleString() : '0.00'}</span>
+                  </div>
+                  <div class="summary-item">
+                      <span class="label">Amount Paid:</span>
+                      <span style="font-weight: bold;">KES ${amountPaid != null ? amountPaid.toLocaleString() : '0.00'}</span>
+                  </div>
+                  <div class="summary-item total">
+                      <span>Term Balance After Payment:</span>
+                      <span>KES ${balanceAfter != null ? balanceAfter.toLocaleString() : '0.00'}</span>
+                  </div>
+              </div>
+
+              <div class="footer">
+                  <p>Issued by School System on ${new Date().toLocaleDateString()}</p>
+                  <p>Thank you for your payment!</p>
+              </div>
+              <button class="print-button" onclick="window.print()">Print or Save as PDF</button>
+          </div>
+      </body>
+      </html>
     `;
 
-    const blob = new Blob([receiptContent], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `receipt-${receiptNumber}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    toast({
-      title: "Receipt Downloaded",
-      description: "Receipt has been downloaded successfully.",
-      variant: "default",
-    });
+    const receiptWindow = window.open('', '_blank');
+    if (receiptWindow) {
+        receiptWindow.document.write(htmlContent);
+        receiptWindow.document.close();
+    } else {
+        toast({ title: "Popup Blocked", description: "Please allow popups to view the receipt." });
+    }
   };
 
   // Fetch receipts when focused child changes
@@ -760,234 +855,230 @@ Thank you for your payment!
     }
   }, [selectedSection, students]);
 
-  useEffect(() => {
-    fetchStudentFeeSummaries();
-  }, [students, schoolCode]);
+useEffect(() => {
+  fetchStudentFeeSummaries();
+}, [students, schoolCode]);
 
-  // Fetch current academic year and term on mount
-  useEffect(() => {
-    async function fetchAcademicInfo() {
-      setLoadingAcademicInfo(true);
-      setAcademicInfoError("");
-      try {
-        const [yearRes, termRes] = await Promise.all([
-          fetch(`/api/schools/${schoolCode}?action=current-academic-year`),
-          fetch(`/api/schools/${schoolCode}?action=current-term`),
-        ]);
-        if (!yearRes.ok) throw new Error("Failed to fetch academic year");
-        if (!termRes.ok) throw new Error("Failed to fetch term");
-        const yearData = await yearRes.json();
-        const termData = await termRes.json();
-        setCurrentAcademicYear(yearData);
-        setCurrentTerm(termData);
-      } catch (err: any) {
-        setAcademicInfoError(err.message || "Failed to load academic info");
-      } finally {
-        setLoadingAcademicInfo(false);
-      }
+// Fetch current academic year and term on mount
+useEffect(() => {
+  async function fetchAcademicInfo() {
+    setLoadingAcademicInfo(true);
+    setAcademicInfoError("");
+    try {
+      const [yearRes, termRes] = await Promise.all([
+        fetch(`/api/schools/${schoolCode}?action=current-academic-year`),
+        fetch(`/api/schools/${schoolCode}?action=current-term`),
+      ]);
+      if (!yearRes.ok) throw new Error("Failed to fetch academic year");
+      if (!termRes.ok) throw new Error("Failed to fetch term");
+      const yearData = await yearRes.json();
+      const termData = await termRes.json();
+      setCurrentAcademicYear(yearData);
+      setCurrentTerm(termData);
+    } catch (err: any) {
+      setAcademicInfoError(err.message || "Failed to load academic info");
+    } finally {
+      setLoadingAcademicInfo(false);
     }
-    fetchAcademicInfo();
-  }, [schoolCode]);
+  }
+  fetchAcademicInfo();
+}, [schoolCode]);
 
-  // Fetch academic years and terms
-  useEffect(() => {
-    async function fetchYearsAndTerms() {
-      try {
-        const res = await fetch(`/api/schools/${schoolCode}/academic-years`);
-        if (!res.ok) throw new Error("Failed to fetch academic years");
-        const years = await res.json();
-        setAcademicYears(years);
-        const current = years.find((y: any) => y.isCurrent);
-        const defaultYearId = current?.id || years[0]?.id || "";
-        setSelectedYearId(defaultYearId);
-        if (defaultYearId) {
-          const tRes = await fetch(
-            `/api/schools/${schoolCode}/terms?yearId=${defaultYearId}`
-          );
-          if (!tRes.ok) throw new Error("Failed to fetch terms");
-          const t = await tRes.json();
-          setTerms(t);
-          const currentTerm = t.find((term: any) => term.isCurrent);
-          setSelectedTermId(currentTerm?.id || t[0]?.id || "");
-        }
-      } catch (err: any) {
-        // Optionally handle error
-      }
-    }
-    if (schoolCode) fetchYearsAndTerms();
-  }, [schoolCode]);
-
-  // When year changes, fetch terms
-  useEffect(() => {
-    async function fetchTerms() {
-      if (!selectedYearId) return;
-      try {
+// Fetch academic years and terms
+useEffect(() => {
+  async function fetchYearsAndTerms() {
+    try {
+      const res = await fetch(`/api/schools/${schoolCode}/academic-years`);
+      if (!res.ok) throw new Error("Failed to fetch academic years");
+      const years = await res.json();
+      setAcademicYears(years);
+      const current = years.find((y: any) => y.isCurrent);
+      const defaultYearId = current?.id || years[0]?.id || "";
+      setSelectedYearId(defaultYearId);
+      if (defaultYearId) {
         const tRes = await fetch(
-          `/api/schools/${schoolCode}/terms?yearId=${selectedYearId}`
+          `/api/schools/${schoolCode}/terms?yearId=${defaultYearId}`
         );
         if (!tRes.ok) throw new Error("Failed to fetch terms");
         const t = await tRes.json();
         setTerms(t);
         const currentTerm = t.find((term: any) => term.isCurrent);
         setSelectedTermId(currentTerm?.id || t[0]?.id || "");
-      } catch (err: any) {
-        // Optionally handle error
       }
+    } catch (err: any) {
+      // Optionally handle error
     }
-    fetchTerms();
-  }, [selectedYearId, schoolCode]);
+  }
+  if (schoolCode) fetchYearsAndTerms();
+}, [schoolCode]);
 
-  // Update fee summary and quick stats when filters change
-  useEffect(() => {
-    if (!selectedYearId || !selectedTermId || students.length === 0) return;
-    const child = students.find((c) => c.id === focusedChildId) || students[0];
-    if (!child) return;
-    // Fetch fee summary for the selected student, year, and term
-    async function fetchFilteredFeeSummary() {
-      try {
-        const res = await fetch(
-          `/api/schools/${schoolCode}/students/${child.id}/fees`
+// When year changes, fetch terms
+useEffect(() => {
+  async function fetchTerms() {
+    if (!selectedYearId) return;
+    try {
+      const tRes = await fetch(
+        `/api/schools/${schoolCode}/terms?yearId=${selectedYearId}`
+      );
+      if (!tRes.ok) throw new Error("Failed to fetch terms");
+      const t = await tRes.json();
+      setTerms(t);
+      const currentTerm = t.find((term: any) => term.isCurrent);
+      setSelectedTermId(currentTerm?.id || t[0]?.id || "");
+    } catch (err: any) {
+      // Optionally handle error
+    }
+  }
+  fetchTerms();
+}, [selectedYearId, schoolCode]);
+
+// Update fee summary and quick stats when filters change
+useEffect(() => {
+  if (!selectedYearId || !selectedTermId || students.length === 0) return;
+  const child = students.find((c) => c.id === focusedChildId) || students[0];
+  if (!child) return;
+  async function fetchFilteredFeeSummary() {
+    try {
+      const res = await fetch(
+        `/api/schools/${schoolCode}/students/${child.id}/fees`
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      let feeSummary = data.feeSummary || [];
+      let filteredSummary = feeSummary;
+      if (
+        feeSummary.length > 0 &&
+        (feeSummary[0].termId || feeSummary[0].academicYearId)
+      ) {
+        filteredSummary = feeSummary.filter(
+          (f: any) =>
+            f.termId === selectedTermId && f.academicYearId === selectedYearId
         );
-        if (!res.ok) return;
-        const data = await res.json();
-        // Find the summary for the selected year and term (by ID)
-        let feeSummary = data.feeSummary || [];
-        // If backend returns termId/academicYearId, filter by those; else fallback to term/year
-        let filteredSummary = feeSummary;
-        if (
-          feeSummary.length > 0 &&
-          (feeSummary[0].termId || feeSummary[0].academicYearId)
-        ) {
-          filteredSummary = feeSummary.filter(
-            (f: any) =>
-              f.termId === selectedTermId && f.academicYearId === selectedYearId
-          );
-        } else {
-          // fallback: try to match by term/year name if IDs missing
-          const selectedYear = academicYears.find(
-            (y) => y.id === selectedYearId
-          );
-          const selectedTerm = terms.find((t) => t.id === selectedTermId);
-          filteredSummary = feeSummary.filter(
-            (f: any) =>
-              f.term === selectedTerm?.name &&
-              String(f.year) === selectedYear?.name
-          );
-        }
-        setStudentFeeSummaries((prev: any) => ({
-          ...prev,
-          [child.id]: { ...data, filteredSummary },
-        }));
-      } catch {}
-    }
-    fetchFilteredFeeSummary();
-  }, [
-    selectedYearId,
-    selectedTermId,
-    focusedChildId,
-    students,
-    schoolCode,
-    academicYears,
-    terms,
-  ]);
+      } else {
+        const selectedYear = academicYears.find(
+          (y) => y.id === selectedYearId
+        );
+        const selectedTerm = terms.find((t) => t.id === selectedTermId);
+        filteredSummary = feeSummary.filter(
+          (f: any) =>
+            f.term === selectedTerm?.name &&
+            String(f.year) === selectedYear?.name
+        );
+      }
+      setStudentFeeSummaries((prev: any) => ({
+        ...prev,
+        [child.id]: { ...data, filteredSummary },
+      }));
+    } catch {}
+  }
+  fetchFilteredFeeSummary();
+}, [
+  selectedYearId,
+  selectedTermId,
+  focusedChildId,
+  students,
+  schoolCode,
+  academicYears,
+  terms,
+]);
 
-  // UI for search
-  const renderReceiptSearch = () => (
-    <div className="mb-4">
-      <input
-        type="text"
-        placeholder="Search receipts..."
-        value={receiptSearch}
-        onChange={(e) => setReceiptSearch(e.target.value)}
-        className="border rounded px-3 py-2 w-full max-w-xs"
-      />
-    </div>
+// UI for search
+const renderReceiptSearch = () => (
+  <div className="mb-4">
+    <input
+      type="text"
+      placeholder="Search receipts..."
+      value={receiptSearch}
+      onChange={(e) => setReceiptSearch(e.target.value)}
+      className="border rounded px-3 py-2 w-full max-w-xs"
+    />
+  </div>
+);
+
+// Filter receipts by search
+const filteredReceipts = receipts.filter((receipt: any) => {
+  const search = receiptSearch.toLowerCase();
+  return (
+    receipt.receiptNumber?.toLowerCase().includes(search) ||
+    receipt.amount?.toString().includes(search) ||
+    receipt.paymentMethod?.toLowerCase().includes(search) ||
+    receipt.description?.toLowerCase().includes(search) ||
+    receipt.academicYearId?.toLowerCase?.().includes(search) ||
+    receipt.termId?.toLowerCase?.().includes(search)
   );
+});
 
-  // Filter receipts by search
-  const filteredReceipts = receipts.filter((receipt: any) => {
-    const search = receiptSearch.toLowerCase();
-    return (
-      receipt.receiptNumber?.toLowerCase().includes(search) ||
-      receipt.amount?.toString().includes(search) ||
-      receipt.paymentMethod?.toLowerCase().includes(search) ||
-      receipt.description?.toLowerCase().includes(search) ||
-      receipt.academicYearId?.toLowerCase?.().includes(search) ||
-      receipt.termId?.toLowerCase?.().includes(search)
-    );
-  });
-
-  // Render receipts table
-  const renderReceiptsTable = () => (
-    <div className="w-full">
-      {renderReceiptSearch()}
-      {loadingReceipts ? (
-        <div>Loading receipts...</div>
-      ) : receiptsError ? (
-        <div className="text-red-600">{receiptsError}</div>
-      ) : (
-        <table className="min-w-full text-sm border">
-          <thead>
-            <tr className="bg-gray-100">
-              <th className="px-4 py-2 border">Receipt No</th>
-              <th className="px-4 py-2 border">Date</th>
-              <th className="px-4 py-2 border">Amount</th>
-              <th className="px-4 py-2 border">Method</th>
-              <th className="px-4 py-2 border">Description</th>
-              <th className="px-4 py-2 border">Outstanding Before</th>
-              <th className="px-4 py-2 border">Outstanding After</th>
-              <th className="px-4 py-2 border">Actions</th>
+// Render receipts table
+const renderReceiptsTable = () => (
+  <div className="w-full">
+    {renderReceiptSearch()}
+    {loadingReceipts ? (
+      <div>Loading receipts...</div>
+    ) : receiptsError ? (
+      <div className="text-red-600">{receiptsError}</div>
+    ) : (
+      <table className="min-w-full text-sm border">
+        <thead>
+          <tr className="bg-gray-100">
+            <th className="px-4 py-2 border">Receipt No</th>
+            <th className="px-4 py-2 border">Date</th>
+            <th className="px-4 py-2 border">Amount</th>
+            <th className="px-4 py-2 border">Method</th>
+            <th className="px-4 py-2 border">Description</th>
+            <th className="px-4 py-2 border">Outstanding Before</th>
+            <th className="px-4 py-2 border">Outstanding After</th>
+            <th className="px-4 py-2 border">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filteredReceipts.length === 0 ? (
+            <tr>
+              <td colSpan={8} className="text-center py-8 text-gray-500">
+                No receipts found for this search.
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {filteredReceipts.length === 0 ? (
-              <tr>
-                <td colSpan={8} className="text-center py-8 text-gray-500">
-                  No receipts found for this search.
+          ) : (
+            filteredReceipts.map((receipt: any) => (
+              <tr key={receipt.id}>
+                <td className="px-4 py-2 border">{receipt.receiptNumber}</td>
+                <td className="px-4 py-2 border">
+                  {new Date(receipt.paymentDate).toLocaleDateString()}
+                </td>
+                <td className="px-4 py-2 border">
+                  {receipt.amount.toLocaleString()}
+                </td>
+                <td className="px-4 py-2 border">
+                  {(receipt.paymentMethod || "")
+                    .replace("_", " ")
+                    .toUpperCase()}
+                </td>
+                <td className="px-4 py-2 border">{receipt.description}</td>
+                <td className="px-4 py-2 border">
+                  {receipt.academicYearOutstandingBefore?.toLocaleString?.() ??
+                    receipt.academicYearOutstandingBefore}
+                </td>
+                <td className="px-4 py-2 border">
+                  {receipt.academicYearOutstandingAfter?.toLocaleString?.() ??
+                    receipt.academicYearOutstandingAfter}
+                </td>
+                <td className="px-4 py-2 border">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleDownloadReceipt(receipt)}
+                    className="flex items-center gap-1"
+                  >
+                    <Receipt className="w-4 h-4" /> Download
+                  </Button>
                 </td>
               </tr>
-            ) : (
-              filteredReceipts.map((receipt: any) => (
-                <tr key={receipt.id}>
-                  <td className="px-4 py-2 border">{receipt.receiptNumber}</td>
-                  <td className="px-4 py-2 border">
-                    {new Date(receipt.paymentDate).toLocaleDateString()}
-                  </td>
-                  <td className="px-4 py-2 border">
-                    {receipt.amount.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-2 border">
-                    {(receipt.paymentMethod || "")
-                      .replace("_", " ")
-                      .toUpperCase()}
-                  </td>
-                  <td className="px-4 py-2 border">{receipt.description}</td>
-                  <td className="px-4 py-2 border">
-                    {receipt.academicYearOutstandingBefore?.toLocaleString?.() ??
-                      receipt.academicYearOutstandingBefore}
-                  </td>
-                  <td className="px-4 py-2 border">
-                    {receipt.academicYearOutstandingAfter?.toLocaleString?.() ??
-                      receipt.academicYearOutstandingAfter}
-                  </td>
-                  <td className="px-4 py-2 border">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleDownloadReceipt(receipt)}
-                      className="flex items-center gap-1"
-                    >
-                      <Receipt className="w-4 h-4" /> Download
-                    </Button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      )}
-    </div>
-  );
+            ))
+          )}
+        </tbody>
+      </table>
+    )}
+  </div>
+);
 
   if (isLoading) {
     return (
@@ -1267,32 +1358,202 @@ Thank you for your payment!
                   const child =
                     students.find((c) => c.id === focusedChildId) ||
                     students[0];
-                  // Use new logic for outstandingFees
-                  const termBalances =
-                    studentFeeSummaries[child.id]?.termBalances || [];
-                  const currentTermId = currentTerm?.id;
-                  const currentTermSummary = termBalances.find(
-                    (f: any) => f.termId === currentTermId
-                  );
-                  const outstandingFees = currentTermSummary?.balance || 0;
+// Use merged logic for outstandingFees
+const termBalances = studentFeeSummaries[child.id]?.termBalances || [];
+const currentTermId = currentTerm?.id;
+const currentTermSummary = termBalances.find(
+  (f: any) => f.termId === currentTermId
+);
+const outstandingFees = currentTermSummary ? currentTermSummary.balance : 0;
+
                   return (
                     <ChildOverview
                       child={child}
                       outstandingFees={outstandingFees}
-                      feeStructure={getStudentFeeStructure(child.gradeId)}
+                      feeStructure={getStudentFeeStructure(child.id)}
                     />
                   );
                 })()}
             </div>
           )}
           {selectedSection === "fees" && (
-            <ParentFeesPanel
-              schoolCode={schoolCode}
-              students={students}
-              focusedChildId={focusedChildId}
-              studentFeeSummaries={studentFeeSummaries}
-              refreshFeeData={fetchStudentFeeSummaries}
-            />
+{selectedSection === "fees" && (
+  <div className="max-w-4xl mx-auto">
+    <h2 className="text-2xl font-bold mb-6 text-center">Fee Structure</h2>
+    {students.length === 0 ? (
+      <Card className="mb-6">
+        <CardContent>No children found.</CardContent>
+      </Card>
+    ) : (
+      <ParentFeesPanel
+        schoolCode={schoolCode}
+        students={students}
+        focusedChildId={focusedChildId}
+        studentFeeSummaries={studentFeeSummaries}
+        refreshFeeData={fetchStudentFeeSummaries}
+      />
+    )}
+  </div>
+)}
+
+{selectedSection === "receipts" && (
+  <div className="max-w-4xl mx-auto">
+    <h2 className="text-2xl font-bold mb-6 text-center">
+      Payment History & Receipts
+    </h2>
+    {students.length === 0 ? (
+      <Card className="mb-6">
+        <CardContent>No children found.</CardContent>
+      </Card>
+    ) : (
+      <div className="space-y-6">
+        {/* Payment Summary Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Payment Summary</CardTitle>
+            <CardDescription>
+              Payment history for{" "}
+              {students.find((c) => c.id === focusedChildId)?.fullName ||
+                students[0].fullName}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="text-center p-4 bg-blue-50 rounded-lg">
+                <div className="text-2xl font-bold text-blue-600">
+                  {receipts.length}
+                </div>
+                <div className="text-sm text-gray-600">Total Payments</div>
+              </div>
+              <div className="text-center p-4 bg-green-50 rounded-lg">
+                <div className="text-2xl font-bold text-green-600">
+                  KES{" "}
+                  {receipts
+                    .reduce((sum, receipt) => sum + receipt.amount, 0)
+                    .toLocaleString()}
+                </div>
+                <div className="text-sm text-gray-600">Total Paid</div>
+              </div>
+              <div className="text-center p-4 bg-orange-50 rounded-lg">
+                <div className="text-2xl font-bold text-orange-600">
+                  {receipts.length > 0
+                    ? new Date(receipts[0].paymentDate).toLocaleDateString()
+                    : "N/A"}
+                </div>
+                <div className="text-sm text-gray-600">Last Payment</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Payment History Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Payment History</CardTitle>
+            <CardDescription>
+              Recent payments and receipts
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {receipts.length > 0 ? (
+              <div className="space-y-4">
+                {receipts.map((receipt) => (
+                  <div
+                    key={receipt.id}
+                    className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <h4 className="font-semibold text-lg">
+                          Receipt #{receipt.receiptNumber}
+                        </h4>
+                        <p className="text-sm text-gray-600">
+                          {receipt.description}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-lg font-bold text-green-600">
+                          KES{" "}
+                          {receipt.amount != null
+                            ? receipt.amount.toLocaleString()
+                            : "0"}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {new Date(
+                            receipt.paymentDate
+                          ).toLocaleDateString()}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <span className="font-medium">Payment Method:</span>
+                        <p className="capitalize">
+                          {receipt.paymentMethod.replace("_", " ")}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="font-medium">Reference:</span>
+                        <p className="text-xs">{receipt.referenceNumber}</p>
+                      </div>
+                      <div>
+                        <span className="font-medium">Balance After:</span>
+                        <p className="text-red-600">
+                          KES{" "}
+                          {receipt.balance != null
+                            ? receipt.balance.toLocaleString()
+                            : "0"}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="font-medium">Balance Before:</span>
+                        <p className="text-gray-600">
+                          KES{" "}
+                          {receipt.balanceCarriedForward != null
+                            ? receipt.balanceCarriedForward.toLocaleString()
+                            : "0"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDownloadReceipt(receipt)}
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        Download Receipt
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSelectedReceipt(receipt)}
+                      >
+                        <Receipt className="w-4 h-4 mr-2" />
+                        View Receipt
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <Receipt className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                <p>No payment history found for this student.</p>
+                <p className="text-sm">
+                  Payments will appear here once made.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    )}
+  </div>
+)}
+
           )}
           {selectedSection === "receipts" && renderReceiptsTable()}
           {selectedSection === "performance" && (
@@ -1322,6 +1583,26 @@ Thank you for your payment!
           term={selectedFeeStructure.term}
           academicYear={selectedFeeStructure.year.toString()}
           onReceiptGenerated={handleReceiptGenerated}
+        />
+      )}
+
+      {selectedReceipt && (
+        <ReceiptView
+          receipt={selectedReceipt}
+          studentName={
+            students.find((s) => s.id === selectedReceipt.studentId)?.user
+              ?.name || "N/A"
+          }
+          studentClass={
+            students.find((s) => s.id === selectedReceipt.studentId)?.class
+              ?.name || "N/A"
+          }
+          admissionNumber={
+            students.find((s) => s.id === selectedReceipt.studentId)
+              ?.admissionNumber || "N/A"
+          }
+          schoolName={schoolName}
+          onClose={() => setSelectedReceipt(null)}
         />
       )}
     </div>
