@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { PrismaClient } from "@prisma/client"
 import bcrypt from "bcryptjs"
+import { sign } from "jsonwebtoken"
+import { cookies } from "next/headers"
 
 const prisma = new PrismaClient()
 
@@ -30,6 +32,13 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
     }
 
     // 4. Return success (and set session/cookie if needed)
+    const token = sign({ userId: user.id, schoolCode: school.code, role: "admin" }, process.env.JWT_SECRET!, { expiresIn: "1h" })
+    cookies().set("admin_auth_token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60, // 1 hour
+      path: "/",
+    })
     return NextResponse.json({ success: true, user: { id: user.id, email: user.email, name: user.name } })
   } catch (error) {
     console.error("Error in auth API:", error)

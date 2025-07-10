@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -61,6 +61,20 @@ interface ReceiptData {
   schoolName: string;
   studentName: string;
   currency: string;
+  paymentBreakdown?: {
+    term: string;
+    year: string;
+    applied: number;
+    total: number;
+    paid: number;
+    outstanding: number;
+    status: string;
+  }[];
+  currentTermBalance?: number;
+  carryForward?: number;
+  balance?: number;
+  academicYearOutstandingAfter?: number;
+  termOutstandingAfter?: number;
 }
 
 export function PaymentForm({
@@ -85,6 +99,14 @@ export function PaymentForm({
   const [isLoading, setIsLoading] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
+  const [feeSummary, setFeeSummary] = useState<any>(null);
+  const [currentTermDue, setCurrentTermDue] = useState<number>(0);
+  const [totalOutstanding, setTotalOutstanding] = useState<number>(0);
+  const [academicYearOutstandingBefore, setAcademicYearOutstandingBefore] =
+    useState<number | null>(null);
+  const [termOutstandingBefore, setTermOutstandingBefore] = useState<
+    number | null
+  >(null);
 
   const handlePayment = async () => {
     if (isProcessing) return;
@@ -112,6 +134,24 @@ export function PaymentForm({
     onStart?.();
 
     try {
+      // Fetch running balance from fee-statement just before payment
+      const statementRes = await fetch(
+        `/api/schools/${schoolCode}/students/${studentId}/fee-statement`
+      );
+      const statement = await statementRes.json();
+      const lastBalance =
+        statement.length > 0 ? statement[statement.length - 1].balance || 0 : 0;
+      const academicYearOutstandingBefore = lastBalance;
+
+      // Optionally, still fetch /fees for term breakdown
+      const res = await fetch(
+        `/api/schools/${schoolCode}/students/${studentId}/fees`
+      );
+      const data = await res.json();
+      const currentTermSummary = data.termBalances.find(
+        (f: any) => f.term === term && String(f.year) === String(academicYear)
+      );
+      const termOutstandingBefore = currentTermSummary?.balance || 0;
       // Call the real payment API
       const response = await fetch(`/api/schools/${schoolCode}/payments`, {
         method: "POST",
@@ -128,6 +168,8 @@ export function PaymentForm({
           phoneNumber: paymentMethod === "mpesa" ? phoneNumber : undefined,
           transactionId: paymentMethod === "manual" ? transactionId : undefined,
           description: `${feeType} - ${term} ${academicYear}`,
+          academicYearOutstandingBefore,
+          termOutstandingBefore,
         }),
       });
 
@@ -139,39 +181,18 @@ export function PaymentForm({
       const result = await response.json();
       const paymentData = result.payment;
 
-      // Generate receipt data from the API response
-      const receipt: ReceiptData = {
-        receiptNumber: paymentData.receiptNumber,
-        paymentId: paymentData.id,
-        studentId: paymentData.studentId,
-        schoolCode,
-        amount: paymentData.amount,
-        paymentMethod: paymentData.paymentMethod,
-        feeType,
-        term,
-        academicYear,
-        reference: paymentData.referenceNumber,
-        phoneNumber: paymentMethod === "mpesa" ? phoneNumber : undefined,
-        transactionId: paymentMethod === "manual" ? transactionId : undefined,
-        status: "completed",
-        issuedAt: new Date(paymentData.paymentDate),
-        issuedBy: "School System",
-        schoolName: "Demo School",
-        studentName: paymentData.student?.user?.name || "Student",
-        currency: "KES",
-      };
-
-      setReceiptData(receipt);
+      // Use only backend-provided data for the receipt
+      setReceiptData(paymentData);
       setShowReceipt(true);
 
       toast({
         title: "Payment Successful!",
         description: `Payment of KES ${amount.toLocaleString()} processed successfully. Receipt #${
-          receipt.receiptNumber
+          paymentData.receiptNumber || "N/A"
         }`,
       });
 
-      onPaymentSuccess?.(receipt);
+      onPaymentSuccess?.(paymentData);
     } catch (error) {
       console.error("Payment error:", error);
       const errorMessage =
@@ -195,6 +216,25 @@ export function PaymentForm({
     setReceiptData(null);
   };
 
+  // Fetch latest fee summary after payment
+  useEffect(() => {
+    if (showReceipt && receiptData) {
+      fetch(`/api/schools/${schoolCode}/students/${studentId}/fees`)
+        .then((res) => res.json())
+        .then((data) => {
+          setFeeSummary(data);
+          // Find current term due
+          const currentTermSummary = data.termBalances.find(
+            (f: any) =>
+              f.term === receiptData.term &&
+              String(f.year) === String(receiptData.academicYear)
+          );
+          setCurrentTermDue(currentTermSummary?.balance || 0);
+          setTotalOutstanding(data.academicYearOutstanding || 0);
+        });
+    }
+  }, [showReceipt, receiptData, schoolCode, studentId]);
+
   if (showReceipt && receiptData) {
     return (
       <Card className="w-full max-w-md mx-auto">
@@ -207,72 +247,76 @@ export function PaymentForm({
             Receipt #: {receiptData.receiptNumber}
           </p>
         </CardHeader>
-
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-2 text-sm">
-            <div>
-              <span className="font-medium">Student ID:</span>
-              <p>{receiptData.studentId}</p>
-            </div>
             <div>
               <span className="font-medium">Student Name:</span>
               <p>{receiptData.studentName}</p>
             </div>
             <div>
-              <span className="font-medium">Fee Type:</span>
-              <p>{receiptData.feeType}</p>
-            </div>
-            <div>
-              <span className="font-medium">Term:</span>
-              <p>{receiptData.term}</p>
+              <span className="font-medium">Admission No.:</span>
+              <p>{receiptData.studentId}</p>
             </div>
             <div>
               <span className="font-medium">Academic Year:</span>
               <p>{receiptData.academicYear}</p>
             </div>
             <div>
+              <span className="font-medium">Term:</span>
+              <p>{receiptData.term}</p>
+            </div>
+            <div>
               <span className="font-medium">Payment Method:</span>
               <p className="uppercase">{receiptData.paymentMethod}</p>
             </div>
-            {receiptData.phoneNumber && (
-              <div>
-                <span className="font-medium">Phone Number:</span>
-                <p>{receiptData.phoneNumber}</p>
-              </div>
-            )}
-            {receiptData.transactionId && (
-              <div>
-                <span className="font-medium">Transaction ID:</span>
-                <p>{receiptData.transactionId}</p>
-              </div>
-            )}
-            <div className="col-span-2">
+            <div>
               <span className="font-medium">Reference:</span>
               <p className="text-xs">{receiptData.reference}</p>
             </div>
-            <div>
-              <span className="font-medium">Status:</span>
-              <p className="uppercase font-bold text-green-600">
-                {receiptData.status}
-              </p>
-            </div>
           </div>
-
-          <div className="border-t pt-4">
+          <div className="border-t pt-4 space-y-2">
             <div className="flex justify-between items-center text-lg font-bold">
-              <span>Total Amount:</span>
-              <span>
-                {receiptData.currency} {receiptData.amount.toLocaleString()}
+              <span>Total Amount Paid:</span>
+              <span>KES {receiptData.amount?.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between items-center text-md">
+              <span>Total Outstanding (Academic Year):</span>
+              <span
+                className={
+                  (receiptData.academicYearOutstandingAfter ?? 0) > 0
+                    ? "text-red-600"
+                    : "text-green-600"
+                }
+              >
+                KES{" "}
+                {receiptData.academicYearOutstandingAfter?.toLocaleString() ??
+                  "N/A"}
+              </span>
+            </div>
+            <div className="flex justify-between items-center text-md">
+              <span>Current Term Due:</span>
+              <span
+                className={
+                  (receiptData.termOutstandingAfter ?? 0) > 0
+                    ? "text-red-600"
+                    : "text-green-600"
+                }
+              >
+                KES{" "}
+                {receiptData.termOutstandingAfter?.toLocaleString() ?? "N/A"}
               </span>
             </div>
           </div>
-
           <div className="text-xs text-gray-500 text-center space-y-1">
-            <p>Issued on: {receiptData.issuedAt.toLocaleDateString()}</p>
+            <p>
+              Issued on:{" "}
+              {receiptData.issuedAt
+                ? new Date(receiptData.issuedAt).toLocaleDateString()
+                : "N/A"}
+            </p>
             <p>Issued by: {receiptData.issuedBy}</p>
             <p className="font-medium">Thank you for your payment!</p>
           </div>
-
           <Button onClick={handleCloseReceipt} className="w-full">
             Close Receipt
           </Button>

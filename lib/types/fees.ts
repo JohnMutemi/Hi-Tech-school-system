@@ -74,4 +74,39 @@ export interface StudentFeesSummary {
   overdueAmount: number
   nextDueDate?: string
   lastPaymentDate?: string
+}
+
+// For termly fee structures
+export interface FeeBreakdownItem {
+  name: string;
+  value: number;
+}
+
+export interface TermlyFeeStructure {
+  id: string;
+  term: string;
+  year: number;
+  gradeId: string;
+  totalAmount: number;
+  breakdown: FeeBreakdownItem[];
+  isActive: boolean;
+  createdAt: string;
+  creator: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  logs: Array<{
+    id: string;
+    action: string;
+    timestamp: string;
+    user: {
+      name: string;
+      email: string;
+    };
+    details: any;
+  }>;
+  gradeName: string;
+  academicYearId: string;
+  termId: string;
 } 

@@ -63,6 +63,17 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
       return NextResponse.json({ error: 'School not found' }, { status: 404 });
     }
 
+    // Fetch current academic year and term
+    const currentYear = await prisma.academicYear.findFirst({
+      where: { schoolId: school.id, isCurrent: true },
+    });
+    let currentTerm = null;
+    if (currentYear) {
+      currentTerm = await prisma.term.findFirst({
+        where: { academicYearId: currentYear.id, isCurrent: true },
+      });
+    }
+
     let parentUser = null;
     let parentTempPassword = 'parent123';
     if (parentPhone) {
@@ -128,6 +139,10 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
         medicalInfo,
         notes,
         isActive: true,
+        currentAcademicYearId: currentYear?.id,
+        currentTermId: currentTerm?.id,
+        joinedAcademicYearId: currentYear?.id,
+        joinedTermId: currentTerm?.id,
       },
       include: {
         user: true,
