@@ -66,9 +66,13 @@ model TeacherProfile {
 }
 
 model Grade {
-  id         String               @id @default(uuid())
-  name       String
-  classes    Class[]
+  id        String   @id @default(uuid())
+  name      String
+  schoolId  String
+  isAlumni  Boolean  @default(false) // Field from promotions logic
+  classes   Class[]
+}
+
   termlyFees TermlyFeeStructure[]
 }
 
@@ -87,12 +91,11 @@ model Class {
   teacher      User?     @relation("TeacherClasses", fields: [teacherId], references: [id])
   students     Student[]
 }
-
 model Student {
   id                    String               @id @default(uuid())
   userId                String               @unique
   schoolId              String
-  classId               String?
+  classId               String?              // references Class (section/stream)
   admissionNumber       String
   dateOfBirth           DateTime?
   dateAdmitted          DateTime?
@@ -102,6 +105,7 @@ model Student {
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt
   academicYear          Int?                 @default(2025)
+
   tempPassword          String?
   parentName            String?
   parentPhone           String?
@@ -112,11 +116,14 @@ model Student {
   emergencyContact      String?
   medicalInfo           String?
   notes                 String?
+
+  // Academic tracking fields from `main`
   currentAcademicYearId String?
   currentTermId         String?
   joinedAcademicYearId  String?
   joinedTermId          String?
 
+  // Relations
   user                  User                 @relation(fields: [userId], references: [id])
   school                School               @relation(fields: [schoolId], references: [id])
   class                 Class?               @relation(fields: [classId], references: [id])
@@ -126,6 +133,7 @@ model Student {
   joinedAcademicYear    AcademicYear?        @relation("JoinedAcademicYear", fields: [joinedAcademicYearId], references: [id])
   joinedTerm            Term?                @relation("JoinedTerm", fields: [joinedTermId], references: [id])
 
+  // Data relationships
   payments              Payment[]
   paymentRequests       PaymentRequest[]
   studentFees           StudentFee[]
@@ -393,4 +401,22 @@ model StudentArrear {
   student        Student      @relation(fields: [studentId], references: [id])
 
   @@index([studentId, academicYearId])
+}
+
+// New model for tracking student arrears across academic years
+model StudentArrears {
+  id              String   @id @default(uuid())
+  studentId       String
+  academicYear    Int
+  openingBalance  Float    @default(0) // Balance carried forward from previous year
+  totalCharged    Float    @default(0) // Total fees charged for this year
+  totalPaid       Float    @default(0) // Total payments made for this year
+  closingBalance  Float    @default(0) // Balance at end of year (can be negative for overpayment)
+  isCarriedForward Boolean @default(false) // Whether this balance was carried forward
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  student         Student  @relation(fields: [studentId], references: [id])
+
+  @@unique([studentId, academicYear])
 }
