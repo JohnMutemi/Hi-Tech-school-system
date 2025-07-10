@@ -52,9 +52,8 @@ export async function GET(req: NextRequest, { params }: { params: { schoolCode: 
       return NextResponse.json(history);
     }
 
-    // Default response if no action matches
     return NextResponse.json({ message: 'Please specify an action.' });
-    
+
   } catch (error: any) {
     console.error('Promotion API error:', error);
     return NextResponse.json({ error: error.message || 'Failed to fetch promotion data' }, { status: 500 });
@@ -70,9 +69,11 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
       fromClass,
       toClass,
       studentIds,
-      excludedStudents = [], // Default to empty array
+      excludedStudents = [],
       promotedBy,
       notes,
+      toAcademicYearId,
+      toTermId
     } = body;
 
     const school = await prisma.school.findUnique({
@@ -87,8 +88,23 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const currentYear = new Date().getFullYear();
-    const nextYear = currentYear + 1;
+    let academicYearId = toAcademicYearId;
+    let termId = toTermId;
+    if (!academicYearId) {
+      const currentYear = await prisma.academicYear.findFirst({
+        where: { schoolId: school.id, isCurrent: true },
+      });
+      academicYearId = currentYear?.id;
+    }
+    if (!termId && academicYearId) {
+      const currentTerm = await prisma.term.findFirst({
+        where: { academicYearId, isCurrent: true },
+      });
+      termId = currentTerm?.id;
+    }
+
+    const currentYear = new Date().getFullYear().toString();
+    const nextYear = (parseInt(currentYear) + 1).toString();
 
     let realPromotedBy = promotedBy;
     if (!realPromotedBy || realPromotedBy === "admin") {
@@ -101,12 +117,10 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
       realPromotedBy = adminUser.id;
     }
 
-    // Start a transaction
     const result = await prisma.$transaction(async (tx) => {
       const promotionLogs = [];
       const carryForwardEntries = [];
 
-      // Promote each selected student
       for (const studentId of studentIds) {
         const student = await tx.student.findUnique({
           where: { id: studentId },
@@ -118,7 +132,6 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
 
         if (!student) continue;
 
-        // Calculate outstanding fee balance from current academic year
         const totalPaid = student.payments.reduce((sum, payment) => sum + payment.amount, 0);
 
         let outstandingBalance = 0;
@@ -131,11 +144,10 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
               isActive: true,
             },
           });
-          
+
           const totalFees = feeStructures.reduce((sum, fs) => sum + Number(fs.totalAmount), 0);
           outstandingBalance = Math.max(0, totalFees - totalPaid);
 
-          // Create carry-forward entry if there's outstanding balance
           if (outstandingBalance > 0) {
             const carryForwardEntry = await tx.payment.create({
               data: {
@@ -155,7 +167,6 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
           }
         }
 
-        // Find the target class for promotion
         const targetClass = await tx.class.findFirst({
           where: { name: toClass, schoolId: school.id, isActive: true },
         });
@@ -164,28 +175,29 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
           throw new Error(`Target class ${toClass} not found`);
         }
 
-        // Update student class and academic year
         await tx.student.update({
           where: { id: studentId },
           data: {
-            class: { connect: { id: targetClass.id } },
-            academicYear: (student.academicYear || currentYear) + 1,
+            classId: targetClass.id,
+            currentAcademicYearId: academicYearId,
+            currentTermId: termId,
           },
         });
 
-        // Create promotion log
         const promotionLog = await tx.promotionLog.create({
           data: {
             studentId,
             fromClass,
             toClass,
-            fromYear: currentYear.toString(),
-            toYear: nextYear.toString(),
+            fromYear: currentYear,
+            toYear: nextYear,
             promotedBy: realPromotedBy,
-            criteria: { 
+            criteria: {
               type: 'bulk_promotion',
               outstandingBalance: outstandingBalance || 0,
               carryForwardCreated: outstandingBalance > 0,
+              academicYearId,
+              termId,
             },
             notes: outstandingBalance > 0 
               ? `${notes} (Fee balance of KES ${outstandingBalance.toLocaleString()} carried forward)`
@@ -197,7 +209,6 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
         promotionLogs.push(promotionLog);
       }
 
-      // Log exclusions if any
       if (excludedStudents.length > 0) {
         const logId = promotionLogs[0]?.id;
         if (logId) {
@@ -215,15 +226,15 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
         }
       }
 
-      return { 
-        success: true, 
-        promotedCount: studentIds.length, 
+      return {
+        success: true,
+        promotedCount: studentIds.length,
         excludedCount: excludedStudents.length,
         carryForwardCount: carryForwardEntries.length,
         totalCarriedForward: carryForwardEntries.reduce((sum: number, entry: any) => sum + entry.amount, 0),
       };
     }, {
-      timeout: 20000, // Increase timeout to 20 seconds
+      timeout: 20000,
     });
 
     return NextResponse.json(result);
@@ -305,7 +316,7 @@ export async function PUT(req: NextRequest, { params }: { params: { schoolCode: 
   }
 }
 
-// Helper function to get eligible students
+// Helper function
 async function getEligibleStudents(schoolId: string, classLevel: string) {
   const targetClass = await prisma.class.findFirst({
     where: { name: classLevel, schoolId: schoolId, isActive: true },
@@ -343,15 +354,10 @@ async function getEligibleStudents(schoolId: string, classLevel: string) {
     },
   });
 
-  const termOrder: { [key: string]: number } = { 'Term 1': 1, 'Term 2': 2, 'Term 3': 3 };
-  const sortedFeeStructures = [...feeStructures].sort((a, b) => termOrder[a.term] - termOrder[b.term]);
-
   return students.map(student => {
-    let outstandingBalance = 0;
-    const totalFeesForYear = feeStructures.reduce((sum, fs) => sum + Number(fs.totalAmount), 0);
-    const totalPaidForYear = student.payments.reduce((sum, p) => sum + p.amount, 0);
-    outstandingBalance = Math.max(0, totalFeesForYear - totalPaidForYear);
-    
+    const totalFees = feeStructures.reduce((sum, fs) => sum + Number(fs.totalAmount), 0);
+    const totalPaid = student.payments.reduce((sum, p) => sum + p.amount, 0);
+    const outstandingBalance = Math.max(0, totalFees - totalPaid);
     const allTermsPaid = outstandingBalance === 0;
 
     return {
@@ -364,10 +370,10 @@ async function getEligibleStudents(schoolId: string, classLevel: string) {
         feeStatus: allTermsPaid ? 'paid' : 'unpaid',
         allTermsPaid,
         meetsCriteria: !criteria || (allTermsPaid && (!criteria.minGrade || true)),
-        outstandingBalance: outstandingBalance,
-        totalFees: totalFeesForYear,
-        totalPaid: totalPaidForYear,
+        outstandingBalance,
+        totalFees,
+        totalPaid,
       },
     };
   });
-} 
+}

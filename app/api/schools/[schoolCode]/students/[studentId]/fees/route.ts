@@ -25,86 +25,159 @@ export async function GET(
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
 
-    const studentAdmissionYear = student.dateAdmitted ? new Date(student.dateAdmitted).getFullYear() : new Date().getFullYear();
-
-    const allPayments = await prisma.payment.findMany({
-      where: { studentId: student.id },
-      orderBy: [{ academicYear: 'asc' }, { paymentDate: 'asc' }],
-    });
-
-    const allTermStructures = await prisma.termlyFeeStructure.findMany({
+    const feeStructures = await prisma.termlyFeeStructure.findMany({
       where: {
         gradeId: student.class?.gradeId,
         isActive: true,
-      },
-      orderBy: [{ year: 'asc' }, { term: 'asc' }],
+        NOT: [
+          { termId: null },
+          { academicYearId: null }
+        ]
+      }
     });
-    
-    const paymentsByYear = allPayments.reduce((acc, p) => {
-      const year = p.academicYear;
-      if (!acc[year]) acc[year] = [];
-      acc[year].push(p);
-      return acc;
-    }, {} as Record<number, typeof allPayments>);
 
-    const structuresByYear = allTermStructures.reduce((acc, s) => {
-      const year = s.year;
-      if (!acc[year]) acc[year] = [];
-      acc[year].push(s);
-      return acc;
-    }, {} as Record<number, typeof allTermStructures>);
+    const payments = await prisma.payment.findMany({
+      where: { studentId: student.id },
+      orderBy: { paymentDate: 'asc' },
+      select: {
+        id: true,
+        studentId: true,
+        amount: true,
+        createdAt: true,
+        paymentDate: true,
+        paymentMethod: true,
+        referenceNumber: true,
+        receiptNumber: true,
+        description: true,
+        receivedBy: true,
+        academicYearId: true,
+        termId: true,
+        academicYear: { select: { name: true } },
+        term: { select: { name: true } }
+      }
+    });
 
-    const feesByYear: any = {};
-    let carryForward = 0;
-    const sortedYears = [...new Set([...Object.keys(structuresByYear).map(Number), ...Object.keys(paymentsByYear).map(Number)])].sort();
+    const joinAcademicYearId = student.joinedAcademicYearId;
+    const joinTermId = student.joinedTermId;
+    const joinDate = student.dateAdmitted ? new Date(student.dateAdmitted) : null;
 
-    for (const year of sortedYears) {
-      if (year < studentAdmissionYear) continue;
+    let filteredFeeStructures = feeStructures;
+    if (joinAcademicYearId && joinTermId) {
+      const joinTermObj = feeStructures.find(t => t.termId === joinTermId);
+      const joinTermName = joinTermObj?.term;
+      const termOrder: Record<string, number> = { 'Term 1': 1, 'Term 2': 2, 'Term 3': 3 };
 
-      const yearStructures = structuresByYear[year] || [];
-      const yearPayments = paymentsByYear[year] || [];
-      
-      const yearTotalDue = yearStructures.reduce((sum, s) => sum + parseFloat(s.totalAmount.toString()), 0);
-      const totalDueWithCarryForward = yearTotalDue + carryForward;
-      
-      const yearTotalPaid = yearPayments.filter(p => p.paymentMethod !== 'CARRY_FORWARD').reduce((sum, p) => sum + p.amount, 0);
-
-      let yearBalance = totalDueWithCarryForward - yearTotalPaid;
-
-      // Distribute this year's payments across its terms
-      let remainingPaidForYear = yearTotalPaid;
-      const terms = yearStructures.map(structure => {
-          const termTotalAmount = parseFloat(structure.totalAmount.toString());
-          const paidForTerm = Math.min(remainingPaidForYear, termTotalAmount);
-          remainingPaidForYear -= paidForTerm;
-          const termBalance = termTotalAmount - paidForTerm;
-          
-          return {
-              term: structure.term,
-              year: structure.year,
-              totalAmount: termTotalAmount,
-              totalPaid: paidForTerm,
-              balance: termBalance,
-              status: termBalance <= 0 ? 'paid' : (paidForTerm > 0 ? 'partial' : 'pending'),
-              payments: yearPayments.filter(p => p.term === structure.term),
-              breakdown: structure.breakdown,
-              dueDate: structure.dueDate,
-          };
+      filteredFeeStructures = filteredFeeStructures.filter(fs => {
+        if (!fs.academicYearId || !fs.term) return false;
+        if (fs.academicYearId < joinAcademicYearId) return false;
+        if (fs.academicYearId === joinAcademicYearId && joinTermName) {
+          return termOrder[fs.term] >= termOrder[joinTermName];
+        }
+        return true;
       });
-
-      feesByYear[year] = {
-        terms,
-        yearTotal: yearTotalDue,
-        yearPaid: yearTotalPaid,
-        yearBalance: yearBalance,
-        carryForwardIn: carryForward,
-      };
-      
-      // The new carry-forward for next year is this year's balance
-      carryForward = yearBalance > 0 ? yearBalance : 0;
+    } else if (joinDate) {
+      filteredFeeStructures = filteredFeeStructures.filter(fs => {
+        return fs.createdAt && new Date(fs.createdAt) >= joinDate;
+      });
     }
-    
-    const finalBalance = carryForward; // The final carry-forward is the total outstanding
+
+    let filteredPayments = payments;
+    if (joinAcademicYearId && joinTermId) {
+      filteredPayments = filteredPayments.filter(p => {
+        if (!p.academicYearId || !p.termId) return false;
+        if (p.academicYearId < joinAcademicYearId) return false;
+        if (p.academicYearId === joinAcademicYearId && p.termId < joinTermId) return false;
+        return true;
+      });
+    } else if (joinDate) {
+      filteredPayments = filteredPayments.filter(p => {
+        return p.paymentDate && new Date(p.paymentDate) >= joinDate;
+      });
+    }
+
+    let transactions: any[] = [];
+
+    for (const fs of filteredFeeStructures) {
+      transactions.push({
+        ref: fs.id,
+        description: `INVOICE - ${fs.term || ''} ${fs.year || ''}`,
+        debit: Number(fs.totalAmount),
+        credit: 0,
+        date: fs.createdAt,
+        type: 'invoice',
+        termId: fs.termId,
+        academicYearId: fs.academicYearId,
+        termName: fs.term || '',
+        academicYearName: fs.year ? fs.year.toString() : ''
+      });
+    }
+
+    for (const p of filteredPayments) {
+      transactions.push({
+        ref: p.receiptNumber || p.referenceNumber || p.id,
+        description: p.description || 'PAYMENT',
+        debit: 0,
+        credit: Number(p.amount),
+        date: p.paymentDate,
+        type: 'payment',
+        termId: p.termId,
+        academicYearId: p.academicYearId,
+        termName: p.term?.name || '',
+        academicYearName: p.academicYear?.name || ''
+      });
+    }
+
+    transactions = transactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    let runningBalance = 0;
+    transactions = transactions.map((txn) => {
+      runningBalance += (txn.debit || 0) - (txn.credit || 0);
+      return {
+        ...txn,
+        balance: runningBalance
+      };
+    });
+
+    const academicYearOutstanding = transactions.length > 0 ? transactions[transactions.length - 1].balance : 0;
+
+    let carryForward = 0;
+    const termBalances = filteredFeeStructures.map((fs) => {
+      const charges = transactions
+        .filter(txn => txn.termId === fs.termId && txn.academicYearId === fs.academicYearId && txn.type === 'invoice')
+        .reduce((sum, txn) => sum + (txn.debit || 0), 0);
+
+      const paymentsForTerm = transactions
+        .filter(txn => txn.termId === fs.termId && txn.academicYearId === fs.academicYearId && txn.type === 'payment')
+        .reduce((sum, txn) => sum + (txn.credit || 0), 0);
+
+      let balance = charges - paymentsForTerm + carryForward;
+      let carryToNext = 0;
+      if (balance < 0) {
+        carryToNext = balance;
+        balance = 0;
+      }
+      const result = {
+        termId: fs.termId,
+        academicYearId: fs.academicYearId,
+        term: fs.term,
+        year: fs.year,
+        totalAmount: fs.totalAmount,
+        balance
+      };
+      carryForward = carryToNext;
+      return result;
+    });
+
+    let arrearsRecords = await prisma.studentArrear.findMany({
+      where: {
+        studentId: student.id,
+        schoolId: school.id,
+        arrearAmount: { gt: 0 },
+        ...(joinAcademicYearId ? { academicYearId: { gte: joinAcademicYearId } } : {})
+      }
+    });
+
+    const arrears = arrearsRecords.reduce((sum, record) => sum + record.arrearAmount, 0);
 
     return NextResponse.json({
       student: {
@@ -114,9 +187,21 @@ export async function GET(
         gradeName: student.class?.grade?.name || 'Not Assigned',
         className: student.class?.name || 'Not Assigned'
       },
-      feesByYear,
-      totalOutstanding: finalBalance,
-      paymentHistory: allPayments,
+      termBalances,
+      academicYearOutstanding,
+      totalOutstanding: academicYearOutstanding,
+      arrears,
+      carryForwardArrears: 0,
+      carryForwardBreakdown: [],
+      paymentHistory: payments.map(payment => ({
+        id: payment.id,
+        amount: payment.amount,
+        paymentDate: payment.paymentDate,
+        paymentMethod: payment.paymentMethod,
+        description: payment.description,
+        receiptNumber: payment.receiptNumber,
+        referenceNumber: payment.referenceNumber
+      }))
     });
 
   } catch (error: any) {
@@ -124,3 +209,4 @@ export async function GET(
     return NextResponse.json({ error: 'Failed to fetch student fees' }, { status: 500 });
   }
 }
+    

@@ -18,6 +18,18 @@ async function main() {
     },
   });
   console.log('Seeded platform-level super admin.');
+
+  // Seed global grades (Grade 1 to Grade 6)
+  for (let i = 1; i <= 6; i++) {
+    const gradeName = `Grade ${i}`;
+    let grade = await prisma.grade.findFirst({ where: { name: gradeName } });
+    if (!grade) {
+      grade = await prisma.grade.create({ data: { name: gradeName } });
+      console.log(`Created grade: ${gradeName}`);
+    } else {
+      console.log(`Grade already exists: ${gradeName}`);
+    }
+  }
 }
 
 main()

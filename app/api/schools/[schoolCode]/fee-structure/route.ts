@@ -9,6 +9,8 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     const schoolCode = params.schoolCode.toLowerCase();
     const { searchParams } = new URL(request.url);
     
+    const termId = searchParams.get('termId');
+    const academicYearId = searchParams.get('academicYearId');
     const term = searchParams.get('term');
     const year = searchParams.get('year');
     const gradeId = searchParams.get('gradeId');
@@ -27,10 +29,12 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       schoolId: school.id,
       isActive: true
     };
-
-    if (term) whereClause.term = term;
-    if (year) whereClause.year = parseInt(year);
+    if (academicYearId) whereClause.academicYearId = academicYearId;
+    if (termId) whereClause.termId = termId;
     if (gradeId) whereClause.gradeId = gradeId;
+    // Legacy support
+    if (!termId && term) whereClause.term = term;
+    if (!academicYearId && year) whereClause.year = parseInt(year);
 
     // Fetch fee structures
     const feeStructures = await prisma.termlyFeeStructure.findMany({
@@ -57,7 +61,9 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
               }
             }
           }
-        }
+        },
+        academicYear: true,
+        termRef: true,
       },
       orderBy: [
         { year: 'desc' },
@@ -84,21 +90,26 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
     const schoolCode = params.schoolCode.toLowerCase();
     const body = await request.json();
     
-    const {
+    let {
       term,
       year,
       gradeId,
       totalAmount,
       breakdown,
-      isActive = true
+      isActive = true,
+      academicYearId,
+      termId
     } = body;
 
-    // Validate required fields
-    if (!term || !year || !gradeId || !totalAmount || !breakdown) {
-      return NextResponse.json(
-        { error: 'Missing required fields: term, year, gradeId, totalAmount, breakdown' },
-        { status: 400 }
-      );
+    // Accept breakdown as array of { name, value }
+    if (!Array.isArray(breakdown)) {
+      // fallback: convert object to array
+      breakdown = Object.entries(breakdown || {}).map(([name, value]) => ({ name, value: parseFloat(value) || 0 }));
+    }
+    // Calculate total from breakdown if not provided or mismatched
+    const calcTotal = breakdown.reduce((sum, item) => sum + (parseFloat(item.value) || 0), 0);
+    if (!totalAmount || Math.abs(calcTotal - parseFloat(totalAmount)) > 0.01) {
+      totalAmount = calcTotal;
     }
 
     // Find the school
@@ -108,6 +119,30 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
 
     if (!school) {
       return NextResponse.json({ error: 'School not found' }, { status: 404 });
+    }
+
+    // If academicYearId/termId not provided, get current
+    if (!academicYearId || !termId) {
+      const currentYear = await prisma.academicYear.findFirst({
+        where: { schoolId: school.id, isCurrent: true },
+      });
+      if (currentYear) {
+        if (!academicYearId) academicYearId = currentYear.id;
+        if (!termId) {
+          const currentTerm = await prisma.term.findFirst({
+            where: { academicYearId: currentYear.id, isCurrent: true },
+          });
+          if (currentTerm) termId = currentTerm.id;
+        }
+      }
+    }
+
+    // If term is not provided but termId is, fetch the term name
+    if (!term && termId) {
+      const termObj = await prisma.term.findUnique({ where: { id: termId } });
+      if (termObj) {
+        term = termObj.name;
+      }
     }
 
     // For now, we'll use a default admin user ID
@@ -123,15 +158,44 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
       return NextResponse.json({ error: 'No admin user found for this school' }, { status: 404 });
     }
 
-    // Check if a fee structure already exists for this term/year/gradeId
-    const existingFeeStructure = await prisma.termlyFeeStructure.findFirst({
-      where: {
-        schoolId: school.id,
-        term,
-        year: parseInt(year),
-        gradeId
-      }
-    });
+    // Validate required fields
+    if (!gradeId || !totalAmount || !breakdown) {
+      return NextResponse.json(
+        { error: 'Missing required fields: gradeId, totalAmount, breakdown' },
+        { status: 400 }
+      );
+    }
+    // At least one of academicYearId/year and termId/term must be present
+    if (!(academicYearId || year) || !(termId || term)) {
+      return NextResponse.json(
+        { error: 'Missing required fields: academicYearId or year, and termId or term' },
+        { status: 400 }
+      );
+    }
+
+    // Check if a fee structure already exists for this term/year/gradeId (new logic first)
+    let existingFeeStructure = null;
+    if (academicYearId && termId) {
+      existingFeeStructure = await prisma.termlyFeeStructure.findFirst({
+        where: {
+          schoolId: school.id,
+          academicYearId,
+          termId,
+          gradeId
+        }
+      });
+    }
+    // Fallback to legacy check
+    if (!existingFeeStructure && year && term) {
+      existingFeeStructure = await prisma.termlyFeeStructure.findFirst({
+        where: {
+          schoolId: school.id,
+          year: parseInt(year),
+          term,
+          gradeId
+        }
+      });
+    }
 
     let feeStructure;
     let action = 'created';
@@ -144,7 +208,9 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
           totalAmount: parseFloat(totalAmount),
           breakdown,
           isActive,
-          updatedAt: new Date()
+          updatedAt: new Date(),
+          academicYearId: academicYearId || undefined,
+          termId: termId || undefined,
         },
         include: {
           grade: true,
@@ -154,7 +220,9 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
               name: true,
               email: true
             }
-          }
+          },
+          academicYear: true,
+          termRef: true,
         }
       });
       action = 'updated';
@@ -162,14 +230,16 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
       // Create new fee structure
       feeStructure = await prisma.termlyFeeStructure.create({
         data: {
-          term,
-          year: parseInt(year),
+          term: term || undefined,
+          year: year ? parseInt(year) : undefined,
           gradeId,
           totalAmount: parseFloat(totalAmount),
           breakdown,
           isActive,
           createdBy: adminUser.id,
-          schoolId: school.id
+          schoolId: school.id,
+          academicYearId: academicYearId || undefined,
+          termId: termId || undefined,
         },
         include: {
           grade: true,
@@ -179,7 +249,9 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
               name: true,
               email: true
             }
-          }
+          },
+          academicYear: true,
+          termRef: true,
         }
       });
     }
@@ -191,8 +263,8 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
         action,
         performedBy: adminUser.id,
         details: {
-          term,
-          year: parseInt(year),
+          term: term || feeStructure.termRef?.name,
+          year: year || feeStructure.academicYear?.name,
           gradeId,
           totalAmount: parseFloat(totalAmount),
           breakdown

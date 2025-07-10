@@ -9,6 +9,17 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
   const school = await prisma.school.findUnique({ where: { code: schoolCode } });
   if (!school) return NextResponse.json({ error: "School not found" }, { status: 404 });
 
+  // Fetch current academic year and term
+  const currentYear = await prisma.academicYear.findFirst({
+    where: { schoolId: school.id, isCurrent: true },
+  });
+  let currentTerm = null;
+  if (currentYear) {
+    currentTerm = await prisma.term.findFirst({
+      where: { academicYearId: currentYear.id, isCurrent: true },
+    });
+  }
+
   const results = [];
   for (const student of students) {
     try {
@@ -59,6 +70,10 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
           gender: student.gender,
           status: student.status || "active",
           isActive: true,
+          currentAcademicYearId: currentYear?.id,
+          currentTermId: currentTerm?.id,
+          joinedAcademicYearId: currentYear?.id,
+          joinedTermId: currentTerm?.id,
         }
       });
       results.push({ admissionNumber: student.admissionNumber, status: "success" });

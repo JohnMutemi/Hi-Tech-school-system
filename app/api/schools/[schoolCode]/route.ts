@@ -1,14 +1,50 @@
 import { PrismaClient } from '@prisma/client';
 import { type NextRequest, NextResponse } from "next/server";
+import { z } from 'zod';
 
 const prisma = new PrismaClient();
 
 export async function GET(request: NextRequest, { params }: { params: { schoolCode: string } }) {
-  try {
-    const schoolCode = params.schoolCode.toLowerCase();
+  const { searchParams } = new URL(request.url);
+  const action = searchParams.get('action');
 
-    const school = await prisma.school.findUnique({
-      where: { code: schoolCode },
+  const school = await prisma.school.findFirst({
+    where: {
+      code: {
+        equals: params.schoolCode,
+        mode: 'insensitive',
+      },
+    },
+  });
+  if (!school) {
+    return NextResponse.json({ error: 'School not found' }, { status: 404 });
+  }
+
+  if (action === 'current-academic-year') {
+    const year = await prisma.academicYear.findFirst({
+      where: { schoolId: school.id, isCurrent: true },
+      include: { terms: true },
+    });
+    return NextResponse.json(year);
+  }
+  if (action === 'current-term') {
+    const year = await prisma.academicYear.findFirst({
+      where: { schoolId: school.id, isCurrent: true },
+      include: { terms: { where: { isCurrent: true } } },
+    });
+    return NextResponse.json(year?.terms?.[0] || null);
+  }
+
+  try {
+    const schoolCode = params.schoolCode;
+
+    const schoolData = await prisma.school.findFirst({
+      where: {
+        code: {
+          equals: schoolCode,
+          mode: 'insensitive',
+        },
+      },
       include: {
         users: {
           where: { role: 'admin' },
@@ -38,38 +74,38 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       }
     });
 
-    if (!school) {
+    if (!schoolData) {
       return NextResponse.json({ error: 'School not found' }, { status: 404 });
     }
 
     // Transform data to match SchoolData interface
     const transformedSchool = {
-      id: school.id,
-      schoolCode: school.code,
-      name: school.name,
-      logo: school.logo,
+      id: schoolData.id,
+      schoolCode: schoolData.code,
+      name: schoolData.name,
+      logo: schoolData.logo,
       colorTheme: "#3b82f6", // Default theme
-      portalUrl: `/schools/${school.code}`,
+      portalUrl: `/schools/${schoolData.code}`,
       description: "",
-      adminEmail: school.users.find(u => u.role === 'admin')?.email || school.email,
+      adminEmail: schoolData.users.find(u => u.role === 'admin')?.email || schoolData.email,
       adminPassword: "", // Don't return password
-      adminFirstName: school.users.find(u => u.role === 'admin')?.name?.split(' ')[0] || "Admin",
-      adminLastName: school.users.find(u => u.role === 'admin')?.name?.split(' ').slice(1).join(' ') || "User",
-      createdAt: school.createdAt.toISOString(),
-      status: school.isActive ? "active" : "suspended",
+      adminFirstName: schoolData.users.find(u => u.role === 'admin')?.name?.split(' ')[0] || "Admin",
+      adminLastName: schoolData.users.find(u => u.role === 'admin')?.name?.split(' ').slice(1).join(' ') || "User",
+      createdAt: schoolData.createdAt.toISOString(),
+      status: schoolData.isActive ? "active" : "suspended",
       profile: {
-        address: school.address,
-        phone: school.phone,
+        address: schoolData.address,
+        phone: schoolData.phone,
         website: "",
         principalName: "",
         establishedYear: new Date().getFullYear().toString(),
         description: "",
-        email: school.email,
+        email: schoolData.email,
         motto: "",
         type: "primary" as const
       },
       teachers: [],
-      students: school.students.map(s => ({
+      students: schoolData.students.map(s => ({
         id: s.id,
         name: "",
         email: "",
@@ -86,7 +122,7 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
         status: s.isActive ? "active" : "inactive"
       })),
       subjects: [],
-      classes: school.classes.map(c => ({
+      classes: schoolData.classes.map(c => ({
         id: c.id,
         name: c.name,
         level: "",
@@ -94,7 +130,11 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
         currentStudents: 0,
         classTeacherId: "",
         subjects: []
-      }))
+      })),
+      // Add admission number settings
+      admissionNumberFormat: schoolData.admissionNumberFormat || '{SCHOOL_CODE}-{YEAR}-{SEQ}',
+      lastAdmissionNumber: schoolData.lastAdmissionNumber || '',
+      admissionNumberAutoIncrement: schoolData.admissionNumberAutoIncrement ?? true,
     };
 
     return NextResponse.json(transformedSchool);
@@ -106,7 +146,7 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
 
 export async function PUT(request: NextRequest, { params }: { params: { schoolCode: string } }) {
   try {
-    const schoolCode = params.schoolCode.toLowerCase();
+    const schoolCode = params.schoolCode;
     const body = await request.json();
     
     const {
@@ -124,8 +164,13 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
     } = body;
 
     // Find the school
-    const school = await prisma.school.findUnique({
-      where: { code: schoolCode },
+    const school = await prisma.school.findFirst({
+      where: {
+        code: {
+          equals: schoolCode,
+          mode: 'insensitive',
+        },
+      },
       include: {
         users: {
           where: { role: 'admin' }
@@ -145,7 +190,8 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
         address: address || school.address,
         phone: phone || school.phone,
         email: email || school.email,
-        isActive: status !== 'suspended'
+        isActive: status !== 'suspended',
+        ...(body.lastAdmissionNumber !== undefined && { lastAdmissionNumber: body.lastAdmissionNumber })
       }
     });
 
@@ -161,8 +207,13 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
     }
 
     // Return updated school
-    const result = await prisma.school.findUnique({
-      where: { code: schoolCode },
+    const result = await prisma.school.findFirst({
+      where: {
+        code: {
+          equals: schoolCode,
+          mode: 'insensitive',
+        },
+      },
       include: {
         users: {
           where: { role: 'admin' },
@@ -221,11 +272,16 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
 
 export async function DELETE(request: NextRequest, { params }: { params: { schoolCode: string } }) {
   try {
-    const schoolCode = params.schoolCode.toLowerCase();
+    const schoolCode = params.schoolCode;
 
     // Check if school exists
-    const school = await prisma.school.findUnique({
-      where: { code: schoolCode }
+    const school = await prisma.school.findFirst({
+      where: {
+        code: {
+          equals: schoolCode,
+          mode: 'insensitive',
+        },
+      },
     });
 
     if (!school) {
@@ -234,7 +290,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { schoo
 
     // Delete school (this will cascade delete related records)
     await prisma.school.delete({
-      where: { code: schoolCode }
+      where: { code: schoolCode },
     });
 
     return NextResponse.json({ message: 'School deleted successfully' });
@@ -242,4 +298,118 @@ export async function DELETE(request: NextRequest, { params }: { params: { schoo
     console.error("Error deleting school:", error);
     return NextResponse.json({ error: "Failed to delete school" }, { status: 500 });
   }
+}
+
+// POST: Set current academic year or term
+export async function POST(req: NextRequest, { params }: { params: { schoolCode: string } }) {
+  const { searchParams } = new URL(req.url);
+  const action = searchParams.get('action');
+  const body = await req.json();
+
+  const school = await prisma.school.findFirst({
+    where: {
+      code: {
+        equals: params.schoolCode,
+        mode: 'insensitive',
+      },
+    },
+  });
+  if (!school) {
+    return NextResponse.json({ error: 'School not found' }, { status: 404 });
+  }
+
+  if (action === 'set-current-academic-year') {
+    const { academicYearId } = body;
+    // Set all years to not current, then set the selected one to current
+    await prisma.academicYear.updateMany({
+      where: { schoolId: school.id },
+      data: { isCurrent: false },
+    });
+    const updated = await prisma.academicYear.update({
+      where: { id: academicYearId },
+      data: { isCurrent: true },
+    });
+    return NextResponse.json(updated);
+  }
+  if (action === 'set-current-term') {
+    const { termId } = body;
+    // Find the academic year for this term
+    const term = await prisma.term.findUnique({ where: { id: termId } });
+    if (!term) return NextResponse.json({ error: 'Term not found' }, { status: 404 });
+    await prisma.term.updateMany({
+      where: { academicYearId: term.academicYearId },
+      data: { isCurrent: false },
+    });
+    const updated = await prisma.term.update({
+      where: { id: termId },
+      data: { isCurrent: true },
+    });
+    return NextResponse.json(updated);
+  }
+
+  // ... existing code ...
+}
+
+// Academic Year CRUD
+export async function academicYearsHandler(req: NextRequest, { params }: { params: { schoolCode: string } }) {
+  const school = await prisma.school.findFirst({
+    where: { code: params.schoolCode, },
+    // @ts-ignore
+    mode: 'insensitive',
+  });
+  if (!school) return NextResponse.json({ error: 'School not found' }, { status: 404 });
+  const method = req.method;
+  if (method === 'GET') {
+    const years = await prisma.academicYear.findMany({ where: { schoolId: school.id }, include: { terms: true } });
+    return NextResponse.json(years);
+  }
+  if (method === 'POST') {
+    const body = await req.json();
+    const created = await prisma.academicYear.create({ data: { ...body, schoolId: school.id } });
+    return NextResponse.json(created);
+  }
+  if (method === 'PUT') {
+    const body = await req.json();
+    const updated = await prisma.academicYear.update({ where: { id: body.id }, data: body });
+    return NextResponse.json(updated);
+  }
+  if (method === 'DELETE') {
+    const body = await req.json();
+    await prisma.academicYear.delete({ where: { id: body.id } });
+    return NextResponse.json({ success: true });
+  }
+  return NextResponse.json({ error: 'Invalid method' }, { status: 405 });
+}
+
+// Term CRUD
+export async function termsHandler(req: NextRequest, { params }: { params: { schoolCode: string } }) {
+  const school = await prisma.school.findFirst({
+    where: { code: params.schoolCode, },
+    // @ts-ignore
+    mode: 'insensitive',
+  });
+  if (!school) return NextResponse.json({ error: 'School not found' }, { status: 404 });
+  const method = req.method;
+  const yearId = new URL(req.url).searchParams.get('yearId');
+  if (method === 'GET') {
+    if (!yearId) return NextResponse.json({ error: 'Missing yearId' }, { status: 400 });
+    const terms = await prisma.term.findMany({ where: { academicYearId: yearId } });
+    return NextResponse.json(terms);
+  }
+  if (method === 'POST') {
+    const body = await req.json();
+    const created = await prisma.term.create({ data: body });
+    return NextResponse.json(created);
+  }
+  if (method === 'PUT') {
+    const body = await req.json();
+    const updated = await prisma.term.update({ where: { id: body.id }, data: body });
+    return NextResponse.json(updated);
+  }
+  if (method === 'DELETE') {
+    const body = await req.json();
+    await prisma.term.delete({ where: { id: body.id } });
+    return NextResponse.json({ success: true });
+  }
+  return NextResponse.json({ error: 'Invalid method' }, { status: 405 });
 } 

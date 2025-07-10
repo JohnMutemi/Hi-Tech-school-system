@@ -1,8 +1,20 @@
 import { PrismaClient } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
+import { generateNextAdmissionNumber } from '@/lib/utils/school-generator';
 
 const prisma = new PrismaClient();
+
+function getNextAdmissionNumber(lastAdmissionNumber: string): string {
+  if (!lastAdmissionNumber) return '001';
+  const match = lastAdmissionNumber.match(/(\d+)(?!.*\d)/);
+  if (match) {
+    const number = match[1];
+    const next = (parseInt(number, 10) + 1).toString().padStart(number.length, '0');
+    return lastAdmissionNumber.replace(/(\d+)(?!.*\d)/, next);
+  }
+  return lastAdmissionNumber + '1';
+}
 
 export async function GET(req: NextRequest, { params }: { params: { schoolCode: string } }) {
   try {
@@ -63,6 +75,23 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
       return NextResponse.json({ error: 'School not found' }, { status: 404 });
     }
 
+    // Admission number logic
+    let finalAdmissionNumber = admissionNumber;
+    if (!finalAdmissionNumber) {
+      finalAdmissionNumber = getNextAdmissionNumber(school.lastAdmissionNumber || '');
+    }
+
+    // Fetch current academic year and term
+    const currentYear = await prisma.academicYear.findFirst({
+      where: { schoolId: school.id, isCurrent: true },
+    });
+    let currentTerm = null;
+    if (currentYear) {
+      currentTerm = await prisma.term.findFirst({
+        where: { academicYearId: currentYear.id, isCurrent: true },
+      });
+    }
+
     let parentUser = null;
     let parentTempPassword = 'parent123';
     if (parentPhone) {
@@ -113,7 +142,7 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
         userId: studentUser.id,
         schoolId: school.id,
         classId,
-        admissionNumber: admissionNumber || `ADM${Date.now()}`,
+        admissionNumber: finalAdmissionNumber,
         dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
         dateAdmitted: dateAdmitted ? new Date(dateAdmitted) : new Date(),
         parentName,
@@ -128,6 +157,10 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
         medicalInfo,
         notes,
         isActive: true,
+        currentAcademicYearId: currentYear?.id,
+        currentTermId: currentTerm?.id,
+        joinedAcademicYearId: currentYear?.id,
+        joinedTermId: currentTerm?.id,
       },
       include: {
         user: true,
@@ -135,6 +168,14 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
         class: { include: { grade: true } }
       },
     });
+
+    // Update school's lastAdmissionNumber after student creation
+    if (finalAdmissionNumber) {
+      await prisma.school.update({
+        where: { id: school.id },
+        data: { lastAdmissionNumber: finalAdmissionNumber },
+      });
+    }
 
     return NextResponse.json({
       ...student,
