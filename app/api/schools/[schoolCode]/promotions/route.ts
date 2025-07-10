@@ -19,13 +19,11 @@ export async function GET(req: NextRequest, { params }: { params: { schoolCode: 
     }
 
     if (action === 'eligible-students' && classLevel) {
-      // Get eligible students for promotion
       const eligibleStudents = await getEligibleStudents(school.id, classLevel);
       return NextResponse.json(eligibleStudents);
     }
 
     if (action === 'criteria') {
-      // Get promotion criteria for the school
       const criteria = await prisma.promotionCriteria.findMany({
         where: { schoolId: school.id, isActive: true },
       });
@@ -33,7 +31,6 @@ export async function GET(req: NextRequest, { params }: { params: { schoolCode: 
     }
 
     if (action === 'progression') {
-      // Get class progression rules
       const progression = await prisma.classProgression.findMany({
         where: { schoolId: school.id, isActive: true },
         orderBy: { order: 'asc' },
@@ -42,53 +39,21 @@ export async function GET(req: NextRequest, { params }: { params: { schoolCode: 
     }
 
     if (action === 'history') {
-      // Get promotion history
       const history = await prisma.promotionLog.findMany({
-        where: { 
-          student: { schoolId: school.id }
-        },
+        where: { student: { schoolId: school.id } },
         include: {
-          student: {
-            include: {
-              user: true
-            }
-          },
+          student: { include: { user: true } },
           user: true,
-          exclusions: {
-            include: {
-              student: {
-                include: {
-                  user: true
-                }
-              }
-            }
-          }
+          exclusions: { include: { student: { include: { user: true } } } },
         },
         orderBy: { promotionDate: 'desc' },
-        take: 50
+        take: 50,
       });
       return NextResponse.json(history);
     }
 
-    // Get all students in the specified class
-    const students = await prisma.student.findMany({
-      where: {
-        schoolId: school.id,
-        classLevel: classLevel || undefined,
-        isActive: true,
-      },
-      include: {
-        user: true,
-        parent: true,
-        payments: {
-          where: {
-            description: { in: ['Term 1', 'Term 2', 'Term 3'] },
-          },
-        },
-      },
-    });
+    return NextResponse.json({ message: 'Please specify an action.' });
 
-    return NextResponse.json(students);
   } catch (error: any) {
     console.error('Promotion API error:', error);
     return NextResponse.json({ error: error.message || 'Failed to fetch promotion data' }, { status: 500 });
@@ -104,7 +69,7 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
       fromClass,
       toClass,
       studentIds,
-      excludedStudents,
+      excludedStudents = [],
       promotedBy,
       notes,
       toAcademicYearId,
@@ -152,84 +117,64 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
       realPromotedBy = adminUser.id;
     }
 
-    // Start a transaction
     const result = await prisma.$transaction(async (tx) => {
       const promotionLogs = [];
       const carryForwardEntries = [];
 
-      // Promote each selected student
       for (const studentId of studentIds) {
         const student = await tx.student.findUnique({
           where: { id: studentId },
           include: {
-            class: true,
-            payments: {
-              where: {
-                description: { in: ['Term 1', 'Term 2', 'Term 3'] },
-              },
-            },
+            class: { include: { grade: true } },
+            payments: { where: { academicYear: currentYear } },
           },
         });
 
         if (!student) continue;
 
-        // Calculate outstanding fee balance from current academic year
-        const currentYearPayments = student.payments.filter(p => 
-          p.description.includes(currentYear) || 
-          ['Term 1', 'Term 2', 'Term 3'].includes(p.description)
-        );
-        
-        const totalPaid = currentYearPayments.reduce((sum, payment) => sum + payment.amount, 0);
+        const totalPaid = student.payments.reduce((sum, payment) => sum + payment.amount, 0);
 
-        // Always define outstandingBalance
         let outstandingBalance = 0;
-
-        // Get fee structure for current grade to calculate total fees
         const currentGrade = student.class?.grade;
         if (currentGrade) {
           const feeStructures = await tx.termlyFeeStructure.findMany({
             where: {
               gradeId: currentGrade.id,
-              year: parseInt(currentYear),
+              year: currentYear,
               isActive: true,
             },
           });
-          
+
           const totalFees = feeStructures.reduce((sum, fs) => sum + Number(fs.totalAmount), 0);
           outstandingBalance = Math.max(0, totalFees - totalPaid);
 
-          // Create carry-forward entry if there's outstanding balance
           if (outstandingBalance > 0) {
             const carryForwardEntry = await tx.payment.create({
               data: {
                 studentId: studentId,
                 amount: outstandingBalance,
                 paymentDate: new Date(),
-                paymentMethod: 'carry_forward',
+                paymentMethod: 'CARRY_FORWARD',
                 referenceNumber: `CF-${currentYear}-${nextYear}`,
                 receiptNumber: `CF-${studentId}-${Date.now()}`,
                 description: `Fee Balance Carried Forward from ${currentYear} to ${nextYear}`,
-                receivedBy: realPromotedBy,
+                receivedBy: 'System',
+                term: 'CARRY_FORWARD',
+                academicYear: nextYear,
               },
             });
             carryForwardEntries.push(carryForwardEntry);
           }
         }
 
-        // Find the target class (section/stream) for promotion
         const targetClass = await tx.class.findFirst({
-          where: {
-            name: toClass,
-            schoolId: school.id,
-            isActive: true,
-          },
+          where: { name: toClass, schoolId: school.id, isActive: true },
         });
 
         if (!targetClass) {
           throw new Error(`Target class ${toClass} not found`);
         }
 
-        // Update student class and academic year/term
         await tx.student.update({
           where: { id: studentId },
           data: {
@@ -239,7 +184,6 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
           },
         });
 
-        // Create promotion log
         const promotionLog = await tx.promotionLog.create({
           data: {
             studentId,
@@ -248,7 +192,7 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
             fromYear: currentYear,
             toYear: nextYear,
             promotedBy: realPromotedBy,
-            criteria: { 
+            criteria: {
               type: 'bulk_promotion',
               outstandingBalance: outstandingBalance || 0,
               carryForwardCreated: outstandingBalance > 0,
@@ -265,28 +209,32 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
         promotionLogs.push(promotionLog);
       }
 
-      // Log exclusions if any
-      if (excludedStudents && excludedStudents.length > 0) {
-        for (const exclusion of excludedStudents) {
-          await tx.promotionExclusion.create({
-            data: {
-              promotionLogId: promotionLogs[0].id, // Use first promotion log as reference
-              studentId: exclusion.studentId,
-              reason: exclusion.reason,
-              notes: exclusion.notes,
-              excludedBy,
-            },
-          });
+      if (excludedStudents.length > 0) {
+        const logId = promotionLogs[0]?.id;
+        if (logId) {
+          for (const exclusion of excludedStudents) {
+            await tx.promotionExclusion.create({
+              data: {
+                promotionLogId: logId,
+                studentId: exclusion.studentId,
+                reason: exclusion.reason,
+                notes: exclusion.notes,
+                excludedBy: realPromotedBy,
+              },
+            });
+          }
         }
       }
 
-      return { 
-        success: true, 
-        promotedCount: studentIds.length, 
-        excludedCount: excludedStudents?.length || 0,
+      return {
+        success: true,
+        promotedCount: studentIds.length,
+        excludedCount: excludedStudents.length,
         carryForwardCount: carryForwardEntries.length,
-        totalCarriedForward: carryForwardEntries.reduce((sum, entry) => sum + entry.amount, 0),
+        totalCarriedForward: carryForwardEntries.reduce((sum: number, entry: any) => sum + entry.amount, 0),
       };
+    }, {
+      timeout: 20000,
     });
 
     return NextResponse.json(result);
@@ -312,7 +260,6 @@ export async function PUT(req: NextRequest, { params }: { params: { schoolCode: 
     }
 
     if (action === 'criteria') {
-      // Update or create promotion criteria
       const criteria = await prisma.promotionCriteria.upsert({
         where: {
           schoolId_classLevel: {
@@ -339,7 +286,6 @@ export async function PUT(req: NextRequest, { params }: { params: { schoolCode: 
     }
 
     if (action === 'progression') {
-      // Update class progression rules
       const progression = await prisma.classProgression.upsert({
         where: {
           schoolId_fromClass: {
@@ -370,18 +316,11 @@ export async function PUT(req: NextRequest, { params }: { params: { schoolCode: 
   }
 }
 
-// Helper function to get eligible students
+// Helper function
 async function getEligibleStudents(schoolId: string, classLevel: string) {
-  // Find the class by name (classLevel parameter)
   const targetClass = await prisma.class.findFirst({
-    where: {
-      name: classLevel,
-      schoolId: schoolId,
-      isActive: true,
-    },
-    include: {
-      grade: true,
-    },
+    where: { name: classLevel, schoolId: schoolId, isActive: true },
+    include: { grade: true },
   });
 
   if (!targetClass) {
@@ -393,36 +332,20 @@ async function getEligibleStudents(schoolId: string, classLevel: string) {
     where: {
       schoolId,
       classId: targetClass.id,
+      academicYear: currentYear,
       isActive: true,
     },
     include: {
       user: true,
-      class: {
-        include: {
-          grade: true,
-        },
-      },
-      payments: {
-        where: {
-          paymentDate: {
-            gte: new Date(`${currentYear}-01-01`),
-            lte: new Date(`${currentYear}-12-31`),
-          },
-        },
-      },
+      class: { include: { grade: true } },
+      payments: { where: { academicYear: currentYear } },
     },
   });
 
-  // Get promotion criteria for the grade
   const criteria = await prisma.promotionCriteria.findFirst({
-    where: { 
-      schoolId, 
-      classLevel: targetClass.grade.name, 
-      isActive: true 
-    },
+    where: { schoolId, classLevel: targetClass.grade.name, isActive: true },
   });
 
-  // Get fee structures for the current grade and year
   const feeStructures = await prisma.termlyFeeStructure.findMany({
     where: {
       gradeId: targetClass.grade.id,
@@ -431,56 +354,26 @@ async function getEligibleStudents(schoolId: string, classLevel: string) {
     },
   });
 
-  // Sort fee structures by term order
-  const termOrder = { 'Term 1': 1, 'Term 2': 2, 'Term 3': 3 };
-  const sortedFeeStructures = [...feeStructures].sort((a, b) => termOrder[a.term] - termOrder[b.term]);
-
   return students.map(student => {
-    const paidTerms = student.payments.map(p => p.description);
-    const allTermsPaid = ['Term 1', 'Term 2', 'Term 3'].every(term => 
-      paidTerms.includes(term)
-    );
-
-    // Carry-forward aware outstanding calculation
-    let carryForward = 0;
-    let totalOutstanding = 0;
-    for (const fs of sortedFeeStructures) {
-      const termPayments = student.payments.filter(p =>
-        p.description?.includes(fs.term) && p.description?.includes(fs.year.toString())
-      );
-      // Debug log
-      console.log(`Student: ${student.user?.name}, Term: ${fs.term} ${fs.year}`);
-      console.log('  All payment descriptions:', student.payments.map(p => p.description));
-      console.log('  Matched payments for this term:', termPayments.map(p => ({ amount: p.amount, description: p.description })));
-      const totalPaidForTerm = termPayments.reduce((sum, p) => sum + p.amount, 0);
-      const totalPaid = totalPaidForTerm + carryForward;
-      let balance = Number(fs.totalAmount) - totalPaid;
-      if (balance < 0) {
-        carryForward = -balance;
-        balance = 0;
-      } else {
-        carryForward = 0;
-      }
-      totalOutstanding += Math.max(balance, 0);
-    }
-
-    const totalFees = sortedFeeStructures.reduce((sum, fs) => sum + Number(fs.totalAmount), 0);
-    const totalPaid = student.payments.reduce((sum, payment) => sum + payment.amount, 0);
+    const totalFees = feeStructures.reduce((sum, fs) => sum + Number(fs.totalAmount), 0);
+    const totalPaid = student.payments.reduce((sum, p) => sum + p.amount, 0);
+    const outstandingBalance = Math.max(0, totalFees - totalPaid);
+    const allTermsPaid = outstandingBalance === 0;
 
     return {
       ...student,
       name: student.user?.name,
       email: student.user?.email,
-      classLevel: targetClass.grade.name, // For backward compatibility
-      className: targetClass.name, // For backward compatibility
+      classLevel: targetClass.grade.name,
+      className: targetClass.name,
       eligibility: {
         feeStatus: allTermsPaid ? 'paid' : 'unpaid',
         allTermsPaid,
-        meetsCriteria: !criteria || (allTermsPaid && (!criteria.minGrade || true)), // Simplified for now
-        outstandingBalance: totalOutstanding,
+        meetsCriteria: !criteria || (allTermsPaid && (!criteria.minGrade || true)),
+        outstandingBalance,
         totalFees,
         totalPaid,
       },
     };
   });
-} 
+}
