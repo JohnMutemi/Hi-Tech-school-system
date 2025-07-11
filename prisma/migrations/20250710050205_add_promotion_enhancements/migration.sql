@@ -2,7 +2,7 @@
 ALTER TABLE "Grade" ADD COLUMN     "isAlumni" BOOLEAN NOT NULL DEFAULT false;
 
 -- CreateTable
-CREATE TABLE "StudentArrears" (
+CREATE TABLE "StudentYearlyBalance" (
     "id" TEXT NOT NULL,
     "studentId" TEXT NOT NULL,
     "academicYear" INTEGER NOT NULL,
@@ -14,11 +14,11 @@ CREATE TABLE "StudentArrears" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "StudentArrears_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "StudentYearlyBalance_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "StudentArrears_studentId_academicYear_key" ON "StudentArrears"("studentId", "academicYear");
+CREATE UNIQUE INDEX "StudentYearlyBalance_studentId_academicYear_key" ON "StudentYearlyBalance"("studentId", "academicYear");
 
 -- AddForeignKey
-ALTER TABLE "StudentArrears" ADD CONSTRAINT "StudentArrears_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "Student"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "StudentYearlyBalance" ADD CONSTRAINT "StudentYearlyBalance_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "Student"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

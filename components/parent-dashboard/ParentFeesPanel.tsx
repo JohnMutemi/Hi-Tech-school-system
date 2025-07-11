@@ -359,7 +359,7 @@ export function ParentFeesPanel({
                 </label>
                 <div className="relative">
                   <select
-                    className="appearance-none border rounded-lg px-4 py-2 pr-8 bg-white shadow focus:outline-none focus:ring-2 focus:ring-blue-200"
+                    className="appearance-none border rounded-xl px-4 py-2 pr-10 bg-white/70 shadow focus:outline-none focus:ring-2 focus:ring-blue-200 backdrop-blur-md text-base"
                     value={selectedTermId}
                     onChange={(e) => setSelectedTermId(e.target.value)}
                     disabled={filterLoading || terms.length === 0}
@@ -500,12 +500,10 @@ export function ParentFeesPanel({
       </Card>
 
       {/* 3. Fee Statement */}
-      <Card className="mb-6">
+      <Card className="bg-white/60 backdrop-blur-xl border border-white/40 shadow-xl rounded-2xl mb-8">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Receipt className="w-6 h-6 text-purple-600" />
-            Fee Statement
-          </CardTitle>
+          <CardTitle className="text-2xl font-bold text-blue-700">Fee Statement</CardTitle>
+          <CardDescription className="text-gray-600">Detailed breakdown of fees for the selected child, year, and term.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex justify-end mb-2">

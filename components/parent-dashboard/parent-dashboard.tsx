@@ -99,9 +99,9 @@ function ChildOverview({
   const recentGrade = child.recentGrade || "B+";
   const attendance = child.attendance || 96;
   return (
-    <div className="mb-8 flex flex-col md:flex-row gap-6 items-stretch">
-      <div className="flex-1 bg-white rounded-lg shadow p-6 flex flex-col md:flex-row gap-6 items-center">
-        <Avatar className="w-20 h-20 mr-4">
+    <div className="mb-8 flex flex-col md:flex-row gap-8 items-stretch">
+      <div className="flex-1 bg-white/60 backdrop-blur-xl rounded-2xl shadow-xl p-8 flex flex-col md:flex-row gap-8 items-center border border-white/40 transition-all">
+        <Avatar className="w-24 h-24 mr-6 ring-4 ring-blue-200 shadow-xl">
           <img
             src={child.avatarUrl || "/placeholder-user.jpg"}
             alt={child.fullName || child.name}
@@ -109,13 +109,13 @@ function ChildOverview({
           />
         </Avatar>
         <div className="flex-1">
-          <div className="font-bold text-lg">
+          <div className="font-extrabold text-2xl text-gray-900 mb-1 drop-shadow-sm">
             {child.fullName || child.name}
           </div>
-          <div className="text-blue-700 font-semibold text-sm">
+          <div className="text-blue-700 font-semibold text-base mb-1">
             {child.gradeName}
           </div>
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-gray-500 mb-1">
             Adm: {child.admissionNumber}
           </div>
           <div className="text-xs text-gray-700 mt-2">
@@ -129,22 +129,35 @@ function ChildOverview({
           </div>
         </div>
       </div>
-      <div className="flex-1 bg-white rounded-lg shadow p-6 flex flex-col gap-4 justify-center">
+      <div className="flex-1 flex flex-col gap-4 justify-center">
         <div className="font-semibold text-gray-700 mb-2">Quick Stats</div>
-        <div className="flex flex-col gap-2">
-          <div className="flex justify-between items-center bg-blue-50 rounded px-3 py-2">
-            <span>Outstanding Fees</span>
-            <span className="text-red-600 font-bold">
-              KES {outstandingFees.toLocaleString()}
-            </span>
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-4">
+            <div className="flex-1 bg-gradient-to-r from-red-100/80 to-pink-200/80 rounded-xl px-5 py-4 flex items-center shadow-md transition-all">
+              <DollarSign className="w-6 h-6 text-red-500 mr-3" />
+              <span className="font-semibold">Outstanding Fees</span>
+              <span className="ml-auto text-lg font-bold text-red-600">
+                KES {outstandingFees.toLocaleString()}
+              </span>
+            </div>
           </div>
-          <div className="flex justify-between items-center bg-purple-50 rounded px-3 py-2">
-            <span>Recent Grade</span>
-            <span className="font-bold">{recentGrade}</span>
+          <div className="flex items-center gap-4">
+            <div className="flex-1 bg-gradient-to-r from-purple-100/80 to-blue-200/80 rounded-xl px-5 py-4 flex items-center shadow-md transition-all">
+              <BarChart2 className="w-6 h-6 text-purple-500 mr-3" />
+              <span className="font-semibold">Recent Grade</span>
+              <span className="ml-auto text-lg font-bold text-purple-700">
+                {recentGrade}
+              </span>
+            </div>
           </div>
-          <div className="flex justify-between items-center bg-green-50 rounded px-3 py-2">
-            <span>Attendance</span>
-            <span className="font-bold text-green-700">{attendance}%</span>
+          <div className="flex items-center gap-4">
+            <div className="flex-1 bg-gradient-to-r from-green-100/80 to-blue-100/80 rounded-xl px-5 py-4 flex items-center shadow-md transition-all">
+              <CheckCircle className="w-6 h-6 text-green-600 mr-3" />
+              <span className="font-semibold">Attendance</span>
+              <span className="ml-auto text-lg font-bold text-green-700">
+                {attendance}%
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -223,6 +236,7 @@ export function ParentDashboard({
   ];
 
   const [studentFeeData, setStudentFeeData] = useState<any>({});
+  const [studentFeeSummaries, setStudentFeeSummaries] = useState<any>({});
 
   // Add state for current academic year and term
   const [currentAcademicYear, setCurrentAcademicYear] = useState<any>(null);
@@ -724,11 +738,17 @@ const handleDownloadReceipt = async (receipt: any) => {
   const amount = receipt.amount || 0;
   const paymentDate = new Date(receipt.paymentDate || receipt.issuedAt).toLocaleDateString();
   const status = (receipt.status || "completed").toUpperCase();
-  const schoolName = receipt.schoolName || "Demo School";
+  // Use real school name from receipt
+  const schoolName = receipt.schoolName || "";
   const issuedBy = receipt.issuedBy || "School System";
   const currency = receipt.currency || "KES";
-  const outstandingBefore = receipt.academicYearOutstandingBefore ?? "N/A";
-  const outstandingAfter = receipt.academicYearOutstandingAfter ?? "N/A";
+  // Use real outstanding balances from receipt
+  function formatOutstanding(val: any) {
+    if (typeof val === 'number' && !isNaN(val)) return `${currency} ${val.toLocaleString()}`;
+    return 'N/A';
+  }
+  const outstandingBefore = receipt.academicYearOutstandingBefore;
+  const outstandingAfter = receipt.academicYearOutstandingAfter;
   const cleanDescription = (receipt.description || "Fee Payment").split(" - ")[0];
 
   const htmlContent = `
@@ -789,8 +809,8 @@ const handleDownloadReceipt = async (receipt: any) => {
 
             <div class="summary">
                 <div class="summary-item total"><span class="label">Total Paid:</span> ${currency} ${amount.toLocaleString()}</div>
-                <div class="summary-item"><span class="label">Outstanding Before (Academic Year):</span> ${currency} ${outstandingBefore.toLocaleString?.() ?? outstandingBefore}</div>
-                <div class="summary-item"><span class="label">Outstanding After (Academic Year):</span> ${currency} ${outstandingAfter.toLocaleString?.() ?? outstandingAfter}</div>
+                <div class="summary-item"><span class="label">Outstanding Before (Academic Year):</span> ${formatOutstanding(outstandingBefore)}</div>
+                <div class="summary-item"><span class="label">Outstanding After (Academic Year):</span> ${formatOutstanding(outstandingAfter)}</div>
             </div>
 
             <div class="footer">Issued by ${issuedBy}</div>
@@ -806,40 +826,6 @@ const handleDownloadReceipt = async (receipt: any) => {
   if (newWindow) newWindow.focus();
 };
 
-
-              <div class="summary">
-                  <div class="summary-item">
-                      <span class="label">Term Balance Before Payment:</span>
-                      <span>KES ${balanceBefore != null ? balanceBefore.toLocaleString() : '0.00'}</span>
-                  </div>
-                  <div class="summary-item">
-                      <span class="label">Amount Paid:</span>
-                      <span style="font-weight: bold;">KES ${amountPaid != null ? amountPaid.toLocaleString() : '0.00'}</span>
-                  </div>
-                  <div class="summary-item total">
-                      <span>Term Balance After Payment:</span>
-                      <span>KES ${balanceAfter != null ? balanceAfter.toLocaleString() : '0.00'}</span>
-                  </div>
-              </div>
-
-              <div class="footer">
-                  <p>Issued by School System on ${new Date().toLocaleDateString()}</p>
-                  <p>Thank you for your payment!</p>
-              </div>
-              <button class="print-button" onclick="window.print()">Print or Save as PDF</button>
-          </div>
-      </body>
-      </html>
-    `;
-
-    const receiptWindow = window.open('', '_blank');
-    if (receiptWindow) {
-        receiptWindow.document.write(htmlContent);
-        receiptWindow.document.close();
-    } else {
-        toast({ title: "Popup Blocked", description: "Please allow popups to view the receipt." });
-    }
-  };
 
   // Fetch receipts when focused child changes
   useEffect(() => {
@@ -1101,11 +1087,18 @@ const renderReceiptsTable = () => (
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
       {/* Sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-20 w-64 bg-white border-r p-4 transform transition-transform md:relative md:translate-x-0">
+      <aside
+        className="fixed inset-y-0 left-0 z-30 w-64 md:w-72 p-4 md:p-6
+          bg-white/60 backdrop-blur-xl shadow-2xl border border-white/40
+          rounded-2xl md:my-8 md:ml-8 md:static md:translate-x-0
+          flex flex-col transition-all duration-300
+          md:max-h-[90vh] md:overflow-y-auto"
+        style={{ boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.18)' }}
+      >
         {/* Profile at top */}
-        <div className="flex flex-col items-center mb-8">
+        <div className="flex flex-col items-center mb-10">
           <Avatar className="w-28 h-28 mb-3 ring-4 ring-blue-200 shadow-lg relative group">
             <img
               src={avatarUrl || "/placeholder-user.jpg"}
@@ -1113,7 +1106,7 @@ const renderReceiptsTable = () => (
               className="rounded-full object-cover w-full h-full"
             />
             <label
-              className="absolute bottom-2 right-2 bg-blue-600 text-white rounded-full p-1 cursor-pointer shadow-md group-hover:scale-110 transition"
+              className="absolute bottom-2 right-2 bg-gradient-to-br from-blue-600 to-purple-600 text-white rounded-full p-1 cursor-pointer shadow-md group-hover:scale-110 transition"
               title="Change profile picture"
             >
               <input
@@ -1137,7 +1130,7 @@ const renderReceiptsTable = () => (
               </div>
             )}
           </Avatar>
-          <div className="text-xl font-bold text-gray-900">
+          <div className="text-2xl font-extrabold text-gray-900 drop-shadow-sm">
             {parent.parentName}
           </div>
           <div className="text-blue-700 font-semibold text-sm">
@@ -1145,25 +1138,30 @@ const renderReceiptsTable = () => (
           </div>
         </div>
         {/* Navigation */}
-        <nav className="mt-6 space-y-2">
+        <nav className="mt-6 space-y-2 w-full">
           {sidebarNav.map((item) => (
             <Button
               key={item.section}
               variant={selectedSection === item.section ? "secondary" : "ghost"}
-              className="w-full justify-start"
+              className={`w-full justify-start px-5 py-3 rounded-xl text-lg font-medium flex items-center gap-3 transition-all duration-200
+                ${selectedSection === item.section
+                  ? "bg-gradient-to-r from-blue-500/80 to-purple-500/80 text-white shadow-lg ring-2 ring-blue-300/40"
+                  : "hover:bg-blue-100/60 hover:text-blue-700"}
+              `}
+              style={selectedSection === item.section ? { boxShadow: '0 4px 24px 0 rgba(99, 102, 241, 0.15)' } : {}}
               onClick={() => setSelectedSection(item.section)}
             >
-              <item.icon className="w-4 h-4 mr-2" /> {item.label}
+              <item.icon className="w-5 h-5" /> {item.label}
             </Button>
           ))}
         </nav>
         {/* Logout */}
-        <div className="mt-auto">
+        <div className="mt-auto pt-8">
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button
                 variant="outline"
-                className="w-full flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                className="w-full flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-100/60 rounded-xl font-semibold"
               >
                 <LogOut className="w-5 h-5" />
                 Logout
@@ -1192,29 +1190,25 @@ const renderReceiptsTable = () => (
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col md:ml-72 md:pl-4 py-6 px-2 md:px-8">
         {/* ...header... */}
-        <main className="flex-grow p-4 md:p-6">
+        <main className="flex-grow p-2 md:p-6">
           {selectedSection === "children" && (
             <div>
               {/* Academic Year & Term Info - Beautiful Glassmorphism Card */}
               <div className="mb-6">
                 {loadingAcademicInfo ? (
-                  <div className="rounded-2xl bg-gradient-to-r from-blue-100/60 via-purple-100/60 to-pink-100/60 shadow-lg p-6 flex items-center justify-center min-h-[80px]">
-                    <span className="text-blue-700 font-semibold animate-pulse">
-                      Loading academic year and term...
-                    </span>
+                  <div className="rounded-2xl bg-gradient-to-r from-blue-100/60 via-purple-100/60 to-pink-100/60 shadow-xl p-8 flex items-center justify-center min-h-[80px] backdrop-blur-xl border border-white/40 animate-pulse">
+                    <span className="text-blue-700 font-semibold">Loading academic year and term...</span>
                   </div>
                 ) : academicInfoError ? (
-                  <div className="rounded-2xl bg-gradient-to-r from-red-100/60 to-pink-100/60 shadow-lg p-6 flex items-center justify-center min-h-[80px]">
-                    <span className="text-red-600 font-semibold">
-                      {academicInfoError}
-                    </span>
+                  <div className="rounded-2xl bg-gradient-to-r from-red-100/60 to-pink-100/60 shadow-xl p-8 flex items-center justify-center min-h-[80px] backdrop-blur-xl border border-white/40">
+                    <span className="text-red-600 font-semibold">{academicInfoError}</span>
                   </div>
                 ) : currentAcademicYear && currentTerm ? (
-                  <div className="rounded-2xl bg-gradient-to-r from-blue-100/60 via-purple-100/60 to-pink-100/60 shadow-xl p-6 flex flex-col md:flex-row items-center justify-between gap-4 backdrop-blur-md border border-white/40">
+                  <div className="rounded-2xl bg-gradient-to-r from-blue-100/60 via-purple-100/60 to-pink-100/60 shadow-2xl p-8 flex flex-col md:flex-row items-center justify-between gap-6 backdrop-blur-xl border border-white/40">
                     <div className="flex items-center gap-4">
-                      <div className="bg-white/60 rounded-full p-3 shadow-md flex items-center justify-center">
+                      <div className="bg-white/60 rounded-full p-4 shadow-md flex items-center justify-center">
                         <Calendar className="w-8 h-8 text-blue-500" />
                       </div>
                       <div>
@@ -1225,13 +1219,7 @@ const renderReceiptsTable = () => (
                           {currentAcademicYear.name}
                           <span className="ml-3 text-base font-medium text-gray-500">
                             (
-                            {new Date(
-                              currentAcademicYear.startDate
-                            ).toLocaleDateString()}{" "}
-                            -{" "}
-                            {new Date(
-                              currentAcademicYear.endDate
-                            ).toLocaleDateString()}
+                            {new Date(currentAcademicYear.startDate).toLocaleDateString()} - {new Date(currentAcademicYear.endDate).toLocaleDateString()}
                             )
                           </span>
                         </div>
@@ -1239,7 +1227,7 @@ const renderReceiptsTable = () => (
                     </div>
                     <div className="w-full h-[1px] bg-gradient-to-r from-blue-200/40 via-purple-200/40 to-pink-200/40 my-4 md:hidden" />
                     <div className="flex items-center gap-4">
-                      <div className="bg-white/60 rounded-full p-3 shadow-md flex items-center justify-center">
+                      <div className="bg-white/60 rounded-full p-4 shadow-md flex items-center justify-center">
                         <Calendar className="w-8 h-8 text-purple-500" />
                       </div>
                       <div>
@@ -1250,11 +1238,7 @@ const renderReceiptsTable = () => (
                           {currentTerm.name}
                           <span className="ml-3 text-base font-medium text-gray-500">
                             (
-                            {new Date(
-                              currentTerm.startDate
-                            ).toLocaleDateString()}{" "}
-                            -{" "}
-                            {new Date(currentTerm.endDate).toLocaleDateString()}
+                            {new Date(currentTerm.startDate).toLocaleDateString()} - {new Date(currentTerm.endDate).toLocaleDateString()}
                             )
                           </span>
                         </div>
@@ -1267,49 +1251,35 @@ const renderReceiptsTable = () => (
               {academicYears.length > 0 && terms.length > 0 && (
                 <div className="flex flex-wrap gap-4 mb-6 items-center">
                   <div>
-                    <label className="block text-xs font-semibold mb-1 text-gray-700">
-                      Academic Year
-                    </label>
+                    <label className="block text-xs font-semibold mb-1 text-gray-700">Academic Year</label>
                     <div className="relative">
                       <select
-                        className="appearance-none border rounded-lg px-4 py-2 pr-8 bg-white shadow focus:outline-none focus:ring-2 focus:ring-blue-200"
+                        className="appearance-none border rounded-xl px-4 py-2 pr-10 bg-white/70 shadow focus:outline-none focus:ring-2 focus:ring-blue-200 backdrop-blur-md text-base"
                         value={selectedYearId}
                         onChange={(e) => setSelectedYearId(e.target.value)}
                         disabled={filterLoading || academicYears.length === 0}
                       >
                         {academicYears.map((year: any) => (
-                          <option key={year.id} value={year.id}>
-                            {year.name}
-                          </option>
+                          <option key={year.id} value={year.id}>{year.name}</option>
                         ))}
                       </select>
-                      <ChevronDown
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-                        size={18}
-                      />
+                      <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={20} />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold mb-1 text-gray-700">
-                      Term
-                    </label>
+                    <label className="block text-xs font-semibold mb-1 text-gray-700">Term</label>
                     <div className="relative">
                       <select
-                        className="appearance-none border rounded-lg px-4 py-2 pr-8 bg-white shadow focus:outline-none focus:ring-2 focus:ring-blue-200"
+                        className="appearance-none border rounded-xl px-4 py-2 pr-10 bg-white/70 shadow focus:outline-none focus:ring-2 focus:ring-purple-200 backdrop-blur-md text-base"
                         value={selectedTermId}
                         onChange={(e) => setSelectedTermId(e.target.value)}
                         disabled={filterLoading || terms.length === 0}
                       >
                         {terms.map((term: any) => (
-                          <option key={term.id} value={term.id}>
-                            {term.name}
-                          </option>
+                          <option key={term.id} value={term.id}>{term.name}</option>
                         ))}
                       </select>
-                      <ChevronDown
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-                        size={18}
-                      />
+                      <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={20} />
                     </div>
                   </div>
                   {filterError && (
@@ -1353,7 +1323,7 @@ const renderReceiptsTable = () => (
                 </div>
               )}
               {/* Child Overview Panel */}
-              {students.length > 0 &&
+              {students.length > 0 && (
                 (() => {
                   const child =
                     students.find((c) => c.id === focusedChildId) ||
@@ -1373,16 +1343,16 @@ const outstandingFees = currentTermSummary ? currentTermSummary.balance : 0;
                       feeStructure={getStudentFeeStructure(child.id)}
                     />
                   );
-                })()}
+                })()
+              )}
             </div>
           )}
           {selectedSection === "fees" && (
-{selectedSection === "fees" && (
   <div className="max-w-4xl mx-auto">
-    <h2 className="text-2xl font-bold mb-6 text-center">Fee Structure</h2>
+    <h2 className="text-3xl font-extrabold mb-8 text-center text-blue-700 drop-shadow-sm tracking-tight">Fee Structure</h2>
     {students.length === 0 ? (
-      <Card className="mb-6">
-        <CardContent>No children found.</CardContent>
+      <Card className="mb-6 bg-white/60 backdrop-blur-xl border border-white/40 shadow-xl rounded-2xl">
+        <CardContent className="py-8 text-center text-gray-500 text-lg">No children found.</CardContent>
       </Card>
     ) : (
       <ParentFeesPanel
@@ -1398,90 +1368,70 @@ const outstandingFees = currentTermSummary ? currentTermSummary.balance : 0;
 
 {selectedSection === "receipts" && (
   <div className="max-w-4xl mx-auto">
-    <h2 className="text-2xl font-bold mb-6 text-center">
+    <h2 className="text-3xl font-extrabold mb-8 text-center text-purple-700 drop-shadow-sm tracking-tight">
       Payment History & Receipts
     </h2>
     {students.length === 0 ? (
-      <Card className="mb-6">
-        <CardContent>No children found.</CardContent>
+      <Card className="mb-6 bg-white/60 backdrop-blur-xl border border-white/40 shadow-xl rounded-2xl">
+        <CardContent className="py-8 text-center text-gray-500 text-lg">No children found.</CardContent>
       </Card>
     ) : (
-      <div className="space-y-6">
+      <div className="space-y-8">
         {/* Payment Summary Card */}
-        <Card>
+        <Card className="bg-gradient-to-r from-blue-100/70 via-purple-100/70 to-pink-100/70 backdrop-blur-xl border border-white/40 shadow-2xl rounded-2xl">
           <CardHeader>
-            <CardTitle>Payment Summary</CardTitle>
-            <CardDescription>
-              Payment history for{" "}
-              {students.find((c) => c.id === focusedChildId)?.fullName ||
-                students[0].fullName}
+            <CardTitle className="text-xl font-bold text-blue-700">Payment Summary</CardTitle>
+            <CardDescription className="text-gray-600">
+              Payment history for {students.find((c) => c.id === focusedChildId)?.fullName || students[0].fullName}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <div className="text-2xl font-bold text-blue-600">
-                  {receipts.length}
-                </div>
-                <div className="text-sm text-gray-600">Total Payments</div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="text-center p-6 bg-white/70 rounded-xl shadow-md">
+                <div className="text-3xl font-extrabold text-blue-600 mb-1">{receipts.length}</div>
+                <div className="text-base text-gray-600">Total Payments</div>
               </div>
-              <div className="text-center p-4 bg-green-50 rounded-lg">
-                <div className="text-2xl font-bold text-green-600">
-                  KES{" "}
-                  {receipts
-                    .reduce((sum, receipt) => sum + receipt.amount, 0)
-                    .toLocaleString()}
+              <div className="text-center p-6 bg-white/70 rounded-xl shadow-md">
+                <div className="text-3xl font-extrabold text-green-600 mb-1">
+                  KES {receipts.reduce((sum, receipt) => sum + receipt.amount, 0).toLocaleString()}
                 </div>
-                <div className="text-sm text-gray-600">Total Paid</div>
+                <div className="text-base text-gray-600">Total Paid</div>
               </div>
-              <div className="text-center p-4 bg-orange-50 rounded-lg">
-                <div className="text-2xl font-bold text-orange-600">
-                  {receipts.length > 0
-                    ? new Date(receipts[0].paymentDate).toLocaleDateString()
-                    : "N/A"}
+              <div className="text-center p-6 bg-white/70 rounded-xl shadow-md">
+                <div className="text-3xl font-extrabold text-orange-600 mb-1">
+                  {receipts.length > 0 ? new Date(receipts[0].paymentDate).toLocaleDateString() : "N/A"}
                 </div>
-                <div className="text-sm text-gray-600">Last Payment</div>
+                <div className="text-base text-gray-600">Last Payment</div>
               </div>
             </div>
           </CardContent>
         </Card>
 
         {/* Payment History Table */}
-        <Card>
+        <Card className="bg-white/60 backdrop-blur-xl border border-white/40 shadow-xl rounded-2xl">
           <CardHeader>
-            <CardTitle>Payment History</CardTitle>
-            <CardDescription>
-              Recent payments and receipts
-            </CardDescription>
+            <CardTitle className="text-xl font-bold text-purple-700">Payment History</CardTitle>
+            <CardDescription className="text-gray-600">Recent payments and receipts</CardDescription>
           </CardHeader>
           <CardContent>
             {receipts.length > 0 ? (
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {receipts.map((receipt) => (
                   <div
                     key={receipt.id}
-                    className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                    className="border border-white/40 rounded-xl p-6 bg-gradient-to-r from-blue-50/60 via-purple-50/60 to-pink-50/60 hover:bg-white/80 transition-colors shadow-md"
                   >
                     <div className="flex justify-between items-start mb-2">
                       <div>
-                        <h4 className="font-semibold text-lg">
-                          Receipt #{receipt.receiptNumber}
-                        </h4>
-                        <p className="text-sm text-gray-600">
-                          {receipt.description}
-                        </p>
+                        <h4 className="font-semibold text-lg text-blue-700">Receipt #{receipt.receiptNumber}</h4>
+                        <p className="text-sm text-gray-600">{receipt.description}</p>
                       </div>
                       <div className="text-right">
                         <div className="text-lg font-bold text-green-600">
-                          KES{" "}
-                          {receipt.amount != null
-                            ? receipt.amount.toLocaleString()
-                            : "0"}
+                          KES {receipt.amount != null ? receipt.amount.toLocaleString() : "0"}
                         </div>
                         <div className="text-xs text-gray-500">
-                          {new Date(
-                            receipt.paymentDate
-                          ).toLocaleDateString()}
+                          {new Date(receipt.paymentDate).toLocaleDateString()}
                         </div>
                       </div>
                     </div>
@@ -1489,38 +1439,27 @@ const outstandingFees = currentTermSummary ? currentTermSummary.balance : 0;
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       <div>
                         <span className="font-medium">Payment Method:</span>
-                        <p className="capitalize">
-                          {receipt.paymentMethod.replace("_", " ")}
-                        </p>
+                        <p className="capitalize">{receipt.paymentMethod ? receipt.paymentMethod.replace("_", " ") : "N/A"}</p>
                       </div>
                       <div>
                         <span className="font-medium">Reference:</span>
-                        <p className="text-xs">{receipt.referenceNumber}</p>
+                        <p className="text-xs">{receipt.referenceNumber || "N/A"}</p>
                       </div>
                       <div>
                         <span className="font-medium">Balance After:</span>
-                        <p className="text-red-600">
-                          KES{" "}
-                          {receipt.balance != null
-                            ? receipt.balance.toLocaleString()
-                            : "0"}
-                        </p>
+                        <p className="text-red-600">KES {receipt.balance != null ? receipt.balance.toLocaleString() : "0"}</p>
                       </div>
                       <div>
                         <span className="font-medium">Balance Before:</span>
-                        <p className="text-gray-600">
-                          KES{" "}
-                          {receipt.balanceCarriedForward != null
-                            ? receipt.balanceCarriedForward.toLocaleString()
-                            : "0"}
-                        </p>
+                        <p className="text-gray-600">KES {receipt.balanceCarriedForward != null ? receipt.balanceCarriedForward.toLocaleString() : "0"}</p>
                       </div>
                     </div>
 
-                    <div className="mt-3 flex gap-2">
+                    <div className="mt-4 flex gap-3">
                       <Button
                         variant="outline"
                         size="sm"
+                        className="rounded-lg bg-gradient-to-r from-blue-100/60 to-purple-100/60 hover:from-blue-200/80 hover:to-purple-200/80"
                         onClick={() => handleDownloadReceipt(receipt)}
                       >
                         <Download className="w-4 h-4 mr-2" />
@@ -1529,6 +1468,7 @@ const outstandingFees = currentTermSummary ? currentTermSummary.balance : 0;
                       <Button
                         variant="outline"
                         size="sm"
+                        className="rounded-lg bg-gradient-to-r from-purple-100/60 to-pink-100/60 hover:from-purple-200/80 hover:to-pink-200/80"
                         onClick={() => setSelectedReceipt(receipt)}
                       >
                         <Receipt className="w-4 h-4 mr-2" />
@@ -1539,12 +1479,10 @@ const outstandingFees = currentTermSummary ? currentTermSummary.balance : 0;
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8 text-gray-500">
-                <Receipt className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                <p>No payment history found for this student.</p>
-                <p className="text-sm">
-                  Payments will appear here once made.
-                </p>
+              <div className="text-center py-12 text-gray-500">
+                <Receipt className="w-14 h-14 mx-auto mb-4 text-gray-300" />
+                <p className="text-lg">No payment history found for this student.</p>
+                <p className="text-base">Payments will appear here once made.</p>
               </div>
             )}
           </CardContent>
@@ -1553,58 +1491,8 @@ const outstandingFees = currentTermSummary ? currentTermSummary.balance : 0;
     )}
   </div>
 )}
-
-          )}
-          {selectedSection === "receipts" && renderReceiptsTable()}
-          {selectedSection === "performance" && (
-            <div>
-              {focusedChildId
-                ? `Performance for child ID: ${focusedChildId}`
-                : "Select a child to view performance."}
-            </div>
-          )}
-          {selectedSection === "settings" && <div>Settings section</div>}
         </main>
       </div>
-
-      {/* Payment Modal */}
-      {selectedStudent && selectedFeeStructure && (
-        <PaymentModal
-          isOpen={paymentModalOpen}
-          onClose={() => {
-            setPaymentModalOpen(false);
-            setSelectedStudent(null);
-            setSelectedFeeStructure(null);
-          }}
-          studentId={selectedStudent.id}
-          schoolCode={schoolCode}
-          amount={selectedFeeStructure.totalAmount}
-          feeType="School Fees"
-          term={selectedFeeStructure.term}
-          academicYear={selectedFeeStructure.year.toString()}
-          onReceiptGenerated={handleReceiptGenerated}
-        />
-      )}
-
-      {selectedReceipt && (
-        <ReceiptView
-          receipt={selectedReceipt}
-          studentName={
-            students.find((s) => s.id === selectedReceipt.studentId)?.user
-              ?.name || "N/A"
-          }
-          studentClass={
-            students.find((s) => s.id === selectedReceipt.studentId)?.class
-              ?.name || "N/A"
-          }
-          admissionNumber={
-            students.find((s) => s.id === selectedReceipt.studentId)
-              ?.admissionNumber || "N/A"
-          }
-          schoolName={schoolName}
-          onClose={() => setSelectedReceipt(null)}
-        />
-      )}
     </div>
   );
 }

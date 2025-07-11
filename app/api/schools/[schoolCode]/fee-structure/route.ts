@@ -99,16 +99,26 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
       isActive = true,
       academicYearId,
       termId
+    }: {
+      term: string;
+      year: number;
+      gradeId: string;
+      totalAmount: number;
+      breakdown: Array<{ name: string; value: number }> | Record<string, number>;
+      isActive?: boolean;
+      academicYearId?: string;
+      termId?: string;
     } = body;
 
     // Accept breakdown as array of { name, value }
     if (!Array.isArray(breakdown)) {
       // fallback: convert object to array
-      breakdown = Object.entries(breakdown || {}).map(([name, value]) => ({ name, value: parseFloat(value) || 0 }));
+      breakdown = Object.entries(breakdown || {}).map(([name, value]: [string, any]) => ({ name, value: parseFloat(value) || 0 }));
     }
     // Calculate total from breakdown if not provided or mismatched
-    const calcTotal = breakdown.reduce((sum, item) => sum + (parseFloat(item.value) || 0), 0);
-    if (!totalAmount || Math.abs(calcTotal - parseFloat(totalAmount)) > 0.01) {
+    const calcTotal = (breakdown as Array<{ name: string; value: number }>).
+      reduce((sum: number, item: { name: string; value: number }) => sum + (parseFloat(item.value as any) || 0), 0);
+    if (!totalAmount || Math.abs(calcTotal - parseFloat(totalAmount as any)) > 0.01) {
       totalAmount = calcTotal;
     }
 
@@ -134,6 +144,14 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
           });
           if (currentTerm) termId = currentTerm.id;
         }
+      }
+    }
+
+    // Always set the 'year' field based on the selected academic year
+    if (academicYearId) {
+      const academicYearObj = await prisma.academicYear.findUnique({ where: { id: academicYearId } });
+      if (academicYearObj) {
+        year = parseInt(academicYearObj.name) || new Date().getFullYear();
       }
     }
 

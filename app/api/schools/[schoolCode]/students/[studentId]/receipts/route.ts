@@ -16,6 +16,7 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
         id: studentId,
         school: { code: schoolCode },
       },
+      include: { school: true },
     });
     if (!student) {
       return NextResponse.json({ error: "Student not found" }, { status: 404 });
@@ -34,7 +35,10 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       orderBy: { paymentDate: "desc" },
     });
 
-    return NextResponse.json(receipts);
+    // Attach school name to each receipt
+    const receiptsWithSchool = receipts.map(r => ({ ...r, schoolName: student.school?.name || "" }));
+
+    return NextResponse.json(receiptsWithSchool);
   } catch (error) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

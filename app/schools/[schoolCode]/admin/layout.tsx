@@ -33,6 +33,12 @@ export default function AdminLayout({
           Promotions
         </Link>
         <Link
+          href={`/schools/${schoolCode}/admin/promotion-criteria`}
+          className="hover:underline"
+        >
+          Promotion Criteria
+        </Link>
+        <Link
           href={`/schools/${schoolCode}/admin/academic-calendar`}
           className="hover:underline"
         >

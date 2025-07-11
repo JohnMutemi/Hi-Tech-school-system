@@ -55,8 +55,16 @@ import {
   GraduationCap,
   ArrowLeft,
   AlertTriangle,
+  Info,
+  Settings,
+  TrendingUp,
+  DollarSign,
+  Calendar,
+  Shield,
 } from "lucide-react";
 import Link from "next/link";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 interface Student {
   id: string;
@@ -65,19 +73,36 @@ interface Student {
   classLevel: string;
   className: string;
   eligibility: {
-    feeStatus: string;
-    allTermsPaid: boolean;
-    meetsCriteria: boolean;
-    outstandingBalance: number;
-    totalFees: number;
-    totalPaid: number;
+    isEligible: boolean;
+    primaryCriteria?: string;
+    allCriteriaResults: Array<{
+      criteriaId: string;
+      criteriaName: string;
+      passed: boolean;
+      failedReasons: string[];
+      details: {
+        averageGrade?: number;
+        outstandingBalance?: number;
+        attendanceRate?: number;
+        disciplinaryCases?: number;
+      };
+    }>;
+    summary: {
+      averageGrade: number;
+      attendanceRate: number;
+      outstandingBalance: number;
+      disciplinaryCases: number;
+      totalFees: number;
+      totalPaid: number;
+    };
   };
-  carryForwardArrears?: number;
 }
 
 interface PromotionExclusion {
   studentId: string;
   reason: string;
+  detailedReason?: string;
+  criteriaFailed?: any;
   notes?: string;
 }
 
@@ -100,6 +125,12 @@ export default function PromotionsPage() {
   const [nextClass, setNextClass] = useState("");
   const [showExclusionDialog, setShowExclusionDialog] = useState(false);
   const [currentStudent, setCurrentStudent] = useState<Student | null>(null);
+  const [showCriteriaDetails, setShowCriteriaDetails] = useState<string | null>(null);
+  const [hasCriteria, setHasCriteria] = useState<boolean>(false);
+  const [promotionMessage, setPromotionMessage] = useState<string>("");
+  const [showSchoolWideDialog, setShowSchoolWideDialog] = useState(false);
+  const [schoolWideResult, setSchoolWideResult] = useState<any>(null);
+  const [schoolWideLoading, setSchoolWideLoading] = useState(false);
 
   useEffect(() => {
     loadClasses();
@@ -130,14 +161,52 @@ export default function PromotionsPage() {
         `/api/schools/${schoolCode}/promotions?action=eligible-students&classLevel=${selectedClass}`
       );
       const data = await response.json();
-      setEligibleStudents(data);
-      // Auto-select all eligible students
-      setSelectedStudents(data.map((student: Student) => student.id));
+      
+      // Handle potential API errors
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to load eligible students');
+      }
+      
+      // Handle new API response structure
+      if (data.students && Array.isArray(data.students)) {
+        setEligibleStudents(data.students);
+        setHasCriteria(data.hasCriteria || false);
+        setPromotionMessage(data.message || "");
+        
+        // Auto-select all eligible students
+        setSelectedStudents(data.students.filter((student: Student) => student.eligibility?.isEligible).map((student: Student) => student.id));
+        
+        // Show message about criteria status
+        if (data.message) {
+          toast({
+            title: data.hasCriteria ? "Criteria Applied" : "Manual Promotion Mode",
+            description: data.message,
+            variant: data.hasCriteria ? "default" : "default",
+          });
+        }
+      } else if (Array.isArray(data)) {
+        // Fallback for old API format
+        setEligibleStudents(data);
+        setHasCriteria(true); // Assume criteria exist for old format
+        setPromotionMessage("");
+        setSelectedStudents(data.filter((student: Student) => student.eligibility?.isEligible).map((student: Student) => student.id));
+      } else {
+        console.error('API returned invalid data:', data);
+        setEligibleStudents([]);
+        setHasCriteria(false);
+        setPromotionMessage("");
+        toast({
+          title: "Error",
+          description: "Invalid data format received from server",
+          variant: "destructive",
+        });
+      }
     } catch (error) {
       console.error("Failed to load eligible students:", error);
+      setEligibleStudents([]);
       toast({
         title: "Error",
-        description: "Failed to load eligible students",
+        description: error instanceof Error ? error.message : "Failed to load eligible students",
         variant: "destructive",
       });
     } finally {
@@ -184,7 +253,10 @@ export default function PromotionsPage() {
   };
 
   const toggleAllStudents = (checked: boolean) => {
-    setSelectedStudents(checked ? eligibleStudents.map((s) => s.id) : []);
+    const eligibleStudentIds = (eligibleStudents || [])
+      .filter(student => student.eligibility?.isEligible)
+      .map(student => student.id);
+    setSelectedStudents(checked ? eligibleStudentIds : []);
   };
 
   const excludeStudent = (student: Student) => {
@@ -195,10 +267,18 @@ export default function PromotionsPage() {
   const confirmExclusion = (reason: string, notes?: string) => {
     if (!currentStudent) return;
 
+          const failedCriteria = currentStudent.eligibility?.allCriteriaResults
+        ?.filter(result => !result.passed)
+        .map(result => ({
+          criteriaName: result.criteriaName,
+          reasons: result.failedReasons
+        })) || [];
+
     const exclusion: PromotionExclusion = {
       studentId: currentStudent.id,
       reason,
-      notes,
+      detailedReason: notes,
+      criteriaFailed: failedCriteria,
     };
 
     setExcludedStudents((prev) => [...prev, exclusion]);
@@ -216,6 +296,7 @@ export default function PromotionsPage() {
     setSelectedStudents((prev) => [...prev, studentId]);
   };
 
+  // Update: handle new API response structure for class-by-class promotion
   const executePromotion = async () => {
     if (selectedStudents.length === 0) {
       toast({
@@ -232,32 +313,29 @@ export default function PromotionsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          fromClass: selectedClass,
-          toClass: nextClass,
-          studentIds: selectedStudents,
-          excludedStudents,
-          promotedBy: "admin", // TODO: Get actual user ID
-          notes: `Bulk promotion from ${selectedClass} to ${nextClass}`,
+          action: "bulk-promotion",
+          data: {
+            fromClass: selectedClass,
+            toClass: nextClass,
+            studentIds: selectedStudents,
+            promotedBy: "admin", // TODO: Get actual user ID
+          },
         }),
       });
 
       const result = await response.json();
 
-      if (result.success) {
+      if (result.promoted) {
         setStep("complete");
-        const carryForwardMessage =
-          result.carryForwardCount > 0
-            ? ` Fee balances of KES ${result.totalCarriedForward.toLocaleString()} were carried forward for ${
-                result.carryForwardCount
-              } student(s).`
-            : "";
-
         toast({
-          title: "Promotion Successful",
-          description: `Successfully promoted ${result.promotedCount} students.${carryForwardMessage}`,
+          title: "Promotion Complete!",
+          description: `Promoted: ${result.promoted.length}, Excluded: ${result.excluded.length}, Errors: ${result.errors.length}`,
         });
+        setPromotionMessage(
+          `Promoted: ${result.promoted.length}, Excluded: ${result.excluded.length}, Errors: ${result.errors.length}`
+        );
       } else {
-        throw new Error(result.error);
+        throw new Error(result.error || "Unknown error");
       }
     } catch (error: any) {
       toast({
@@ -270,18 +348,60 @@ export default function PromotionsPage() {
     }
   };
 
-  const getEligibilityBadge = (student: Student) => {
-    if (student.eligibility.allTermsPaid) {
-      return <Badge className="bg-green-100 text-green-800">Fully Paid</Badge>;
+  // Update: handle new API response structure for school-wide promotion
+  const executeSchoolWidePromotion = async () => {
+    setSchoolWideLoading(true);
+    setSchoolWideResult(null);
+    try {
+      const response = await fetch(`/api/schools/${schoolCode}/promotions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "school-wide-bulk-promotion",
+          data: { promotedBy: "admin" }, // TODO: Replace with actual user ID
+        }),
+      });
+      const result = await response.json();
+      setSchoolWideResult(result);
+      if (result.promoted) {
+        toast({
+          title: "School-Wide Promotion Complete!",
+          description: `Promoted: ${result.promoted.length}, Excluded: ${result.excluded.length}, Errors: ${result.errors.length}`,
+        });
+      } else {
+        toast({
+          title: "School-Wide Promotion Failed",
+          description: result.error || result.message || "Unknown error",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "School-Wide Promotion Failed",
+        description: error.message || "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setSchoolWideLoading(false);
     }
-    if (student.eligibility.outstandingBalance > 0) {
+  };
+
+  const getEligibilityBadge = (student: Student) => {
+    if (student.eligibility?.isEligible) {
+      return (
+        <Badge className="bg-green-100 text-green-800">
+          <CheckCircle className="w-3 h-3 mr-1" />
+          Eligible
+        </Badge>
+      );
+    } else {
       return (
         <Badge variant="destructive" className="bg-red-100 text-red-800">
-          Arrears: KES {student.eligibility.outstandingBalance.toLocaleString()}
+          <XCircle className="w-3 h-3 mr-1" />
+          Not Eligible
         </Badge>
       );
     }
-    return <Badge variant="destructive">Fee Arrears</Badge>;
   };
 
   const getExclusionReasonLabel = (reason: string) => {
@@ -289,11 +409,25 @@ export default function PromotionsPage() {
       academic: "Academic Performance",
       fees: "Fee Arrears",
       disciplinary: "Disciplinary Issues",
-      parent_request: "Parent Request",
       attendance: "Poor Attendance",
+      parent_request: "Parent Request",
       other: "Other",
     };
     return reasons[reason as keyof typeof reasons] || reason;
+  };
+
+  const getCriteriaSummary = (student: Student) => {
+    const summary = student.eligibility?.summary;
+    if (!summary) return "No data available";
+    
+    const details = [];
+    
+    if (summary.averageGrade) details.push(`Grade: ${summary.averageGrade}%`);
+    if (summary.attendanceRate) details.push(`Attendance: ${summary.attendanceRate}%`);
+    if (summary.outstandingBalance > 0) details.push(`Balance: KES ${summary.outstandingBalance.toLocaleString()}`);
+    if (summary.disciplinaryCases > 0) details.push(`Discipline: ${summary.disciplinaryCases} cases`);
+    
+    return details.length > 0 ? details.join(" • ") : "No performance data";
   };
 
   if (step === "complete") {
@@ -304,61 +438,23 @@ export default function PromotionsPage() {
             <CheckCircle className="w-16 h-16 text-green-600 mx-auto mb-4" />
             <CardTitle className="text-2xl">Promotion Complete!</CardTitle>
             <CardDescription>
-              The bulk promotion has been successfully executed.
+              {promotionMessage}
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center">
             <div className="space-y-4">
-              <p className="text-lg">
-                <strong>{selectedStudents.length}</strong> students promoted
-                from {selectedClass} to {nextClass}
-              </p>
               {excludedStudents.length > 0 && (
-                <p className="text-gray-600">
-                  <strong>{excludedStudents.length}</strong> students were
-                  excluded from promotion
-                </p>
+                <div className="text-gray-600">
+                  <strong>Excluded Students:</strong>
+                  <ul className="list-disc list-inside">
+                    {excludedStudents.map((ex, idx) => (
+                      <li key={idx}>{ex.studentId}: {ex.reason}</li>
+                    ))}
+                  </ul>
+                </div>
               )}
-              {/* Fee Carry-Forward Summary */}
-              {(() => {
-                const studentsWithArrears = eligibleStudents.filter(
-                  (student) =>
-                    selectedStudents.includes(student.id) &&
-                    student.eligibility.outstandingBalance > 0
-                );
-                const totalArrears = studentsWithArrears.reduce(
-                  (sum, student) =>
-                    sum + student.eligibility.outstandingBalance,
-                  0
-                );
-
-                if (studentsWithArrears.length > 0) {
-                  return (
-                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                      <div className="flex items-center gap-2 mb-2">
-                        <CheckCircle className="w-5 h-5 text-blue-600" />
-                        <p className="text-sm font-medium text-blue-800">
-                          Fee Arrears Carried Forward
-                        </p>
-                      </div>
-                      <p className="text-sm text-blue-700">
-                        <strong>{studentsWithArrears.length}</strong> student(s)
-                        had outstanding balances totaling{" "}
-                        <strong className="text-red-600">
-                          KES {totalArrears.toLocaleString()}
-                        </strong>{" "}
-                        that were automatically carried forward to the new
-                        academic year.
-                      </p>
-                    </div>
-                  );
-                }
-                return null;
-              })()}
               <div className="flex gap-4 justify-center">
-                <Button onClick={() => setStep("select")}>
-                  Start New Promotion
-                </Button>
+                <Button onClick={() => setStep("select")}>Start New Promotion</Button>
                 <Button variant="outline" asChild>
                   <Link href={`/schools/${schoolCode}`}>Back to Dashboard</Link>
                 </Button>
@@ -381,13 +477,89 @@ export default function PromotionsPage() {
             </Link>
           </Button>
         </div>
-        <h1 className="text-3xl font-bold mb-2">
-          Student Promotion Management
-        </h1>
-        <p className="text-gray-600">
-          Manage bulk student promotions with individual exclusions
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">
+              Student Promotion Management
+            </h1>
+            <p className="text-gray-600">
+              Manage bulk student promotions with comprehensive eligibility criteria
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" asChild>
+              <Link href={`/schools/${schoolCode}/admin/promotion-criteria`}>
+                <Settings className="w-4 h-4 mr-2" />
+                Manage Criteria
+              </Link>
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => setShowSchoolWideDialog(true)}
+              disabled={schoolWideLoading}
+            >
+              Promote All Eligible Students (School-Wide)
+            </Button>
+          </div>
+        </div>
       </div>
+
+      {/* School-Wide Promotion Dialog */}
+      <AlertDialog open={showSchoolWideDialog} onOpenChange={setShowSchoolWideDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm School-Wide Promotion</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will promote <b>all eligible students in all classes</b> for this school. Are you sure you want to proceed?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={schoolWideLoading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={executeSchoolWidePromotion}
+              disabled={schoolWideLoading}
+            >
+              {schoolWideLoading ? "Promoting..." : "Yes, Promote All"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+          {schoolWideResult && (
+            <div className="mt-4">
+              {schoolWideResult.promoted ? (
+                <div className="text-green-700">
+                  <b>Promotion Complete!</b><br />
+                  Promoted: {schoolWideResult.promoted.length}<br />
+                  Excluded: {schoolWideResult.excluded.length}<br />
+                  Errors: {schoolWideResult.errors.length}<br />
+                  {schoolWideResult.excluded.length > 0 && (
+                    <div className="text-gray-600 mt-2">
+                      <strong>Excluded Students:</strong>
+                      <ul className="list-disc list-inside">
+                        {schoolWideResult.excluded.map((ex: any, idx: number) => (
+                          <li key={idx}>{ex.studentId}: {ex.reason}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {schoolWideResult.errors.length > 0 && (
+                    <div className="text-red-600 mt-2">
+                      <strong>Errors:</strong>
+                      <ul className="list-disc list-inside">
+                        {schoolWideResult.errors.map((err: string, idx: number) => (
+                          <li key={idx}>{err}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-red-700">
+                  <b>Promotion Failed:</b> {schoolWideResult.error || schoolWideResult.message}
+                </div>
+              )}
+            </div>
+          )}
+        </AlertDialogContent>
+      </AlertDialog>
 
       {step === "select" && (
         <Card>
@@ -400,10 +572,8 @@ export default function PromotionsPage() {
           <CardContent>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-2">
-                  Current Class
-                </label>
-                <Select onValueChange={setSelectedClass} value={selectedClass}>
+                <Label htmlFor="class-select">Current Class</Label>
+                <Select value={selectedClass} onValueChange={setSelectedClass}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select a class" />
                   </SelectTrigger>
@@ -417,13 +587,18 @@ export default function PromotionsPage() {
                 </Select>
               </div>
 
-              {selectedClass && nextClass && (
-                <div className="flex items-center gap-2 text-lg">
-                  <span>{selectedClass}</span>
-                  <ArrowRight className="w-5 h-5" />
-                  <span className="font-semibold text-blue-600">
-                    {nextClass}
-                  </span>
+              {selectedClass && (
+                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Info className="w-5 h-5 text-blue-600" />
+                    <p className="text-sm font-medium text-blue-800">
+                      Promotion Information
+                    </p>
+                  </div>
+                  <p className="text-sm text-blue-700">
+                    Students from <strong>{selectedClass}</strong> will be promoted to{" "}
+                    <strong>{nextClass || "Next Class"}</strong> based on comprehensive eligibility criteria.
+                  </p>
                 </div>
               )}
 
@@ -433,7 +608,17 @@ export default function PromotionsPage() {
                   disabled={loading}
                   className="w-full"
                 >
-                  {loading ? "Loading..." : "Continue to Review"}
+                  {loading ? (
+                    <div className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Loading Students...
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4" />
+                      Review Eligible Students
+                    </div>
+                  )}
                 </Button>
               )}
             </div>
@@ -445,168 +630,241 @@ export default function PromotionsPage() {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Step 2: Review and Modify Selection</CardTitle>
-              <CardDescription>
-                Review eligible students and exclude any that shouldn't be
-                promoted
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Step 2: Review Eligible Students</CardTitle>
+                  <CardDescription>
+                    Review and select students for promotion from {selectedClass} to {nextClass}
+                  </CardDescription>
+                </div>
+                <Button variant="outline" onClick={() => setStep("select")}>
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    checked={
-                      selectedStudents.length === eligibleStudents.length
-                    }
-                    onCheckedChange={toggleAllStudents}
-                  />
-                  <span>
-                    Select All ({selectedStudents.length} of{" "}
-                    {eligibleStudents.length})
-                  </span>
-                </div>
-                <Badge variant="outline">{nextClass}</Badge>
-              </div>
+              <div className="space-y-4">
+                {/* Promotion Mode Banner */}
+                {!hasCriteria && eligibleStudents.length > 0 && (
+                  <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Settings className="w-5 h-5 text-yellow-600" />
+                      <span className="text-sm font-medium text-yellow-800">Manual Promotion Mode</span>
+                    </div>
+                    <p className="text-sm text-yellow-700 mb-3">
+                      No promotion criteria are set for {selectedClass}. All students are available for manual promotion.
+                    </p>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" asChild>
+                        <Link href={`/schools/${schoolCode}/admin/promotion-criteria`}>
+                          <Settings className="w-4 h-4 mr-2" />
+                          Set Promotion Criteria
+                        </Link>
+                      </Button>
+                      <Button variant="outline" size="sm" asChild>
+                        <Link href={`/schools/${schoolCode}/admin/promotions`}>
+                          Continue with Manual Promotion
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Select</TableHead>
-                      <TableHead>Student Name</TableHead>
-                      <TableHead>Admission No.</TableHead>
-                      <TableHead>Current Class</TableHead>
-                      <TableHead>Fee Status</TableHead>
-                      <TableHead>Outstanding Balance</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {eligibleStudents.map((student) => {
-                      // Support multi-year arrears if present
-                      const carryForwardArrears =
-                        student.carryForwardArrears || 0;
-                      const totalOutstanding =
-                        (student.eligibility?.outstandingBalance || 0) +
-                        carryForwardArrears;
-                      return (
-                        <TableRow key={student.id}>
-                          <TableCell>
-                            <Checkbox
-                              checked={selectedStudents.includes(student.id)}
-                              onCheckedChange={() => toggleStudent(student.id)}
-                            />
-                          </TableCell>
-                          <TableCell className="font-medium">
-                            {student.name}
-                          </TableCell>
-                          <TableCell>{student.admissionNumber}</TableCell>
-                          <TableCell>
-                            <div>
-                              <div className="font-medium">
-                                {student.className}
+                {/* Summary Statistics */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle className="w-5 h-5 text-green-600" />
+                      <span className="text-sm font-medium text-green-800">Eligible</span>
+                    </div>
+                    <p className="text-2xl font-bold text-green-700">
+                      {(eligibleStudents || []).filter(s => s.eligibility?.isEligible).length}
+                    </p>
+                  </div>
+                  <div className="p-4 bg-red-50 rounded-lg border border-red-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <XCircle className="w-5 h-5 text-red-600" />
+                      <span className="text-sm font-medium text-red-800">Not Eligible</span>
+                    </div>
+                    <p className="text-2xl font-bold text-red-700">
+                      {(eligibleStudents || []).filter(s => !s.eligibility?.isEligible).length}
+                    </p>
+                  </div>
+                  <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Users className="w-5 h-5 text-blue-600" />
+                      <span className="text-sm font-medium text-blue-800">Selected</span>
+                    </div>
+                    <p className="text-2xl font-bold text-blue-700">
+                      {selectedStudents.length}
+                    </p>
+                  </div>
+                  <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <AlertTriangle className="w-5 h-5 text-orange-600" />
+                      <span className="text-sm font-medium text-orange-800">Excluded</span>
+                    </div>
+                    <p className="text-2xl font-bold text-orange-700">
+                      {excludedStudents.length}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Students Table */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-medium">Students</h3>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        checked={selectedStudents.length === (eligibleStudents || []).filter(s => s.eligibility?.isEligible).length}
+                        onCheckedChange={toggleAllStudents}
+                      />
+                      <span className="text-sm text-gray-600">Select all eligible</span>
+                    </div>
+                  </div>
+
+                  {eligibleStudents.length === 0 ? (
+                    <div className="p-8 text-center">
+                      <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">No Students Found</h3>
+                      <p className="text-gray-600 mb-4">
+                        {promotionMessage || `No students found in ${selectedClass} for the current academic year.`}
+                      </p>
+                      <div className="flex gap-2 justify-center">
+                        <Button variant="outline" onClick={() => setStep("select")}>
+                          Try Different Class
+                        </Button>
+                        <Button variant="outline" asChild>
+                          <Link href={`/schools/${schoolCode}/admin/students`}>
+                            View All Students
+                          </Link>
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="border rounded-lg">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-12">Select</TableHead>
+                            <TableHead>Student</TableHead>
+                            <TableHead>Eligibility</TableHead>
+                            <TableHead>Performance Summary</TableHead>
+                            <TableHead>Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {(eligibleStudents || []).map((student) => (
+                          <TableRow key={student.id}>
+                            <TableCell>
+                              <Checkbox
+                                checked={selectedStudents.includes(student.id)}
+                                onCheckedChange={() => toggleStudent(student.id)}
+                                disabled={!student.eligibility?.isEligible}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <div>
+                                <div className="font-medium">{student.name}</div>
+                                <div className="text-sm text-gray-500">
+                                  {student.admissionNumber} • {student.className}
+                                </div>
                               </div>
-                              <div className="text-sm text-gray-500">
-                                {student.classLevel}
+                            </TableCell>
+                            <TableCell>
+                              {getEligibilityBadge(student)}
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-sm text-gray-600 max-w-xs">
+                                {getCriteriaSummary(student)}
                               </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {totalOutstanding > 0 ? (
-                              <Badge
-                                variant="destructive"
-                                className="bg-red-100 text-red-800"
-                              >
-                                Arrears: KES {totalOutstanding.toLocaleString()}
-                              </Badge>
-                            ) : (
-                              <Badge className="bg-green-100 text-green-800">
-                                Fully Paid
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {totalOutstanding > 0 ? (
-                              <div className="text-red-600 font-medium">
-                                KES {totalOutstanding.toLocaleString()}
-                                {carryForwardArrears > 0 && (
-                                  <div className="text-xs text-yellow-700 mt-1">
-                                    (Includes KES{" "}
-                                    {carryForwardArrears.toLocaleString()} from
-                                    previous years)
+                                                             {student.eligibility?.primaryCriteria && (
+                                 <div className="text-xs text-blue-600 mt-1">
+                                   Criteria: {student.eligibility.primaryCriteria}
+                                 </div>
+                               )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setShowCriteriaDetails(student.id)}
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </Button>
+                                {!student.eligibility?.isEligible && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => excludeStudent(student)}
+                                  >
+                                    <AlertTriangle className="w-4 h-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                                              </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </div>
+
+                {/* Excluded Students */}
+                {excludedStudents.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Excluded Students</CardTitle>
+                      <CardDescription>
+                        Students manually excluded from promotion
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                                                  {excludedStudents.map((exclusion) => {
+                            const student = (eligibleStudents || []).find(s => s.id === exclusion.studentId);
+                          return (
+                            <div key={exclusion.studentId} className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200">
+                              <div>
+                                <div className="font-medium">{student?.name}</div>
+                                <div className="text-sm text-red-600">
+                                  Reason: {getExclusionReasonLabel(exclusion.reason)}
+                                </div>
+                                {exclusion.detailedReason && (
+                                  <div className="text-sm text-gray-600">
+                                    {exclusion.detailedReason}
                                   </div>
                                 )}
                               </div>
-                            ) : (
-                              <div className="text-green-600 font-medium">
-                                No Balance
-                              </div>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => excludeStudent(student)}
-                              disabled={!selectedStudents.includes(student.id)}
-                            >
-                              <XCircle className="w-4 h-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => removeExclusion(exclusion.studentId)}
+                              >
+                                Remove
+                              </Button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
-              {excludedStudents.length > 0 && (
-                <div className="mt-6">
-                  <h3 className="text-lg font-semibold mb-3">
-                    Excluded Students
-                  </h3>
-                  <div className="space-y-2">
-                    {excludedStudents.map((exclusion) => {
-                      const student = eligibleStudents.find(
-                        (s) => s.id === exclusion.studentId
-                      );
-                      return (
-                        <div
-                          key={exclusion.studentId}
-                          className="flex items-center justify-between p-3 bg-red-50 rounded-lg"
-                        >
-                          <div>
-                            <p className="font-medium">{student?.name}</p>
-                            <p className="text-sm text-gray-600">
-                              Reason:{" "}
-                              {getExclusionReasonLabel(exclusion.reason)}
-                              {exclusion.notes && ` - ${exclusion.notes}`}
-                            </p>
-                          </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => removeExclusion(exclusion.studentId)}
-                          >
-                            Include
-                          </Button>
-                        </div>
-                      );
-                    })}
-                  </div>
+                <div className="flex justify-end gap-4">
+                  <Button variant="outline" onClick={() => setStep("select")}>
+                    Back
+                  </Button>
+                  <Button
+                    onClick={() => setStep("confirm")}
+                    disabled={selectedStudents.length === 0}
+                  >
+                    Continue to Confirmation
+                  </Button>
                 </div>
-              )}
-
-              <div className="flex gap-4 mt-6">
-                <Button variant="outline" onClick={() => setStep("select")}>
-                  Back
-                </Button>
-                <Button
-                  onClick={() => setStep("confirm")}
-                  disabled={selectedStudents.length === 0}
-                >
-                  Continue to Confirmation
-                </Button>
               </div>
             </CardContent>
           </Card>
@@ -616,101 +874,85 @@ export default function PromotionsPage() {
       {step === "confirm" && (
         <Card>
           <CardHeader>
-            <CardTitle>Step 3: Confirm Promotion</CardTitle>
-            <CardDescription>
-              Review the final promotion details before executing
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Step 3: Confirm Promotion</CardTitle>
+                <CardDescription>
+                  Review the promotion details before executing
+                </CardDescription>
+              </div>
+              <Button variant="outline" onClick={() => setStep("review")}>
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 bg-blue-50 rounded-lg">
-                  <p className="text-sm text-blue-600">From Class</p>
-                  <p className="text-lg font-semibold">{selectedClass}</p>
-                </div>
-                <div className="p-4 bg-green-50 rounded-lg">
-                  <p className="text-sm text-green-600">To Class</p>
-                  <p className="text-lg font-semibold">{nextClass}</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 bg-green-50 rounded-lg">
-                  <p className="text-sm text-green-600">Students to Promote</p>
-                  <p className="text-2xl font-bold text-green-700">
-                    {selectedStudents.length}
-                  </p>
-                </div>
-                <div className="p-4 bg-red-50 rounded-lg">
-                  <p className="text-sm text-red-600">Students Excluded</p>
-                  <p className="text-2xl font-bold text-red-700">
-                    {excludedStudents.length}
-                  </p>
-                </div>
-              </div>
-
-              {/* Fee Carry-Forward Summary */}
-              {(() => {
-                const studentsWithArrears = eligibleStudents.filter(
-                  (student) =>
-                    selectedStudents.includes(student.id) &&
-                    student.eligibility.outstandingBalance > 0
-                );
-                const totalArrears = studentsWithArrears.reduce(
-                  (sum, student) =>
-                    sum + student.eligibility.outstandingBalance,
-                  0
-                );
-
-                if (studentsWithArrears.length > 0) {
-                  return (
-                    <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-                      <div className="flex items-center gap-2 mb-2">
-                        <AlertTriangle className="w-5 h-5 text-yellow-600" />
-                        <p className="text-sm font-medium text-yellow-800">
-                          Fee Arrears Carry-Forward
-                        </p>
-                      </div>
-                      <p className="text-sm text-yellow-700 mb-2">
-                        {studentsWithArrears.length} student(s) have outstanding
-                        balances that will be carried forward:
-                      </p>
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <span className="text-yellow-600">
-                            Students with arrears:
-                          </span>
-                          <span className="font-medium ml-2">
-                            {studentsWithArrears.length}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-yellow-600">
-                            Total to carry forward:
-                          </span>
-                          <span className="font-medium ml-2 text-red-600">
-                            KES {totalArrears.toLocaleString()}
-                          </span>
-                        </div>
-                      </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <h4 className="font-medium text-blue-800 mb-2">Promotion Details</h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span>From Class:</span>
+                      <span className="font-medium">{selectedClass}</span>
                     </div>
-                  );
-                }
-                return null;
-              })()}
+                    <div className="flex justify-between">
+                      <span>To Class:</span>
+                      <span className="font-medium">{nextClass}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Students to Promote:</span>
+                      <span className="font-medium">{selectedStudents.length}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Excluded Students:</span>
+                      <span className="font-medium">{excludedStudents.length}</span>
+                    </div>
+                  </div>
+                </div>
 
-              <div className="flex gap-4">
+                <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                  <h4 className="font-medium text-green-800 mb-2">Selected Students</h4>
+                  <div className="space-y-1 text-sm">
+                                            {(eligibleStudents || [])
+                          .filter(student => selectedStudents.includes(student.id))
+                          .slice(0, 5)
+                          .map(student => (
+                        <div key={student.id} className="flex justify-between">
+                          <span>{student.name}</span>
+                          <span className="text-green-600">✓</span>
+                        </div>
+                      ))}
+                    {selectedStudents.length > 5 && (
+                      <div className="text-sm text-gray-600">
+                        ... and {selectedStudents.length - 5} more
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-4">
                 <Button variant="outline" onClick={() => setStep("review")}>
-                  Back to Review
+                  Back
                 </Button>
                 <Button
                   onClick={executePromotion}
                   disabled={loading}
                   className="bg-green-600 hover:bg-green-700"
                 >
-                  {loading
-                    ? "Executing..."
-                    : `Promote ${selectedStudents.length} Students`}
+                  {loading ? (
+                    <div className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Executing Promotion...
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <GraduationCap className="w-4 h-4" />
+                      Execute Promotion
+                    </div>
+                  )}
                 </Button>
               </div>
             </div>
@@ -718,13 +960,89 @@ export default function PromotionsPage() {
         </Card>
       )}
 
+      {/* Criteria Details Dialog */}
+      <Dialog open={!!showCriteriaDetails} onOpenChange={() => setShowCriteriaDetails(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Eligibility Criteria Details</DialogTitle>
+            <DialogDescription>
+              Detailed breakdown of promotion criteria evaluation
+            </DialogDescription>
+          </DialogHeader>
+          {showCriteriaDetails && (() => {
+            const student = (eligibleStudents || []).find(s => s.id === showCriteriaDetails);
+            if (!student) return null;
+
+            return (
+              <div className="space-y-4">
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <h4 className="font-medium mb-2">{student.name}</h4>
+                                     <div className="grid grid-cols-2 gap-4 text-sm">
+                     <div>
+                       <span className="text-gray-600">Average Grade:</span>
+                       <span className="ml-2 font-medium">{student.eligibility?.summary?.averageGrade || 'N/A'}%</span>
+                     </div>
+                     <div>
+                       <span className="text-gray-600">Attendance:</span>
+                       <span className="ml-2 font-medium">{student.eligibility?.summary?.attendanceRate || 'N/A'}%</span>
+                     </div>
+                     <div>
+                       <span className="text-gray-600">Outstanding Balance:</span>
+                       <span className="ml-2 font-medium">KES {(student.eligibility?.summary?.outstandingBalance || 0).toLocaleString()}</span>
+                     </div>
+                     <div>
+                       <span className="text-gray-600">Disciplinary Cases:</span>
+                       <span className="ml-2 font-medium">{student.eligibility?.summary?.disciplinaryCases || 0}</span>
+                     </div>
+                   </div>
+                </div>
+
+                <div className="space-y-3">
+                  <h4 className="font-medium">Criteria Evaluation</h4>
+                                     {(student.eligibility?.allCriteriaResults || []).map((result, index) => (
+                    <div key={index} className={`p-3 rounded-lg border ${
+                      result.passed ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+                    }`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-medium">{result.criteriaName}</span>
+                        {result.passed ? (
+                          <Badge className="bg-green-100 text-green-800">
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            Passed
+                          </Badge>
+                        ) : (
+                          <Badge variant="destructive" className="bg-red-100 text-red-800">
+                            <XCircle className="w-3 h-3 mr-1" />
+                            Failed
+                          </Badge>
+                        )}
+                      </div>
+                      {result.failedReasons.length > 0 && (
+                        <div className="text-sm text-red-600">
+                          <div className="font-medium mb-1">Reasons:</div>
+                          <ul className="list-disc list-inside space-y-1">
+                            {result.failedReasons.map((reason, idx) => (
+                              <li key={idx}>{reason}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
       {/* Exclusion Dialog */}
       <Dialog open={showExclusionDialog} onOpenChange={setShowExclusionDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Exclude Student from Promotion</DialogTitle>
             <DialogDescription>
-              Exclude {currentStudent?.name} from bulk promotion to {nextClass}
+              Provide a reason for excluding {currentStudent?.name} from promotion
             </DialogDescription>
           </DialogHeader>
           <ExclusionForm
@@ -737,7 +1055,6 @@ export default function PromotionsPage() {
   );
 }
 
-// Exclusion Form Component
 function ExclusionForm({
   onConfirm,
   onCancel,
@@ -749,18 +1066,16 @@ function ExclusionForm({
   const [notes, setNotes] = useState("");
 
   const handleConfirm = () => {
-    if (reason) {
-      onConfirm(reason, notes);
+    if (reason.trim()) {
+      onConfirm(reason, notes.trim() || undefined);
     }
   };
 
   return (
     <div className="space-y-4">
       <div>
-        <label className="block text-sm font-medium mb-2">
-          Reason for Exclusion
-        </label>
-        <Select onValueChange={setReason} value={reason}>
+        <Label htmlFor="reason">Reason for Exclusion</Label>
+        <Select value={reason} onValueChange={setReason}>
           <SelectTrigger>
             <SelectValue placeholder="Select a reason" />
           </SelectTrigger>
@@ -768,23 +1083,21 @@ function ExclusionForm({
             <SelectItem value="academic">Academic Performance</SelectItem>
             <SelectItem value="fees">Fee Arrears</SelectItem>
             <SelectItem value="disciplinary">Disciplinary Issues</SelectItem>
-            <SelectItem value="parent_request">Parent Request</SelectItem>
             <SelectItem value="attendance">Poor Attendance</SelectItem>
+            <SelectItem value="parent_request">Parent Request</SelectItem>
             <SelectItem value="other">Other</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-2">
-          Additional Notes
-        </label>
-        <textarea
-          className="w-full p-3 border rounded-md"
-          rows={3}
-          placeholder="Provide additional context..."
+        <Label htmlFor="notes">Additional Notes (Optional)</Label>
+        <Textarea
+          id="notes"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
+          placeholder="Provide additional details..."
+          rows={3}
         />
       </div>
 
@@ -792,8 +1105,8 @@ function ExclusionForm({
         <Button variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button onClick={handleConfirm} disabled={!reason}>
-          Exclude Student
+        <Button onClick={handleConfirm} disabled={!reason.trim()}>
+          Confirm Exclusion
         </Button>
       </DialogFooter>
     </div>
