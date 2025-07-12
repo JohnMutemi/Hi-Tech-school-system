@@ -8,6 +8,8 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
   try {
     const { schoolCode, studentId } = params;
     const decodedSchoolCode = decodeURIComponent(schoolCode);
+    const { searchParams } = new URL(request.url);
+    const academicYearId = searchParams.get('academicYearId');
 
     // Find the school
     const school = await prisma.school.findUnique({ where: { code: decodedSchoolCode } });
@@ -38,6 +40,15 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
 
+    // Get current academic year if not specified
+    let targetAcademicYearId = academicYearId || null;
+    if (!targetAcademicYearId) {
+      const currentYear = await prisma.academicYear.findFirst({
+        where: { schoolId: school.id, isCurrent: true },
+      });
+      targetAcademicYearId = currentYear?.id || null;
+    }
+
     // Get all termly fee structures (charges/invoices) for this student/grade
     const feeStructures = await prisma.termlyFeeStructure.findMany({
       where: {
@@ -46,11 +57,12 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
         NOT: [
           { termId: null },
           { academicYearId: null }
-        ]
+        ],
+        ...(targetAcademicYearId ? { academicYearId: targetAcademicYearId } : {})
       }
     });
 
-    console.log('DEBUG: All fee structures found:', feeStructures.map(fs => ({
+    console.log('DEBUG: Filtered fee structures found:', feeStructures.map(fs => ({
       id: fs.id,
       term: fs.term,
       year: fs.year,
@@ -61,7 +73,10 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
 
     // Get all payments for this student (include academicYearId and termId)
     const payments = await prisma.payment.findMany({
-      where: { studentId: student.id },
+      where: { 
+        studentId: student.id,
+        ...(targetAcademicYearId ? { academicYearId: targetAcademicYearId } : {})
+      },
       orderBy: { paymentDate: 'asc' },
       select: {
         id: true,
@@ -99,7 +114,8 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       joinTermId,
       joinDate,
       studentId: student.id,
-      gradeId: student.class?.gradeId
+      gradeId: student.class?.gradeId,
+      targetAcademicYearId
     });
 
     // Filter fee structures to only include those on or after the join point
@@ -123,7 +139,7 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       });
     }
 
-    console.log('DEBUG: Filtered fee structures:', filteredFeeStructures.map(fs => ({
+    console.log('DEBUG: Filtered fee structures after join logic:', filteredFeeStructures.map(fs => ({
       id: fs.id,
       term: fs.term,
       year: fs.year,

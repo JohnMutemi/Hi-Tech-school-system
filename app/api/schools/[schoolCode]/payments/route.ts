@@ -88,17 +88,10 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
       }
     });
 
+    // Add check: If termRecord is not found, return error
     if (!termRecord) {
-      // Create term if it doesn't exist
-      termRecord = await prisma.term.create({
-        data: {
-          academicYearId: academicYearRecord.id,
-          name: term,
-          startDate: new Date(),
-          endDate: new Date(),
-          isCurrent: false
-        }
-      });
+      console.error('Payment API: Term not found for academic year', { term, academicYear: academicYearRecord.name });
+      return NextResponse.json({ error: `Term '${term}' not found for academic year '${academicYearRecord.name}'. Please contact admin.` }, { status: 400 });
     }
 
     // Generate receipt number
@@ -107,6 +100,76 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
     // Generate reference number if not provided
     const finalReferenceNumber = referenceNumber || `PAY-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
+    // --- NEW LOGIC: Fetch current balances before payment ---
+    // Get all termly fee structures for this student/grade for the academic year
+    const feeStructures = await prisma.termlyFeeStructure.findMany({
+      where: {
+        gradeId: student.class?.gradeId,
+        isActive: true,
+        academicYearId: academicYearRecord.id,
+        NOT: [ { termId: null } ]
+      }
+    });
+    // Get all payments for this student for the academic year
+    const payments = await prisma.payment.findMany({
+      where: {
+        studentId: student.id,
+        academicYearId: academicYearRecord.id
+      },
+      orderBy: { paymentDate: 'asc' }
+    });
+    // Build transactions: charges (debit), payments (credit)
+    let transactions = [];
+    for (const fs of feeStructures) {
+      transactions.push({
+        ref: fs.id,
+        description: `INVOICE - ${fs.term || ''} ${fs.year || ''}`,
+        debit: Number(fs.totalAmount),
+        credit: 0,
+        date: fs.createdAt,
+        type: 'invoice',
+        termId: fs.termId,
+        academicYearId: fs.academicYearId,
+        term: fs.term,
+        year: fs.year
+      });
+    }
+    for (const p of payments) {
+      transactions.push({
+        ref: p.receiptNumber || p.referenceNumber || p.id,
+        description: p.description || 'PAYMENT',
+        debit: 0,
+        credit: Number(p.amount),
+        date: p.paymentDate,
+        type: 'payment',
+        termId: p.termId,
+        academicYearId: p.academicYearId,
+        term: undefined,
+        year: undefined
+      });
+    }
+    transactions = transactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    // Calculate running balance
+    let runningBalance = 0;
+    transactions = transactions.map((txn) => {
+      runningBalance += (txn.debit || 0) - (txn.credit || 0);
+      return {
+        ...txn,
+        balance: runningBalance
+      };
+    });
+    const academicYearOutstandingBefore = transactions.length > 0 ? transactions[transactions.length - 1].balance : 0;
+    // --- Find the term fee structure for the payment ---
+    const targetTermFee = feeStructures.find(fs => fs.term === term);
+    // Calculate term balance before
+    let termOutstandingBefore = 0;
+    if (targetTermFee) {
+      const charges = transactions.filter(txn => txn.termId === targetTermFee.termId && txn.type === 'invoice').reduce((sum, txn) => sum + (txn.debit || 0), 0);
+      const paymentsForTerm = transactions.filter(txn => txn.termId === targetTermFee.termId && txn.type === 'payment').reduce((sum, txn) => sum + (txn.credit || 0), 0);
+      termOutstandingBefore = charges - paymentsForTerm;
+    }
+    // --- Apply the payment ---
+    // (We just record the payment; the /fees endpoint will recalculate balances in real time)
     // Create the payment
     const payment = await prisma.payment.create({
       data: {
@@ -122,14 +185,39 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
         termId: termRecord.id,
       }
     });
-
-    // Calculate outstanding balances (simplified)
-    const academicYearOutstandingBefore = 0; // You can implement proper calculation here
-    const termOutstandingBefore = 0; // You can implement proper calculation here
-    const academicYearOutstandingAfter = academicYearOutstandingBefore - Number(amount);
-    const termOutstandingAfter = termOutstandingBefore - Number(amount);
-
-    // Create receipt
+    // --- Recalculate balances after payment ---
+    // Add this payment to the transactions and recalc
+    transactions.push({
+      ref: payment.receiptNumber || payment.referenceNumber || payment.id,
+      description: payment.description || 'PAYMENT',
+      debit: 0,
+      credit: Number(payment.amount),
+      date: payment.paymentDate,
+      type: 'payment',
+      termId: payment.termId,
+      academicYearId: payment.academicYearId,
+      term: term,
+      year: academicYear,
+      balance: 0 // will be recalculated below
+    });
+    transactions = transactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    runningBalance = 0;
+    transactions = transactions.map((txn) => {
+      runningBalance += (txn.debit || 0) - (txn.credit || 0);
+      return {
+        ...txn,
+        balance: runningBalance
+      };
+    });
+    const academicYearOutstandingAfter = transactions.length > 0 ? transactions[transactions.length - 1].balance : 0;
+    // Calculate term balance after
+    let termOutstandingAfter = 0;
+    if (targetTermFee) {
+      const charges = transactions.filter(txn => txn.termId === targetTermFee.termId && txn.type === 'invoice').reduce((sum, txn) => sum + (txn.debit || 0), 0);
+      const paymentsForTerm = transactions.filter(txn => txn.termId === targetTermFee.termId && txn.type === 'payment').reduce((sum, txn) => sum + (txn.credit || 0), 0);
+      termOutstandingAfter = charges - paymentsForTerm;
+    }
+    // --- Create receipt with correct balances and term/year ---
     const receipt = await prisma.receipt.create({
       data: {
         paymentId: payment.id,

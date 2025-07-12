@@ -361,26 +361,32 @@ export class PromotionService {
    * Fetch the active promotion criteria for a given class
    */
   static async getActiveCriteriaForClass(schoolId: string, className: string): Promise<any[]> {
+    console.log(`Getting criteria for class: ${className}, school: ${schoolId}`);
     // Try to find progression rule for this class
     const progression = await prisma.classProgression.findFirst({
       where: { schoolId, fromClass: className, isActive: true },
       orderBy: { order: 'asc' }, // Use 'order' field for ordering
     });
+    console.log(`Progression found:`, progression);
     let criteria = [];
     if (progression?.criteriaId) {
       const crit = await prisma.promotionCriteria.findUnique({ where: { id: progression.criteriaId } });
+      console.log(`Criteria from progression:`, crit);
       if (crit && crit.customCriteria) criteria = crit.customCriteria as any[];
     } else {
       // Fallback: find highest priority active criteria for this class level
       const classObj = await prisma.class.findFirst({ where: { schoolId, name: className, isActive: true }, include: { grade: true } });
+      console.log(`Class object:`, classObj);
       if (classObj?.grade?.name) {
         const crit = await prisma.promotionCriteria.findFirst({
           where: { schoolId, classLevel: classObj.grade.name, isActive: true },
           orderBy: { priority: 'asc' },
         });
+        console.log(`Criteria from class level:`, crit);
         if (crit && crit.customCriteria) criteria = crit.customCriteria as any[];
       }
     }
+    console.log(`Final criteria array:`, criteria);
     return criteria;
   }
 
@@ -388,16 +394,20 @@ export class PromotionService {
    * Check if a student meets all criteria, return all failed reasons
    */
   static async checkStudentEligibilityWithReasons(student: any, criteria: any[]): Promise<{ eligible: boolean; failed: string[] }> {
+    console.log(`Checking eligibility for student: ${student.id}, criteria count: ${criteria.length}`);
     const failed: string[] = [];
     for (const crit of criteria) {
+      console.log(`Checking criteria:`, crit);
       if (crit.type === 'fee_balance') {
         const balance = await this.calculateOutstandingBalance(student.id, student.academicYear || new Date().getFullYear());
+        console.log(`Student ${student.id} balance: ${balance}, limit: ${crit.limit}`);
         if (balance > crit.limit) {
           failed.push(`Fee balance (${balance}) exceeds limit (${crit.limit})`);
         }
       }
       // Add more criteria types here as needed
     }
+    console.log(`Student ${student.id} eligibility result:`, { eligible: failed.length === 0, failed });
     return { eligible: failed.length === 0, failed };
   }
 

@@ -33,10 +33,40 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     const receipts = await prisma.receipt.findMany({
       where,
       orderBy: { paymentDate: "desc" },
+      include: {
+        term: true,
+        academicYear: true,
+        payment: {
+          include: {
+            student: {
+              include: {
+                user: true,
+                class: true
+              }
+            }
+          }
+        },
+      },
     });
 
-    // Attach school name to each receipt
-    const receiptsWithSchool = receipts.map(r => ({ ...r, schoolName: student.school?.name || "" }));
+    // Attach school name and flatten term/year info
+    const receiptsWithSchool = receipts.map(r => ({
+      ...r,
+      schoolName: student.school?.name || "",
+      term: r.term?.name || r.termId || "",
+      academicYear: r.academicYear?.name || r.academicYearId || "",
+      termOutstandingBefore: r.termOutstandingBefore,
+      termOutstandingAfter: r.termOutstandingAfter,
+      academicYearOutstandingBefore: r.academicYearOutstandingBefore,
+      academicYearOutstandingAfter: r.academicYearOutstandingAfter,
+      paymentMethod: r.payment?.paymentMethod || r.paymentMethod,
+      referenceNumber: r.payment?.referenceNumber || r.referenceNumber,
+      amount: r.amount,
+      paymentDate: r.paymentDate,
+      studentName: r.payment?.student?.user?.name || "",
+      className: r.payment?.student?.class?.name || "",
+      admissionNumber: r.payment?.student?.admissionNumber || "",
+    }));
 
     return NextResponse.json(receiptsWithSchool);
   } catch (error) {

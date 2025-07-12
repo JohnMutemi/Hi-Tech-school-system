@@ -446,21 +446,18 @@ export function ParentDashboard({
 
   // Fetch student fee summary for all students
   const fetchStudentFeeSummaries = async () => {
-    if (students.length === 0) return;
+    if (students.length === 0 || !currentAcademicYear) return;
     const summaries: any = {};
     await Promise.all(
       students.map(async (student) => {
         try {
           const res = await fetch(
-            `/api/schools/${schoolCode}/students/${student.id}/fees`,
+            `/api/schools/${schoolCode}/students/${student.id}/fees?academicYearId=${currentAcademicYear.id}`,
             { cache: 'no-store' }
           );
           if (res.ok) {
             const data = await res.json();
-            // Flatten all terms for the current year into an array
-            const currentYear = new Date().getFullYear();
-            const yearTerms = data.feesByYear?.[currentYear]?.terms || [];
-            summaries[student.id] = yearTerms;
+            summaries[student.id] = data;
           }
         } catch (e) {
           // ignore
@@ -470,19 +467,19 @@ export function ParentDashboard({
     setStudentFeeData({ ...summaries });
   };
 
-  // Call fetchStudentFeeSummaries when students change
+  // Call fetchStudentFeeSummaries when students or current academic year change
   useEffect(() => {
-    if (students.length > 0) {
+    if (students.length > 0 && currentAcademicYear) {
       fetchStudentFeeSummaries();
     }
-  }, [students]);
+  }, [students, currentAcademicYear]);
 
   // Update getStudentFeeStructure to use studentFeeData
   const getStudentFeeStructure = (studentId: string) => {
     const termOrder = ["Term 1", "Term 2", "Term 3"];
-    const terms = studentFeeData[studentId] || [];
+    const termBalances = studentFeeData[studentId]?.termBalances || [];
     // Sort by term order
-    const sortedTerms = [...terms].sort((a, b) => termOrder.indexOf(a.term) - termOrder.indexOf(b.term));
+    const sortedTerms = [...termBalances].sort((a, b) => termOrder.indexOf(a.term) - termOrder.indexOf(b.term));
     // Find the first unpaid term (balance > 0)
     const firstUnpaid = sortedTerms.find(term => term.balance > 0);
     // Return the first unpaid, or the first available if all are paid
@@ -749,6 +746,8 @@ const handleDownloadReceipt = async (receipt: any) => {
   }
   const outstandingBefore = receipt.academicYearOutstandingBefore;
   const outstandingAfter = receipt.academicYearOutstandingAfter;
+  const termOutstandingBefore = receipt.termOutstandingBefore;
+  const termOutstandingAfter = receipt.termOutstandingAfter;
   const cleanDescription = (receipt.description || "Fee Payment").split(" - ")[0];
 
   const htmlContent = `
@@ -811,6 +810,8 @@ const handleDownloadReceipt = async (receipt: any) => {
                 <div class="summary-item total"><span class="label">Total Paid:</span> ${currency} ${amount.toLocaleString()}</div>
                 <div class="summary-item"><span class="label">Outstanding Before (Academic Year):</span> ${formatOutstanding(outstandingBefore)}</div>
                 <div class="summary-item"><span class="label">Outstanding After (Academic Year):</span> ${formatOutstanding(outstandingAfter)}</div>
+                <div class="summary-item"><span class="label">Outstanding Before (Term):</span> ${formatOutstanding(termOutstandingBefore)}</div>
+                <div class="summary-item"><span class="label">Outstanding After (Term):</span> ${formatOutstanding(termOutstandingAfter)}</div>
             </div>
 
             <div class="footer">Issued by ${issuedBy}</div>
@@ -926,31 +927,14 @@ useEffect(() => {
   async function fetchFilteredFeeSummary() {
     try {
       const res = await fetch(
-        `/api/schools/${schoolCode}/students/${child.id}/fees`
+        `/api/schools/${schoolCode}/students/${child.id}/fees?academicYearId=${selectedYearId}`
       );
       if (!res.ok) return;
       const data = await res.json();
-      let feeSummary = data.feeSummary || [];
-      let filteredSummary = feeSummary;
-      if (
-        feeSummary.length > 0 &&
-        (feeSummary[0].termId || feeSummary[0].academicYearId)
-      ) {
-        filteredSummary = feeSummary.filter(
-          (f: any) =>
-            f.termId === selectedTermId && f.academicYearId === selectedYearId
-        );
-      } else {
-        const selectedYear = academicYears.find(
-          (y) => y.id === selectedYearId
-        );
-        const selectedTerm = terms.find((t) => t.id === selectedTermId);
-        filteredSummary = feeSummary.filter(
-          (f: any) =>
-            f.term === selectedTerm?.name &&
-            String(f.year) === selectedYear?.name
-        );
-      }
+      let termBalances = data.termBalances || [];
+      let filteredSummary = termBalances.filter(
+        (f: any) => f.termId === selectedTermId
+      );
       setStudentFeeSummaries((prev: any) => ({
         ...prev,
         [child.id]: { ...data, filteredSummary },
@@ -964,8 +948,6 @@ useEffect(() => {
   focusedChildId,
   students,
   schoolCode,
-  academicYears,
-  terms,
 ]);
 
 // UI for search
@@ -1092,7 +1074,7 @@ const renderReceiptsTable = () => (
       <aside
         className="fixed inset-y-0 left-0 z-30 w-64 md:w-72 p-4 md:p-6
           bg-white/60 backdrop-blur-xl shadow-2xl border border-white/40
-          rounded-2xl md:my-8 md:ml-8 md:static md:translate-x-0
+          rounded-2xl md:static md:translate-x-0
           flex flex-col transition-all duration-300
           md:max-h-[90vh] md:overflow-y-auto"
         style={{ boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.18)' }}
@@ -1190,9 +1172,9 @@ const renderReceiptsTable = () => (
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col md:ml-72 md:pl-4 py-6 px-2 md:px-8">
+      <div className="flex-1 flex flex-col md:ml-0 py-0 px-0">
         {/* ...header... */}
-        <main className="flex-grow p-2 md:p-6">
+        <main className="flex-grow p-0 md:p-0">
           {selectedSection === "children" && (
             <div>
               {/* Academic Year & Term Info - Beautiful Glassmorphism Card */}
@@ -1329,7 +1311,7 @@ const renderReceiptsTable = () => (
                     students.find((c) => c.id === focusedChildId) ||
                     students[0];
 // Use merged logic for outstandingFees
-const termBalances = studentFeeSummaries[child.id]?.termBalances || [];
+const termBalances = studentFeeData[child.id]?.termBalances || [];
 const currentTermId = currentTerm?.id;
 const currentTermSummary = termBalances.find(
   (f: any) => f.termId === currentTermId

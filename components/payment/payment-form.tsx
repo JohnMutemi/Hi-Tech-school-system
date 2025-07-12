@@ -31,6 +31,7 @@ import {
   User,
   School,
   Sparkles,
+  Loader2,
 } from "lucide-react";
 
 interface PaymentFormProps {
@@ -82,6 +83,19 @@ interface ReceiptData {
   termOutstandingAfter?: number;
 }
 
+// Enhanced logging utility for frontend
+const logPaymentForm = (stage: string, data: any, type: 'info' | 'success' | 'error' | 'warning' = 'info') => {
+  const timestamp = new Date().toISOString();
+  const logData = {
+    timestamp,
+    stage,
+    type,
+    data: typeof data === 'object' ? JSON.stringify(data, null, 2) : data
+  };
+  
+  console.log(`🟡 [PAYMENT-FORM-${stage.toUpperCase()}] ${timestamp}:`, logData);
+};
+
 export function PaymentForm({
   schoolCode,
   studentId,
@@ -96,7 +110,7 @@ export function PaymentForm({
   isProcessing = false,
 }: PaymentFormProps) {
   const { toast } = useToast();
-  const [paymentMethod, setPaymentMethod] = useState<"mpesa" | "manual">("mpesa");
+  const [paymentMethod, setPaymentMethod] = useState<"mpesa" | "manual">("manual");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [transactionId, setTransactionId] = useState("");
   const [customAmount, setCustomAmount] = useState<number>(amount);
@@ -106,26 +120,58 @@ export function PaymentForm({
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
   const [studentInfo, setStudentInfo] = useState<any>(null);
   const [schoolInfo, setSchoolInfo] = useState<any>(null);
+  const [progressStage, setProgressStage] = useState<string>('');
+
+  logPaymentForm('COMPONENT_MOUNT', {
+    schoolCode,
+    studentId,
+    amount,
+    feeType,
+    term,
+    academicYear
+  });
 
   // Fetch student and school info on component mount
   useEffect(() => {
     const fetchInfo = async () => {
+      logPaymentForm('FETCH_INFO_START', { schoolCode, studentId });
+      
       try {
+        setProgressStage('Fetching student information...');
+        
         // Fetch student info
         const studentRes = await fetch(`/api/schools/${schoolCode}/students/${studentId}`);
         if (studentRes.ok) {
           const student = await studentRes.json();
           setStudentInfo(student);
+          logPaymentForm('STUDENT_INFO_FETCHED', {
+            studentId: student.id,
+            studentName: student.user?.name,
+            className: student.class?.name
+          });
+        } else {
+          logPaymentForm('STUDENT_INFO_ERROR', { status: studentRes.status }, 'error');
         }
 
+        setProgressStage('Fetching school information...');
+        
         // Fetch school info
         const schoolRes = await fetch(`/api/schools/${schoolCode}`);
         if (schoolRes.ok) {
           const school = await schoolRes.json();
           setSchoolInfo(school);
+          logPaymentForm('SCHOOL_INFO_FETCHED', {
+            schoolId: school.id,
+            schoolName: school.name
+          });
+        } else {
+          logPaymentForm('SCHOOL_INFO_ERROR', { status: schoolRes.status }, 'error');
         }
+
+        setProgressStage('');
       } catch (error) {
-        console.error("Error fetching info:", error);
+        logPaymentForm('FETCH_INFO_ERROR', error, 'error');
+        setProgressStage('');
       }
     };
 
@@ -136,36 +182,41 @@ export function PaymentForm({
     const numValue = parseFloat(value) || 0;
     setCustomAmount(numValue);
     setUseFullAmount(false);
+    
+    logPaymentForm('AMOUNT_CHANGED', {
+      oldAmount: amount,
+      newAmount: numValue,
+      useFullAmount: false
+    });
   };
 
   const handleFullAmountClick = () => {
     setCustomAmount(amount);
     setUseFullAmount(true);
+    
+    logPaymentForm('FULL_AMOUNT_SELECTED', {
+      amount,
+      useFullAmount: true
+    });
   };
 
   const handlePayment = async () => {
-    if (isProcessing) return;
+    if (isProcessing) {
+      logPaymentForm('PAYMENT_BLOCKED', { reason: 'Already processing' }, 'warning');
+      return;
+    }
+
+    logPaymentForm('PAYMENT_START', {
+      amount: customAmount,
+      paymentMethod,
+      feeType,
+      term,
+      academicYear
+    });
 
     // Validate required fields
-    if (paymentMethod === "mpesa" && !phoneNumber.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Phone number is required for M-Pesa payments",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (paymentMethod === "manual" && !transactionId.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Transaction ID is required for manual payments",
-        variant: "destructive",
-      });
-      return;
-    }
-
     if (customAmount <= 0) {
+      logPaymentForm('VALIDATION_ERROR', { error: 'Invalid amount', amount: customAmount }, 'error');
       toast({
         title: "Validation Error",
         description: "Payment amount must be greater than 0",
@@ -175,36 +226,60 @@ export function PaymentForm({
     }
 
     setIsLoading(true);
+    setProgressStage('Initializing payment...');
     onStart?.();
 
     try {
-      // Simplified payment logic - send academic year and term names instead of IDs
-      const response = await fetch(`/api/schools/${schoolCode}/payments`, {
+      setProgressStage('Preparing payment request...');
+      
+      const paymentRequest = {
+        paymentType: "manual",
+        amount: customAmount,
+        paymentMethod: "manual",
+        feeType,
+        academicYear,
+        term,
+        description: `${feeType} - ${term} ${academicYear}`,
+        referenceNumber: transactionId || undefined,
+        receivedBy: "Parent Portal",
+      };
+
+      logPaymentForm('PAYMENT_REQUEST_PREPARED', paymentRequest);
+
+      setProgressStage('Sending payment to server...');
+      
+      // Send payment request with proper academic year and term
+      const response = await fetch(`/api/schools/${schoolCode}/students/${studentId}/payments`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          studentId,
-          amount: customAmount,
-          paymentMethod,
-          feeType,
-          academicYear, // Send name instead of ID
-          term, // Send name instead of ID
-          description: `${feeType} - ${term} ${academicYear}`,
-          phoneNumber: paymentMethod === "mpesa" ? phoneNumber : undefined,
-          referenceNumber: paymentMethod === "manual" ? transactionId : undefined,
-        }),
+        body: JSON.stringify(paymentRequest),
+      });
+
+      logPaymentForm('PAYMENT_RESPONSE_RECEIVED', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
       });
 
       if (!response.ok) {
         const errorData = await response.json();
+        logPaymentForm('PAYMENT_API_ERROR', errorData, 'error');
         throw new Error(errorData.error || "Payment failed");
       }
 
+      setProgressStage('Processing payment response...');
+      
       const result = await response.json();
       
-      // Create receipt data
+      logPaymentForm('PAYMENT_SUCCESS', {
+        paymentId: result.payment?.id,
+        receiptNumber: result.payment?.receiptNumber,
+        amount: result.payment?.amount
+      });
+      
+      // Create receipt data from the API response
       const receiptData: ReceiptData = {
         receiptNumber: result.payment.receiptNumber,
         paymentId: result.payment.id,
@@ -216,8 +291,7 @@ export function PaymentForm({
         term,
         academicYear,
         reference: result.payment.referenceNumber,
-        phoneNumber: paymentMethod === "mpesa" ? phoneNumber : undefined,
-        transactionId: paymentMethod === "manual" ? transactionId : undefined,
+        transactionId: transactionId || undefined,
         status: "completed",
         issuedAt: new Date(),
         issuedBy: "Parent Portal",
@@ -230,16 +304,28 @@ export function PaymentForm({
 
       setReceiptData(receiptData);
       setShowReceipt(true);
+      setProgressStage('Payment completed successfully!');
+      
+      logPaymentForm('RECEIPT_CREATED', {
+        receiptNumber: receiptData.receiptNumber,
+        paymentId: receiptData.paymentId
+      });
       
       toast({
-        title: "Payment Successful!",
-        description: `Payment of KES ${customAmount.toLocaleString()} processed successfully.`,
+        title: "Payment Simulation Successful!",
+        description: `Payment simulation of KES ${customAmount.toLocaleString()} completed successfully.`,
         variant: "default",
       });
 
       onPaymentSuccess?.(result.payment);
     } catch (error: any) {
-      console.error("Payment error:", error);
+      logPaymentForm('PAYMENT_ERROR', {
+        error: error.message,
+        stack: error.stack
+      }, 'error');
+      
+      setProgressStage('Payment failed');
+      
       toast({
         title: "Payment Failed",
         description: error.message || "Failed to process payment. Please try again.",
@@ -249,44 +335,59 @@ export function PaymentForm({
     } finally {
       setIsLoading(false);
       onComplete?.();
+      
+      // Clear progress stage after a delay
+      setTimeout(() => setProgressStage(''), 3000);
     }
   };
 
   const handleCloseReceipt = () => {
+    logPaymentForm('RECEIPT_CLOSED', { receiptNumber: receiptData?.receiptNumber });
     setShowReceipt(false);
     setReceiptData(null);
   };
 
   const downloadReceipt = () => {
     if (!receiptData) return;
-
+    
+    logPaymentForm('RECEIPT_DOWNLOAD', { receiptNumber: receiptData.receiptNumber });
+    
+    // Create receipt content
     const receiptContent = `
 RECEIPT
 
-School: ${receiptData.schoolName}
-Student: ${receiptData.studentName}
-Receipt No: ${receiptData.receiptNumber}
+Receipt Number: ${receiptData.receiptNumber}
+Payment ID: ${receiptData.paymentId}
 Date: ${receiptData.issuedAt.toLocaleDateString()}
 Time: ${receiptData.issuedAt.toLocaleTimeString()}
 
-Payment Details:
+SCHOOL: ${receiptData.schoolName}
+STUDENT: ${receiptData.studentName}
+ADMISSION: ${studentInfo?.admissionNumber || 'N/A'}
+
+PAYMENT DETAILS:
 Amount: KES ${receiptData.amount.toLocaleString()}
 Payment Method: ${receiptData.paymentMethod}
-Reference: ${receiptData.reference}
 Fee Type: ${receiptData.feeType}
 Term: ${receiptData.term}
 Academic Year: ${receiptData.academicYear}
+Reference: ${receiptData.reference}
 
-Balance After Payment:
-Academic Year Outstanding: KES ${receiptData.academicYearOutstandingAfter?.toLocaleString() || 'N/A'}
-Term Outstanding: KES ${receiptData.termOutstandingAfter?.toLocaleString() || 'N/A'}
+BALANCE AFTER PAYMENT:
+Academic Year Outstanding: KES ${receiptData.academicYearOutstandingAfter?.toLocaleString() || '0'}
+Term Outstanding: KES ${receiptData.termOutstandingAfter?.toLocaleString() || '0'}
 
 Issued by: ${receiptData.issuedBy}
+Status: ${receiptData.status}
+
+---
+This is a computer-generated receipt.
     `.trim();
 
-    const blob = new Blob([receiptContent], { type: "text/plain" });
+    // Create and download file
+    const blob = new Blob([receiptContent], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
+    const a = document.createElement('a');
     a.href = url;
     a.download = `receipt-${receiptData.receiptNumber}.txt`;
     document.body.appendChild(a);
@@ -296,260 +397,197 @@ Issued by: ${receiptData.issuedBy}
   };
 
   return (
-    <div className="max-w-2xl mx-auto">
-      {/* Header Section */}
-      <div className="text-center mb-8">
-        <div className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-full text-sm font-medium mb-4">
-          <Sparkles className="h-4 w-4" />
-          Quick Payment Portal
+    <div className="space-y-6">
+      {/* Progress Indicator */}
+      {progressStage && (
+        <div className="flex items-center space-x-2 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+          <span className="text-sm text-blue-700">{progressStage}</span>
         </div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">School Fee Payment</h2>
-        <p className="text-gray-600">Complete your payment securely and quickly</p>
-      </div>
-
-      {/* Student Info Banner */}
-      <div className="bg-gradient-to-r from-slate-50 to-blue-50 border border-slate-200 rounded-xl p-6 mb-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
-              <User className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900">{studentInfo?.user?.name || "Loading..."}</h3>
-              <p className="text-sm text-gray-600">{schoolInfo?.name || "Loading..."}</p>
-            </div>
-          </div>
-          <div className="text-right">
-            <p className="text-sm text-gray-600">Term {term}</p>
-            <p className="text-sm font-medium text-gray-900">{academicYear}</p>
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* Payment Form */}
-      <Card className="border-0 shadow-lg bg-white">
-        <CardHeader className="text-center pb-6">
-          <CardTitle className="text-xl font-bold text-gray-900">Payment Details</CardTitle>
-          <CardDescription className="text-gray-600">Select your payment amount and method</CardDescription>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <DollarSign className="h-5 w-5 text-green-600" />
+            <span>Payment Details</span>
+          </CardTitle>
+          <CardDescription>
+            Complete your fee payment using the payment simulation
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Amount Selection */}
-          <div className="space-y-4">
-            <Label className="text-sm font-medium text-gray-700">Payment Amount</Label>
-            
-            {/* Full Amount Option */}
-            <div 
-              className={`relative cursor-pointer rounded-lg border-2 p-4 transition-all ${
-                useFullAmount 
-                  ? 'border-blue-500 bg-blue-50' 
-                  : 'border-gray-200 hover:border-gray-300'
-              }`}
-              onClick={handleFullAmountClick}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-4 h-4 rounded-full border-2 ${
-                    useFullAmount ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
-                  }`}>
-                    {useFullAmount && <div className="w-2 h-2 bg-white rounded-full m-0.5"></div>}
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-900">Pay Full Amount</p>
-                    <p className="text-sm text-gray-600">Complete payment for {term} {academicYear}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-lg font-bold text-gray-900">KES {amount.toLocaleString()}</p>
-                </div>
-              </div>
+        <CardContent className="space-y-4">
+          {/* Amount Section */}
+          <div className="space-y-2">
+            <Label htmlFor="amount">Payment Amount (KES)</Label>
+            <div className="flex space-x-2">
+              <Input
+                id="amount"
+                type="number"
+                value={customAmount}
+                onChange={(e) => handleAmountChange(e.target.value)}
+                placeholder="Enter amount"
+                className="flex-1"
+                disabled={isLoading}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleFullAmountClick}
+                disabled={isLoading || useFullAmount}
+                className="whitespace-nowrap"
+              >
+                Full Amount
+              </Button>
             </div>
-
-            {/* Custom Amount Option */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <div className={`w-4 h-4 rounded-full border-2 ${
-                  !useFullAmount ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
-                }`}>
-                  {!useFullAmount && <div className="w-2 h-2 bg-white rounded-full m-0.5"></div>}
-                </div>
-                <Label className="text-sm font-medium text-gray-700">Custom Amount</Label>
-              </div>
-              <div className="relative ml-7">
-                <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  type="number"
-                  value={customAmount}
-                  onChange={(e) => handleAmountChange(e.target.value)}
-                  className="pl-10 h-12 text-lg font-semibold border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                  placeholder="Enter amount"
-                  min="0"
-                  step="0.01"
-                  disabled={useFullAmount}
-                />
-              </div>
-            </div>
+            <p className="text-sm text-muted-foreground">
+              Outstanding: KES {amount.toLocaleString()} | 
+              Custom: KES {customAmount.toLocaleString()}
+            </p>
           </div>
 
           {/* Payment Method */}
-          <div className="space-y-4">
-            <Label className="text-sm font-medium text-gray-700">Payment Method</Label>
-            <Select value={paymentMethod} onValueChange={(value: "mpesa" | "manual") => setPaymentMethod(value)}>
-              <SelectTrigger className="h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="mpesa">
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-4 w-4" />
-                    M-Pesa Mobile Money
-                  </div>
-                </SelectItem>
-                <SelectItem value="manual">
-                  <div className="flex items-center gap-2">
-                    <Upload className="h-4 w-4" />
-                    Manual Payment
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="space-y-2">
+            <Label>Payment Method</Label>
+            <div className="flex space-x-2">
+              <Button
+                type="button"
+                variant={paymentMethod === "manual" ? "default" : "outline"}
+                onClick={() => setPaymentMethod("manual")}
+                disabled={isLoading}
+                className="flex-1"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Manual Payment
+              </Button>
+              <Button
+                type="button"
+                variant={paymentMethod === "mpesa" ? "default" : "outline"}
+                onClick={() => setPaymentMethod("mpesa")}
+                disabled={isLoading}
+                className="flex-1"
+              >
+                <Phone className="h-4 w-4 mr-2" />
+                M-Pesa (Disabled)
+              </Button>
+            </div>
+          </div>
 
-            {/* Dynamic Fields */}
-            {paymentMethod === "mpesa" && (
-              <div className="space-y-2">
-                <Label htmlFor="phoneNumber" className="text-sm font-medium text-gray-700">
-                  Phone Number
-                </Label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="phoneNumber"
-                    type="tel"
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
-                    className="pl-10 h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                    placeholder="e.g., 254700000000"
-                  />
-                </div>
-              </div>
-            )}
-
-            {paymentMethod === "manual" && (
-              <div className="space-y-2">
-                <Label htmlFor="transactionId" className="text-sm font-medium text-gray-700">
-                  Transaction ID
-                </Label>
-                <div className="relative">
-                  <Upload className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="transactionId"
-                    type="text"
-                    value={transactionId}
-                    onChange={(e) => setTransactionId(e.target.value)}
-                    className="pl-10 h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                    placeholder="Enter transaction ID"
-                  />
-                </div>
-              </div>
-            )}
+          {/* Transaction ID (Optional) */}
+          <div className="space-y-2">
+            <Label htmlFor="transactionId">Transaction ID (Optional)</Label>
+            <Input
+              id="transactionId"
+              value={transactionId}
+              onChange={(e) => setTransactionId(e.target.value)}
+              placeholder="Enter transaction ID if available"
+              disabled={isLoading}
+            />
           </div>
 
           {/* Payment Summary */}
-          <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-            <h4 className="font-medium text-gray-900">Payment Summary</h4>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Amount:</span>
-                <span className="font-semibold text-gray-900">KES {customAmount.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Method:</span>
-                <span className="font-semibold text-gray-900 capitalize">{paymentMethod}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Fee Type:</span>
-                <span className="font-semibold text-gray-900">{feeType}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Term:</span>
-                <span className="font-semibold text-gray-900">{term}</span>
-              </div>
+          <div className="p-4 bg-gray-50 rounded-lg space-y-2">
+            <h4 className="font-medium">Payment Summary</h4>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div>Amount:</div>
+              <div className="font-medium">KES {customAmount.toLocaleString()}</div>
+              <div>Method:</div>
+              <div className="font-medium">{paymentMethod === "manual" ? "Manual Payment" : "M-Pesa"}</div>
+              <div>Fee Type:</div>
+              <div className="font-medium">{feeType}</div>
+              <div>Term:</div>
+              <div className="font-medium">{term}</div>
+              <div>Academic Year:</div>
+              <div className="font-medium">{academicYear}</div>
             </div>
           </div>
 
           {/* Submit Button */}
           <Button
             onClick={handlePayment}
-            disabled={isLoading || isProcessing}
-            className="w-full h-14 text-lg font-semibold bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg"
+            disabled={isLoading || isProcessing || customAmount <= 0}
+            className="w-full"
+            size="lg"
           >
             {isLoading ? (
-              <div className="flex items-center gap-2">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 Processing Payment...
-              </div>
+              </>
             ) : (
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-5 w-5" />
-                Pay KES {customAmount.toLocaleString()}
-              </div>
+              <>
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Process Payment Simulation
+              </>
             )}
           </Button>
+
+          {/* Simulation Notice */}
+          <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex items-center space-x-2">
+              <Sparkles className="h-4 w-4 text-yellow-600" />
+              <span className="text-sm text-yellow-800">
+                <strong>Payment Simulation:</strong> This is a test environment. No real money will be charged.
+              </span>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
       {/* Receipt Modal */}
       {showReceipt && receiptData && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <Card className="w-full max-w-md bg-white">
-            <CardHeader className="text-center">
-              <CardTitle className="flex items-center justify-center gap-2 text-green-600">
-                <CheckCircle className="h-6 w-6" />
-                Payment Successful!
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="text-center space-y-2">
-                <p className="text-2xl font-bold text-green-600">
-                  KES {receiptData.amount.toLocaleString()}
-                </p>
-                <p className="text-sm text-gray-600">
-                  Receipt: {receiptData.receiptNumber}
-                </p>
+          <div className="bg-white rounded-lg max-w-md w-full max-h-[80vh] overflow-y-auto">
+            <div className="p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Payment Receipt</h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCloseReceipt}
+                >
+                  ×
+                </Button>
               </div>
               
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span>Student:</span>
-                  <span className="font-medium">{receiptData.studentName}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Method:</span>
-                  <span className="font-medium capitalize">{receiptData.paymentMethod}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Reference:</span>
-                  <span className="font-medium">{receiptData.reference}</span>
+              <div className="space-y-3 text-sm">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="font-medium">Receipt #:</div>
+                  <div>{receiptData.receiptNumber}</div>
+                  <div className="font-medium">Amount:</div>
+                  <div>KES {receiptData.amount.toLocaleString()}</div>
+                  <div className="font-medium">Date:</div>
+                  <div>{receiptData.issuedAt.toLocaleDateString()}</div>
+                  <div className="font-medium">Time:</div>
+                  <div>{receiptData.issuedAt.toLocaleTimeString()}</div>
+                  <div className="font-medium">Student:</div>
+                  <div>{receiptData.studentName}</div>
+                  <div className="font-medium">School:</div>
+                  <div>{receiptData.schoolName}</div>
+                  <div className="font-medium">Term Outstanding:</div>
+                  <div>KES {receiptData.termOutstandingAfter?.toLocaleString() || '0'}</div>
                 </div>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex space-x-2">
                 <Button
                   onClick={downloadReceipt}
-                  className="flex-1 bg-green-600 hover:bg-green-700"
+                  variant="outline"
+                  className="flex-1"
                 >
                   <Receipt className="h-4 w-4 mr-2" />
-                  Download Receipt
+                  Download
                 </Button>
                 <Button
                   onClick={handleCloseReceipt}
-                  variant="outline"
                   className="flex-1"
                 >
                   Close
                 </Button>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
       )}
     </div>
