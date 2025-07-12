@@ -179,6 +179,21 @@ export async function PUT(req: NextRequest, { params }: { params: { schoolCode: 
         customCriteria: data.customCriteria,
       };
       
+      // Extract fee balance criteria from customCriteria and set maxOutstandingBalance
+      if (data.customCriteria && Array.isArray(data.customCriteria)) {
+        const feeBalanceCriteria = data.customCriteria.find((c: any) => 
+          c.name.toLowerCase().includes('fee') || 
+          c.name.toLowerCase().includes('balance') ||
+          c.name.toLowerCase().includes('payment')
+        );
+        
+        if (feeBalanceCriteria && feeBalanceCriteria.limit) {
+          updateData.maxOutstandingBalance = parseFloat(feeBalanceCriteria.limit);
+          updateData.requireFullPayment = false; // Use maxOutstandingBalance instead of full payment
+          console.log(`Updating maxOutstandingBalance to ${updateData.maxOutstandingBalance} from custom criteria`);
+        }
+      }
+      
       // Optional fields
       if (data.isActive !== undefined) updateData.isActive = data.isActive;
       if (data.isDefault !== undefined) updateData.isDefault = data.isDefault;
@@ -267,6 +282,14 @@ async function getEligibleStudents(schoolId: string, classLevel: string) {
     },
     orderBy: { priority: 'asc' }
   });
+  
+  console.log(`Found ${criteria.length} criteria for class level ${targetClass.grade.name}:`, criteria.map(c => ({
+    id: c.id,
+    name: c.name,
+    maxOutstandingBalance: c.maxOutstandingBalance,
+    requireFullPayment: c.requireFullPayment,
+    customCriteria: c.customCriteria
+  })));
 
   // Get fee structures
   const feeStructures = await prisma.termlyFeeStructure.findMany({
@@ -367,6 +390,7 @@ async function getEligibleStudents(schoolId: string, classLevel: string) {
         results.details.averageGrade = averageGrade;
 
         // Fee Payment Check
+        console.log(`Checking fee balance for student: ${student.user?.name}, balance: ${outstandingBalance}, maxAllowed: ${criterion.maxOutstandingBalance}, requireFull: ${criterion.requireFullPayment}`);
         if (criterion.requireFullPayment && outstandingBalance > 0) {
           results.passed = false;
           results.failedReasons.push(`Outstanding balance ${outstandingBalance} but full payment required`);
@@ -396,8 +420,8 @@ async function getEligibleStudents(schoolId: string, classLevel: string) {
         return results;
       });
 
-      // Overall eligibility (passes at least one criteria)
-      const isEligible = eligibilityResults.some(result => result.passed);
+      // Overall eligibility (must pass ALL criteria)
+      const isEligible = eligibilityResults.every(result => result.passed);
       const primaryCriteria = eligibilityResults.find(result => result.passed) || eligibilityResults[0];
 
       return {
@@ -466,6 +490,21 @@ async function createPromotionCriteria(schoolId: string, data: any) {
     isDefault: false,
     priority: 1,
   };
+
+  // Extract fee balance criteria from customCriteria and set maxOutstandingBalance
+  if (data.customCriteria && Array.isArray(data.customCriteria)) {
+    const feeBalanceCriteria = data.customCriteria.find((c: any) => 
+      c.name.toLowerCase().includes('fee') || 
+      c.name.toLowerCase().includes('balance') ||
+      c.name.toLowerCase().includes('payment')
+    );
+    
+    if (feeBalanceCriteria && feeBalanceCriteria.limit) {
+      criteriaData.maxOutstandingBalance = parseFloat(feeBalanceCriteria.limit);
+      criteriaData.requireFullPayment = false; // Use maxOutstandingBalance instead of full payment
+      console.log(`Setting maxOutstandingBalance to ${criteriaData.maxOutstandingBalance} from custom criteria`);
+    }
+  }
 
   console.log("Final criteria data for Prisma:", criteriaData);
 
