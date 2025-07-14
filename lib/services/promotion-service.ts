@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { calculateStudentOutstanding } from "@/lib/utils/fee-balance";
 
 const prisma = new PrismaClient();
 
@@ -63,7 +64,7 @@ export class PromotionService {
           payments: {
             where: {
               academicYear: {
-                year: currentYear
+                name: String(currentYear)
               }
             }
           }
@@ -186,10 +187,7 @@ export class PromotionService {
       }
     });
 
-    // Calculate total fees
-    const totalFees = feeStructures.reduce((sum, fs) => sum + Number(fs.totalAmount), 0);
-
-    // Get total payments for the year
+    // Get all payments for the year
     const payments = await prisma.payment.findMany({
       where: {
         studentId,
@@ -200,10 +198,14 @@ export class PromotionService {
       }
     });
 
-    const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
-
-    // Return outstanding balance (can be negative for overpayment)
-    return totalFees - totalPaid;
+    // Use the running balance utility for accurate outstanding (handles overpayments/credits)
+    const { outstandingBalance } = await calculateStudentOutstanding({
+      student,
+      feeStructures,
+      payments,
+      filterAcademicYear: Number(academicYear),
+    });
+    return outstandingBalance;
   }
 
   /**
@@ -399,6 +401,7 @@ export class PromotionService {
     for (const crit of criteria) {
       console.log(`Checking criteria:`, crit);
       if (crit.type === 'fee_balance') {
+        // Use running balance logic for fee balance
         const balance = await this.calculateOutstandingBalance(student.id, student.academicYear || new Date().getFullYear());
         console.log(`Student ${student.id} balance: ${balance}, limit: ${crit.limit}`);
         if (balance > crit.limit) {

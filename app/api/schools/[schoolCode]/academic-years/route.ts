@@ -10,6 +10,7 @@ export async function GET(req: NextRequest, { params }: { params: { schoolCode: 
     const years = await prisma.academicYear.findMany({
       where: { schoolId: school.id },
       orderBy: { startDate: "desc" },
+      include: { terms: true }, // Include terms for each year
     });
     return NextResponse.json(years);
   } catch (error: any) {
