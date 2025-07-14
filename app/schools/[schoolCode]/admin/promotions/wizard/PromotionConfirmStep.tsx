@@ -79,10 +79,10 @@ export default function PromotionConfirmStep() {
       </h2>
       <div className="mb-4">
         <div>
-          Academic Year: <b>{selectedAcademicYear}</b>
+          Academic Year: <b>{selectedAcademicYear?.name}</b>
         </div>
         <div>
-          Term: <b>{selectedTerm}</b>
+          Term: <b>{selectedTerm?.name}</b>
         </div>
         <div>
           To be promoted: <b>{numPromoted}</b>
