@@ -78,7 +78,7 @@ import type {
   Subject,
   SchoolClass,
   Grade,
-} from "@/lib/types";
+} from "@/lib/school-storage";
 import { updateSchoolClasses, getSchool } from "@/lib/school-storage";
 import Link from "next/link";
 import { generateTempPassword } from "@/lib/utils/school-generator";
@@ -187,6 +187,7 @@ export function SchoolSetupDashboard({
   );
 
   const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [bursars, setBursars] = useState<any[]>([]);
   const [students, setStudents] = useState<Student[]>(
     schoolData.students || []
   );
@@ -245,6 +246,7 @@ export function SchoolSetupDashboard({
 
   // Form states for new items
   const [newTeacher, setNewTeacher] = useState<Partial<Teacher>>({});
+  const [newBursar, setNewBursar] = useState<Partial<any>>({});
   const [newStudent, setNewStudent] = useState<Partial<Student>>({});
   const [newSubject, setNewSubject] = useState<Partial<Subject>>({});
   const [newClass, setNewClass] = useState<Partial<SchoolClass>>({});
@@ -252,6 +254,11 @@ export function SchoolSetupDashboard({
   // Add state for showing credentials
   const [showTeacherCredentials, setShowTeacherCredentials] = useState(false);
   const [lastTeacherCredentials, setLastTeacherCredentials] = useState<{
+    email: string;
+    tempPassword: string;
+  } | null>(null);
+  const [showBursarCredentials, setShowBursarCredentials] = useState(false);
+  const [lastBursarCredentials, setLastBursarCredentials] = useState<{
     email: string;
     tempPassword: string;
   } | null>(null);
@@ -319,6 +326,29 @@ export function SchoolSetupDashboard({
       }
     }
     fetchTeachers();
+  }, [schoolData.schoolCode, toast]);
+
+  // Fetch bursars from API on component mount
+  useEffect(() => {
+    async function fetchBursars() {
+      try {
+        const res = await fetch(
+          `/api/schools/${schoolData.schoolCode}/bursars`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setBursars(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch bursars", error);
+        toast({
+          title: "Error",
+          description: "Could not load bursar data.",
+          variant: "destructive",
+        });
+      }
+    }
+    fetchBursars();
   }, [schoolData.schoolCode, toast]);
 
   // Fetch students from API on component mount
@@ -570,6 +600,120 @@ export function SchoolSetupDashboard({
         description: "Failed to delete teacher.",
         variant: "destructive",
       });
+    }
+  };
+
+  const deleteBursar = async (id: string) => {
+    try {
+      const response = await fetch(
+        `/api/schools/${schoolData.schoolCode}/bursars`,
+        {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to delete bursar");
+      }
+
+      setBursars(bursars.filter((b) => b.id !== id));
+      toast({
+        title: "Success!",
+        description: "Bursar deleted successfully!",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete bursar.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const updateBursar = async (updatedBursar: any) => {
+    try {
+      const response = await fetch(
+        `/api/schools/${schoolData.schoolCode}/bursars`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: updatedBursar.id,
+            name: updatedBursar.name,
+            email: updatedBursar.email,
+            phone: updatedBursar.phone,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to update bursar");
+      }
+
+      const returnedBursar = await response.json();
+      setBursars(bursars.map((b) => (b.id === returnedBursar.id ? returnedBursar : b)));
+
+      setEditingItem(null);
+      setViewMode((prev) => ({ ...prev, staff: "list" }));
+      toast({
+        title: "Success!",
+        description: "Bursar updated successfully!",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update bursar.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Bursar CRUD operations
+  const createBursar = async (bursarData: Partial<any>) => {
+    if (!bursarData.name || !bursarData.email) {
+      toast({
+        title: "Validation Error",
+        description: "Name and Email are required.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    const tempPassword = "bursar123";
+    try {
+      const response = await fetch(
+        `/api/schools/${schoolData.schoolCode}/bursars`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...bursarData, tempPassword }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to create bursar");
+      }
+
+      const newBursar = await response.json();
+      setBursars([...bursars, newBursar]);
+
+      setNewBursar({});
+      setViewMode((prev) => ({ ...prev, staff: "list" }));
+      handleStepComplete("staff");
+      setLastBursarCredentials({ email: newBursar.email, tempPassword });
+      setShowBursarCredentials(true);
+      toast({ title: "Success!", description: "Bursar added successfully!" });
+      return true;
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create bursar.",
+        variant: "destructive",
+      });
+      return false;
     }
   };
 
@@ -1089,6 +1233,99 @@ export function SchoolSetupDashboard({
                 style={{ backgroundColor: schoolData.colorTheme }}
               >
                 {teacher ? "Update Teacher" : "Add Teacher"}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  // Bursar Form Component
+  const BursarForm = ({
+    bursar,
+    onSave,
+    onCancel,
+  }: {
+    bursar?: any;
+    onSave: (bursar: any) => void;
+    onCancel: () => void;
+  }) => {
+    const [formData, setFormData] = useState<Partial<any>>(
+      bursar || newBursar
+    );
+
+    const handleSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (bursar) {
+        onSave(formData as any);
+      } else {
+        // Directly create bursar without setting state first
+        const success = await createBursar(formData);
+        if (success) {
+          // Reset form data after successful creation
+          setFormData({});
+        }
+      }
+    };
+
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            {bursar ? "Edit Bursar" : "Add New Bursar"}
+            <Button variant="outline" onClick={onCancel}>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to List
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Full Name *</Label>
+                <Input
+                  value={formData.name || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
+                  placeholder="Bursar Name"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Email Address *</Label>
+                <Input
+                  type="email"
+                  value={formData.email || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, email: e.target.value })
+                  }
+                  placeholder="bursar@school.edu"
+                  required
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Phone Number</Label>
+              <Input
+                value={formData.phone || ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, phone: e.target.value })
+                }
+                placeholder="+254 700 000 000"
+              />
+            </div>
+            <div className="flex justify-end space-x-4">
+              <Button type="button" variant="outline" onClick={onCancel}>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                style={{ backgroundColor: schoolData.colorTheme }}
+              >
+                {bursar ? "Update Bursar" : "Add Bursar"}
               </Button>
             </div>
           </form>
@@ -2173,156 +2410,312 @@ export function SchoolSetupDashboard({
                 }
               />
             ) : editingItem ? (
-              <TeacherForm
-                teacher={editingItem}
-                onSave={updateTeacher}
-                onCancel={() => {
-                  setEditingItem(null);
-                  setViewMode((prev) => ({ ...prev, staff: "list" }));
-                }}
-              />
+              editingItem.role === 'bursar' ? (
+                <BursarForm
+                  bursar={editingItem}
+                  onSave={updateBursar}
+                  onCancel={() => {
+                    setEditingItem(null);
+                    setViewMode((prev) => ({ ...prev, staff: "list" }));
+                  }}
+                />
+              ) : (
+                <TeacherForm
+                  teacher={editingItem}
+                  onSave={updateTeacher}
+                  onCancel={() => {
+                    setEditingItem(null);
+                    setViewMode((prev) => ({ ...prev, staff: "list" }));
+                  }}
+                />
+              )
             ) : (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    Teachers ({teachers.length})
-                    <Button
-                      onClick={() =>
-                        setViewMode((prev) => ({ ...prev, staff: "form" }))
-                      }
-                      style={{ backgroundColor: schoolData.colorTheme }}
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Teacher
-                    </Button>
-                  </CardTitle>
-                  <CardDescription>
-                    Manage your school's teaching staff
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {teachers.length === 0 ? (
-                    <div className="text-center py-8">
-                      <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-600">
-                        No teachers added yet. Click "Add Teacher" to get
-                        started.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Name</TableHead>
-                            <TableHead>Email</TableHead>
-                            <TableHead>Phone</TableHead>
-                            <TableHead>Qualification</TableHead>
-                            <TableHead>Date Joined</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {teachers.map((teacher) => (
-                            <TableRow key={teacher.id}>
-                              <TableCell className="font-medium">
-                                {teacher.name}
-                              </TableCell>
-                              <TableCell>{teacher.email}</TableCell>
-                              <TableCell>{teacher.phone}</TableCell>
-                              <TableCell>
-                                {teacher.teacherProfile?.qualification || "-"}
-                              </TableCell>
-                              <TableCell>
-                                {teacher.teacherProfile?.dateJoined
-                                  ? new Date(
-                                      teacher.teacherProfile.dateJoined
-                                    ).toLocaleDateString()
-                                  : "-"}
-                              </TableCell>
-                              <TableCell>
-                                <Badge
-                                  variant={
-                                    teacher.status === "active"
-                                      ? "default"
-                                      : "secondary"
-                                  }
-                                >
-                                  {teacher.status}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex space-x-2">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setViewingItem(teacher)}
-                                  >
-                                    <Eye className="w-4 h-4" />
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setEditingItem(teacher)}
-                                  >
-                                    <Edit className="w-4 h-4" />
-                                  </Button>
-                                  <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="text-red-600"
-                                      >
-                                        <Trash2 className="w-4 h-4" />
-                                      </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>
-                                          Delete Teacher
-                                        </AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                          Are you sure you want to delete{" "}
-                                          {teacher.name}? This action cannot be
-                                          undone.
-                                        </AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel>
-                                          Cancel
-                                        </AlertDialogCancel>
-                                        <AlertDialogAction
-                                          onClick={() =>
-                                            deleteTeacher(teacher.id)
-                                          }
-                                        >
-                                          Delete
-                                        </AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
-                                </div>
-                              </TableCell>
+              <>
+                {/* Teachers Section */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                      Teachers ({teachers.length})
+                      <Button
+                        onClick={() =>
+                          setViewMode((prev) => ({ ...prev, staff: "form" }))
+                        }
+                        style={{ backgroundColor: schoolData.colorTheme }}
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Teacher
+                      </Button>
+                    </CardTitle>
+                    <CardDescription>
+                      Manage your school's teaching staff
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {teachers.length === 0 ? (
+                      <div className="text-center py-8">
+                        <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                        <p className="text-gray-600">
+                          No teachers added yet. Click "Add Teacher" to get
+                          started.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Name</TableHead>
+                              <TableHead>Email</TableHead>
+                              <TableHead>Phone</TableHead>
+                              <TableHead>Qualification</TableHead>
+                              <TableHead>Date Joined</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead>Actions</TableHead>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                          </TableHeader>
+                          <TableBody>
+                            {teachers.map((teacher) => (
+                              <TableRow key={teacher.id}>
+                                <TableCell className="font-medium">
+                                  {teacher.name}
+                                </TableCell>
+                                <TableCell>{teacher.email}</TableCell>
+                                <TableCell>{teacher.phone}</TableCell>
+                                <TableCell>
+                                  {teacher.teacherProfile?.qualification || "-"}
+                                </TableCell>
+                                <TableCell>
+                                  {teacher.teacherProfile?.dateJoined
+                                    ? new Date(
+                                        teacher.teacherProfile.dateJoined
+                                      ).toLocaleDateString()
+                                    : "-"}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge
+                                    variant={
+                                      teacher.status === "active"
+                                        ? "default"
+                                        : "secondary"
+                                    }
+                                  >
+                                    {teacher.status}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex space-x-2">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => setViewingItem(teacher)}
+                                    >
+                                      <Eye className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => setEditingItem(teacher)}
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                    </Button>
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="text-red-600"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>
+                                            Delete Teacher
+                                          </AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                            Are you sure you want to delete{" "}
+                                            {teacher.name}? This action cannot be
+                                            undone.
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel>
+                                            Cancel
+                                          </AlertDialogCancel>
+                                          <AlertDialogAction
+                                            onClick={() =>
+                                              deleteTeacher(teacher.id)
+                                            }
+                                          >
+                                            Delete
+                                          </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Bursars Section */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                      Bursars ({bursars.length})
+                      <Button
+                        onClick={() =>
+                          setViewMode((prev) => ({ ...prev, staff: "bursar-form" }))
+                        }
+                        style={{ backgroundColor: schoolData.colorTheme }}
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Bursar
+                      </Button>
+                    </CardTitle>
+                    <CardDescription>
+                      Manage your school's financial staff
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {bursars.length === 0 ? (
+                      <div className="text-center py-8">
+                        <DollarSign className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                        <p className="text-gray-600">
+                          No bursars added yet. Click "Add Bursar" to get
+                          started.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Name</TableHead>
+                              <TableHead>Email</TableHead>
+                              <TableHead>Phone</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead>Actions</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {bursars.map((bursar) => (
+                              <TableRow key={bursar.id}>
+                                <TableCell className="font-medium">
+                                  {bursar.name}
+                                </TableCell>
+                                <TableCell>{bursar.email}</TableCell>
+                                <TableCell>{bursar.phone || "-"}</TableCell>
+                                <TableCell>
+                                  <Badge variant="default">
+                                    Active
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex space-x-2">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => setViewingItem(bursar)}
+                                    >
+                                      <Eye className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => setEditingItem(bursar)}
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                    </Button>
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="text-red-600"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>
+                                            Delete Bursar
+                                          </AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                            Are you sure you want to delete{" "}
+                                            {bursar.name}? This action cannot be
+                                            undone.
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel>
+                                            Cancel
+                                          </AlertDialogCancel>
+                                          <AlertDialogAction
+                                            onClick={() =>
+                                              bursar.role === 'bursar' ? deleteBursar(bursar.id) : deleteTeacher(bursar.id)
+                                            }
+                                          >
+                                            Delete
+                                          </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </>
             )}
 
-            {/* Teacher View Dialog */}
+            {/* Bursar Form Modal */}
+            {viewMode.staff === "bursar-form" && (
+              <Dialog
+                open={viewMode.staff === "bursar-form"}
+                onOpenChange={() =>
+                  setViewMode((prev) => ({ ...prev, staff: "list" }))
+                }
+              >
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Add New Bursar</DialogTitle>
+                    <DialogDescription>
+                      Create a new bursar account for your school
+                    </DialogDescription>
+                  </DialogHeader>
+                  <BursarForm
+                    onSave={createBursar}
+                    onCancel={() =>
+                      setViewMode((prev) => ({ ...prev, staff: "list" }))
+                    }
+                  />
+                </DialogContent>
+              </Dialog>
+            )}
+
+            {/* Staff View Dialog */}
             <Dialog
               open={!!viewingItem}
               onOpenChange={() => setViewingItem(null)}
             >
               <DialogContent className="max-w-2xl">
                 <DialogHeader>
-                  <DialogTitle>Teacher Details</DialogTitle>
+                  <DialogTitle>
+                    {viewingItem?.role === 'bursar' ? 'Bursar Details' : 'Teacher Details'}
+                  </DialogTitle>
                   <DialogDescription>
                     Complete information for {viewingItem?.name}
                   </DialogDescription>
@@ -2398,22 +2791,23 @@ export function SchoolSetupDashboard({
                         <Link
                           href={`/schools/${
                             schoolData.schoolCode
-                          }/teachers/login?email=${encodeURIComponent(
+                          }/${viewingItem.role === 'bursar' ? 'bursar' : 'teachers'}/login?email=${encodeURIComponent(
                             viewingItem.email
                           )}&password=${encodeURIComponent(
-                            viewingItem.teacherProfile?.tempPassword || ""
+                            viewingItem.role === 'bursar' ? 'bursar123' : (viewingItem.teacherProfile?.tempPassword || "")
                           )}`}
                         >
-                          Go to Teacher Dashboard
+                          Go to {viewingItem.role === 'bursar' ? 'Bursar' : 'Teacher'} Dashboard
                         </Link>
                       </Button>
                       <Button
                         variant="secondary"
                         onClick={async () => {
-                          await fetch(
-                            `/api/schools/${schoolData.schoolCode}/teachers/${viewingItem.id}/send-credentials`,
-                            { method: "POST" }
-                          );
+                          const endpoint = viewingItem.role === 'bursar' 
+                            ? `/api/schools/${schoolData.schoolCode}/bursars/${viewingItem.id}/send-credentials`
+                            : `/api/schools/${schoolData.schoolCode}/teachers/${viewingItem.id}/send-credentials`;
+                          
+                          await fetch(endpoint, { method: "POST" });
                           toast({
                             title: "Credentials sent (simulated)",
                             description: `Credentials sent to ${viewingItem.email}`,
@@ -3932,6 +4326,94 @@ export function SchoolSetupDashboard({
           >
             Close
           </Button>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add a modal/dialog to show credentials after adding a bursar */}
+      <Dialog
+        open={showBursarCredentials}
+        onOpenChange={setShowBursarCredentials}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Bursar Login Credentials</DialogTitle>
+            <DialogDescription>
+              Share these credentials with the bursar for their first login.
+              <br />
+              <span className="text-blue-700 font-semibold">
+                Default password for all new bursars is <b>bursar123</b>.
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          {lastBursarCredentials && (
+            <div className="space-y-4">
+              <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                <div className="flex justify-between items-center">
+                  <strong>Email:</strong>
+                  <span className="font-mono">
+                    {lastBursarCredentials.email}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <strong>Password:</strong>
+                  <span className="font-mono text-blue-700">
+                    {lastBursarCredentials.tempPassword}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Button
+                  asChild
+                  className="w-full bg-green-600 hover:bg-green-700"
+                >
+                  <Link
+                    href={`/schools/${encodeURIComponent(
+                      schoolData.schoolCode
+                    )}/bursar/login?email=${encodeURIComponent(
+                      lastBursarCredentials.email
+                    )}&password=${encodeURIComponent(
+                      lastBursarCredentials.tempPassword
+                    )}`}
+                  >
+                    🚀 Quick Login (Auto-fill)
+                  </Link>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    const credentials = `Email: ${lastBursarCredentials.email}\nPassword: ${lastBursarCredentials.tempPassword}`;
+                    navigator.clipboard.writeText(credentials);
+                    toast({
+                      title: "Copied!",
+                      description: "Credentials copied to clipboard",
+                      variant: "default",
+                    });
+                  }}
+                >
+                  📋 Copy Credentials
+                </Button>
+                <Button asChild variant="outline" className="w-full">
+                  <Link
+                    href={`/schools/${schoolData.schoolCode}/bursar/login`}
+                  >
+                    📝 Manual Login
+                  </Link>
+                </Button>
+              </div>
+
+              <div className="text-xs text-gray-500 text-center">
+                💡 Tip: Use "Quick Login" to automatically fill the login form
+                with these credentials
+                <br />
+                <span className="text-orange-600">
+                  ⚠️ Note: Credentials are only shown immediately after creation
+                  for security reasons
+                </span>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

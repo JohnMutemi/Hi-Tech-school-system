@@ -83,6 +83,11 @@ export interface SchoolClass {
   subjects: string[]
 }
 
+export interface Grade {
+  id: string
+  name: string
+}
+
 export interface SchoolAdmin {
   email: string
   password: string

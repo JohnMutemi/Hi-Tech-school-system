@@ -7,6 +7,7 @@ export interface SessionData {
   email: string
   name: string
   role: string
+  schoolId?: string
 }
 
 export const sessionOptions = {

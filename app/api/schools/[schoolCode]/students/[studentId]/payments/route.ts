@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { paymentService } from '@/lib/services/payment-service'
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
 
 // Enhanced logging utility for API routes
 const logApiRequest = (method: string, endpoint: string, data: any, type: 'request' | 'response' | 'error' = 'request') => {
@@ -209,69 +212,92 @@ export async function POST(
 }
 
 export async function GET(
-  req: NextRequest,
+  request: NextRequest,
   { params }: { params: { schoolCode: string; studentId: string } }
 ) {
-  const { studentId } = params;
-  const requestId = `req-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
-
-  logApiRequest('GET', `/api/schools/${params.schoolCode}/students/${studentId}/payments`, {
-    requestId,
-    studentId,
-    url: req.url
-  });
-
   try {
-    // Get payment history
-    const payments = await paymentService.getPaymentHistory(studentId)
-    const pendingRequests = await paymentService.getPendingPaymentRequests(studentId)
+    const { schoolCode, studentId } = params;
+    const { searchParams } = new URL(request.url);
+    
+    const academicYearId = searchParams.get("academicYearId");
+    const limit = parseInt(searchParams.get("limit") || "50");
+    const offset = parseInt(searchParams.get("offset") || "0");
 
-    const responseData = {
-      success: true,
-      data: {
-        payments: payments.map(p => ({
-          id: p.id,
-          amount: p.amount,
-          paymentDate: p.paymentDate,
-          paymentMethod: p.paymentMethod,
-          receiptNumber: p.receiptNumber,
-          referenceNumber: p.referenceNumber,
-          description: p.description,
-          studentName: p.student?.user?.name,
-          className: p.student?.class?.name,
-          admissionNumber: p.student?.admissionNumber,
-          academicYear: p.academicYear?.name,
-          term: p.term?.name
-        })),
-        pendingRequests: pendingRequests.map(r => ({
-          id: r.id,
-          amount: r.amount,
-          status: r.status,
-          expiresAt: r.expiresAt,
-          createdAt: r.createdAt
-        }))
-      }
+    // Find the school
+    const school = await prisma.school.findUnique({
+      where: { code: schoolCode },
+    });
+
+    if (!school) {
+      return NextResponse.json({ error: "School not found" }, { status: 404 });
+    }
+
+    // Verify the student belongs to this school
+    const student = await prisma.student.findFirst({
+      where: {
+        id: studentId,
+        schoolId: school.id,
+        isActive: true,
+      },
+    });
+
+    if (!student) {
+      return NextResponse.json({ error: "Student not found" }, { status: 404 });
+    }
+
+    // Build where clause for payments
+    const whereClause: any = {
+      studentId: studentId,
     };
 
-    logApiRequest('GET', `/api/schools/${params.schoolCode}/students/${studentId}/payments`, {
-      requestId,
-      stage: 'SUCCESS',
-      paymentCount: payments.length,
-      pendingRequestCount: pendingRequests.length
-    }, 'response');
+    // Filter by academic year if specified
+    if (academicYearId) {
+      whereClause.academicYearId = academicYearId;
+    }
 
-    return NextResponse.json(responseData)
+    // Fetch payments with related data
+    const payments = await prisma.payment.findMany({
+      where: whereClause,
+      include: {
+        academicYear: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        term: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+      orderBy: {
+        paymentDate: "desc",
+      },
+      take: limit,
+      skip: offset,
+    });
+
+    // Get total count for pagination
+    const totalCount = await prisma.payment.count({
+      where: whereClause,
+    });
+
+    return NextResponse.json({
+      payments,
+      pagination: {
+        total: totalCount,
+        limit,
+        offset,
+        hasMore: offset + limit < totalCount,
+      },
+    });
   } catch (error) {
-    logApiRequest('GET', `/api/schools/${params.schoolCode}/students/${studentId}/payments`, {
-      requestId,
-      stage: 'EXCEPTION',
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, 'error');
-
-    console.error('Payment history error:', error)
+    console.error("Error fetching payment history:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch payment history' },
+      { error: "Failed to fetch payment history" },
       { status: 500 }
-    )
+    );
   }
 } 
