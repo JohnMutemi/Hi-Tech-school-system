@@ -39,11 +39,12 @@ function getNextGradeName(
 export default function ProgressionModal({
   grades,
   classes,
-  teachers = [], // default to empty array
+  teachers = [],
   schoolCode,
   onClose,
   onClassCreated,
-}: ProgressionModalProps) {
+  onSave,
+}: ProgressionModalProps & { onSave?: () => void }) {
   const [createDialog, setCreateDialog] = useState<{
     open: boolean;
     gradeId: string;
@@ -51,7 +52,7 @@ export default function ProgressionModal({
   }>({ open: false, gradeId: "", name: "" });
 
   // Build all grade/class combinations
-  const rows: {
+  let rows: {
     fromClass: string;
     toClass: string;
     status: string;
@@ -88,12 +89,17 @@ export default function ProgressionModal({
           ? nextGradeClass.name
           : `${nextGradeName} ${streamSuffix}`.trim();
       }
-      // Check if toClass exists
+      // Check if toClass exists (case-insensitive, trimmed)
       let status = "OK";
       let action = "Edit";
-      if (toClass === "ALUMNI") {
-        status = "ALUMNI missing";
-        action = "Create";
+      if (toClass.trim().toLowerCase() === "alumni") {
+        const alumniExists = classes.some(
+          (c) => c.name.trim().toLowerCase() === "alumni"
+        );
+        if (!alumniExists) {
+          status = "ALUMNI missing";
+          action = "Create";
+        }
       } else if (!classes.some((c) => c.name === toClass)) {
         status = `${toClass} missing`;
         action = "Create";
@@ -108,6 +114,14 @@ export default function ProgressionModal({
       });
     }
   }
+
+  // Filter out ALUMNI → ALUMNI row
+  rows = rows.filter(
+    (row) => !(row.fromClass === "ALUMNI" && row.toClass === "ALUMNI")
+  );
+
+  // Check if all rows are OK
+  const allOK = rows.every((row) => row.status === "OK");
 
   return (
     <div className="p-4 bg-white rounded shadow-lg max-w-3xl w-full">
@@ -135,7 +149,7 @@ export default function ProgressionModal({
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.fromClass}>
+            <tr key={row.fromClass + row.toClass}>
               <td className="border px-2 py-1">{row.fromClass}</td>
               <td className="border px-2 py-1">{row.toClass}</td>
               <td className="border px-2 py-1">{row.status}</td>
@@ -166,6 +180,27 @@ export default function ProgressionModal({
           ))}
         </tbody>
       </table>
+      {/* Ready to Save indicator and Save button */}
+      <div className="flex items-center justify-between mt-4">
+        {allOK ? (
+          <span className="text-green-600 font-semibold">
+            All progression rules are set. Ready to save!
+          </span>
+        ) : (
+          <span className="text-red-600">
+            Please create all missing classes to complete the progression list.
+          </span>
+        )}
+        <button
+          className={`bg-green-600 text-white px-4 py-2 rounded ml-4 ${
+            !allOK ? "opacity-50 cursor-not-allowed" : ""
+          }`}
+          onClick={onSave}
+          disabled={!allOK}
+        >
+          Save
+        </button>
+      </div>
       {/* Create Class Dialog */}
       {createDialog.open && (
         <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
@@ -174,7 +209,7 @@ export default function ProgressionModal({
             <ClassCreateForm
               schoolCode={schoolCode}
               grades={grades}
-              teachers={teachers || []} // always pass an array
+              teachers={teachers}
               initialGradeId={createDialog.gradeId}
               initialName={createDialog.name}
               onSuccess={() => {
