@@ -14,9 +14,9 @@ export default function PromotionPreviewStep() {
     criteriaList,
     overrides = {},
     exclusions = {},
+    eligibleStudents = [],
+    ineligibleStudents = [],
   } = wizardState;
-  const [eligibleStudents, setEligibleStudents] = useState([]);
-  const [ineligibleStudents, setIneligibleStudents] = useState([]);
   const [studentBalances, setStudentBalances] = useState({});
   const [currentAcademicYearId, setCurrentAcademicYearId] = useState("");
   const [loading, setLoading] = useState(false);
