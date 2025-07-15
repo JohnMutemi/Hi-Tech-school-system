@@ -12,7 +12,7 @@ export async function POST(
   try {
     const { schoolCode } = params;
     const body = await request.json();
-    const { students, promotedBy } = body;
+    const { students, promotedBy, ineligibleStudents = [] } = body;
 
     // Validate required fields
     if (!students || !Array.isArray(students) || students.length === 0) {
@@ -47,8 +47,33 @@ export async function POST(
       promotedBy
     );
 
-    // Set the new academic year and term as active
+    // Save student arrears for the previous academic year
     const currentYear = new Date().getFullYear();
+    const previousAcademicYear = await prisma.academicYear.findFirst({
+      where: { schoolId: school.id, name: currentYear.toString() }
+    });
+    if (previousAcademicYear) {
+      // Combine students and ineligibleStudents, dedupe by studentId
+      const allStudents = [...students, ...ineligibleStudents].filter((s, idx, arr) =>
+        arr.findIndex(stu => stu.studentId === s.studentId) === idx
+      );
+      for (const s of allStudents) {
+        // Log before creating StudentArrear
+        console.log('Creating StudentArrear for student:', s.studentId, 'with arrearAmount:', s.outstandingBalance);
+        await prisma.studentArrear.create({
+          data: {
+            studentId: s.studentId,
+            schoolId: school.id,
+            academicYearId: previousAcademicYear.id,
+            arrearAmount: s.outstandingBalance ?? 0,
+            // dateRecorded: default,
+            notes: 'Carried forward after promotion',
+          }
+        });
+      }
+    }
+
+    // Set the new academic year and term as active
     const newAcademicYearName = (currentYear + 1).toString();
     // Find or create the new academic year
     let newAcademicYear = await prisma.academicYear.findFirst({

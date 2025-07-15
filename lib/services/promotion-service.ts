@@ -514,6 +514,7 @@ export class PromotionService {
       overrideReason?: string;
       notes?: string;
       criteriaId?: string;
+      outstandingBalance?: number; // Added outstandingBalance to the type definition
     }>,
     promotedBy: string
   ) {
@@ -546,6 +547,7 @@ export class PromotionService {
           // Update student class
           await prisma.student.update({ where: { id: s.studentId }, data: { classId: targetClassId } });
           // Log promotion
+          console.log('Creating PromotionLog for student:', s.studentId, 'with outstandingBalance:', s.outstandingBalance);
           await prisma.promotionLog.create({
             data: {
               studentId: s.studentId,
@@ -562,6 +564,7 @@ export class PromotionService {
               overrideReason: s.overrideReason,
               notes: s.notes,
               promotionType: 'bulk',
+              outstandingBalance: s.outstandingBalance ?? 0,
             },
           });
           summary.promoted.push(s.studentId);

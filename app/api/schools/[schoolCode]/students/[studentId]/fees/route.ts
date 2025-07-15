@@ -187,13 +187,14 @@ export async function GET(
       where: {
         studentId: student.id,
         schoolId: school.id,
-        arrearAmount: { gt: 0 },
+        // Remove arrearAmount: { gt: 0 } to include all arrears (positive, zero, negative)
         ...(joinAcademicYearId ? { academicYearId: { gte: joinAcademicYearId } } : {}),
-        ...(targetAcademicYearId ? { academicYearId: targetAcademicYearId } : {})
+        // Do not filter by targetAcademicYearId, sum all arrears
       }
     });
 
     const arrears = arrearsRecords.reduce((sum, record) => sum + record.arrearAmount, 0);
+    const totalOutstanding = academicYearOutstanding + arrears;
 
     return NextResponse.json({
       student: {
@@ -205,7 +206,7 @@ export async function GET(
       },
       termBalances,
       academicYearOutstanding,
-      totalOutstanding: academicYearOutstanding,
+      totalOutstanding,
       arrears,
       carryForwardArrears: 0,
       carryForwardBreakdown: [],

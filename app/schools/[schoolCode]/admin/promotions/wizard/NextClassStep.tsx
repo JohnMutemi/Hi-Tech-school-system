@@ -243,21 +243,32 @@ export default function NextClassStep({ onNext }: { onNext: () => void }) {
     fetchReview();
   }, [editingRules, schoolCode]);
 
-  // After fetching review students, attach toClass to each eligible student in wizard state
+  // After fetching review students, attach toClass and outstandingBalance to each eligible student in wizard state
   useEffect(() => {
     if (reviewStudents.length > 0 && editingRules.length > 0) {
-      const studentsWithToClass = reviewStudents.map((s: any) => {
-        const fromClass = s.fromClass || s.className || "";
-        const progression = editingRules.find(
-          (p: any) => p.fromClass === fromClass
-        );
-        const toClass = progression ? progression.toClass : "";
-        return { ...s, toClass };
+      setWizardState((prev: any) => {
+        const studentsWithToClass = reviewStudents.map((s: any) => {
+          const fromClass = s.fromClass || s.className || "";
+          const progression = editingRules.find(
+            (p: any) => p.fromClass === fromClass
+          );
+          const toClass = progression ? progression.toClass : "";
+          // Preserve outstandingBalance from previous wizard state if present
+          const prevStudent = prev.eligibleStudents?.find(
+            (e: any) => e.id === s.id
+          );
+          const outstandingBalance =
+            prevStudent?.outstandingBalance ??
+            s.outstandingBalance ??
+            s.eligibility?.summary?.outstandingBalance ??
+            0;
+          return { ...s, toClass, outstandingBalance };
+        });
+        return {
+          ...prev,
+          eligibleStudents: studentsWithToClass,
+        };
       });
-      setWizardState((prev: any) => ({
-        ...prev,
-        eligibleStudents: studentsWithToClass,
-      }));
     }
   }, [reviewStudents, editingRules, setWizardState]);
 

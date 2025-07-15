@@ -116,17 +116,6 @@ export default function PromotionPreviewStep() {
         fromClass: s.fromClass || s.currentClass || "",
         toClass: s.toClass || s.nextClass || "",
       }));
-      setEligibleStudents(eligibleWithNextClass);
-      setIneligibleStudents(data.ineligibleStudents || []);
-      setWizardState((prev: any) => {
-        const newState = {
-          ...prev,
-          eligibleStudents: eligibleWithNextClass,
-          ineligibleStudents: data.ineligibleStudents,
-        };
-        console.log("Wizard state:", newState); // DEBUG
-        return newState;
-      });
       // Fetch balances for all students using current academic year
       const allStudents = [
         ...(data.eligibleStudents || []),
@@ -138,6 +127,31 @@ export default function PromotionPreviewStep() {
         currentAcademicYearId
       );
       setStudentBalances(balances);
+      // Attach outstandingBalance to both eligible and ineligible students
+      const eligibleWithBalances = eligibleWithNextClass.map((s) => ({
+        ...s,
+        outstandingBalance: balances[s.id] ?? 0,
+      }));
+      const ineligibleWithBalances = (data.ineligibleStudents || []).map(
+        (s) => ({
+          ...s,
+          outstandingBalance: balances[s.id] ?? 0,
+        })
+      );
+      // Log for verification
+      console.log(
+        "Eligible students with outstandingBalance (after merge):",
+        eligibleWithBalances
+      );
+      console.log(
+        "Ineligible students with outstandingBalance (after merge):",
+        ineligibleWithBalances
+      );
+      setWizardState((prev: any) => ({
+        ...prev,
+        eligibleStudents: eligibleWithBalances,
+        ineligibleStudents: ineligibleWithBalances,
+      }));
     } catch (e) {
       setError("Failed to fetch students.");
       toast({

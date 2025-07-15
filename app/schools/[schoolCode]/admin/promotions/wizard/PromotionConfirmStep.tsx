@@ -34,6 +34,11 @@ export default function PromotionConfirmStep() {
     fetchAdminSession();
   }, [schoolCode]);
 
+  useEffect(() => {
+    // Log wizard state when confirmation step is mounted
+    console.log("Wizard state on mount (confirmation step):", wizardState);
+  }, [wizardState]);
+
   const { toast } = useToast();
 
   // Calculate summary
@@ -45,6 +50,8 @@ export default function PromotionConfirmStep() {
     setLoading(true);
     setError("");
     setSuccess(false);
+    // Log the full wizard state for debugging
+    console.log("Wizard state at confirmation:", wizardState);
     try {
       // Build students array for bulk promotion
       const students = eligibleStudents
@@ -57,12 +64,22 @@ export default function PromotionConfirmStep() {
           overrideReason: overrides[s.id]?.note || "",
           notes: "",
           criteriaId: s.criteriaId || undefined,
+          outstandingBalance: s.outstandingBalance ?? 0, // Ensure balance is included
         }));
+      // Prepare ineligible students array (all, with balances)
+      const ineligible = ineligibleStudents.map((s: any) => ({
+        studentId: s.id,
+        fromClass: s.currentClass || s.fromClass || "",
+        toClass: s.toClass || s.nextClass || (s.isGraduating ? "Alumni" : ""),
+        outstandingBalance: s.outstandingBalance ?? 0,
+      }));
       const body = {
         students,
+        ineligibleStudents: ineligible,
         promotedBy: adminId, // Use the real admin user ID
       };
       console.log("Sending students array to backend:", students); // DEBUG
+      console.log("Sending ineligibleStudents array to backend:", ineligible); // DEBUG
       const res = await fetch(`/api/schools/${schoolCode}/promotions/bulk`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
