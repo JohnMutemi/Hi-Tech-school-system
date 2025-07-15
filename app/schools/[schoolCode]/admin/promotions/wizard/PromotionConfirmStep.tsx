@@ -1,4 +1,4 @@
-import React, { useContext, useState } from "react";
+import React, { useContext, useState, useEffect } from "react";
 import { PromotionWizardContext } from "./PromotionWizard";
 import { useToast } from "@/hooks/use-toast";
 
@@ -21,6 +21,18 @@ export default function PromotionConfirmStep() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [promotionResult, setPromotionResult] = useState<any>(null);
+  const [adminId, setAdminId] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchAdminSession() {
+      const res = await fetch(`/api/schools/${schoolCode}/admin/session`);
+      if (res.ok) {
+        const data = await res.json();
+        setAdminId(data.adminId);
+      }
+    }
+    fetchAdminSession();
+  }, [schoolCode]);
 
   const { toast } = useToast();
 
@@ -48,7 +60,7 @@ export default function PromotionConfirmStep() {
         }));
       const body = {
         students,
-        promotedBy: "admin", // TODO: Replace with actual user ID
+        promotedBy: adminId, // Use the real admin user ID
       };
       console.log("Sending students array to backend:", students); // DEBUG
       const res = await fetch(`/api/schools/${schoolCode}/promotions/bulk`, {
@@ -134,7 +146,7 @@ export default function PromotionConfirmStep() {
       <button
         className="bg-blue-600 text-white px-4 py-2 rounded flex items-center justify-center min-w-[140px]"
         onClick={handleConfirm}
-        disabled={loading || confirmationInput !== "CONFIRM"}
+        disabled={loading || confirmationInput !== "CONFIRM" || !adminId}
       >
         {loading ? (
           <>

@@ -47,6 +47,48 @@ export async function POST(
       promotedBy
     );
 
+    // Set the new academic year and term as active
+    const currentYear = new Date().getFullYear();
+    const newAcademicYearName = (currentYear + 1).toString();
+    // Find or create the new academic year
+    let newAcademicYear = await prisma.academicYear.findFirst({
+      where: { schoolId: school.id, name: newAcademicYearName }
+    });
+    if (!newAcademicYear) {
+      newAcademicYear = await prisma.academicYear.create({
+        data: {
+          schoolId: school.id,
+          name: newAcademicYearName,
+          startDate: new Date(currentYear + 1, 0, 1),
+          endDate: new Date(currentYear + 1, 11, 31),
+          isCurrent: false
+        }
+      });
+    }
+    // Set all years to not current, then set the new one as current
+    await prisma.academicYear.updateMany({
+      where: { schoolId: school.id },
+      data: { isCurrent: false }
+    });
+    await prisma.academicYear.update({
+      where: { id: newAcademicYear.id },
+      data: { isCurrent: true }
+    });
+    // Set the new term as current (assume 'Term 1')
+    let newTerm = await prisma.term.findFirst({
+      where: { academicYearId: newAcademicYear.id, name: 'Term 1' }
+    });
+    if (newTerm) {
+      await prisma.term.updateMany({
+        where: { academicYearId: newAcademicYear.id },
+        data: { isCurrent: false }
+      });
+      await prisma.term.update({
+        where: { id: newTerm.id },
+        data: { isCurrent: true }
+      });
+    }
+
     return NextResponse.json(result, { status: 200 });
 
   } catch (error: any) {

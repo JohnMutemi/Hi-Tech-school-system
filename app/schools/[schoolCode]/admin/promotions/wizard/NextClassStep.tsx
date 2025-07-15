@@ -10,9 +10,10 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import ProgressionModal from "./ProgressionModal";
+import { useToast } from "@/hooks/use-toast";
 
 export default function NextClassStep({ onNext }: { onNext: () => void }) {
-  const { wizardState } = useContext(PromotionWizardContext);
+  const { wizardState, setWizardState } = useContext(PromotionWizardContext);
   const { schoolCode } = wizardState;
 
   // Section 1: Progression rules
@@ -29,6 +30,7 @@ export default function NextClassStep({ onNext }: { onNext: () => void }) {
   const [unsaved, setUnsaved] = useState(false);
   const [grades, setGrades] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
+  const { toast } = useToast();
 
   // Fetch classes, grades, and teachers on mount
   const fetchClasses = async () => {
@@ -36,6 +38,20 @@ export default function NextClassStep({ onNext }: { onNext: () => void }) {
     const res = await fetch(`/api/schools/${schoolCode}/classes`);
     if (res.ok) {
       setClasses(await res.json());
+    }
+  };
+
+  // Fetch progression rules from backend
+  const fetchProgressionRules = async () => {
+    if (!schoolCode) return;
+    const res = await fetch(`/api/schools/${schoolCode}/progression`);
+    if (res.ok) {
+      const data = await res.json();
+      setEditingRules(
+        Array.isArray(data.progressions) ? data.progressions : []
+      );
+    } else {
+      setEditingRules([]);
     }
   };
 
@@ -53,7 +69,7 @@ export default function NextClassStep({ onNext }: { onNext: () => void }) {
   const [reviewStudents, setReviewStudents] = useState<any[]>([]);
   const [loadingReview, setLoadingReview] = useState(false);
 
-  // Fetch classes, grades, and teachers on mount
+  // Fetch classes, grades, teachers, and progression rules on mount
   useEffect(() => {
     async function fetchData() {
       if (!schoolCode) return;
@@ -74,10 +90,18 @@ export default function NextClassStep({ onNext }: { onNext: () => void }) {
         const data = await teacherRes.json();
         setTeachers(data);
       }
-      // Optionally fetch progressions if needed
+      // Fetch progression rules
+      fetchProgressionRules();
     }
     fetchData();
   }, [schoolCode]);
+
+  // Also fetch progression rules after saving
+  useEffect(() => {
+    if (progressionSaved) {
+      fetchProgressionRules();
+    }
+  }, [progressionSaved, schoolCode]);
 
   // Save progression rules
   async function handleSaveRules() {
@@ -131,10 +155,76 @@ export default function NextClassStep({ onNext }: { onNext: () => void }) {
     }
   }
 
-  // Section 2: Fetch review students after rules are saved
+  // Save progression rules from modal
+  const handleSaveProgression = async () => {
+    // Build progression rules from current classes/grades
+    // For each class, find its next class (progression)
+    const rules = [];
+    // Sort grades by number for correct order
+    const sortedGrades = [...grades].sort((a, b) => {
+      const aNum = parseInt(a.name.replace(/\D/g, ""));
+      const bNum = parseInt(b.name.replace(/\D/g, ""));
+      return aNum - bNum;
+    });
+    for (let i = 0; i < sortedGrades.length; i++) {
+      const grade = sortedGrades[i];
+      const gradeClasses = classes.filter((c) => c.gradeId === grade.id);
+      for (const cls of gradeClasses) {
+        // Find next grade
+        let toClass = "";
+        if (i === sortedGrades.length - 1) {
+          // Last grade, promote to ALUMNI if exists
+          const alumniClass = classes.find(
+            (c) => c.name.trim().toLowerCase() === "alumni"
+          );
+          toClass = alumniClass ? alumniClass.name : "ALUMNI";
+        } else {
+          // Promote to next grade, same stream
+          const nextGrade = sortedGrades[i + 1];
+          const streamSuffix = cls.name.replace(grade.name, "").trim();
+          const nextGradeClass = classes.find(
+            (c) => c.gradeId === nextGrade.id && c.name.endsWith(streamSuffix)
+          );
+          toClass = nextGradeClass
+            ? nextGradeClass.name
+            : `${nextGrade.name} ${streamSuffix}`.trim();
+        }
+        rules.push({
+          fromClass: cls.name,
+          toClass,
+          order: i + 1,
+        });
+      }
+    }
+    try {
+      const res = await fetch(`/api/schools/${schoolCode}/progression`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rules }),
+      });
+      if (!res.ok) throw new Error("Failed to save progression rules");
+      setProgressionModalOpen(false);
+      setProgressionSaved(true); // Show review table
+      toast({
+        title: "Progression rules saved!",
+        description: "Class progression rules have been saved successfully.",
+        variant: "success",
+      });
+      // Fetch and update editingRules after save
+      fetchProgressionRules();
+    } catch (e: any) {
+      toast({
+        title: "Error",
+        description: e.message || "Error saving progression rules.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Section 2: Fetch review students after rules are saved or if progression rules exist
   useEffect(() => {
     async function fetchReview() {
-      if (!progressionSaved) return;
+      if (editingRules.length === 0) return;
       setLoadingReview(true);
       try {
         const res = await fetch(
@@ -151,12 +241,30 @@ export default function NextClassStep({ onNext }: { onNext: () => void }) {
       }
     }
     fetchReview();
-  }, [progressionSaved, schoolCode]);
+  }, [editingRules, schoolCode]);
+
+  // After fetching review students, attach toClass to each eligible student in wizard state
+  useEffect(() => {
+    if (reviewStudents.length > 0 && editingRules.length > 0) {
+      const studentsWithToClass = reviewStudents.map((s: any) => {
+        const fromClass = s.fromClass || s.className || "";
+        const progression = editingRules.find(
+          (p: any) => p.fromClass === fromClass
+        );
+        const toClass = progression ? progression.toClass : "";
+        return { ...s, toClass };
+      });
+      setWizardState((prev: any) => ({
+        ...prev,
+        eligibleStudents: studentsWithToClass,
+      }));
+    }
+  }, [reviewStudents, editingRules, setWizardState]);
 
   // Check if all rules are set
-  const allRulesSet = editingRules.every(
-    (r) => r.toClass && r.toClass.trim() !== ""
-  );
+  const allRulesSet =
+    Array.isArray(editingRules) &&
+    editingRules.every((r) => r.toClass && r.toClass.trim() !== "");
   const allStudentsOK = reviewStudents.every((s) => s.status === "OK");
 
   return (
@@ -192,6 +300,7 @@ export default function NextClassStep({ onNext }: { onNext: () => void }) {
                 schoolCode={schoolCode || ""}
                 onClose={() => setProgressionModalOpen(false)}
                 onClassCreated={fetchClasses}
+                onSave={handleSaveProgression}
               />
             </DialogContent>
           </Dialog>
@@ -247,60 +356,99 @@ export default function NextClassStep({ onNext }: { onNext: () => void }) {
         </div>
       )}
       {/* Section 2: Review Student Progression */}
-      {progressionSaved && (
-        <div>
-          <h3 className="font-semibold mb-2 mt-8">
-            2. Review Student Progression
-          </h3>
-          {loadingReview ? (
-            <div>Loading...</div>
-          ) : (
-            <table className="min-w-full border mb-2">
-              <thead>
-                <tr>
-                  <th className="border px-2 py-1">Name</th>
-                  <th className="border px-2 py-1">Admission #</th>
-                  <th className="border px-2 py-1">From Class</th>
-                  <th className="border px-2 py-1">To Class</th>
-                  <th className="border px-2 py-1">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {reviewStudents.length === 0 ? (
+      {
+        // Always show Section 2 for debugging
+        true && (
+          <div>
+            <h3 className="font-semibold mb-2 mt-8">
+              2. Review Student Progression
+            </h3>
+            {loadingReview ? (
+              <div>Loading...</div>
+            ) : (
+              <table className="min-w-full border mb-2">
+                <thead>
                   <tr>
-                    <td colSpan={5} className="text-center py-2">
-                      No students to review.
-                    </td>
+                    <th className="border px-2 py-1">Name</th>
+                    <th className="border px-2 py-1">Admission #</th>
+                    <th className="border px-2 py-1">From Class</th>
+                    <th className="border px-2 py-1">To Class</th>
+                    <th className="border px-2 py-1">Status</th>
                   </tr>
-                ) : (
-                  reviewStudents.map((s: any) => (
-                    <tr key={s.id}>
-                      <td className="border px-2 py-1">{s.name}</td>
-                      <td className="border px-2 py-1">{s.admissionNumber}</td>
-                      <td className="border px-2 py-1">{s.fromClass}</td>
-                      <td className="border px-2 py-1">{s.toClass}</td>
-                      <td
-                        className={`border px-2 py-1 ${
-                          s.status !== "OK" ? "text-red-600" : "text-green-600"
-                        }`}
-                      >
-                        {s.status}
+                </thead>
+                <tbody>
+                  {reviewStudents.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="text-center py-2">
+                        No students to review.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          )}
-          <button
-            className="bg-green-600 text-white px-4 py-2 rounded mt-4"
-            onClick={onNext}
-            disabled={!allStudentsOK}
-          >
-            Next
-          </button>
-        </div>
-      )}
+                  ) : (
+                    reviewStudents.map((s: any, idx: number) => {
+                      // Map each student to their next class using progression rules
+                      const fromClass = s.fromClass || s.className || "";
+                      const progression = editingRules.find(
+                        (p: any) => p.fromClass === fromClass
+                      );
+                      const toClass = progression ? progression.toClass : "";
+                      const status = toClass ? "OK" : "Missing";
+                      return (
+                        <tr key={s.id || idx}>
+                          <td className="border px-2 py-1">{s.name}</td>
+                          <td className="border px-2 py-1">
+                            {s.admissionNumber}
+                          </td>
+                          <td className="border px-2 py-1">{fromClass}</td>
+                          <td className="border px-2 py-1">
+                            {toClass || (
+                              <span className="text-red-600">Missing</span>
+                            )}
+                          </td>
+                          <td
+                            className={`border px-2 py-1 ${
+                              status === "OK"
+                                ? "text-green-600"
+                                : "text-red-600"
+                            }`}
+                          >
+                            {status}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            )}
+            {/* Block Next if any student is missing a progression */}
+            {reviewStudents.some((s: any) => {
+              const fromClass = s.fromClass || s.className || "";
+              const progression = editingRules.find(
+                (p: any) => p.fromClass === fromClass
+              );
+              return !progression || !progression.toClass;
+            }) && (
+              <div className="text-red-600 mb-2">
+                Some students are missing a progression rule. Please fix before
+                proceeding.
+              </div>
+            )}
+            <button
+              className="bg-green-600 text-white px-4 py-2 rounded mt-4"
+              onClick={onNext}
+              disabled={reviewStudents.some((s: any) => {
+                const fromClass = s.fromClass || s.className || "";
+                const progression = editingRules.find(
+                  (p: any) => p.fromClass === fromClass
+                );
+                return !progression || !progression.toClass;
+              })}
+            >
+              Next
+            </button>
+          </div>
+        )
+      }
     </div>
   );
 }
