@@ -28,6 +28,16 @@ export default function NextClassStep({ onNext }: { onNext: () => void }) {
   const [progressionModalOpen, setProgressionModalOpen] = useState(false);
   const [unsaved, setUnsaved] = useState(false);
   const [grades, setGrades] = useState<any[]>([]);
+  const [teachers, setTeachers] = useState<any[]>([]);
+
+  // Fetch classes, grades, and teachers on mount
+  const fetchClasses = async () => {
+    if (!schoolCode) return;
+    const res = await fetch(`/api/schools/${schoolCode}/classes`);
+    if (res.ok) {
+      setClasses(await res.json());
+    }
+  };
 
   // Track unsaved changes
   useEffect(() => {
@@ -43,13 +53,14 @@ export default function NextClassStep({ onNext }: { onNext: () => void }) {
   const [reviewStudents, setReviewStudents] = useState<any[]>([]);
   const [loadingReview, setLoadingReview] = useState(false);
 
-  // Fetch classes, grades, and progression rules on mount
+  // Fetch classes, grades, and teachers on mount
   useEffect(() => {
     async function fetchData() {
       if (!schoolCode) return;
-      const [classRes, gradeRes] = await Promise.all([
+      const [classRes, gradeRes, teacherRes] = await Promise.all([
         fetch(`/api/schools/${schoolCode}/classes`),
         fetch(`/api/schools/${schoolCode}/grades`),
+        fetch(`/api/schools/${schoolCode}/teachers`),
       ]);
       if (classRes.ok) {
         const data = await classRes.json();
@@ -58,6 +69,10 @@ export default function NextClassStep({ onNext }: { onNext: () => void }) {
       if (gradeRes.ok) {
         const data = await gradeRes.json();
         setGrades(data);
+      }
+      if (teacherRes.ok) {
+        const data = await teacherRes.json();
+        setTeachers(data);
       }
       // Optionally fetch progressions if needed
     }
@@ -173,7 +188,10 @@ export default function NextClassStep({ onNext }: { onNext: () => void }) {
               <ProgressionModal
                 grades={grades}
                 classes={classes}
+                teachers={teachers || []}
+                schoolCode={schoolCode || ""}
                 onClose={() => setProgressionModalOpen(false)}
+                onClassCreated={fetchClasses}
               />
             </DialogContent>
           </Dialog>
