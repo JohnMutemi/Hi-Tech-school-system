@@ -143,7 +143,7 @@ export class PromotionService {
             promotionList.push({
               studentId: student.id,
               fromClass: currentClass.name,
-              toClass: 'No Next Class',
+              toClass: '', // Changed from 'No Next Class' to ''
               fromYear: currentYear,
               toYear: currentYear + 1,
               outstandingBalance,
@@ -493,6 +493,80 @@ export class PromotionService {
           summary.promoted.push(student.id);
         } catch (err: any) {
           summary.errors.push(`Failed to promote ${student.id}: ${err.message}`);
+        }
+      }
+    } catch (err: any) {
+      summary.errors.push(`General error: ${err.message}`);
+    }
+    return summary;
+  }
+
+  /**
+   * Bulk promote an arbitrary list of students to their specified target classes
+   */
+  static async bulkPromoteStudents(
+    schoolId: string,
+    students: Array<{
+      studentId: string;
+      fromClass: string;
+      toClass: string;
+      manualOverride?: boolean;
+      overrideReason?: string;
+      notes?: string;
+      criteriaId?: string;
+    }>,
+    promotedBy: string
+  ) {
+    const summary = { promoted: [], excluded: [], errors: [], log: [] };
+    try {
+      for (const s of students) {
+        try {
+          // Validate fromClass and toClass
+          const fromClassObj = await prisma.class.findFirst({ where: { schoolId, name: s.fromClass, isActive: true } });
+          if (!fromClassObj) {
+            const allClasses = await prisma.class.findMany({ where: { schoolId, isActive: true } });
+            console.error(`From class "${s.fromClass}" not found. Available classes:`, allClasses.map(c => c.name));
+            summary.excluded.push({ studentId: s.studentId, reason: `From class ${s.fromClass} not found` });
+            continue;
+          }
+          const toClassObj = await prisma.class.findFirst({ where: { schoolId, name: s.toClass, isActive: true } });
+          if (!toClassObj && s.toClass !== 'Alumni') {
+            const allClasses = await prisma.class.findMany({ where: { schoolId, isActive: true } });
+            console.error(`To class "${s.toClass}" not found. Available classes:`, allClasses.map(c => c.name));
+            summary.excluded.push({ studentId: s.studentId, reason: `To class ${s.toClass} not found` });
+            continue;
+          }
+          // If toClass is Alumni, handle graduation logic (optional: implement as needed)
+          let targetClassId = toClassObj?.id;
+          if (s.toClass === 'Alumni') {
+            // Find or create Alumni class
+            const alumniClass = await this.getOrCreateAlumniClass(prisma, schoolId);
+            targetClassId = alumniClass.id;
+          }
+          // Update student class
+          await prisma.student.update({ where: { id: s.studentId }, data: { classId: targetClassId } });
+          // Log promotion
+          await prisma.promotionLog.create({
+            data: {
+              studentId: s.studentId,
+              fromClass: s.fromClass,
+              toClass: s.toClass,
+              fromGrade: fromClassObj.gradeId,
+              toGrade: toClassObj?.gradeId || null,
+              fromYear: new Date().getFullYear().toString(),
+              toYear: (new Date().getFullYear() + 1).toString(),
+              promotedBy,
+              criteriaResults: { type: 'bulk_promotion' },
+              appliedCriteriaId: s.criteriaId,
+              manualOverride: !!s.manualOverride,
+              overrideReason: s.overrideReason,
+              notes: s.notes,
+              promotionType: 'bulk',
+            },
+          });
+          summary.promoted.push(s.studentId);
+        } catch (err: any) {
+          summary.errors.push(`Failed to promote ${s.studentId}: ${err.message}`);
         }
       }
     } catch (err: any) {

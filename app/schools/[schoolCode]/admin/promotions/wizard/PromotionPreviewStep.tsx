@@ -110,12 +110,18 @@ export default function PromotionPreviewStep() {
       );
       const data = await res.json();
       console.log("API response:", data); // DEBUG
-      setEligibleStudents(data.eligibleStudents || []);
+      // After fetching eligible students, ensure fromClass and toClass are set
+      const eligibleWithNextClass = (data.eligibleStudents || []).map((s) => ({
+        ...s,
+        fromClass: s.fromClass || s.currentClass || "",
+        toClass: s.toClass || s.nextClass || "",
+      }));
+      setEligibleStudents(eligibleWithNextClass);
       setIneligibleStudents(data.ineligibleStudents || []);
       setWizardState((prev: any) => {
         const newState = {
           ...prev,
-          eligibleStudents: data.eligibleStudents,
+          eligibleStudents: eligibleWithNextClass,
           ineligibleStudents: data.ineligibleStudents,
         };
         console.log("Wizard state:", newState); // DEBUG
@@ -331,7 +337,8 @@ export default function PromotionPreviewStep() {
             <tr>
               <th className="border px-2 py-1">Name</th>
               <th className="border px-2 py-1">Admission #</th>
-              <th className="border px-2 py-1">Class</th>
+              <th className="border px-2 py-1">From Class</th>
+              <th className="border px-2 py-1">To Class</th>
               <th className="border px-2 py-1">Performance Summary</th>
               <th className="border px-2 py-1">Actions</th>
             </tr>
@@ -339,7 +346,7 @@ export default function PromotionPreviewStep() {
           <tbody>
             {pagedEligible.length === 0 && (
               <tr>
-                <td colSpan={5} className="text-center py-4">
+                <td colSpan={6} className="text-center py-4">
                   No eligible students found.
                 </td>
               </tr>
@@ -348,7 +355,10 @@ export default function PromotionPreviewStep() {
               <tr key={s.id}>
                 <td className="border px-2 py-1">{s.name}</td>
                 <td className="border px-2 py-1">{s.admissionNumber}</td>
-                <td className="border px-2 py-1">{s.currentClass}</td>
+                <td className="border px-2 py-1">
+                  {s.fromClass || s.currentClass || "-"}
+                </td>
+                <td className="border px-2 py-1">{s.toClass || "-"}</td>
                 <td className="border px-2 py-1">
                   Grade: {s.grade || "-"} • Attendance: {s.attendance || "-"}% •{" "}
                   {renderBalanceCell(studentBalances[s.id] ?? 0)}
@@ -396,7 +406,8 @@ export default function PromotionPreviewStep() {
             <tr>
               <th className="border px-2 py-1">Name</th>
               <th className="border px-2 py-1">Admission #</th>
-              <th className="border px-2 py-1">Class</th>
+              <th className="border px-2 py-1">From Class</th>
+              <th className="border px-2 py-1">To Class</th>
               <th className="border px-2 py-1">Performance Summary</th>
               <th className="border px-2 py-1">Actions</th>
             </tr>
@@ -404,7 +415,7 @@ export default function PromotionPreviewStep() {
           <tbody>
             {pagedIneligible.length === 0 && (
               <tr>
-                <td colSpan={5} className="text-center py-4">
+                <td colSpan={6} className="text-center py-4">
                   No ineligible students found.
                 </td>
               </tr>
@@ -413,7 +424,12 @@ export default function PromotionPreviewStep() {
               <tr key={s.id}>
                 <td className="border px-2 py-1">{s.name}</td>
                 <td className="border px-2 py-1">{s.admissionNumber}</td>
-                <td className="border px-2 py-1">{s.currentClass}</td>
+                <td className="border px-2 py-1">
+                  {s.fromClass || s.currentClass || "-"}
+                </td>
+                <td className="border px-2 py-1">
+                  {s.toClass || s.fromClass || s.currentClass || "-"}
+                </td>
                 <td className="border px-2 py-1">
                   Grade: {s.grade || "-"} • Attendance: {s.attendance || "-"}% •{" "}
                   {renderBalanceCell(studentBalances[s.id] ?? 0)}

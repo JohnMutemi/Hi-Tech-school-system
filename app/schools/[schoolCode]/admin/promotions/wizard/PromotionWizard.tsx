@@ -1,10 +1,11 @@
-import React, { useState, createContext, useContext } from "react";
+import React, { useState, createContext, useContext, useEffect } from "react";
 // Placeholder imports for steps
 import AcademicYearStep from "./AcademicYearStep";
 import PromotionCriteriaStep from "./PromotionCriteriaStep";
 import PromotionPreviewStep from "./PromotionPreviewStep";
 import PromotionConfirmStep from "./PromotionConfirmStep";
 import PromotionResultsStep from "./PromotionResultsStep";
+import NextClassStep from "./NextClassStep";
 
 // Wizard context for sharing state
 export const PromotionWizardContext = createContext(null);
@@ -13,13 +14,43 @@ const steps = [
   { label: "Academic Year", component: AcademicYearStep },
   { label: "Criteria", component: PromotionCriteriaStep },
   { label: "Preview", component: PromotionPreviewStep },
+  { label: "Class Progression", component: NextClassStep },
   { label: "Confirm", component: PromotionConfirmStep },
   { label: "Results", component: PromotionResultsStep },
 ];
 
 export default function PromotionWizard() {
   const [currentStep, setCurrentStep] = useState(0);
-  const [wizardState, setWizardState] = useState({}); // Add fields as needed
+  const [wizardState, setWizardState] = useState({
+    eligibleStudents: [],
+    ineligibleStudents: [],
+    classList: [],
+    schoolCode: "",
+    // add other shared fields as needed
+  });
+
+  // Set schoolCode from URL if not already set
+  useEffect(() => {
+    if (!wizardState.schoolCode && typeof window !== "undefined") {
+      const code = window.location.pathname.split("/")[2];
+      if (code) {
+        setWizardState((prev: any) => ({ ...prev, schoolCode: code }));
+      }
+    }
+  }, [wizardState.schoolCode]);
+
+  // Fetch class list at wizard start
+  useEffect(() => {
+    async function fetchClasses() {
+      if (!wizardState.schoolCode) return;
+      const res = await fetch(`/api/schools/${wizardState.schoolCode}/classes`);
+      if (res.ok) {
+        const data = await res.json();
+        setWizardState((prev: any) => ({ ...prev, classList: data }));
+      }
+    }
+    fetchClasses();
+  }, [wizardState.schoolCode]);
 
   const StepComponent = steps[currentStep].component;
 

@@ -20,6 +20,7 @@ export default function PromotionConfirmStep() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [promotionResult, setPromotionResult] = useState<any>(null);
 
   const { toast } = useToast();
 
@@ -33,17 +34,23 @@ export default function PromotionConfirmStep() {
     setError("");
     setSuccess(false);
     try {
-      // Prepare student IDs, apply exclusions/overrides as needed
-      const studentIds = eligibleStudents
+      // Build students array for bulk promotion
+      const students = eligibleStudents
         .filter((s: any) => !exclusions[s.id])
-        .map((s: any) => s.id);
+        .map((s: any) => ({
+          studentId: s.id,
+          fromClass: s.currentClass || s.fromClass || "",
+          toClass: s.toClass || s.nextClass || (s.isGraduating ? "Alumni" : ""),
+          manualOverride: !!overrides[s.id],
+          overrideReason: overrides[s.id]?.note || "",
+          notes: "",
+          criteriaId: s.criteriaId || undefined,
+        }));
       const body = {
-        studentIds,
-        currentYear: selectedAcademicYear,
+        students,
         promotedBy: "admin", // TODO: Replace with actual user ID
-        overrides,
-        exclusions,
       };
+      console.log("Sending students array to backend:", students); // DEBUG
       const res = await fetch(`/api/schools/${schoolCode}/promotions/bulk`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -52,6 +59,7 @@ export default function PromotionConfirmStep() {
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "Promotion failed");
       setSuccess(true);
+      setPromotionResult(result);
       setWizardState((prev: any) => ({ ...prev, promotionResults: result }));
       toast({
         title: "Promotion Complete!",
@@ -109,6 +117,18 @@ export default function PromotionConfirmStep() {
       {success && (
         <div className="text-green-600 mb-2">
           Promotion executed successfully!
+        </div>
+      )}
+      {promotionResult?.excluded?.length > 0 && (
+        <div className="mt-4">
+          <h4 className="font-semibold">Excluded Students:</h4>
+          <ul className="text-sm text-red-700">
+            {promotionResult.excluded.map((ex: any, i: number) => (
+              <li key={i}>
+                {ex.studentId}: {ex.reason}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
       <button

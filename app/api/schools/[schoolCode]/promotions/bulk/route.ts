@@ -12,19 +12,18 @@ export async function POST(
   try {
     const { schoolCode } = params;
     const body = await request.json();
-    const { studentIds, currentYear, promotedBy } = body;
+    const { students, promotedBy } = body;
 
     // Validate required fields
-    if (!studentIds || !Array.isArray(studentIds) || studentIds.length === 0) {
+    if (!students || !Array.isArray(students) || students.length === 0) {
       return NextResponse.json(
-        { error: 'Student IDs array is required' },
+        { error: 'Students array is required' },
         { status: 400 }
       );
     }
-
-    if (!currentYear || !promotedBy) {
+    if (!promotedBy) {
       return NextResponse.json(
-        { error: 'Current year and promoted by user ID are required' },
+        { error: 'Promoted by user ID is required' },
         { status: 400 }
       );
     }
@@ -42,18 +41,13 @@ export async function POST(
     }
 
     // Execute bulk promotion
-    const result = await PromotionService.executeBulkPromotion(
+    const result = await PromotionService.bulkPromoteStudents(
       school.id,
-      currentYear,
-      studentIds,
+      students,
       promotedBy
     );
 
-    if (result.success) {
-      return NextResponse.json(result, { status: 200 });
-    } else {
-      return NextResponse.json(result, { status: 400 });
-    }
+    return NextResponse.json(result, { status: 200 });
 
   } catch (error: any) {
     console.error('Bulk promotion error:', error);
