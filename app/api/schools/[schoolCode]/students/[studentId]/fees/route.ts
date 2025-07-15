@@ -194,7 +194,7 @@ export async function GET(
     });
 
     const arrears = arrearsRecords.reduce((sum, record) => sum + record.arrearAmount, 0);
-    const totalOutstanding = academicYearOutstanding + arrears;
+    const outstanding = academicYearOutstanding + arrears;
 
     return NextResponse.json({
       student: {
@@ -206,7 +206,7 @@ export async function GET(
       },
       termBalances,
       academicYearOutstanding,
-      totalOutstanding,
+      outstanding,
       arrears,
       carryForwardArrears: 0,
       carryForwardBreakdown: [],

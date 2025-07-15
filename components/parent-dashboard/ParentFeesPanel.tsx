@@ -210,6 +210,7 @@ export function ParentFeesPanel({
     (f: any) => f.termId === currentTermId
   );
   const outstandingFees = currentTermSummary?.balance || 0;
+  const outstanding = feeSummary?.outstanding || 0;
 
   // Calculate totals for statement
   const totalDebit = statement.reduce(
@@ -223,7 +224,7 @@ export function ParentFeesPanel({
   const totalBalance =
     statement.length > 0 ? statement[statement.length - 1].balance || 0 : 0;
   // Use statement's last balance as total outstanding
-  const totalOutstanding = totalBalance;
+  // const outstanding = totalBalance; // This line is removed
 
   // PDF export handler
   const handleDownloadPDF = async () => {
@@ -488,11 +489,9 @@ export function ParentFeesPanel({
               </span>
             </div>
             <div>
-              <span className="font-semibold">
-                Total Outstanding (Academic Year):
-              </span>{" "}
+              <span className="font-semibold">Total Outstanding:</span>{" "}
               <span className="text-blue-700 font-bold">
-                KES {totalOutstanding.toLocaleString()}
+                KES {outstanding.toLocaleString()}
               </span>
             </div>
           </div>
