@@ -31,6 +31,7 @@ model School {
   studentArrears    StudentArrear[]
   termlyFees        TermlyFeeStructure[]
   users             User[]
+  grades            Grade[]
 }
 
 model User {
@@ -68,12 +69,11 @@ model TeacherProfile {
 model Grade {
   id        String   @id @default(uuid())
   name      String
-  schoolId  String
+  schoolId  String?
   isAlumni  Boolean  @default(false) // Field from promotions logic
   classes   Class[]
-}
-
   termlyFees TermlyFeeStructure[]
+  school    School?  @relation(fields: [schoolId], references: [id])
 }
 
 model Class {
@@ -141,7 +141,8 @@ model Student {
   promotionLogs         PromotionLog[]
   promotionExclusions   PromotionExclusion[]
   receipts              Receipt[]
-  studentArrears        StudentArrear[]
+  studentArrears        StudentArrears[]
+  studentArrearsLegacy  StudentArrear[]
 }
 
 model Payment {
