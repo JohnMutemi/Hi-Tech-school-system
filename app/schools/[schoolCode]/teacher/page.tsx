@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Avatar } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   LogOut,
   User,
@@ -13,15 +15,15 @@ import {
   Settings,
   Key,
   Menu,
+  GraduationCap,
+  FileText,
+  Calendar,
+  Bell,
+  CheckCircle,
+  Eye,
+  Edit,
 } from "lucide-react";
-
-const sidebarNav = [
-  { label: "My Classes", icon: BookOpen, section: "classes" },
-  { label: "My Subjects", icon: BookOpen, section: "subjects" },
-  { label: "My Students", icon: Users, section: "students" },
-  { label: "Settings", icon: Settings, section: "settings" },
-  { label: "Profile", icon: User, section: "profile" },
-];
+import { TeacherSidebar } from "@/components/teacher-dashboard/TeacherSidebar";
 
 export default function TeacherDashboardPage({
   params,
@@ -31,7 +33,7 @@ export default function TeacherDashboardPage({
   const { schoolCode } = params;
   const router = useRouter();
   const [teacher, setTeacher] = useState<any>(null);
-  const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("overview");
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -41,7 +43,7 @@ export default function TeacherDashboardPage({
   const [avatarError, setAvatarError] = useState("");
   const [editProfile, setEditProfile] = useState(false);
   const [editData, setEditData] = useState<any>({});
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [schoolData, setSchoolData] = useState<any>(null);
 
   useEffect(() => {
     async function fetchTeacher() {
@@ -68,6 +70,13 @@ export default function TeacherDashboardPage({
         }
         const teacherData = await res.json();
         setTeacher(teacherData);
+        
+        // Fetch school data for color theme
+        const schoolRes = await fetch(`/api/schools/${schoolCode}`);
+        if (schoolRes.ok) {
+          const schoolData = await schoolRes.json();
+          setSchoolData(schoolData);
+        }
       } catch (err) {
         router.replace(`/schools/${schoolCode}/teachers/login`);
       }
@@ -203,19 +212,19 @@ export default function TeacherDashboardPage({
   };
 
   const renderContent = () => {
-    if (activeSection === "profile" && teacher) {
+    if (activeTab === "profile" && teacher) {
       return editProfile ? <EditProfileForm /> : <ProfileView />;
     }
-    if (activeSection === "classes") {
+    if (activeTab === "classes") {
       return <ClassesView />;
     }
-    if (activeSection === "subjects") {
+    if (activeTab === "subjects") {
       return <SubjectsView />;
     }
-    if (activeSection === "students") {
+    if (activeTab === "students") {
       return <StudentsView />;
     }
-    if (activeSection === "settings") {
+    if (activeTab === "settings") {
       return <SettingsView />;
     }
     return <WelcomeView />;
@@ -375,93 +384,171 @@ export default function TeacherDashboardPage({
   );
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      {/* Sidebar */}
-      <aside
-        className={`fixed inset-y-0 left-0 z-20 w-64 bg-white border-r p-4 transform transition-transform md:relative md:translate-x-0 ${
-          isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
-      >
-        <div className="flex flex-col items-center text-center p-4 border-b">
-          <Avatar className="w-24 h-24 mb-4 relative group">
-            <img
-              src={teacher?.avatarUrl || "/placeholder-user.jpg"}
-              alt={teacher?.name}
-            />
-            <label className="absolute bottom-0 right-0 bg-blue-600 text-white rounded-full p-1 cursor-pointer">
-              <input
-                type="file"
-                className="hidden"
-                onChange={handleAvatarChange}
-              />
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
-                />
-              </svg>
-            </label>
-          </Avatar>
-          <h2 className="font-bold text-xl">{teacher?.name}</h2>
-          <p className="text-sm text-gray-500">{teacher?.email}</p>
+    <div className="min-h-screen flex bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      {/* Sidebar with modern look */}
+      {teacher && schoolData && (
+        <TeacherSidebar 
+          activeTab={activeTab} 
+          onTabChange={setActiveTab} 
+          colorTheme={schoolData.colorTheme || "#3b82f6"} 
+          onLogout={handleLogout} 
+          teacher={teacher} 
+        />
+      )}
+      
+      {/* Main Content Area with vertical divider */}
+      <div className="flex-1 flex justify-center items-start relative">
+        {/* Vertical divider/shadow */}
+        <div className="hidden md:block absolute left-0 top-0 h-full w-10 z-10">
+          <div className="h-full w-2 ml-6 bg-gradient-to-b from-transparent via-blue-200 to-transparent shadow-2xl rounded-full opacity-80" />
         </div>
-        <nav className="mt-6 space-y-2">
-          {sidebarNav.map((item) => (
-            <Button
-              key={item.section}
-              variant={activeSection === item.section ? "secondary" : "ghost"}
-              className="w-full justify-start"
-              onClick={() => {
-                setActiveSection(item.section);
-                setIsSidebarOpen(false);
-              }}
+        
+        <main className="flex-1 flex justify-center items-start p-2 md:p-6 transition-all duration-300">
+          <section className="w-full max-w-7xl bg-white/80 rounded-3xl shadow-2xl p-4 md:p-14 backdrop-blur-lg mx-2 md:mx-6 ml-0 md:ml-20 lg:ml-32 pl-0 md:pl-16">
+            {/* Header */}
+            <div
+              className="sticky top-0 z-20 bg-white/70 shadow-sm border-b rounded-2xl mb-8 px-4 py-8 flex items-center justify-between"
+              style={{ borderTopColor: schoolData?.colorTheme || "#3b82f6", borderTopWidth: "4px" }}
             >
-              <item.icon className="w-4 h-4 mr-2" /> {item.label}
-            </Button>
-          ))}
-        </nav>
-        <div className="absolute bottom-4 left-4 right-4">
-          <Button variant="outline" className="w-full" onClick={handleLogout}>
-            <LogOut className="w-4 h-4 mr-2" /> Logout
-          </Button>
-        </div>
-      </aside>
+              <div className="flex items-center space-x-4">
+                <Avatar className="w-16 h-16 border-2 shadow-lg">
+                  <AvatarImage src={teacher?.avatarUrl} alt={teacher?.name} />
+                  <AvatarFallback className="bg-blue-600 text-white text-lg font-semibold">
+                    {teacher?.name?.charAt(0) || "T"}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <h1 className="text-3xl font-bold text-gray-900">
+                    Welcome, {teacher?.name}!
+                  </h1>
+                  <p className="text-gray-600">
+                    Teacher Dashboard - {schoolData?.name || "School"}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-4">
+                <Badge variant="default" className="bg-green-100 text-green-800">
+                  Active Teacher
+                </Badge>
+              </div>
+            </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col">
-        <header className="bg-white border-b p-4 flex justify-between items-center sticky top-0 z-10 md:hidden">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          >
-            <Menu />
-          </Button>
-          <h1 className="font-semibold text-lg">Teacher Dashboard</h1>
-          <Avatar className="w-8 h-8">
-            <img
-              src={teacher?.avatarUrl || "/placeholder-user.jpg"}
-              alt={teacher?.name}
-            />
-          </Avatar>
-        </header>
+            {/* Main Tab Content */}
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              {/* Overview Tab */}
+              <TabsContent value="overview" className="space-y-8">
+                {/* Summary Stats Section */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                  <Card className="bg-gradient-to-br from-blue-50 to-blue-100 shadow-lg border-0 rounded-2xl flex flex-col items-center py-4 md:py-6 px-4 md:px-6">
+                    <CardContent className="flex flex-col items-center p-2">
+                      <GraduationCap className="w-6 h-6 text-blue-500 mb-1" />
+                      <div className="text-2xl font-bold">3</div>
+                      <div className="text-gray-500 text-sm">My Classes</div>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-gradient-to-br from-green-50 to-green-100 shadow-lg border-0 rounded-2xl flex flex-col items-center py-4 md:py-6 px-4 md:px-6">
+                    <CardContent className="flex flex-col items-center p-2">
+                      <FileText className="w-6 h-6 text-green-500 mb-1" />
+                      <div className="text-2xl font-bold">5</div>
+                      <div className="text-gray-500 text-sm">My Subjects</div>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-gradient-to-br from-purple-50 to-purple-100 shadow-lg border-0 rounded-2xl flex flex-col items-center py-4 md:py-6 px-4 md:px-6">
+                    <CardContent className="flex flex-col items-center p-2">
+                      <Users className="w-6 h-6 text-purple-500 mb-1" />
+                      <div className="text-2xl font-bold">120</div>
+                      <div className="text-gray-500 text-sm">My Students</div>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-gradient-to-br from-orange-50 to-orange-100 shadow-lg border-0 rounded-2xl flex flex-col items-center py-4 md:py-6 px-4 md:px-6">
+                    <CardContent className="flex flex-col items-center p-2">
+                      <Calendar className="w-6 h-6 text-orange-500 mb-1" />
+                      <div className="text-2xl font-bold">95%</div>
+                      <div className="text-gray-500 text-sm">Attendance</div>
+                    </CardContent>
+                  </Card>
+                </div>
 
-        <main className="flex-grow p-4 md:p-6">
-          {teacher ? renderContent() : <p>Loading...</p>}
+                {/* Quick Actions */}
+                <Card className="bg-white/60 backdrop-blur-lg rounded-3xl shadow-2xl border-0 px-4 py-4 md:px-12 md:py-10">
+                  <CardHeader className="px-2 py-2 md:px-6 md:py-4">
+                    <CardTitle className="flex items-center space-x-2 text-base md:text-xl">
+                      <CheckCircle className="w-6 h-6 md:w-5 md:h-5 text-green-500" />
+                      <span>Quick Actions</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <Button
+                        onClick={() => setActiveTab("classes")}
+                        className="h-20 flex flex-col items-center justify-center space-y-2 bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
+                      >
+                        <GraduationCap className="w-6 h-6" />
+                        <span>View My Classes</span>
+                      </Button>
+                      <Button
+                        onClick={() => setActiveTab("students")}
+                        className="h-20 flex flex-col items-center justify-center space-y-2 bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white"
+                      >
+                        <Users className="w-6 h-6" />
+                        <span>Manage Students</span>
+                      </Button>
+                      <Button
+                        onClick={() => setActiveTab("settings")}
+                        className="h-20 flex flex-col items-center justify-center space-y-2 bg-gradient-to-br from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white"
+                      >
+                        <Settings className="w-6 h-6" />
+                        <span>Account Settings</span>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Other Tab Contents */}
+              <TabsContent value="classes" className="space-y-8 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl shadow-lg p-6">
+                <ClassesView />
+              </TabsContent>
+
+              <TabsContent value="subjects" className="space-y-8 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl shadow-lg p-6">
+                <SubjectsView />
+              </TabsContent>
+
+              <TabsContent value="students" className="space-y-8 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl shadow-lg p-6">
+                <StudentsView />
+              </TabsContent>
+
+              <TabsContent value="attendance" className="space-y-8 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl shadow-lg p-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Attendance Management</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-gray-600">Attendance tracking functionality coming soon...</p>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="notifications" className="space-y-8 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl shadow-lg p-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Notifications</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-gray-600">No new notifications</p>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="settings" className="space-y-8 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl shadow-lg p-6">
+                <SettingsView />
+              </TabsContent>
+
+              <TabsContent value="profile" className="space-y-8 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl shadow-lg p-6">
+                {teacher && (editProfile ? <EditProfileForm /> : <ProfileView />)}
+              </TabsContent>
+            </Tabs>
+          </section>
         </main>
       </div>
     </div>

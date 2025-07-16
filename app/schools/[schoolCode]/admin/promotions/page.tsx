@@ -55,6 +55,7 @@ import {
   GraduationCap,
   ArrowLeft,
   AlertTriangle,
+  Settings,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -87,7 +88,7 @@ export default function PromotionsPage() {
   const { toast } = useToast();
 
   const [step, setStep] = useState<
-    "select" | "review" | "confirm" | "complete"
+    "select" | "review" | "confirm" | "complete" | "settings"
   >("select");
   const [selectedClass, setSelectedClass] = useState("");
   const [eligibleStudents, setEligibleStudents] = useState<Student[]>([]);
@@ -101,6 +102,29 @@ export default function PromotionsPage() {
   const [showExclusionDialog, setShowExclusionDialog] = useState(false);
   const [currentStudent, setCurrentStudent] = useState<Student | null>(null);
 
+  // Settings state
+  const [settingsTab, setSettingsTab] = useState<"criteria" | "progression">("criteria");
+  const [criteria, setCriteria] = useState<any[]>([]);
+  const [progression, setProgression] = useState<any[]>([]);
+  const [loadingSettings, setLoadingSettings] = useState(false);
+  
+  // Criteria form state
+  const [criteriaForm, setCriteriaForm] = useState({
+    classLevel: "",
+    minGrade: "",
+    attendance: "",
+    feeStatus: "paid",
+    isActive: true,
+  });
+  
+  // Progression form state
+  const [progressionForm, setProgressionForm] = useState({
+    fromClass: "",
+    toClass: "",
+    order: 1,
+    isActive: true,
+  });
+
   useEffect(() => {
     loadClasses();
   }, []);
@@ -111,6 +135,12 @@ export default function PromotionsPage() {
       determineNextClass();
     }
   }, [selectedClass]);
+
+  useEffect(() => {
+    if (step === "settings") {
+      loadSettings();
+    }
+  }, [step]);
 
   const loadClasses = async () => {
     try {
@@ -130,9 +160,19 @@ export default function PromotionsPage() {
         `/api/schools/${schoolCode}/promotions?action=eligible-students&classLevel=${selectedClass}`
       );
       const data = await response.json();
-      setEligibleStudents(data);
-      // Auto-select all eligible students
-      setSelectedStudents(data.map((student: Student) => student.id));
+      if (Array.isArray(data)) {
+        setEligibleStudents(data);
+        // Auto-select all eligible students
+        setSelectedStudents(data.map((student: Student) => student.id));
+      } else {
+        setEligibleStudents([]);
+        setSelectedStudents([]);
+        toast({
+          title: "Error",
+          description: data.error || "Failed to load eligible students",
+          variant: "destructive",
+        });
+      }
     } catch (error) {
       console.error("Failed to load eligible students:", error);
       toast({
@@ -286,7 +326,6 @@ export default function PromotionsPage() {
 
   const getExclusionReasonLabel = (reason: string) => {
     const reasons = {
-      academic: "Academic Performance",
       fees: "Fee Arrears",
       disciplinary: "Disciplinary Issues",
       parent_request: "Parent Request",
@@ -295,6 +334,436 @@ export default function PromotionsPage() {
     };
     return reasons[reason as keyof typeof reasons] || reason;
   };
+
+  // Settings functions
+  const loadSettings = async () => {
+    setLoadingSettings(true);
+    try {
+      // Load criteria
+      const criteriaResponse = await fetch(
+        `/api/schools/${schoolCode}/promotions?action=criteria`
+      );
+      const criteriaData = await criteriaResponse.json();
+      setCriteria(Array.isArray(criteriaData) ? criteriaData : []);
+
+      // Load progression
+      const progressionResponse = await fetch(
+        `/api/schools/${schoolCode}/promotions?action=progression`
+      );
+      const progressionData = await progressionResponse.json();
+      setProgression(Array.isArray(progressionData) ? progressionData : []);
+    } catch (error) {
+      console.error("Failed to load settings:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load promotion settings",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingSettings(false);
+    }
+  };
+
+  const saveCriteria = async () => {
+    if (!criteriaForm.classLevel) {
+      toast({
+        title: "Error",
+        description: "Please select a class level",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/schools/${schoolCode}/promotions`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "criteria",
+          data: {
+            ...criteriaForm,
+            minGrade: criteriaForm.minGrade ? parseFloat(criteriaForm.minGrade) : null,
+            attendance: criteriaForm.attendance ? parseInt(criteriaForm.attendance) : null,
+          },
+        }),
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Success",
+          description: "Promotion criteria saved successfully",
+        });
+        setCriteriaForm({
+          classLevel: "",
+          minGrade: "",
+          attendance: "",
+          feeStatus: "paid",
+          isActive: true,
+        });
+        loadSettings();
+      } else {
+        throw new Error("Failed to save criteria");
+      }
+    } catch (error) {
+      console.error("Failed to save criteria:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save promotion criteria",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const saveProgression = async () => {
+    if (!progressionForm.fromClass || !progressionForm.toClass) {
+      toast({
+        title: "Error",
+        description: "Please fill in both from and to classes",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/schools/${schoolCode}/promotions`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "progression",
+          data: progressionForm,
+        }),
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Success",
+          description: "Class progression saved successfully",
+        });
+        setProgressionForm({
+          fromClass: "",
+          toClass: "",
+          order: 1,
+          isActive: true,
+        });
+        loadSettings();
+      } else {
+        throw new Error("Failed to save progression");
+      }
+    } catch (error) {
+      console.error("Failed to save progression:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save class progression",
+        variant: "destructive",
+      });
+    }
+  };
+
+  if (step === "settings") {
+    return (
+      <div className="container mx-auto py-8">
+        <div className="mb-8">
+          <div className="flex items-center gap-4 mb-4">
+            <Button variant="outline" onClick={() => setStep("select")}>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Promotions
+            </Button>
+          </div>
+          <h1 className="text-3xl font-bold mb-2">Promotion Settings</h1>
+          <p className="text-gray-600">
+            Configure promotion criteria and class progression rules
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Promotion Criteria */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CheckCircle className="w-5 h-5" />
+                Promotion Criteria
+              </CardTitle>
+              <CardDescription>
+                Set minimum requirements for student promotion
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingSettings ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                  <p>Loading criteria...</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Add New Criteria Form */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">Add New Criteria</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Class Level
+                        </label>
+                        <Select
+                          value={criteriaForm.classLevel}
+                          onValueChange={(value) =>
+                            setCriteriaForm({ ...criteriaForm, classLevel: value })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select class level" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {classes.map((className) => (
+                              <SelectItem key={className} value={className}>
+                                {className}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Minimum Grade (Optional)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          max="100"
+                          value={criteriaForm.minGrade}
+                          onChange={(e) =>
+                            setCriteriaForm({ ...criteriaForm, minGrade: e.target.value })
+                          }
+                          className="w-full p-2 border rounded-md"
+                          placeholder="e.g., 50.0"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Minimum Attendance % (Optional)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={criteriaForm.attendance}
+                          onChange={(e) =>
+                            setCriteriaForm({ ...criteriaForm, attendance: e.target.value })
+                          }
+                          className="w-full p-2 border rounded-md"
+                          placeholder="e.g., 80"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Fee Status Requirement
+                        </label>
+                        <Select
+                          value={criteriaForm.feeStatus}
+                          onValueChange={(value) =>
+                            setCriteriaForm({ ...criteriaForm, feeStatus: value })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="paid">Fully Paid</SelectItem>
+                            <SelectItem value="partial">Partially Paid</SelectItem>
+                            <SelectItem value="any">Any Status</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <Button onClick={saveCriteria} className="w-full">
+                      Save Criteria
+                    </Button>
+                  </div>
+
+                  {/* Existing Criteria */}
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4">Current Criteria</h3>
+                    {criteria.length === 0 ? (
+                      <p className="text-gray-500 text-center py-4">
+                        No criteria set. Add criteria above.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {criteria.map((criterion) => (
+                          <div
+                            key={criterion.id}
+                            className="p-3 border rounded-lg bg-gray-50"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="font-medium">{criterion.classLevel}</p>
+                                <p className="text-sm text-gray-600">
+                                  Min Grade: {criterion.minGrade || "Not set"} | 
+                                  Attendance: {criterion.attendance || "Not set"}% | 
+                                  Fees: {criterion.feeStatus}
+                                </p>
+                              </div>
+                              <Badge variant={criterion.isActive ? "default" : "secondary"}>
+                                {criterion.isActive ? "Active" : "Inactive"}
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Class Progression */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ArrowRight className="w-5 h-5" />
+                Class Progression
+              </CardTitle>
+              <CardDescription>
+                Define which classes promote to which
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingSettings ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                  <p>Loading progression...</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Add New Progression Form */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">Add New Progression</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          From Class
+                        </label>
+                        <Select
+                          value={progressionForm.fromClass}
+                          onValueChange={(value) =>
+                            setProgressionForm({ ...progressionForm, fromClass: value })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select from class" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {classes.map((className) => (
+                              <SelectItem key={className} value={className}>
+                                {className}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          To Class
+                        </label>
+                        <Select
+                          value={progressionForm.toClass}
+                          onValueChange={(value) =>
+                            setProgressionForm({ ...progressionForm, toClass: value })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select to class" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {classes.map((className) => (
+                              <SelectItem key={className} value={className}>
+                                {className}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Order
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={progressionForm.order}
+                          onChange={(e) =>
+                            setProgressionForm({ ...progressionForm, order: parseInt(e.target.value) })
+                          }
+                          className="w-full p-2 border rounded-md"
+                          placeholder="1"
+                        />
+                      </div>
+                      <div className="flex items-end">
+                        <label className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            checked={progressionForm.isActive}
+                            onChange={(e) =>
+                              setProgressionForm({ ...progressionForm, isActive: e.target.checked })
+                            }
+                            className="rounded"
+                          />
+                          <span className="text-sm">Active</span>
+                        </label>
+                      </div>
+                    </div>
+                    <Button onClick={saveProgression} className="w-full">
+                      Save Progression
+                    </Button>
+                  </div>
+
+                  {/* Existing Progression */}
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4">Current Progression</h3>
+                    {progression.length === 0 ? (
+                      <p className="text-gray-500 text-center py-4">
+                        No progression rules set. Add progression above.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {progression
+                          .sort((a, b) => a.order - b.order)
+                          .map((prog) => (
+                            <div
+                              key={prog.id}
+                              className="p-3 border rounded-lg bg-gray-50"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium">{prog.fromClass}</span>
+                                  <ArrowRight className="w-4 h-4 text-gray-400" />
+                                  <span className="font-medium">{prog.toClass}</span>
+                                  <span className="text-sm text-gray-500">
+                                    (Order: {prog.order})
+                                  </span>
+                                </div>
+                                <Badge variant={prog.isActive ? "default" : "secondary"}>
+                                  {prog.isActive ? "Active" : "Inactive"}
+                                </Badge>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   if (step === "complete") {
     return (
@@ -379,6 +848,14 @@ export default function PromotionsPage() {
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Dashboard
             </Link>
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setStep("settings")}
+            className="ml-auto"
+          >
+            <Settings className="w-4 h-4 mr-2" />
+            Promotion Settings
           </Button>
         </div>
         <h1 className="text-3xl font-bold mb-2">
