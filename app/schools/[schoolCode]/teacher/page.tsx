@@ -2,26 +2,70 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
-  LogOut,
-  User,
-  BookOpen,
-  Users,
-  Settings,
-  Key,
-  Menu,
   GraduationCap,
+  Users,
   FileText,
   Calendar,
-  Bell,
   CheckCircle,
+  Settings,
+  LogOut,
+  Bell,
+  BookOpen,
+  TrendingUp,
+  Activity,
+  User,
+  Mail,
+  Phone,
+  MapPin,
+  Clock,
+  Star,
+  Award,
+  Target,
+  BarChart3,
+  PieChart,
+  LineChart,
   Eye,
   Edit,
+  Trash2,
+  Plus,
+  Search,
+  Filter,
+  Download,
+  Upload,
+  RefreshCw,
+  Save,
+  X,
+  ChevronDown,
+  ChevronUp,
+  ChevronRight,
+  ChevronLeft,
+  MoreHorizontal,
+  MoreVertical,
+  Grid,
+  List,
+  CalendarDays,
+  BookMarked,
+  Library,
+  School,
+  Building,
+  Home,
+  Briefcase,
+  UserCheck,
+  UserX,
+  UserPlus,
+  UserMinus,
+  UserEdit,
+  UserCog,
+  UserShield,
+  UserStar,
+  Key,
+  AlertCircle,
 } from "lucide-react";
 import { TeacherSidebar } from "@/components/teacher-dashboard/TeacherSidebar";
 
@@ -30,526 +74,690 @@ export default function TeacherDashboardPage({
 }: {
   params: { schoolCode: string };
 }) {
-  const { schoolCode } = params;
   const router = useRouter();
   const [teacher, setTeacher] = useState<any>(null);
+  const [schoolData, setSchoolData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
-  const [showChangePassword, setShowChangePassword] = useState(false);
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordMsg, setPasswordMsg] = useState("");
-  const [avatarUploading, setAvatarUploading] = useState(false);
-  const [avatarError, setAvatarError] = useState("");
-  const [editProfile, setEditProfile] = useState(false);
-  const [editData, setEditData] = useState<any>({});
-  const [schoolData, setSchoolData] = useState<any>(null);
 
   useEffect(() => {
-    async function fetchTeacher() {
+    async function fetchTeacherData() {
       try {
-        const sessionRes = await fetch(
-          `/api/schools/${schoolCode}/teachers/session`
-        );
-        if (!sessionRes.ok) {
-          router.replace(`/schools/${schoolCode}/teachers/login`);
-          return;
-        }
-        const session = await sessionRes.json();
-        const teacherId = session.teacherId;
-        if (!teacherId) {
-          router.replace(`/schools/${schoolCode}/teachers/login`);
-          return;
-        }
-        const res = await fetch(
-          `/api/schools/${schoolCode}/teachers/${teacherId}`
-        );
+        const res = await fetch(`/api/schools/${params.schoolCode}/teachers/session`);
         if (!res.ok) {
-          router.replace(`/schools/${schoolCode}/teachers/login`);
-          return;
+          throw new Error("Not authenticated");
         }
-        const teacherData = await res.json();
-        setTeacher(teacherData);
-        
-        // Fetch school data for color theme
-        const schoolRes = await fetch(`/api/schools/${schoolCode}`);
-        if (schoolRes.ok) {
-          const schoolData = await schoolRes.json();
-          setSchoolData(schoolData);
-        }
-      } catch (err) {
-        router.replace(`/schools/${schoolCode}/teachers/login`);
+        const data = await res.json();
+        setTeacher(data.teacher);
+        setSchoolData(data.schoolData);
+        setIsLoading(false);
+      } catch (error) {
+        console.error("Session fetch error:", error);
+        router.push(`/schools/${params.schoolCode}/teacher/login`);
       }
     }
-    fetchTeacher();
-  }, [schoolCode, router]);
+    fetchTeacherData();
+  }, [params.schoolCode, router]);
 
   const handleLogout = async () => {
-    await fetch(`/api/schools/${schoolCode}/teachers/logout`, {
-      method: "POST",
-    });
-    router.replace(`/schools/${schoolCode}/teachers/login`);
-  };
-
-  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    setAvatarError("");
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      setAvatarError("Please select a valid image file.");
-      return;
+    try {
+      await fetch(`/api/schools/${params.schoolCode}/teachers/logout`, { method: "POST" });
+      router.push(`/schools/${params.schoolCode}/teacher/login`);
+    } catch (error) {
+      console.error("Logout error:", error);
+      router.push(`/schools/${params.schoolCode}/teacher/login`);
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setAvatarError("Image must be less than 5MB.");
-      return;
-    }
-    setAvatarUploading(true);
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      const avatarUrl = ev.target?.result as string;
-      await fetch(`/api/schools/${schoolCode}/teachers`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teacherId: teacher.id, avatarUrl }),
-      });
-      setTeacher((prev: any) => ({ ...prev, avatarUrl }));
-      setAvatarUploading(false);
-    };
-    reader.onerror = () => {
-      setAvatarUploading(false);
-      setAvatarError("Failed to read image file. Please try again.");
-    };
-    reader.readAsDataURL(file);
   };
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    setPasswordMsg("");
-    if (!oldPassword || !newPassword || !confirmPassword) {
-      setPasswordMsg("All fields are required.");
-      return;
-    }
     if (newPassword !== confirmPassword) {
-      setPasswordMsg("New passwords do not match.");
+      setPasswordMsg("New passwords do not match");
       return;
     }
-    if (oldPassword !== teacher?.tempPassword) {
-      setPasswordMsg("Old password is incorrect.");
-      return;
+
+    try {
+      const res = await fetch(`/api/schools/${params.schoolCode}/teachers/change-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          oldPassword,
+          newPassword,
+        }),
+      });
+
+      if (res.ok) {
+        setPasswordMsg("Password changed successfully!");
+        setOldPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+      } else {
+        const data = await res.json();
+        setPasswordMsg(data.error || "Failed to change password");
+      }
+    } catch (error) {
+      setPasswordMsg("Failed to change password");
     }
-    if (!teacher?.id) return;
-    const teacherId = teacher.id;
-    await fetch(`/api/schools/${schoolCode}/teachers`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ teacherId: teacherId, tempPassword: newPassword }),
-    });
-    setTeacher((prev: any) => ({ ...prev, tempPassword: newPassword }));
-    setPasswordMsg("Password changed successfully!");
-    setOldPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
   };
 
-  const handleEditProfile = () => {
-    setEditData({
-      name: teacher.name,
-      phone: teacher.phone,
-      qualification: teacher.qualification,
-      avatarUrl: teacher.avatarUrl,
-    });
-    setEditProfile(true);
-  };
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
-  const handleEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setEditData((prev: any) => ({ ...prev, [name]: value }));
-  };
+  const renderOverview = () => (
+    <div className="space-y-6">
+      {/* Teacher Profile Card */}
+      <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
+        <CardHeader className="pb-4">
+          <CardTitle className="flex items-center gap-3 text-blue-800">
+            <User className="w-6 h-6" />
+            Teacher Profile
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <Avatar className="w-20 h-20 border-4 border-blue-200 shadow-lg">
+              <AvatarImage src={teacher?.avatarUrl} alt={teacher?.name} />
+              <AvatarFallback className="bg-blue-600 text-white text-xl font-semibold">
+                {teacher?.name?.charAt(0) || "T"}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 space-y-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                <div>
+                  <span className="font-semibold text-gray-700">Name:</span>
+                  <span className="ml-2 text-gray-900">{teacher?.name || "N/A"}</span>
+                </div>
+                <div>
+                  <span className="font-semibold text-gray-700">Employee ID:</span>
+                  <span className="ml-2 text-gray-900">{teacher?.employeeId || "N/A"}</span>
+                </div>
+                <div>
+                  <span className="font-semibold text-gray-700">Department:</span>
+                  <span className="ml-2 text-gray-900">{teacher?.department || "N/A"}</span>
+                </div>
+                <div>
+                  <span className="font-semibold text-gray-700">Status:</span>
+                  <Badge className="ml-2 bg-green-100 text-green-800">Active</Badge>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-  const handleEditAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    setAvatarError("");
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      setAvatarError("Please select a valid image file.");
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setAvatarError("Image must be less than 5MB.");
-      return;
-    }
-    setAvatarUploading(true);
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const avatarUrl = ev.target?.result as string;
-      setEditData((prev: any) => ({ ...prev, avatarUrl }));
-      setAvatarUploading(false);
-    };
-    reader.onerror = () => {
-      setAvatarUploading(false);
-      setAvatarError("Failed to read image file. Please try again.");
-    };
-    reader.readAsDataURL(file);
-  };
+      {/* Quick Stats Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-blue-600">Classes</p>
+                <p className="text-2xl font-bold text-blue-800">4</p>
+              </div>
+              <GraduationCap className="w-8 h-8 text-blue-600" />
+            </div>
+          </CardContent>
+        </Card>
 
-  const handleSaveProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!teacher?.id) return;
-    const teacherId = teacher.id;
-    await fetch(`/api/schools/${schoolCode}/teachers`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ teacherId: teacherId, ...editData }),
-    });
-    setTeacher((prev: any) => ({ ...prev, ...editData }));
-    setEditProfile(false);
-    setEditData({});
-  };
+        <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-green-600">Students</p>
+                <p className="text-2xl font-bold text-green-800">120</p>
+              </div>
+              <Users className="w-8 h-8 text-green-600" />
+            </div>
+          </CardContent>
+        </Card>
 
-  const handleCancelEdit = () => {
-    setEditProfile(false);
-    setEditData({});
-  };
+        <Card className="bg-gradient-to-br from-purple-50 to-violet-50 border-purple-200">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-purple-600">Subjects</p>
+                <p className="text-2xl font-bold text-purple-800">3</p>
+              </div>
+              <BookOpen className="w-8 h-8 text-purple-600" />
+            </div>
+          </CardContent>
+        </Card>
 
-  const renderContent = () => {
-    if (activeTab === "profile" && teacher) {
-      return editProfile ? <EditProfileForm /> : <ProfileView />;
-    }
-    if (activeTab === "classes") {
-      return <ClassesView />;
-    }
-    if (activeTab === "subjects") {
-      return <SubjectsView />;
-    }
-    if (activeTab === "students") {
-      return <StudentsView />;
-    }
-    if (activeTab === "settings") {
-      return <SettingsView />;
-    }
-    return <WelcomeView />;
-  };
+        <Card className="bg-gradient-to-br from-orange-50 to-amber-50 border-orange-200">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-orange-600">Attendance</p>
+                <p className="text-2xl font-bold text-orange-800">95%</p>
+              </div>
+              <Calendar className="w-8 h-8 text-orange-600" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-  const WelcomeView = () => (
-    <div className="text-center">
-      <h2 className="text-3xl font-bold mb-2">Welcome, {teacher?.name}!</h2>
-      <p className="text-gray-600">
-        Select an option from the menu to get started.
-      </p>
+      {/* Recent Activities */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Activity className="w-5 h-5" />
+            Recent Activities
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {[
+              { icon: FileText, text: "Grades submitted for Math", time: "2 hours ago", color: "text-blue-600" },
+              { icon: Calendar, text: "Attendance marked", time: "1 day ago", color: "text-green-600" },
+              { icon: Bell, text: "New assignment posted", time: "3 days ago", color: "text-purple-600" },
+              { icon: Users, text: "Parent meeting scheduled", time: "1 week ago", color: "text-orange-600" },
+            ].map((activity, index) => (
+              <div key={index} className="flex items-center gap-3 p-3 rounded-lg bg-gray-50">
+                <activity.icon className={`w-5 h-5 ${activity.color}`} />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-900">{activity.text}</p>
+                  <p className="text-xs text-gray-500">{activity.time}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 
-  const ProfileView = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle>My Profile</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <p>
-          <strong>Name:</strong> {teacher.name}
-        </p>
-        <p>
-          <strong>Email:</strong> {teacher.email}
-        </p>
-        <p>
-          <strong>Phone:</strong> {teacher.phone || "N/A"}
-        </p>
-        <p>
-          <strong>Qualification:</strong> {teacher.qualification || "N/A"}
-        </p>
-        <Button onClick={handleEditProfile}>Edit Profile</Button>
-      </CardContent>
-    </Card>
-  );
-
-  const EditProfileForm = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle>Edit Profile</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSaveProfile} className="space-y-4">
-          <input
-            name="name"
-            value={editData.name || ""}
-            onChange={handleEditChange}
-            placeholder="Name"
-            className="w-full p-2 border rounded"
-          />
-          <input
-            name="phone"
-            value={editData.phone || ""}
-            onChange={handleEditChange}
-            placeholder="Phone"
-            className="w-full p-2 border rounded"
-          />
-          <input
-            name="qualification"
-            value={editData.qualification || ""}
-            onChange={handleEditChange}
-            placeholder="Qualification"
-            className="w-full p-2 border rounded"
-          />
-          <div className="flex gap-2">
-            <Button type="submit">Save Changes</Button>
-            <Button variant="outline" onClick={handleCancelEdit}>
-              Cancel
-            </Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
-  );
-
-  const ClassesView = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle>My Classes</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {teacher?.classes?.length > 0 ? (
-          <ul className="space-y-2">
-            {teacher.classes.map((c: any) => (
-              <li key={c.id} className="p-2 border rounded">
-                {c.name}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p>You are not assigned to any classes yet.</p>
-        )}
-      </CardContent>
-    </Card>
-  );
-
-  const SubjectsView = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle>My Subjects</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p>Feature to view subjects is coming soon.</p>
-      </CardContent>
-    </Card>
-  );
-
-  const StudentsView = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle>My Students</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p>Feature to view students is coming soon.</p>
-      </CardContent>
-    </Card>
-  );
-
-  const SettingsView = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle>Settings</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleChangePassword} className="space-y-4">
-          <h3 className="font-semibold">Change Password</h3>
-          <input
-            type="password"
-            placeholder="Old Password"
-            value={oldPassword}
-            onChange={(e) => setOldPassword(e.target.value)}
-            required
-            className="w-full p-2 border rounded"
-          />
-          <input
-            type="password"
-            placeholder="New Password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            required
-            className="w-full p-2 border rounded"
-          />
-          <input
-            type="password"
-            placeholder="Confirm Password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            required
-            className="w-full p-2 border rounded"
-          />
-          {passwordMsg && <p className="text-sm text-red-500">{passwordMsg}</p>}
-          <Button type="submit">Update Password</Button>
-        </form>
-      </CardContent>
-    </Card>
-  );
-
-  return (
-    <div className="min-h-screen flex bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      {/* Sidebar with modern look */}
-      {teacher && schoolData && (
-        <TeacherSidebar 
-          activeTab={activeTab} 
-          onTabChange={setActiveTab} 
-          colorTheme={schoolData.colorTheme || "#3b82f6"} 
-          onLogout={handleLogout} 
-          teacher={teacher} 
-        />
-      )}
-      
-      {/* Main Content Area with vertical divider */}
-      <div className="flex-1 flex justify-center items-start relative">
-        {/* Vertical divider/shadow */}
-        <div className="hidden md:block absolute left-0 top-0 h-full w-10 z-10">
-          <div className="h-full w-2 ml-6 bg-gradient-to-b from-transparent via-blue-200 to-transparent shadow-2xl rounded-full opacity-80" />
-        </div>
-        
-        <main className="flex-1 flex justify-center items-start p-2 md:p-6 transition-all duration-300">
-          <section className="w-full max-w-7xl bg-white/80 rounded-3xl shadow-2xl p-4 md:p-14 backdrop-blur-lg mx-2 md:mx-6 ml-0 md:ml-20 lg:ml-32 pl-0 md:pl-16">
-            {/* Header */}
-            <div
-              className="sticky top-0 z-20 bg-white/70 shadow-sm border-b rounded-2xl mb-8 px-4 py-8 flex items-center justify-between"
-              style={{ borderTopColor: schoolData?.colorTheme || "#3b82f6", borderTopWidth: "4px" }}
-            >
-              <div className="flex items-center space-x-4">
-                <Avatar className="w-16 h-16 border-2 shadow-lg">
-                  <AvatarImage src={teacher?.avatarUrl} alt={teacher?.name} />
-                  <AvatarFallback className="bg-blue-600 text-white text-lg font-semibold">
-                    {teacher?.name?.charAt(0) || "T"}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <h1 className="text-3xl font-bold text-gray-900">
-                    Welcome, {teacher?.name}!
-                  </h1>
-                  <p className="text-gray-600">
-                    Teacher Dashboard - {schoolData?.name || "School"}
-                  </p>
+  const renderClasses = () => (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <GraduationCap className="w-5 h-5" />
+            My Classes
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[
+              { name: "Grade 10A", subject: "Mathematics", students: 32, schedule: "Mon, Wed, Fri" },
+              { name: "Grade 9B", subject: "Mathematics", students: 28, schedule: "Tue, Thu" },
+              { name: "Grade 8A", subject: "Mathematics", students: 30, schedule: "Mon, Wed" },
+              { name: "Grade 7B", subject: "Mathematics", students: 25, schedule: "Tue, Thu, Fri" },
+            ].map((cls, index) => (
+              <div key={index} className="p-4 border rounded-lg hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-gray-900">{cls.name}</h3>
+                  <Badge className="bg-blue-100 text-blue-800">{cls.subject}</Badge>
+                </div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Students:</span>
+                    <span className="font-medium">{cls.students}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Schedule:</span>
+                    <span className="font-medium">{cls.schedule}</span>
+                  </div>
+                </div>
+                <div className="mt-4 flex gap-2">
+                  <Button size="sm" variant="outline" className="flex-1">
+                    <Users className="w-4 h-4 mr-1" />
+                    View Students
+                  </Button>
+                  <Button size="sm" variant="outline" className="flex-1">
+                    <FileText className="w-4 h-4 mr-1" />
+                    Grades
+                  </Button>
                 </div>
               </div>
-              <div className="flex items-center space-x-4">
-                <Badge variant="default" className="bg-green-100 text-green-800">
-                  Active Teacher
-                </Badge>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderSubjects = () => (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BookOpen className="w-5 h-5" />
+            My Subjects
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[
+              { name: "Mathematics", grade: "Grade 7-10", students: 115, avgGrade: "B+" },
+              { name: "Advanced Mathematics", grade: "Grade 11-12", students: 45, avgGrade: "A-" },
+              { name: "Statistics", grade: "Grade 12", students: 28, avgGrade: "B" },
+            ].map((subject, index) => (
+              <div key={index} className="p-4 border rounded-lg hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-gray-900">{subject.name}</h3>
+                  <Badge className="bg-purple-100 text-purple-800">{subject.grade}</Badge>
+                </div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Students:</span>
+                    <span className="font-medium">{subject.students}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Avg Grade:</span>
+                    <span className="font-medium">{subject.avgGrade}</span>
+                  </div>
+                </div>
+                <div className="mt-4 flex gap-2">
+                  <Button size="sm" variant="outline" className="flex-1">
+                    <FileText className="w-4 h-4 mr-1" />
+                    Curriculum
+                  </Button>
+                  <Button size="sm" variant="outline" className="flex-1">
+                    <BarChart3 className="w-4 h-4 mr-1" />
+                    Analytics
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderStudents = () => (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="w-5 h-5" />
+            My Students
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {[
+              { name: "John Doe", class: "Grade 10A", attendance: 95, avgGrade: "A-" },
+              { name: "Jane Smith", class: "Grade 10A", attendance: 88, avgGrade: "B+" },
+              { name: "Mike Johnson", class: "Grade 9B", attendance: 92, avgGrade: "A" },
+              { name: "Sarah Wilson", class: "Grade 9B", attendance: 85, avgGrade: "B" },
+              { name: "David Brown", class: "Grade 8A", attendance: 90, avgGrade: "A-" },
+            ].map((student, index) => (
+              <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <Avatar className="w-10 h-10">
+                    <AvatarFallback className="bg-blue-600 text-white">
+                      {student.name.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="font-medium text-gray-900">{student.name}</p>
+                    <p className="text-sm text-gray-600">{student.class}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="text-center">
+                    <p className="text-sm text-gray-600">Attendance</p>
+                    <p className="font-semibold text-green-600">{student.attendance}%</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm text-gray-600">Avg Grade</p>
+                    <p className="font-semibold text-blue-600">{student.avgGrade}</p>
+                  </div>
+                  <Button size="sm" variant="outline">
+                    <Eye className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderAttendance = () => (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="w-5 h-5" />
+            Attendance Management
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-green-800">95%</p>
+                <p className="text-sm text-green-600">Overall Attendance</p>
               </div>
             </div>
+            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-blue-800">120</p>
+                <p className="text-sm text-blue-600">Total Students</p>
+              </div>
+            </div>
+            <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-orange-800">6</p>
+                <p className="text-sm text-orange-600">Absent Today</p>
+              </div>
+            </div>
+            <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-purple-800">3</p>
+                <p className="text-sm text-purple-600">Late Today</p>
+              </div>
+            </div>
+          </div>
 
-            {/* Main Tab Content */}
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              {/* Overview Tab */}
-              <TabsContent value="overview" className="space-y-8">
-                {/* Summary Stats Section */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                  <Card className="bg-gradient-to-br from-blue-50 to-blue-100 shadow-lg border-0 rounded-2xl flex flex-col items-center py-4 md:py-6 px-4 md:px-6">
-                    <CardContent className="flex flex-col items-center p-2">
-                      <GraduationCap className="w-6 h-6 text-blue-500 mb-1" />
-                      <div className="text-2xl font-bold">3</div>
-                      <div className="text-gray-500 text-sm">My Classes</div>
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-gradient-to-br from-green-50 to-green-100 shadow-lg border-0 rounded-2xl flex flex-col items-center py-4 md:py-6 px-4 md:px-6">
-                    <CardContent className="flex flex-col items-center p-2">
-                      <FileText className="w-6 h-6 text-green-500 mb-1" />
-                      <div className="text-2xl font-bold">5</div>
-                      <div className="text-gray-500 text-sm">My Subjects</div>
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-gradient-to-br from-purple-50 to-purple-100 shadow-lg border-0 rounded-2xl flex flex-col items-center py-4 md:py-6 px-4 md:px-6">
-                    <CardContent className="flex flex-col items-center p-2">
-                      <Users className="w-6 h-6 text-purple-500 mb-1" />
-                      <div className="text-2xl font-bold">120</div>
-                      <div className="text-gray-500 text-sm">My Students</div>
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-gradient-to-br from-orange-50 to-orange-100 shadow-lg border-0 rounded-2xl flex flex-col items-center py-4 md:py-6 px-4 md:px-6">
-                    <CardContent className="flex flex-col items-center p-2">
-                      <Calendar className="w-6 h-6 text-orange-500 mb-1" />
-                      <div className="text-2xl font-bold">95%</div>
-                      <div className="text-gray-500 text-sm">Attendance</div>
-                    </CardContent>
-                  </Card>
+          {/* Class Attendance */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-gray-900">Today's Attendance</h3>
+            {[
+              { class: "Grade 10A", present: 30, absent: 2, late: 1 },
+              { class: "Grade 9B", present: 26, absent: 2, late: 0 },
+              { class: "Grade 8A", present: 28, absent: 2, late: 2 },
+            ].map((cls, index) => (
+              <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
+                <div>
+                  <h4 className="font-medium text-gray-900">{cls.class}</h4>
+                  <p className="text-sm text-gray-600">Total: {cls.present + cls.absent + cls.late} students</p>
                 </div>
+                <div className="flex items-center gap-4">
+                  <div className="text-center">
+                    <p className="text-sm text-green-600 font-medium">{cls.present}</p>
+                    <p className="text-xs text-gray-600">Present</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm text-red-600 font-medium">{cls.absent}</p>
+                    <p className="text-xs text-gray-600">Absent</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm text-orange-600 font-medium">{cls.late}</p>
+                    <p className="text-xs text-gray-600">Late</p>
+                  </div>
+                  <Button size="sm" variant="outline">
+                    <Edit className="w-4 h-4 mr-1" />
+                    Mark
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
 
-                {/* Quick Actions */}
-                <Card className="bg-white/60 backdrop-blur-lg rounded-3xl shadow-2xl border-0 px-4 py-4 md:px-12 md:py-10">
-                  <CardHeader className="px-2 py-2 md:px-6 md:py-4">
-                    <CardTitle className="flex items-center space-x-2 text-base md:text-xl">
-                      <CheckCircle className="w-6 h-6 md:w-5 md:h-5 text-green-500" />
-                      <span>Quick Actions</span>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <Button
-                        onClick={() => setActiveTab("classes")}
-                        className="h-20 flex flex-col items-center justify-center space-y-2 bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
-                      >
-                        <GraduationCap className="w-6 h-6" />
-                        <span>View My Classes</span>
-                      </Button>
-                      <Button
-                        onClick={() => setActiveTab("students")}
-                        className="h-20 flex flex-col items-center justify-center space-y-2 bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white"
-                      >
-                        <Users className="w-6 h-6" />
-                        <span>Manage Students</span>
-                      </Button>
-                      <Button
-                        onClick={() => setActiveTab("settings")}
-                        className="h-20 flex flex-col items-center justify-center space-y-2 bg-gradient-to-br from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white"
-                      >
-                        <Settings className="w-6 h-6" />
-                        <span>Account Settings</span>
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
+  const renderNotifications = () => (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bell className="w-5 h-5" />
+            Notifications
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {[
+              {
+                title: "Staff Meeting",
+                message: "Monthly staff meeting scheduled for Friday at 3 PM",
+                time: "2 hours ago",
+                type: "meeting",
+                color: "bg-blue-100 text-blue-800"
+              },
+              {
+                title: "Grade Submission Deadline",
+                message: "Term 2 grades due by end of this week",
+                time: "1 day ago",
+                type: "deadline",
+                color: "bg-orange-100 text-orange-800"
+              },
+              {
+                title: "Parent Conference",
+                message: "Parent-teacher conference next Tuesday",
+                time: "3 days ago",
+                type: "conference",
+                color: "bg-purple-100 text-purple-800"
+              },
+              {
+                title: "Professional Development",
+                message: "Math teaching workshop next month",
+                time: "1 week ago",
+                type: "workshop",
+                color: "bg-green-100 text-green-800"
+              },
+            ].map((notification, index) => (
+              <div key={index} className="flex items-start gap-3 p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                <div className={`w-2 h-2 rounded-full mt-2 ${notification.color.replace('bg-', 'bg-').replace(' text-', '')}`}></div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-1">
+                    <h3 className="font-medium text-gray-900">{notification.title}</h3>
+                    <span className="text-xs text-gray-500">{notification.time}</span>
+                  </div>
+                  <p className="text-sm text-gray-600">{notification.message}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
 
-              {/* Other Tab Contents */}
-              <TabsContent value="classes" className="space-y-8 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl shadow-lg p-6">
-                <ClassesView />
-              </TabsContent>
+  const renderSettings = () => (
+    <div className="space-y-6">
+      {/* Change Password */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Key className="w-5 h-5" />
+            Change Password
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleChangePassword} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Current Password</label>
+                <input
+                  type="password"
+                  value={oldPassword}
+                  onChange={(e) => setOldPassword(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">New Password</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Confirm New Password</label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+            </div>
+            {passwordMsg && (
+              <p className={`text-sm ${passwordMsg.includes("successfully") ? "text-green-600" : "text-red-600"}`}>
+                {passwordMsg}
+              </p>
+            )}
+            <Button type="submit" className="w-full sm:w-auto">
+              <Save className="w-4 h-4 mr-2" />
+              Change Password
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
 
-              <TabsContent value="subjects" className="space-y-8 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl shadow-lg p-6">
-                <SubjectsView />
-              </TabsContent>
+      {/* Account Information */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <User className="w-5 h-5" />
+            Account Information
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+              <input
+                type="text"
+                value={teacher?.name || ""}
+                readOnly
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+              <input
+                type="email"
+                value={teacher?.email || ""}
+                readOnly
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Employee ID</label>
+              <input
+                type="text"
+                value={teacher?.employeeId || ""}
+                readOnly
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Department</label>
+              <input
+                type="text"
+                value={teacher?.department || ""}
+                readOnly
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
 
-              <TabsContent value="students" className="space-y-8 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl shadow-lg p-6">
-                <StudentsView />
-              </TabsContent>
+  const renderContent = () => {
+    switch (activeTab) {
+      case "overview":
+        return renderOverview();
+      case "classes":
+        return renderClasses();
+      case "subjects":
+        return renderSubjects();
+      case "students":
+        return renderStudents();
+      case "attendance":
+        return renderAttendance();
+      case "notifications":
+        return renderNotifications();
+      case "settings":
+        return renderSettings();
+      default:
+        return renderOverview();
+    }
+  };
 
-              <TabsContent value="attendance" className="space-y-8 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl shadow-lg p-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Attendance Management</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-gray-600">Attendance tracking functionality coming soon...</p>
-                  </CardContent>
-                </Card>
-              </TabsContent>
+  return (
+    <div className="flex min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+      <TeacherSidebar
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        colorTheme="#3b82f6"
+        onLogout={handleLogout}
+        teacher={teacher}
+      />
+      
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-h-screen">
+        {/* Mobile Header - Hidden on desktop */}
+        <header className="lg:hidden bg-white shadow-sm border-b sticky top-0 z-20">
+          <div className="flex items-center justify-between px-4 py-4">
+            <div className="flex items-center gap-3">
+              <div className="flex flex-col">
+                <span className="font-bold text-lg text-blue-700">Teacher Portal</span>
+                <span className="text-xs text-gray-500">
+                  {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="hidden sm:flex items-center gap-2 text-sm text-gray-600 bg-gray-50 px-3 py-2 rounded-full">
+                <User className="w-4 h-4" />
+                <span className="font-medium">{teacher?.name || 'Teacher'}</span>
+              </div>
+            </div>
+          </div>
+        </header>
 
-              <TabsContent value="notifications" className="space-y-8 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl shadow-lg p-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Notifications</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-gray-600">No new notifications</p>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="settings" className="space-y-8 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl shadow-lg p-6">
-                <SettingsView />
-              </TabsContent>
-
-              <TabsContent value="profile" className="space-y-8 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl shadow-lg p-6">
-                {teacher && (editProfile ? <EditProfileForm /> : <ProfileView />)}
-              </TabsContent>
-            </Tabs>
-          </section>
+        {/* Main Content */}
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full pb-24 lg:pb-8">
+          {renderContent()}
         </main>
+
+        {/* Mobile Bottom Navigation */}
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-20">
+          <div className="flex justify-around">
+            {[
+              { id: "overview", label: "Overview", icon: BookOpen },
+              { id: "classes", label: "Classes", icon: GraduationCap },
+              { id: "students", label: "Students", icon: Users },
+              { id: "attendance", label: "Attendance", icon: Calendar },
+              { id: "settings", label: "Settings", icon: Settings },
+            ].map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className={`flex flex-col items-center py-3 px-2 min-w-0 flex-1 transition-all duration-200 ${
+                    isActive 
+                      ? "text-blue-600 bg-blue-50" 
+                      : "text-gray-600 hover:text-blue-600 hover:bg-blue-50"
+                  }`}
+                >
+                  <Icon className="w-6 h-6 mb-1" />
+                  <span className="text-xs font-medium truncate">{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </nav>
       </div>
     </div>
   );

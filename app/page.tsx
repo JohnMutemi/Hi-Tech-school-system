@@ -8,22 +8,31 @@ import { Footer } from "@/components/footer"
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gradient-to-br from-white via-blue-50/30 to-indigo-100/30 dark:from-gray-900 dark:via-gray-800/30 dark:to-slate-900/30 transition-colors duration-300">
       <Header />
-      <main>
-        <section className="border-b border-gray-200 bg-gradient-to-br from-slate-50 to-blue-50" id="hero">
+      <main className="relative">
+        {/* Hero Section */}
+        <section id="hero">
           <HeroSection />
         </section>
-        <section className="border-b border-gray-100 bg-white" id="about">
+        
+        {/* About Section */}
+        <section id="about">
           <AboutSection />
         </section>
-        <section className="border-b border-gray-100 bg-gray-50" id="features">
+        
+        {/* Features Section */}
+        <section id="features">
           <FeaturesSection />
         </section>
-        <section className="border-b border-gray-100 bg-white" id="pricing">
+        
+        {/* Pricing Section */}
+        <section id="pricing">
           <PricingSection />
         </section>
-        <section className="bg-gray-50" id="contact">
+        
+        {/* Contact Section */}
+        <section id="contact">
           <ContactSection />
         </section>
       </main>

@@ -33,6 +33,9 @@ import {
   School,
   BookOpen,
   Settings,
+  Eye,
+  User,
+  Save,
 } from "lucide-react";
 import { ReceiptView } from "@/components/ui/receipt-view";
 import { Badge } from "@/components/ui/badge";
@@ -853,30 +856,365 @@ const renderReceiptsTable = () => (
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Card className="p-8 text-center">
-          <p>Loading dashboard...</p>
-        </Card>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
       </div>
     );
   }
 
-  if (!parent) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Card className="p-8 text-center">
-          <p>You are not logged in. Redirecting...</p>
-        </Card>
-      </div>
-    );
-  }
+  const renderOverview = () => (
+    <div className="space-y-6">
+      {/* Welcome Section */}
+      <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
+        <CardHeader className="pb-4">
+          <CardTitle className="flex items-center gap-3 text-blue-800">
+            <Sparkles className="w-6 h-6" />
+            Welcome, {parent?.parentName}!
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-gray-700">Manage your children's education and stay updated with their progress.</p>
+        </CardContent>
+      </Card>
+
+      {/* Children Overview */}
+      {students.map((child) => (
+        <ChildOverview
+          key={child.id}
+          child={child}
+          outstandingFees={getStudentFeeStructure(child.id)?.balance || 0}
+          feeStructure={getStudentFeeStructure(child.id)}
+        />
+      ))}
+
+      {/* Quick Actions */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="w-5 h-5" />
+            Quick Actions
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Button
+              onClick={() => setActiveTab("fees")}
+              className="h-20 flex flex-col items-center justify-center space-y-2 bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white"
+            >
+              <DollarSign className="w-6 h-6" />
+              <span>Pay Fees</span>
+            </Button>
+            <Button
+              onClick={() => setActiveTab("receipts")}
+              className="h-20 flex flex-col items-center justify-center space-y-2 bg-gradient-to-br from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white"
+            >
+              <Receipt className="w-6 h-6" />
+              <span>View Receipts</span>
+            </Button>
+            <Button
+              onClick={() => setActiveTab("performance")}
+              className="h-20 flex flex-col items-center justify-center space-y-2 bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
+            >
+              <BarChart2 className="w-6 h-6" />
+              <span>Academic Progress</span>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderChildren = () => (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="w-5 h-5" />
+            My Children
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {students.map((child) => (
+              <Card key={child.id} className="hover:shadow-md transition-shadow">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-4 mb-4">
+                    <Avatar className="w-16 h-16">
+                      <img
+                        src={child.avatarUrl || "/placeholder-user.jpg"}
+                        alt={child.fullName || child.name}
+                        className="rounded-full object-cover w-full h-full"
+                      />
+                    </Avatar>
+                    <div>
+                      <h3 className="font-semibold text-lg text-gray-900">
+                        {child.fullName || child.name}
+                      </h3>
+                      <p className="text-blue-700 font-medium">{child.gradeName}</p>
+                      <p className="text-sm text-gray-600">Adm: {child.admissionNumber}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Gender:</span>
+                      <span className="font-medium">{child.gender}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Date of Birth:</span>
+                      <span className="font-medium">
+                        {child.dateOfBirth ? child.dateOfBirth.split("T")[0] : "N/A"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Date Admitted:</span>
+                      <span className="font-medium">
+                        {child.dateAdmitted ? child.dateAdmitted.split("T")[0] : "N/A"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex gap-2">
+                    <Button size="sm" variant="outline" className="flex-1">
+                      <Eye className="w-4 h-4 mr-1" />
+                      View Details
+                    </Button>
+                    <Button size="sm" variant="outline" className="flex-1">
+                      <BarChart2 className="w-4 h-4 mr-1" />
+                      Progress
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderFees = () => (
+    <div className="space-y-6">
+      <ParentFeesPanel
+        students={students}
+        schoolCode={schoolCode}
+        onPaymentSuccess={handlePaymentSuccess}
+        onPaymentError={handlePaymentError}
+      />
+    </div>
+  );
+
+  const renderReceipts = () => (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Receipt className="w-5 h-5" />
+            Payment Receipts
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {receipts.length === 0 ? (
+            <div className="text-center py-8">
+              <Receipt className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600">No receipts found</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {receipts.map((receipt) => (
+                <div key={receipt.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <Receipt className="w-5 h-5 text-blue-600" />
+                    <div>
+                      <p className="font-medium text-gray-900">Receipt #{receipt.receiptNumber}</p>
+                      <p className="text-sm text-gray-600">{receipt.studentName} • {receipt.date}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="font-semibold text-gray-900">KES {receipt.amount.toLocaleString()}</span>
+                    <Button size="sm" variant="outline" onClick={() => handleDownloadReceipt(receipt)}>
+                      <Download className="w-4 h-4 mr-1" />
+                      Download
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderPerformance = () => (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart2 className="w-5 h-5" />
+            Academic Performance
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8">
+            <BarChart2 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-600">Academic performance tracking coming soon...</p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderSettings = () => (
+    <div className="space-y-6">
+      {/* Profile Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <User className="w-5 h-5" />
+            Profile Settings
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              <Avatar className="w-20 h-20">
+                <img
+                  src={avatarUrl || "/placeholder-user.jpg"}
+                  alt={parent?.parentName || "Parent Avatar"}
+                  className="rounded-full object-cover w-full h-full"
+                />
+              </Avatar>
+              <div>
+                <h3 className="font-semibold text-lg">{parent?.parentName}</h3>
+                <p className="text-gray-600">{parent?.parentPhone}</p>
+                <p className="text-gray-600">{parent?.parentEmail}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                <input
+                  type="text"
+                  value={parent?.parentName || ""}
+                  readOnly
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+                <input
+                  type="tel"
+                  value={parent?.parentPhone || ""}
+                  readOnly
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                <input
+                  type="email"
+                  value={parent?.parentEmail || ""}
+                  readOnly
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
+                <input
+                  type="text"
+                  value={parent?.parentAddress || ""}
+                  readOnly
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                />
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Change Password */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Key className="w-5 h-5" />
+            Change Password
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleChangePassword} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Current Password</label>
+                <input
+                  type="password"
+                  value={oldPassword}
+                  onChange={(e) => setOldPassword(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">New Password</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Confirm New Password</label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+            </div>
+            {passwordMsg && (
+              <p className={`text-sm ${passwordMsg.includes("successfully") ? "text-green-600" : "text-red-600"}`}>
+                {passwordMsg}
+              </p>
+            )}
+            <Button type="submit" className="w-full sm:w-auto">
+              <Save className="w-4 h-4 mr-2" />
+              Change Password
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case "overview":
+        return renderOverview();
+      case "children":
+        return renderChildren();
+      case "fees":
+        return renderFees();
+      case "receipts":
+        return renderReceipts();
+      case "performance":
+        return renderPerformance();
+      case "settings":
+        return renderSettings();
+      default:
+        return renderOverview();
+    }
+  };
 
   return (
-    <div className="min-h-screen flex bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      {/* Parent Sidebar */}
-      <ParentSidebar 
-        activeTab={activeTab} 
-        onTabChange={setActiveTab} 
+    <div className="flex min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+      <ParentSidebar
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
         colorTheme="#3b82f6"
         onLogout={handleLogout}
         parent={parent}
@@ -887,565 +1225,69 @@ const renderReceiptsTable = () => (
       />
       
       {/* Main Content Area */}
-      <div className="flex-1 flex justify-center items-start relative">
-        {/* Vertical divider/shadow */}
-        <div className="hidden md:block absolute left-0 top-0 h-full w-10 z-10">
-          <div className="h-full w-2 ml-6 bg-gradient-to-b from-transparent via-blue-200 to-transparent shadow-2xl rounded-full opacity-80" />
-        </div>
-        
-        <main className="flex-1 flex justify-center items-start p-2 md:p-6 transition-all duration-300">
-          <section className="w-full max-w-7xl bg-white/80 rounded-3xl shadow-2xl p-4 md:p-14 backdrop-blur-lg mx-2 md:mx-6 ml-0 md:ml-20 lg:ml-32 pl-0 md:pl-16">
-            {/* Header */}
-            <div
-              className="sticky top-0 z-20 bg-white/70 shadow-sm border-b rounded-2xl mb-8 px-4 py-8 flex items-center justify-between"
-              style={{ borderTopColor: "#3b82f6", borderTopWidth: "4px" }}
-            >
-              <div className="flex items-center space-x-4">
-                <div
-                  className="w-16 h-16 rounded-xl flex items-center justify-center border-2 shadow-lg"
-                  style={{
-                    backgroundColor: "#3b82f6" + "20",
-                    borderColor: "#3b82f6",
-                  }}
-                >
-                  <Users
-                    className="w-8 h-8"
-                    style={{ color: "#3b82f6" }}
-                  />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-bold text-gray-900">
-                    Welcome, {parent.parentName}!
-                  </h1>
-                </div>
-              </div>
-              <div className="flex items-center space-x-4">
-                <Badge variant="default">
-                  Parent Portal
-                </Badge>
+      <div className="flex-1 flex flex-col min-h-screen">
+        {/* Mobile Header - Hidden on desktop */}
+        <header className="lg:hidden bg-white shadow-sm border-b sticky top-0 z-20">
+          <div className="flex items-center justify-between px-4 py-4">
+            <div className="flex items-center gap-3">
+              <div className="flex flex-col">
+                <span className="font-bold text-lg text-blue-700">Parent Portal</span>
+                <span className="text-xs text-gray-500">
+                  {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+                </span>
               </div>
             </div>
+            <div className="flex items-center gap-2">
+              <div className="hidden sm:flex items-center gap-2 text-sm text-gray-600 bg-gray-50 px-3 py-2 rounded-full">
+                <User className="w-4 h-4" />
+                <span className="font-medium">{parent?.parentName || 'Parent'}</span>
+              </div>
+            </div>
+          </div>
+        </header>
 
-            {/* Main Tab Content */}
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              
-              {/* Overview Tab */}
-              <TabsContent value="overview" className="space-y-8">
-                {/* Summary Stats Section */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                  <Card className="bg-gradient-to-br from-blue-50 to-blue-100 shadow-lg border-0 rounded-2xl flex flex-col items-center py-4 md:py-6 px-4 md:px-6">
-                    <CardContent className="flex flex-col items-center p-2">
-                      <Users className="w-6 h-6 text-blue-500 mb-1" />
-                      <div className="text-2xl font-bold">{students.length}</div>
-                      <div className="text-gray-500 text-sm">Children</div>
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-gradient-to-br from-red-50 to-red-100 shadow-lg border-0 rounded-2xl flex flex-col items-center py-4 md:py-6 px-4 md:px-6">
-                    <CardContent className="flex flex-col items-center p-2">
-                      <DollarSign className="w-6 h-6 text-red-500 mb-1" />
-                      <div className="text-2xl font-bold">KES {totalOutstandingFees.toLocaleString()}</div>
-                      <div className="text-gray-500 text-sm">Outstanding</div>
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-gradient-to-br from-green-50 to-green-100 shadow-lg border-0 rounded-2xl flex flex-col items-center py-4 md:py-6 px-4 md:px-6">
-                    <CardContent className="flex flex-col items-center p-2">
-                      <Receipt className="w-6 h-6 text-green-500 mb-1" />
-                      <div className="text-2xl font-bold">KES {totalPayments.toLocaleString()}</div>
-                      <div className="text-gray-500 text-sm">Total Paid</div>
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-gradient-to-br from-purple-50 to-purple-100 shadow-lg border-0 rounded-2xl flex flex-col items-center py-4 md:py-6 px-4 md:px-6">
-                    <CardContent className="flex flex-col items-center p-2">
-                      <BarChart2 className="w-6 h-6 text-purple-500 mb-1" />
-                      <div className="text-2xl font-bold">{receipts.length}</div>
-                      <div className="text-gray-500 text-sm">Payments</div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Academic Year & Term Info Card */}
-                <Card className="bg-white/60 backdrop-blur-lg rounded-3xl shadow-2xl border-0 px-4 py-4 md:px-12 md:py-10">
-                  <CardHeader className="px-2 py-2 md:px-6 md:py-4">
-                    <CardTitle className="flex items-center space-x-2 text-base md:text-xl">
-                      <Calendar className="w-6 h-6 md:w-5 md:h-5 text-blue-500" />
-                      <span>Academic Information</span>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {loadingAcademicInfo ? (
-                      <div className="text-center py-4">
-                        <span className="text-blue-700 font-semibold animate-pulse">
-                          Loading academic year and term...
-                        </span>
-                      </div>
-                    ) : academicInfoError ? (
-                      <div className="text-center py-4">
-                        <span className="text-red-600 font-semibold">
-                          {academicInfoError}
-                        </span>
-                      </div>
-                    ) : currentAcademicYear && currentTerm ? (
-                      <div className="grid md:grid-cols-2 gap-6">
-                        <div className="bg-blue-50 rounded-xl p-4">
-                          <div className="text-sm font-semibold text-gray-600 mb-2">Current Academic Year</div>
-                          <div className="text-xl font-bold text-blue-700">{currentAcademicYear.name}</div>
-                          <div className="text-sm text-gray-500 mt-1">
-                            {new Date(currentAcademicYear.startDate).toLocaleDateString()} - {new Date(currentAcademicYear.endDate).toLocaleDateString()}
-                          </div>
-                        </div>
-                        <div className="bg-purple-50 rounded-xl p-4">
-                          <div className="text-sm font-semibold text-gray-600 mb-2">Current Term</div>
-                          <div className="text-xl font-bold text-purple-700">{currentTerm.name}</div>
-                          <div className="text-sm text-gray-500 mt-1">
-                            {new Date(currentTerm.startDate).toLocaleDateString()} - {new Date(currentTerm.endDate).toLocaleDateString()}
-                          </div>
-                        </div>
-                      </div>
-                    ) : null}
-                  </CardContent>
-                </Card>
-
-                {/* Children Summary */}
-                {students.length > 0 && (
-                  <Card className="bg-white/70 backdrop-blur-lg rounded-2xl shadow-xl border-0">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <GraduationCap className="w-5 h-5" />
-                        My Children ({students.length})
-                      </CardTitle>
-                      <CardDescription>
-                        Select a child to view detailed information
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {students.map((child) => (
-                          <div
-                            key={child.id}
-                            className={`p-4 rounded-xl border-2 cursor-pointer transition-all hover:shadow-lg ${
-                              focusedChildId === child.id
-                                ? "border-blue-500 bg-blue-50"
-                                : "border-gray-200 bg-white hover:border-blue-300"
-                            }`}
-                            onClick={() => setFocusedChildId(child.id)}
-                          >
-                            <div className="flex items-center gap-3">
-                              <Avatar className="w-12 h-12">
-                                <img
-                                  src={child.avatarUrl || "/placeholder-user.jpg"}
-                                  alt={child.fullName || child.name}
-                                  className="rounded-full object-cover w-full h-full"
-                                />
-                              </Avatar>
-                              <div>
-                                <div className="font-semibold text-gray-900">
-                                  {child.fullName || child.name}
-                                </div>
-                                <div className="text-sm text-blue-600">
-                                  {child.gradeName || child.className}
-                                </div>
-                                <div className="text-xs text-gray-500">
-                                  Adm: {child.admissionNumber}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Recent Activity */}
-                <Card className="bg-white/70 backdrop-blur-lg rounded-2xl shadow-xl border-0">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Sparkles className="w-5 h-5" />
-                      Recent Activity
-                    </CardTitle>
-                    <CardDescription>
-                      Latest payments and activities
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {recentActivity.length > 0 ? (
-                      <div className="space-y-3">
-                        {recentActivity.map((receipt) => (
-                          <div key={receipt.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                                <Receipt className="w-4 h-4 text-green-600" />
-                              </div>
-                              <div>
-                                <div className="font-medium text-gray-900">
-                                  Payment - {receipt.description}
-                                </div>
-                                <div className="text-sm text-gray-500">
-                                  {new Date(receipt.paymentDate).toLocaleDateString()}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <div className="font-bold text-green-600">
-                                KES {receipt.amount.toLocaleString()}
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                Receipt #{receipt.receiptNumber}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-8 text-gray-500">
-                        <Receipt className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                        <p>No recent activity</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* My Children Tab */}
-              <TabsContent value="children" className="space-y-8 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl shadow-lg p-6">
-                {/* Child Selection */}
-                {students.length > 0 && (
-                  <div className="mb-6">
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Select Child:
-                    </label>
-                    <select
-                      className="border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 w-full max-w-xs"
-                      value={focusedChildId || students[0].id}
-                      onChange={(e) => setFocusedChildId(e.target.value)}
-                    >
-                      {students.map((child) => (
-                        <option key={child.id} value={child.id}>
-                          {child.fullName || child.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {/* Child Overview */}
-                {students.length > 0 && focusedChildId && (
-                  (() => {
-                    const child = students.find((c) => c.id === focusedChildId) || students[0];
-                    const termBalances = studentFeeSummaries[child.id]?.termBalances || [];
-                    const currentTermId = currentTerm?.id;
-                    const currentTermSummary = termBalances.find(
-                      (f: any) => f.termId === currentTermId
-                    );
-                    const outstandingFees = currentTermSummary ? currentTermSummary.balance : 0;
-
-                    return (
-                      <ChildOverview
-                        child={child}
-                        outstandingFees={outstandingFees}
-                        feeStructure={getStudentFeeStructure(child.id)}
-                      />
-                    );
-                  })()
-                )}
-
-                {students.length === 0 && (
-                  <Card>
-                    <CardContent className="text-center py-8">
-                      <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-600">No children found.</p>
-                    </CardContent>
-                  </Card>
-                )}
-              </TabsContent>
-
-              {/* Fee Management Tab */}
-              <TabsContent value="fees" className="space-y-8 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl shadow-lg p-6">
-                {students.length === 0 ? (
-                  <Card>
-                    <CardContent className="text-center py-8">
-                      <DollarSign className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-600">No children found.</p>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <ParentFeesPanel
-                    schoolCode={schoolCode}
-                    students={students}
-                    focusedChildId={focusedChildId}
-                    studentFeeSummaries={studentFeeSummaries}
-                    refreshFeeData={fetchStudentFeeSummaries}
-                  />
-                )}
-              </TabsContent>
-
-              {/* Payment History Tab */}
-              <TabsContent value="receipts" className="space-y-8 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl shadow-lg p-6">
-                <Card className="bg-white/70 backdrop-blur-lg rounded-2xl shadow-xl border-0">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Receipt className="w-5 h-5" />
-                      Payment History & Receipts
-                    </CardTitle>
-                    <CardDescription>
-                      View and download payment receipts
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {students.length === 0 ? (
-                      <div className="text-center py-8 text-gray-500">
-                        <Receipt className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                        <p>No children found.</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-6">
-                        {/* Payment Summary */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div className="text-center p-4 bg-blue-50 rounded-lg">
-                            <div className="text-2xl font-bold text-blue-600">
-                              {receipts.length}
-                            </div>
-                            <div className="text-sm text-gray-600">Total Payments</div>
-                          </div>
-                          <div className="text-center p-4 bg-green-50 rounded-lg">
-                            <div className="text-2xl font-bold text-green-600">
-                              KES {totalPayments.toLocaleString()}
-                            </div>
-                            <div className="text-sm text-gray-600">Total Paid</div>
-                          </div>
-                          <div className="text-center p-4 bg-orange-50 rounded-lg">
-                            <div className="text-2xl font-bold text-orange-600">
-                              {receipts.length > 0
-                                ? new Date(receipts[0].paymentDate).toLocaleDateString()
-                                : "N/A"}
-                            </div>
-                            <div className="text-sm text-gray-600">Last Payment</div>
-                          </div>
-                        </div>
-
-                        {/* Receipts Table */}
-                        <div className="overflow-x-auto">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Receipt No</TableHead>
-                                <TableHead>Date</TableHead>
-                                <TableHead>Amount</TableHead>
-                                <TableHead>Method</TableHead>
-                                <TableHead>Description</TableHead>
-                                <TableHead>Actions</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {receipts.length === 0 ? (
-                                <TableRow>
-                                  <TableCell colSpan={6} className="text-center py-8 text-gray-500">
-                                    No payment history found.
-                                  </TableCell>
-                                </TableRow>
-                              ) : (
-                                receipts.map((receipt) => (
-                                  <TableRow key={receipt.id}>
-                                    <TableCell>{receipt.receiptNumber}</TableCell>
-                                    <TableCell>
-                                      {new Date(receipt.paymentDate).toLocaleDateString()}
-                                    </TableCell>
-                                    <TableCell className="font-bold text-green-600">
-                                      KES {receipt.amount.toLocaleString()}
-                                    </TableCell>
-                                    <TableCell className="capitalize">
-                                      {(receipt.paymentMethod || "").replace("_", " ")}
-                                    </TableCell>
-                                    <TableCell>{receipt.description}</TableCell>
-                                    <TableCell>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => handleDownloadReceipt(receipt)}
-                                      >
-                                        <Download className="w-4 h-4 mr-2" />
-                                        Download
-                                      </Button>
-                                    </TableCell>
-                                  </TableRow>
-                                ))
-                              )}
-                            </TableBody>
-                          </Table>
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* Academic Performance Tab */}
-              <TabsContent value="performance" className="space-y-8 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl shadow-lg p-6">
-                <Card className="bg-white/70 backdrop-blur-lg rounded-2xl shadow-xl border-0">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <BarChart2 className="w-5 h-5" />
-                      Academic Performance
-                    </CardTitle>
-                    <CardDescription>
-                      Track your child's academic progress
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {students.length === 0 ? (
-                      <div className="text-center py-8 text-gray-500">
-                        <BarChart2 className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                        <p>No children found.</p>
-                      </div>
-                    ) : focusedChildId ? (
-                      <div className="text-center py-8">
-                        <p className="text-gray-600">
-                          Performance tracking for {students.find(c => c.id === focusedChildId)?.fullName || students[0].fullName}
-                        </p>
-                        <p className="text-sm text-gray-500 mt-2">
-                          Academic performance features coming soon...
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="text-center py-8 text-gray-500">
-                        <p>Select a child to view performance.</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* Account Settings Tab */}
-              <TabsContent value="settings" className="space-y-8 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl shadow-lg p-6">
-                <Card className="bg-white/70 backdrop-blur-lg rounded-2xl shadow-xl border-0">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Settings className="w-5 h-5" />
-                      Account Settings
-                    </CardTitle>
-                    <CardDescription>
-                      Manage your account preferences and security
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-6">
-                      {/* Profile Section */}
-                      <div>
-                        <h3 className="text-lg font-semibold mb-4">Profile Information</h3>
-                        <div className="grid md:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Parent Name
-                            </label>
-                            <p className="text-gray-900 font-medium">{parent.parentName}</p>
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Phone Number
-                            </label>
-                            <p className="text-gray-900 font-medium">{parent.parentPhone}</p>
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Email Address
-                            </label>
-                            <p className="text-gray-900 font-medium">{parent.parentEmail || "Not provided"}</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Password Change Section */}
-                      <div>
-                        <h3 className="text-lg font-semibold mb-4">Change Password</h3>
-                        <form onSubmit={handleChangePassword} className="space-y-4">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Current Password
-                            </label>
-                            <Input
-                              type="password"
-                              value={oldPassword}
-                              onChange={(e) => setOldPassword(e.target.value)}
-                              placeholder="Enter current password"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              New Password
-                            </label>
-                            <Input
-                              type="password"
-                              value={newPassword}
-                              onChange={(e) => setNewPassword(e.target.value)}
-                              placeholder="Enter new password"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Confirm New Password
-                            </label>
-                            <Input
-                              type="password"
-                              value={confirmPassword}
-                              onChange={(e) => setConfirmPassword(e.target.value)}
-                              placeholder="Confirm new password"
-                            />
-                          </div>
-                          {passwordMsg && (
-                            <div className={`text-sm ${passwordMsg.includes('success') ? 'text-green-600' : 'text-red-600'}`}>
-                              {passwordMsg}
-                            </div>
-                          )}
-                          <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-                            Change Password
-                          </Button>
-                        </form>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-          </section>
+        {/* Main Content */}
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full pb-24 lg:pb-8">
+          {renderContent()}
         </main>
+
+        {/* Mobile Bottom Navigation */}
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-20">
+          <div className="flex justify-around">
+            {[
+              { id: "overview", label: "Overview", icon: Sparkles },
+              { id: "children", label: "Children", icon: Users },
+              { id: "fees", label: "Fees", icon: DollarSign },
+              { id: "receipts", label: "Receipts", icon: Receipt },
+              { id: "settings", label: "Settings", icon: Settings },
+            ].map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className={`flex flex-col items-center py-3 px-2 min-w-0 flex-1 transition-all duration-200 ${
+                    isActive 
+                      ? "text-blue-600 bg-blue-50" 
+                      : "text-gray-600 hover:text-blue-600 hover:bg-blue-50"
+                  }`}
+                >
+                  <Icon className="w-6 h-6 mb-1" />
+                  <span className="text-xs font-medium truncate">{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </nav>
       </div>
 
-      {/* Payment Modal */}
-      {selectedStudent && selectedFeeStructure && (
-        <PaymentModal
-          isOpen={paymentModalOpen}
-          onClose={() => {
-            setPaymentModalOpen(false);
-            setSelectedStudent(null);
-            setSelectedFeeStructure(null);
-          }}
-          studentId={selectedStudent.id}
-          schoolCode={schoolCode}
-          amount={selectedFeeStructure.totalAmount}
-          feeType="School Fees"
-          term={selectedFeeStructure.term}
-          academicYear={selectedFeeStructure.year.toString()}
-          onReceiptGenerated={handleReceiptGenerated}
-        />
-      )}
-
+      {/* Receipt Modal */}
       {selectedReceipt && (
         <ReceiptView
           receipt={selectedReceipt}
-          studentName={
-            students.find((s) => s.id === selectedReceipt.studentId)?.user
-              ?.name || "N/A"
-          }
-          studentClass={
-            students.find((s) => s.id === selectedReceipt.studentId)?.class
-              ?.name || "N/A"
-          }
-          admissionNumber={
-            students.find((s) => s.id === selectedReceipt.studentId)
-              ?.admissionNumber || "N/A"
-          }
-          schoolName={schoolName}
           onClose={() => setSelectedReceipt(null)}
+          onDownload={() => handleDownloadReceipt(selectedReceipt)}
         />
       )}
     </div>

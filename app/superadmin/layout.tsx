@@ -89,17 +89,18 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
       <div className="flex-1 flex flex-col min-h-screen">
         {/* Mobile Header */}
         <header className="lg:hidden bg-white shadow-sm border-b sticky top-0 z-20">
-          <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center justify-between px-4 py-4">
             <div className="flex items-center gap-3">
               <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                 <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" className="lg:hidden hover:bg-blue-50">
-                    <Menu className="h-5 w-5" />
+                  <Button variant="ghost" size="icon" className="lg:hidden hover:bg-blue-50 h-12 w-12 rounded-xl">
+                    <Menu className="h-6 w-6" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="left" className="w-64 p-0">
-                  <SheetHeader className="p-4 border-b">
-                    <SheetTitle className="text-left text-blue-700 font-bold">Hi-Tech SMS</SheetTitle>
+                <SheetContent side="left" className="w-80 p-0">
+                  <SheetHeader className="p-6 border-b bg-gradient-to-r from-blue-600 to-blue-700 text-white">
+                    <SheetTitle className="text-left text-white font-bold text-xl">Hi-Tech SMS</SheetTitle>
+                    <p className="text-blue-100 text-sm mt-2">Super Admin Portal</p>
                   </SheetHeader>
                   <nav className="flex-1 py-6 space-y-2">
                     {navigationItems.map((item) => {
@@ -110,30 +111,32 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
                           key={item.href}
                           href={item.href} 
                           onClick={() => setIsMobileMenuOpen(false)}
-                          className={`flex items-center gap-3 px-6 py-3 rounded-lg font-medium transition-colors ${
-                            isActive ? "bg-blue-100 text-blue-700" : "text-gray-700 hover:bg-blue-50 hover:text-blue-700"
+                          className={`flex items-center gap-4 px-6 py-4 rounded-xl font-medium transition-colors mx-3 ${
+                            isActive ? "bg-blue-100 text-blue-700 shadow-md" : "text-gray-700 hover:bg-blue-50 hover:text-blue-700"
                           }`} 
                           aria-current={isActive ? "page" : undefined}
                         >
-                          <Icon className="w-5 h-5" /> {item.label}
+                          <Icon className="w-6 h-6" /> {item.label}
                         </Link>
                       )
                     })}
                   </nav>
-                  <div className="mt-auto p-4 border-t">
-                    <div className="mb-4 px-2 py-2 bg-gray-50 rounded-lg">
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <User className="w-4 h-4" />
-                        <span className="font-medium">{user?.name || 'Admin'}</span>
+                  <div className="mt-auto p-6 border-t">
+                    <div className="mb-4 px-4 py-3 bg-gray-50 rounded-xl">
+                      <div className="flex items-center gap-3 text-sm text-gray-600">
+                        <User className="w-5 h-5" />
+                        <div>
+                          <span className="font-medium">{user?.name || 'Admin'}</span>
+                          <div className="text-xs text-gray-500">{user?.email}</div>
+                        </div>
                       </div>
-                      <div className="text-xs text-gray-500 mt-1">{user?.email}</div>
                     </div>
                     <button
                       onClick={() => {
                         handleLogout()
                         setIsMobileMenuOpen(false)
                       }}
-                      className="flex items-center gap-2 w-full px-4 py-3 rounded-lg text-red-600 hover:bg-red-50 font-medium transition-colors justify-center"
+                      className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-red-600 hover:bg-red-50 font-medium transition-colors justify-center"
                     >
                       <LogOut className="w-5 h-5" /> Logout
                     </button>
@@ -141,7 +144,7 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
                 </SheetContent>
               </Sheet>
               <div className="flex flex-col">
-                <span className="font-bold text-lg text-blue-700">Hi-Tech SMS</span>
+                <span className="font-bold text-xl text-blue-700">Hi-Tech SMS</span>
                 <span className="text-xs text-gray-500">
                   {navigationItems.find(item => 
                     pathname === item.href || (item.href !== "/superadmin" && pathname.startsWith(item.href))
@@ -150,7 +153,7 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <div className="hidden sm:flex items-center gap-2 text-sm text-gray-600 bg-gray-50 px-3 py-1 rounded-full">
+              <div className="hidden sm:flex items-center gap-2 text-sm text-gray-600 bg-gray-50 px-3 py-2 rounded-full">
                 <User className="w-4 h-4" />
                 <span className="font-medium">{user?.name || 'Admin'}</span>
               </div>
@@ -159,7 +162,7 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
         </header>
 
         {/* Main Content */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full pb-20 lg:pb-8">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full pb-24 lg:pb-8">
           {children}
         </main>
 
@@ -173,14 +176,14 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex flex-col items-center py-3 px-4 min-w-0 flex-1 mobile-nav-transition ${
+                  className={`flex flex-col items-center py-3 px-2 min-w-0 flex-1 mobile-nav-transition ${
                     isActive 
                       ? "text-blue-600 bg-blue-50 nav-item-active" 
                       : "text-gray-600 hover:text-blue-600 hover:bg-blue-50"
                   }`}
                   aria-current={isActive ? "page" : undefined}
                 >
-                  <Icon className="w-5 h-5 mb-1" />
+                  <Icon className="w-6 h-6 mb-1" />
                   <span className="text-xs font-medium truncate">{item.label}</span>
                 </Link>
               )
