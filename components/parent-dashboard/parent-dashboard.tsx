@@ -28,9 +28,18 @@ import {
   RefreshCw,
   Download,
   ChevronDown,
+  Sparkles,
+  GraduationCap,
+  School,
+  BookOpen,
+  Settings,
+  Eye,
+  User,
+  Save,
 } from "lucide-react";
 import { ReceiptView } from "@/components/ui/receipt-view";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableHeader,
@@ -61,6 +70,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { PaymentModal } from "@/components/payment/payment-modal";
 import { ParentFeesPanel } from "./ParentFeesPanel";
+
+import { ParentSidebar } from "./ParentSidebar";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+
 
 interface FeeStructure {
   id: string;
@@ -164,7 +182,7 @@ export function ParentDashboard({
   const [parent, setParent] = useState<any>(null);
   const [students, setStudents] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("children");
+  const [activeTab, setActiveTab] = useState("overview");
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarError, setAvatarError] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -190,7 +208,6 @@ export function ParentDashboard({
     useState<FeeStructure | null>(null);
 
   // Add state for selected section and selected child
-  const [selectedSection, setSelectedSection] = useState("children");
   const [focusedChildId, setFocusedChildId] = useState<string | null>(null);
 
   // Sidebar navigation items
@@ -203,6 +220,9 @@ export function ParentDashboard({
   ];
 
   const [studentFeeSummaries, setStudentFeeSummaries] = useState<any>({});
+
+  const [studentFeeData, setStudentFeeData] = useState<any>({});
+
 
   // Add state for current academic year and term
   const [currentAcademicYear, setCurrentAcademicYear] = useState<any>(null);
@@ -223,9 +243,31 @@ export function ParentDashboard({
   // Add state for search
   const [receiptSearch, setReceiptSearch] = useState("");
 
+  // Add state for student fee summaries
+  const [studentFeeSummaries, setStudentFeeSummaries] = useState<any>({});
+
+  // Calculate total outstanding fees across all children
+  const totalOutstandingFees = students.reduce((total, student) => {
+    const termBalances = studentFeeSummaries[student.id]?.termBalances || [];
+    const currentTermId = currentTerm?.id;
+    const currentTermSummary = termBalances.find(
+      (f: any) => f.termId === currentTermId
+    );
+    const outstandingFees = currentTermSummary ? currentTermSummary.balance : 0;
+    return total + outstandingFees;
+  }, 0);
+
+  // Calculate total payments from receipts
+  const totalPayments = receipts.reduce((sum, receipt) => sum + receipt.amount, 0);
+
+  // Get recent activity (last 5 receipts)
+  const recentActivity = receipts.slice(0, 5);
+
+  // Fetch session and parent data
   useEffect(() => {
     async function fetchSession() {
       try {
+
         console.log("ParentDashboard: Starting fetchSession", {
           schoolCode,
           parentId,
@@ -276,132 +318,90 @@ export function ParentDashboard({
           });
           setParent(data.parent);
           setStudents(data.students);
+
+        const res = await fetch(`/api/schools/${schoolCode}/parents/session`);
+        if (!res.ok) {
+          throw new Error("Not authenticated");
         }
-      } catch (error) {
-        console.error("ParentDashboard: Failed to fetch session:", error);
-        router.replace(`/schools/${schoolCode}/parent/login`);
-      } finally {
+        const data = await res.json();
+        setParent(data.parent);
+        setStudents(data.students || []);
+        setSchoolName(data.schoolName || "");
+        if (data.students && data.students.length > 0) {
+          setFocusedChildId(data.students[0].id);
+        }
         setIsLoading(false);
+      } catch (error) {
+        console.error("Session fetch error:", error);
+        router.push(`/schools/${schoolCode}/parent/login`);
       }
     }
     fetchSession();
-  }, [schoolCode, parentId]);
+  }, [schoolCode, router]);
 
-  // NEW: Fetch fee structures after students are loaded
+  // Fetch fee structures
   useEffect(() => {
     if (students.length > 0) {
       fetchFeeStructures(students);
     }
   }, [students]);
 
-  // Listen for fee structure updates from admin panel
+  // Event listener for fee structure updates
   useEffect(() => {
     const handleFeeStructureUpdate = (event: CustomEvent) => {
-      if (event.detail.schoolCode === schoolCode && students.length > 0) {
-        console.log(
-          "Fee structure updated, refreshing parent data...",
-          event.detail
-        );
+      if (event.detail && event.detail.type === "feeStructureUpdated") {
         fetchFeeStructures(students);
-        toast({
-          title: "Fee Structure Updated",
-          description:
-            "New fee structure has been added and is now available for payment.",
-          variant: "default",
-        });
       }
     };
 
-    window.addEventListener(
-      "feeStructureUpdated",
-      handleFeeStructureUpdate as EventListener
-    );
-
+    window.addEventListener("feeStructureUpdated", handleFeeStructureUpdate as EventListener);
     return () => {
-      window.removeEventListener(
-        "feeStructureUpdated",
-        handleFeeStructureUpdate as EventListener
-      );
+      window.removeEventListener("feeStructureUpdated", handleFeeStructureUpdate as EventListener);
     };
-  }, [schoolCode, students]);
+  }, [students]);
 
-  // Manual refresh function
+  // Refresh fees function
   const handleRefreshFees = async () => {
     if (students.length > 0) {
-      console.log("Manually refreshing fee structures...");
       await fetchFeeStructures(students);
-      toast({
-        title: "Fee Structures Refreshed",
-        description: "Latest fee structures have been loaded.",
-        variant: "default",
-      });
+      await fetchStudentFeeSummaries();
     }
   };
 
   // Fetch fee structures for students
   const fetchFeeStructures = async (studentList: any[]) => {
+    setLoadingFees(true);
     try {
-      setLoadingFees(true);
-      // Get unique grade IDs from students
-      const gradeIds = [
-        ...new Set(
-          studentList
-            .map((student) => student.gradeId)
-            .filter((gradeId) => gradeId) // Filter out null/undefined values
-        ),
-      ];
+      const res = await fetch(`/api/schools/${schoolCode}/fee-structure`);
+      if (!res.ok) {
+        throw new Error("Failed to fetch fee structures");
+      }
+      const data = await res.json();
+      setFeeStructures(data);
 
-      console.log("Fetching fee structures for grade IDs:", gradeIds);
-
-      // Get current year
-      const currentDate = new Date();
-      const currentYear = currentDate.getFullYear();
-
-      console.log(`Fetching fee structures for year: ${currentYear}`);
-
-      // Fetch fee structures for all terms (Term 1, Term 2, Term 3) for each grade ID
-      const feePromises = gradeIds.flatMap((gradeId) => {
-        const terms = ["Term 1", "Term 2", "Term 3"];
-        return terms.map(async (term) => {
-          const response = await fetch(
-            `/api/schools/${schoolCode}/fee-structure?term=${term}&year=${currentYear}&gradeId=${gradeId}`
-          );
-          if (response.ok) {
-            const data = await response.json();
-            console.log(
-              `Fee structures for grade ID ${gradeId}, ${term}:`,
-              data
-            );
-
-            // Find active fee structure
-            const activeFeeStructure = data.find((fee: any) => fee.isActive);
-            console.log(
-              `Active fee structure for grade ID ${gradeId}, ${term}:`,
-              activeFeeStructure
-            );
-
-            return activeFeeStructure || null;
-          } else {
-            console.error(
-              `Failed to fetch fee structures for grade ID ${gradeId}, ${term}:`,
-              response.status,
-              response.statusText
-            );
-            return null;
-          }
-        });
+      // Map fee structures to students
+      const studentFeeData: any = {};
+      studentList.forEach((student) => {
+        const studentFeeStructure = data.find(
+          (fs: any) => fs.gradeId === student.gradeId
+        );
+        if (studentFeeStructure) {
+          studentFeeData[student.id] = studentFeeStructure;
+        }
       });
-
-      const feeResults = await Promise.all(feePromises);
-      const allFees = feeResults.filter((fee) => fee !== null);
-      console.log("All active fee structures:", allFees);
-      setFeeStructures(allFees);
+      setStudentFeeData(studentFeeData);
     } catch (error) {
-      console.error("Failed to fetch fee structures:", error);
+      console.error("Error fetching fee structures:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load fee structures",
+        variant: "destructive",
+      });
     } finally {
       setLoadingFees(false);
     }
   };
+
 
   // Get fee structure for a specific student (updated to use gradeId)
   const getStudentFeeStructure = (studentGradeId: string) => {
@@ -450,12 +450,45 @@ export function ParentDashboard({
   };
 
   // Handle payment modal opening
+
+  // Fetch student fee summaries
+  const fetchStudentFeeSummaries = async () => {
+    if (students.length === 0) return;
+
+    try {
+      const summaries: any = {};
+      for (const student of students) {
+        try {
+          const res = await fetch(
+            `/api/schools/${schoolCode}/students/${student.id}/fees`
+          );
+          if (res.ok) {
+            const data = await res.json();
+            summaries[student.id] = data;
+          }
+        } catch (error) {
+          console.error(`Error fetching fees for student ${student.id}:`, error);
+        }
+      }
+      setStudentFeeSummaries(summaries);
+    } catch (error) {
+      console.error("Error fetching student fee summaries:", error);
+    }
+  };
+
+  // Get student fee structure
+  const getStudentFeeStructure = (studentId: string) => {
+    return studentFeeData[studentId];
+  };
+
+  // Handle opening payment modal
+
   const handleOpenPaymentModal = (student: any) => {
     const feeStructure = getStudentFeeStructure(student.gradeId);
     if (!feeStructure) {
       toast({
-        title: "Error",
-        description: "No fee structure available for this student",
+        title: "No Fee Structure",
+        description: "No fee structure found for this student's grade",
         variant: "destructive",
       });
       return;
@@ -491,31 +524,38 @@ export function ParentDashboard({
   // Handle payment success
   const handlePaymentSuccess = async (payment: any) => {
     toast({
-      title: "Payment Successful",
-      description: `Payment of KES ${
-        payment.amount?.toLocaleString() ||
-        selectedFeeStructure?.totalAmount.toLocaleString()
-      } has been processed successfully.`,
-      variant: "default",
+      title: "Payment Successful!",
+      description: `Payment of KES ${payment.amount.toLocaleString()} processed successfully`,
     });
+
 
     // Refresh student fee summaries to ensure receipt uses up-to-date data
     await fetchStudentFeeSummaries();
 
     // Close modal
+
     setPaymentModalOpen(false);
     setSelectedStudent(null);
     setSelectedFeeStructure(null);
+    
+    // Refresh fee data
+    await handleRefreshFees();
+    
+    // Refresh receipts
+    if (activeTab === "receipts") {
+      await fetchReceipts();
+    }
   };
 
   // Handle payment error
   const handlePaymentError = (error: string) => {
     toast({
       title: "Payment Failed",
-      description: error || "An error occurred while processing payment",
+      description: error,
       variant: "destructive",
     });
   };
+
 
   // Fetch receipts from backend (directly from receipt table)
   const fetchReceipts = async () => {
@@ -536,111 +576,144 @@ export function ParentDashboard({
       setReceipts(data);
     } catch (err: any) {
       setReceiptsError(err.message || "Failed to load receipts");
+
+  // Fetch receipts
+  const fetchReceipts = async () => {
+    if (students.length === 0) return;
+    
+    setLoadingReceipts(true);
+    setReceiptsError("");
+    
+    try {
+      const allReceipts: any[] = [];
+      
+      for (const student of students) {
+        try {
+          const res = await fetch(
+            `/api/schools/${schoolCode}/students/${student.id}/receipts`
+          );
+          if (res.ok) {
+            const data = await res.json();
+            allReceipts.push(...data);
+          }
+        } catch (error) {
+          console.error(`Error fetching receipts for student ${student.id}:`, error);
+        }
+      }
+      
+      // Sort receipts by date (newest first)
+      allReceipts.sort((a, b) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime());
+      
+      setReceipts(allReceipts);
+    } catch (error) {
+      console.error("Error fetching receipts:", error);
+      setReceiptsError("Failed to load receipts");
     } finally {
       setLoadingReceipts(false);
     }
   };
 
   // Simulate profile image upload
+  // Handle avatar change
+
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setAvatarError("");
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Validate file type
     if (!file.type.startsWith("image/")) {
-      setAvatarError("Please select a valid image file.");
+      setAvatarError("Please select an image file");
       return;
     }
+
+    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      setAvatarError("Image must be less than 5MB.");
+      setAvatarError("File size must be less than 5MB");
       return;
     }
+
     setAvatarUploading(true);
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      const url = ev.target?.result as string;
-      setAvatarUrl(url);
-      setAvatarUploading(false);
-      // Update parent avatar via API
-      await fetch(`/api/schools/${schoolCode}/parents`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ parentId: parent.id, avatarUrl: url }),
-      });
-    };
-    reader.onerror = () => {
-      setAvatarUploading(false);
-      setAvatarError("Failed to read image file. Please try again.");
-    };
-    reader.readAsDataURL(file);
+    setAvatarError("");
+
+    // Simulate upload (replace with actual upload logic)
+    setTimeout(() => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setAvatarUrl(event.target?.result as string);
+        setAvatarUploading(false);
+        toast({
+          title: "Avatar Updated",
+          description: "Profile picture updated successfully",
+        });
+      };
+      reader.readAsDataURL(file);
+    }, 1000);
   };
 
-  // Logout logic
+  // Handle logout
   const handleLogout = async () => {
     try {
       await fetch(`/api/schools/${schoolCode}/parents/logout`, {
         method: "POST",
       });
+      router.push(`/schools/${schoolCode}/parent/login`);
     } catch (error) {
-      console.error("Logout failed", error);
-    } finally {
-      router.replace(`/schools/${schoolCode}/parent/login`);
+      console.error("Logout error:", error);
+      router.push(`/schools/${schoolCode}/parent/login`);
     }
   };
 
-  // Change password logic
+  // Handle change password
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    setPasswordMsg("");
-    if (!oldPassword || !newPassword || !confirmPassword) {
-      setPasswordMsg("All fields are required.");
-      return;
-    }
+    
     if (newPassword !== confirmPassword) {
-      setPasswordMsg("New passwords do not match.");
+      setPasswordMsg("New passwords do not match");
       return;
     }
-    // Update parent password via API
-    const res = await fetch(`/api/schools/${schoolCode}/parents`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ parentId: parent.id, oldPassword, newPassword }),
-    });
-    if (res.ok) {
-      setPasswordMsg("Password changed successfully!");
-      setOldPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-    } else {
-      const data = await res.json();
-      setPasswordMsg(data.error || "Failed to change password");
+
+    if (newPassword.length < 6) {
+      setPasswordMsg("Password must be at least 6 characters long");
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/schools/${schoolCode}/parents/reset-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          oldPassword,
+          newPassword,
+        }),
+      });
+
+      if (res.ok) {
+        setPasswordMsg("Password changed successfully");
+        setOldPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+        toast({
+          title: "Success",
+          description: "Password changed successfully",
+        });
+      } else {
+        const data = await res.json();
+        setPasswordMsg(data.error || "Failed to change password");
+      }
+    } catch (error) {
+      setPasswordMsg("An error occurred while changing password");
     }
   };
 
-  // Receipt handling
+  // Handle receipt generated
   const handleReceiptGenerated = (receipt: any) => {
-    // Add the new receipt to the receipts list
-    const newReceipt = {
-      id: receipt.paymentId,
-      receiptNumber: receipt.receiptNumber,
-      paymentDate: receipt.issuedAt,
-      amount: receipt.amount,
-      paymentMethod: receipt.paymentMethod,
-      description: `${receipt.feeType} - ${receipt.term} ${receipt.academicYear}`,
-      student: {
-        name: receipt.studentName || "Demo Student",
-        className: "Demo Class",
-        admissionNumber: receipt.studentId,
-      },
-      ...receipt,
-    };
-
-    setReceipts((prev) => [newReceipt, ...prev]);
+    setReceipts((prev) => [receipt, ...prev]);
     toast({
       title: "Receipt Generated",
-      description: "Payment receipt has been added to your receipts tab.",
-      variant: "default",
+      description: "Payment receipt has been generated",
     });
   };
+
 
   const handleDownloadReceipt = async (receipt: any) => {
     let studentId = receipt.studentId || receipt.student?.id;
@@ -794,6 +867,53 @@ export function ParentDashboard({
 
               <div class="footer">Issued by ${issuedBy}</div>
               <button class="print-button" onclick="window.print()">Print Receipt</button>
+
+
+  // Handle download receipt
+  const handleDownloadReceipt = async (receipt: any) => {
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+          <title>Payment Receipt</title>
+          <style>
+              body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+              .receipt { max-width: 600px; margin: 0 auto; border: 2px solid #333; padding: 20px; }
+              .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px; }
+              .details { margin-bottom: 20px; }
+              .summary { border-top: 1px solid #ccc; padding-top: 10px; }
+              .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #666; }
+              .print-button { display: block; margin: 20px auto; padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+          </style>
+      </head>
+      <body>
+          <div className="receipt">
+              <div className="header">
+                  <h1>${schoolName}</h1>
+                  <h2>Payment Receipt</h2>
+                  <p>Receipt #${receipt.receiptNumber}</p>
+              </div>
+              
+              <div className="details">
+                  <p><strong>Date:</strong> ${new Date(receipt.paymentDate).toLocaleDateString()}</p>
+                  <p><strong>Student:</strong> ${students.find(s => s.id === receipt.studentId)?.fullName || 'N/A'}</p>
+                  <p><strong>Payment Method:</strong> ${receipt.paymentMethod}</p>
+                  <p><strong>Reference:</strong> ${receipt.referenceNumber}</p>
+                  <p><strong>Status:</strong> ${receipt.status}</p>
+              </div>
+
+              <div className="summary">
+                  <p><strong>Total Paid:</strong> KES ${receipt.amount.toLocaleString()}</p>
+                  <p><strong>Outstanding Before:</strong> KES ${receipt.balanceCarriedForward?.toLocaleString() || '0'}</p>
+                  <p><strong>Outstanding After:</strong> KES ${receipt.balance?.toLocaleString() || '0'}</p>
+              </div>
+
+              <div className="footer">
+                  <p>Issued by ${schoolName}</p>
+                  <p>Thank you for your payment!</p>
+              </div>
+              <button className="print-button" onclick="window.print()">Print Receipt</button>
+
           </div>
       </body>
       </html>
@@ -814,10 +934,16 @@ export function ParentDashboard({
 
   // Fetch receipts when receipts section is selected
   useEffect(() => {
-    if (selectedSection === "receipts" && students.length > 0) {
+    if (activeTab === "receipts" && students.length > 0) {
       fetchReceipts();
     }
-  }, [selectedSection, students]);
+  }, [activeTab, students]);
+
+  // Fetch student fee summaries
+  useEffect(() => {
+    fetchStudentFeeSummaries();
+  }, [students, schoolCode]);
+
 
   useEffect(() => {
     fetchStudentFeeSummaries();
@@ -876,6 +1002,61 @@ export function ParentDashboard({
     if (schoolCode) fetchYearsAndTerms();
   }, [schoolCode]);
 
+=======
+  // Fetch current academic year and term on mount
+  useEffect(() => {
+    async function fetchAcademicInfo() {
+      setLoadingAcademicInfo(true);
+      setAcademicInfoError("");
+      try {
+        const [yearRes, termRes] = await Promise.all([
+          fetch(`/api/schools/${schoolCode}?action=current-academic-year`),
+          fetch(`/api/schools/${schoolCode}?action=current-term`),
+        ]);
+        if (!yearRes.ok) throw new Error("Failed to fetch academic year");
+        if (!termRes.ok) throw new Error("Failed to fetch term");
+        const yearData = await yearRes.json();
+        const termData = await termRes.json();
+        setCurrentAcademicYear(yearData);
+        setCurrentTerm(termData);
+      } catch (err: any) {
+        setAcademicInfoError(err.message || "Failed to load academic info");
+      } finally {
+        setLoadingAcademicInfo(false);
+      }
+    }
+    fetchAcademicInfo();
+  }, [schoolCode]);
+
+  // Fetch academic years and terms
+  useEffect(() => {
+    async function fetchYearsAndTerms() {
+      try {
+        const res = await fetch(`/api/schools/${schoolCode}/academic-years`);
+        if (!res.ok) throw new Error("Failed to fetch academic years");
+        const years = await res.json();
+        setAcademicYears(years);
+        const current = years.find((y: any) => y.isCurrent);
+        const defaultYearId = current?.id || years[0]?.id || "";
+        setSelectedYearId(defaultYearId);
+        if (defaultYearId) {
+          const tRes = await fetch(
+            `/api/schools/${schoolCode}/terms?yearId=${defaultYearId}`
+          );
+          if (!tRes.ok) throw new Error("Failed to fetch terms");
+          const t = await tRes.json();
+          setTerms(t);
+          const currentTerm = t.find((term: any) => term.isCurrent);
+          setSelectedTermId(currentTerm?.id || t[0]?.id || "");
+        }
+      } catch (err: any) {
+        // Optionally handle error
+      }
+    }
+    if (schoolCode) fetchYearsAndTerms();
+  }, [schoolCode]);
+
+
   // When year changes, fetch terms
   useEffect(() => {
     async function fetchTerms() {
@@ -901,7 +1082,7 @@ export function ParentDashboard({
     if (!selectedYearId || !selectedTermId || students.length === 0) return;
     const child = students.find((c) => c.id === focusedChildId) || students[0];
     if (!child) return;
-    // Fetch fee summary for the selected student, year, and term
+
     async function fetchFilteredFeeSummary() {
       try {
         const res = await fetch(
@@ -909,9 +1090,13 @@ export function ParentDashboard({
         );
         if (!res.ok) return;
         const data = await res.json();
+
         // Find the summary for the selected year and term (by ID)
         let feeSummary = data.feeSummary || [];
         // If backend returns termId/academicYearId, filter by those; else fallback to term/year
+
+        let feeSummary = data.feeSummary || [];
+
         let filteredSummary = feeSummary;
         if (
           feeSummary.length > 0 &&
@@ -922,7 +1107,9 @@ export function ParentDashboard({
               f.termId === selectedTermId && f.academicYearId === selectedYearId
           );
         } else {
+
           // fallback: try to match by term/year name if IDs missing
+
           const selectedYear = academicYears.find(
             (y) => y.id === selectedYearId
           );
@@ -951,6 +1138,7 @@ export function ParentDashboard({
   ]);
 
   // UI for search
+
   const renderReceiptSearch = () => (
     <div className="mb-4">
       <input
@@ -961,6 +1149,30 @@ export function ParentDashboard({
         className="border rounded px-3 py-2 w-full max-w-xs"
       />
     </div>
+
+const renderReceiptSearch = () => (
+  <div className="mb-4">
+    <input
+      type="text"
+      placeholder="Search receipts..."
+      value={receiptSearch}
+      onChange={(e) => setReceiptSearch(e.target.value)}
+      className="border rounded px-3 py-2 w-full max-w-xs"
+    />
+  </div>
+);
+
+// Filter receipts by search
+const filteredReceipts = receipts.filter((receipt: any) => {
+  const search = receiptSearch.toLowerCase();
+  return (
+    receipt.receiptNumber?.toLowerCase().includes(search) ||
+    receipt.amount?.toString().includes(search) ||
+    receipt.paymentMethod?.toLowerCase().includes(search) ||
+    receipt.description?.toLowerCase().includes(search) ||
+    receipt.academicYearId?.toLowerCase?.().includes(search) ||
+    receipt.termId?.toLowerCase?.().includes(search)
+
   );
 
   // Filter receipts by search
@@ -1182,275 +1394,190 @@ export function ParentDashboard({
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Card className="p-8 text-center">
-          <p>Loading dashboard...</p>
-        </Card>
-      </div>
-    );
-  }
-
-  if (!parent) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Card className="p-8 text-center">
-          <p>You are not logged in. Redirecting...</p>
-        </Card>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex min-h-screen bg-gray-50">
-      {/* Sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-20 w-64 bg-white border-r p-4 transform transition-transform md:relative md:translate-x-0">
-        {/* Profile at top */}
-        <div className="flex flex-col items-center mb-8">
-          <Avatar className="w-28 h-28 mb-3 ring-4 ring-blue-200 shadow-lg relative group">
-            <img
-              src={avatarUrl || "/placeholder-user.jpg"}
-              alt={parent.parentName || "Parent Avatar"}
-              className="rounded-full object-cover w-full h-full"
-            />
-            <label
-              className="absolute bottom-2 right-2 bg-blue-600 text-white rounded-full p-1 cursor-pointer shadow-md group-hover:scale-110 transition"
-              title="Change profile picture"
-            >
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleAvatarChange}
-                disabled={avatarUploading}
-                ref={fileInputRef}
-              />
-              <Camera className="w-5 h-5" />
-            </label>
-            {avatarUploading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-white/70 rounded-full">
-                <span className="text-blue-600 font-bold">Uploading...</span>
-              </div>
-            )}
-            {avatarError && (
-              <div className="absolute left-0 right-0 -bottom-8 text-xs text-red-600 text-center">
-                {avatarError}
-              </div>
-            )}
-          </Avatar>
-          <div className="text-xl font-bold text-gray-900">
-            {parent.parentName}
-          </div>
-          <div className="text-blue-700 font-semibold text-sm">
-            {parent.parentPhone}
-          </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
         </div>
-        {/* Navigation */}
-        <nav className="mt-6 space-y-2">
-          {sidebarNav.map((item) => (
+      </div>
+    );
+  }
+
+  const renderOverview = () => (
+    <div className="space-y-6">
+      {/* Welcome Section */}
+      <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
+        <CardHeader className="pb-4">
+          <CardTitle className="flex items-center gap-3 text-blue-800">
+            <Sparkles className="w-6 h-6" />
+            Welcome, {parent?.parentName}!
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-gray-700">Manage your children's education and stay updated with their progress.</p>
+        </CardContent>
+      </Card>
+
+      {/* Children Overview */}
+      {students.map((child) => (
+        <ChildOverview
+          key={child.id}
+          child={child}
+          outstandingFees={getStudentFeeStructure(child.id)?.balance || 0}
+          feeStructure={getStudentFeeStructure(child.id)}
+        />
+      ))}
+
+      {/* Quick Actions */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="w-5 h-5" />
+            Quick Actions
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <Button
-              key={item.section}
-              variant={selectedSection === item.section ? "secondary" : "ghost"}
-              className="w-full justify-start"
-              onClick={() => setSelectedSection(item.section)}
+              onClick={() => setActiveTab("fees")}
+              className="h-20 flex flex-col items-center justify-center space-y-2 bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white"
             >
-              <item.icon className="w-4 h-4 mr-2" /> {item.label}
+              <DollarSign className="w-6 h-6" />
+              <span>Pay Fees</span>
             </Button>
-          ))}
-        </nav>
-        {/* Logout */}
-        <div className="mt-auto">
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                variant="outline"
-                className="w-full flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
-              >
-                <LogOut className="w-5 h-5" />
-                Logout
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Confirm Logout</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Are you sure you want to logout? You will need to login again
-                  to access the dashboard.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleLogout}
-                  className="bg-red-600 hover:bg-red-700"
-                >
-                  Logout
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
-      </aside>
+            <Button
+              onClick={() => setActiveTab("receipts")}
+              className="h-20 flex flex-col items-center justify-center space-y-2 bg-gradient-to-br from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white"
+            >
+              <Receipt className="w-6 h-6" />
+              <span>View Receipts</span>
+            </Button>
+            <Button
+              onClick={() => setActiveTab("performance")}
+              className="h-20 flex flex-col items-center justify-center space-y-2 bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
+            >
+              <BarChart2 className="w-6 h-6" />
+              <span>Academic Progress</span>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col">
-        {/* ...header... */}
-        <main className="flex-grow p-4 md:p-6">
-          {selectedSection === "children" && (
-            <div>
-              {/* Academic Year & Term Info - Beautiful Glassmorphism Card */}
-              <div className="mb-6">
-                {loadingAcademicInfo ? (
-                  <div className="rounded-2xl bg-gradient-to-r from-blue-100/60 via-purple-100/60 to-pink-100/60 shadow-lg p-6 flex items-center justify-center min-h-[80px]">
-                    <span className="text-blue-700 font-semibold animate-pulse">
-                      Loading academic year and term...
-                    </span>
-                  </div>
-                ) : academicInfoError ? (
-                  <div className="rounded-2xl bg-gradient-to-r from-red-100/60 to-pink-100/60 shadow-lg p-6 flex items-center justify-center min-h-[80px]">
-                    <span className="text-red-600 font-semibold">
-                      {academicInfoError}
-                    </span>
-                  </div>
-                ) : currentAcademicYear && currentTerm ? (
-                  <div className="rounded-2xl bg-gradient-to-r from-blue-100/60 via-purple-100/60 to-pink-100/60 shadow-xl p-6 flex flex-col md:flex-row items-center justify-between gap-4 backdrop-blur-md border border-white/40">
-                    <div className="flex items-center gap-4">
-                      <div className="bg-white/60 rounded-full p-3 shadow-md flex items-center justify-center">
-                        <Calendar className="w-8 h-8 text-blue-500" />
-                      </div>
-                      <div>
-                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1">
-                          Academic Year
-                        </div>
-                        <div className="text-2xl md:text-3xl font-bold text-blue-700 drop-shadow-sm">
-                          {currentAcademicYear.name}
-                          <span className="ml-3 text-base font-medium text-gray-500">
-                            (
-                            {new Date(
-                              currentAcademicYear.startDate
-                            ).toLocaleDateString()}{" "}
-                            -{" "}
-                            {new Date(
-                              currentAcademicYear.endDate
-                            ).toLocaleDateString()}
-                            )
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="w-full h-[1px] bg-gradient-to-r from-blue-200/40 via-purple-200/40 to-pink-200/40 my-4 md:hidden" />
-                    <div className="flex items-center gap-4">
-                      <div className="bg-white/60 rounded-full p-3 shadow-md flex items-center justify-center">
-                        <Calendar className="w-8 h-8 text-purple-500" />
-                      </div>
-                      <div>
-                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1">
-                          Current Term
-                        </div>
-                        <div className="text-2xl md:text-3xl font-bold text-purple-700 drop-shadow-sm">
-                          {currentTerm.name}
-                          <span className="ml-3 text-base font-medium text-gray-500">
-                            (
-                            {new Date(
-                              currentTerm.startDate
-                            ).toLocaleDateString()}{" "}
-                            -{" "}
-                            {new Date(currentTerm.endDate).toLocaleDateString()}
-                            )
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-              {/* Academic Year & Term Filters */}
-              {academicYears.length > 0 && terms.length > 0 && (
-                <div className="flex flex-wrap gap-4 mb-6 items-center">
-                  <div>
-                    <label className="block text-xs font-semibold mb-1 text-gray-700">
-                      Academic Year
-                    </label>
-                    <div className="relative">
-                      <select
-                        className="appearance-none border rounded-lg px-4 py-2 pr-8 bg-white shadow focus:outline-none focus:ring-2 focus:ring-blue-200"
-                        value={selectedYearId}
-                        onChange={(e) => setSelectedYearId(e.target.value)}
-                        disabled={filterLoading || academicYears.length === 0}
-                      >
-                        {academicYears.map((year: any) => (
-                          <option key={year.id} value={year.id}>
-                            {year.name}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-                        size={18}
+  const renderChildren = () => (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="w-5 h-5" />
+            My Children
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {students.map((child) => (
+              <Card key={child.id} className="hover:shadow-md transition-shadow">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-4 mb-4">
+                    <Avatar className="w-16 h-16">
+                      <img
+                        src={child.avatarUrl || "/placeholder-user.jpg"}
+                        alt={child.fullName || child.name}
+                        className="rounded-full object-cover w-full h-full"
                       />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold mb-1 text-gray-700">
-                      Term
-                    </label>
-                    <div className="relative">
-                      <select
-                        className="appearance-none border rounded-lg px-4 py-2 pr-8 bg-white shadow focus:outline-none focus:ring-2 focus:ring-blue-200"
-                        value={selectedTermId}
-                        onChange={(e) => setSelectedTermId(e.target.value)}
-                        disabled={filterLoading || terms.length === 0}
-                      >
-                        {terms.map((term: any) => (
-                          <option key={term.id} value={term.id}>
-                            {term.name}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-                        size={18}
-                      />
-                    </div>
-                  </div>
-                  {filterError && (
-                    <div className="text-red-600 mb-2">{filterError}</div>
-                  )}
-                </div>
-              )}
-              {/* Children summary at the top */}
-              {students.length > 0 && (
-                <Card className="mb-6">
-                  <CardContent>
-                    <div className="flex flex-wrap gap-4 items-center justify-between">
-                      <div>
-                        <b>Children:</b> {students.length}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-              {/* Dropdown for selecting child */}
-              {students.length > 0 && (
-                <div className="mb-6 flex items-center gap-4">
-                  <label
-                    htmlFor="child-select"
-                    className="font-semibold text-gray-700"
-                  >
-                    Select Child:
-                  </label>
-                  <select
-                    id="child-select"
-                    className="border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    value={focusedChildId || students[0].id}
-                    onChange={(e) => setFocusedChildId(e.target.value)}
-                  >
-                    {students.map((child) => (
-                      <option key={child.id} value={child.id}>
+                    </Avatar>
+                    <div>
+                      <h3 className="font-semibold text-lg text-gray-900">
                         {child.fullName || child.name}
-                      </option>
-                    ))}
-                  </select>
+                      </h3>
+                      <p className="text-blue-700 font-medium">{child.gradeName}</p>
+                      <p className="text-sm text-gray-600">Adm: {child.admissionNumber}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Gender:</span>
+                      <span className="font-medium">{child.gender}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Date of Birth:</span>
+                      <span className="font-medium">
+                        {child.dateOfBirth ? child.dateOfBirth.split("T")[0] : "N/A"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Date Admitted:</span>
+                      <span className="font-medium">
+                        {child.dateAdmitted ? child.dateAdmitted.split("T")[0] : "N/A"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex gap-2">
+                    <Button size="sm" variant="outline" className="flex-1">
+                      <Eye className="w-4 h-4 mr-1" />
+                      View Details
+                    </Button>
+                    <Button size="sm" variant="outline" className="flex-1">
+                      <BarChart2 className="w-4 h-4 mr-1" />
+                      Progress
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderFees = () => (
+    <div className="space-y-6">
+      <ParentFeesPanel
+        students={students}
+        schoolCode={schoolCode}
+        onPaymentSuccess={handlePaymentSuccess}
+        onPaymentError={handlePaymentError}
+      />
+    </div>
+  );
+
+  const renderReceipts = () => (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Receipt className="w-5 h-5" />
+            Payment Receipts
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {receipts.length === 0 ? (
+            <div className="text-center py-8">
+              <Receipt className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600">No receipts found</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {receipts.map((receipt) => (
+                <div key={receipt.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <Receipt className="w-5 h-5 text-blue-600" />
+                    <div>
+                      <p className="font-medium text-gray-900">Receipt #{receipt.receiptNumber}</p>
+                      <p className="text-sm text-gray-600">{receipt.studentName} • {receipt.date}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="font-semibold text-gray-900">KES {receipt.amount.toLocaleString()}</span>
+                    <Button size="sm" variant="outline" onClick={() => handleDownloadReceipt(receipt)}>
+                      <Download className="w-4 h-4 mr-1" />
+                      Download
+                    </Button>
+                  </div>
                 </div>
+
               )}
               {/* Child Overview Panel */}
               {students.length > 0 &&
@@ -1491,11 +1618,220 @@ export function ParentDashboard({
               {focusedChildId
                 ? `Performance for child ID: ${focusedChildId}`
                 : "Select a child to view performance."}
+=======
+              ))}
             </div>
           )}
-          {selectedSection === "settings" && <div>Settings section</div>}
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderPerformance = () => (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart2 className="w-5 h-5" />
+            Academic Performance
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8">
+            <BarChart2 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-600">Academic performance tracking coming soon...</p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderSettings = () => (
+    <div className="space-y-6">
+      {/* Profile Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <User className="w-5 h-5" />
+            Profile Settings
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              <Avatar className="w-20 h-20">
+                <img
+                  src={avatarUrl || "/placeholder-user.jpg"}
+                  alt={parent?.parentName || "Parent Avatar"}
+                  className="rounded-full object-cover w-full h-full"
+                />
+              </Avatar>
+              <div>
+                <h3 className="font-semibold text-lg">{parent?.parentName}</h3>
+                <p className="text-gray-600">{parent?.parentPhone}</p>
+                <p className="text-gray-600">{parent?.parentEmail}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                <input
+                  type="text"
+                  value={parent?.parentName || ""}
+                  readOnly
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+                <input
+                  type="tel"
+                  value={parent?.parentPhone || ""}
+                  readOnly
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                <input
+                  type="email"
+                  value={parent?.parentEmail || ""}
+                  readOnly
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
+                <input
+                  type="text"
+                  value={parent?.parentAddress || ""}
+                  readOnly
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                />
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Change Password */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Key className="w-5 h-5" />
+            Change Password
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleChangePassword} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Current Password</label>
+                <input
+                  type="password"
+                  value={oldPassword}
+                  onChange={(e) => setOldPassword(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">New Password</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Confirm New Password</label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+            </div>
+            {passwordMsg && (
+              <p className={`text-sm ${passwordMsg.includes("successfully") ? "text-green-600" : "text-red-600"}`}>
+                {passwordMsg}
+              </p>
+            )}
+            <Button type="submit" className="w-full sm:w-auto">
+              <Save className="w-4 h-4 mr-2" />
+              Change Password
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case "overview":
+        return renderOverview();
+      case "children":
+        return renderChildren();
+      case "fees":
+        return renderFees();
+      case "receipts":
+        return renderReceipts();
+      case "performance":
+        return renderPerformance();
+      case "settings":
+        return renderSettings();
+      default:
+        return renderOverview();
+    }
+  };
+
+  return (
+    <div className="flex min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+      <ParentSidebar
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        colorTheme="#3b82f6"
+        onLogout={handleLogout}
+        parent={parent}
+        onAvatarChange={handleAvatarChange}
+        avatarUploading={avatarUploading}
+        avatarError={avatarError}
+        avatarUrl={avatarUrl}
+      />
+      
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-h-screen">
+        {/* Mobile Header - Hidden on desktop */}
+        <header className="lg:hidden bg-white shadow-sm border-b sticky top-0 z-20">
+          <div className="flex items-center justify-between px-4 py-4">
+            <div className="flex items-center gap-3">
+              <div className="flex flex-col">
+                <span className="font-bold text-lg text-blue-700">Parent Portal</span>
+                <span className="text-xs text-gray-500">
+                  {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+                </span>
+              </div>
+
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="hidden sm:flex items-center gap-2 text-sm text-gray-600 bg-gray-50 px-3 py-2 rounded-full">
+                <User className="w-4 h-4" />
+                <span className="font-medium">{parent?.parentName || 'Parent'}</span>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Main Content */}
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full pb-24 lg:pb-8">
+          {renderContent()}
         </main>
-      </div>
+
 
       {/* Payment Modal */}
       {selectedStudent && selectedFeeStructure && (
@@ -1513,6 +1849,45 @@ export function ParentDashboard({
           term={selectedFeeStructure.term}
           academicYear={selectedFeeStructure.year.toString()}
           onReceiptGenerated={handleReceiptGenerated}
+
+        {/* Mobile Bottom Navigation */}
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-20">
+          <div className="flex justify-around">
+            {[
+              { id: "overview", label: "Overview", icon: Sparkles },
+              { id: "children", label: "Children", icon: Users },
+              { id: "fees", label: "Fees", icon: DollarSign },
+              { id: "receipts", label: "Receipts", icon: Receipt },
+              { id: "settings", label: "Settings", icon: Settings },
+            ].map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className={`flex flex-col items-center py-3 px-2 min-w-0 flex-1 transition-all duration-200 ${
+                    isActive 
+                      ? "text-blue-600 bg-blue-50" 
+                      : "text-gray-600 hover:text-blue-600 hover:bg-blue-50"
+                  }`}
+                >
+                  <Icon className="w-6 h-6 mb-1" />
+                  <span className="text-xs font-medium truncate">{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+      </div>
+
+      {/* Receipt Modal */}
+      {selectedReceipt && (
+        <ReceiptView
+          receipt={selectedReceipt}
+          onClose={() => setSelectedReceipt(null)}
+          onDownload={() => handleDownloadReceipt(selectedReceipt)}
+
         />
       )}
     </div>
