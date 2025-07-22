@@ -16,44 +16,138 @@ function getNextAdmissionNumber(lastAdmissionNumber: string): string {
   return lastAdmissionNumber + '1';
 }
 
-export async function GET(req: NextRequest, { params }: { params: { schoolCode: string } }) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { schoolCode: string } }
+) {
   try {
+    const { schoolCode } = params;
+    const { searchParams } = new URL(request.url);
+    
+    const gradeId = searchParams.get("gradeId");
+    const classId = searchParams.get("classId");
+    const search = searchParams.get("search");
+    const role = searchParams.get("role");
+
+    // Find the school
     const school = await prisma.school.findUnique({
-      where: { code: params.schoolCode },
-      include: {
-        students: {
-          include: {
-            user: true,
-            parent: true,
-            class: {
-              include: { grade: true }
-            }
-          },
-        },
-      },
+      where: { code: schoolCode },
     });
 
     if (!school) {
-      return NextResponse.json({ error: 'School not found' }, { status: 404 });
+      return NextResponse.json({ error: "School not found" }, { status: 404 });
     }
 
-    const studentsWithDetails = school.students.map(student => ({
-      ...student,
-      name: student.user?.name,
-      email: student.user?.email,
-      phone: student.user?.phone,
-      className: student.class?.name,
-      gradeName: student.class?.grade?.name,
-      parent: student.parent ? {
-        name: student.parent.name,
-        email: student.parent.email,
-        phone: student.parent.phone,
-      } : null,
-    }));
+    // Build where clause
+    const whereClause: any = {
+      schoolId: school.id,
+      isActive: true,
+    };
 
-    return NextResponse.json(studentsWithDetails);
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Failed to fetch students' }, { status: 500 });
+    // Filter by class if specified
+    if (classId) {
+      whereClause.classId = classId;
+    } else if (gradeId) {
+      // Filter by grade if class not specified
+      whereClause.class = {
+        gradeId: gradeId,
+      };
+    }
+
+    // Filter by role if specified
+    if (role) {
+      whereClause.user = {
+        role: role,
+      };
+    }
+
+    // Add search filter if specified
+    if (search) {
+      whereClause.OR = [
+        {
+          user: {
+            name: {
+              contains: search,
+              mode: "insensitive",
+            },
+          },
+        },
+        {
+          admissionNumber: {
+            contains: search,
+            mode: "insensitive",
+          },
+        },
+        {
+          parent: {
+            name: {
+              contains: search,
+              mode: "insensitive",
+            },
+          },
+        },
+      ];
+    }
+
+    // Fetch students with related data
+    const students = await prisma.student.findMany({
+      where: whereClause,
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+          },
+        },
+        class: {
+          include: {
+            grade: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        parent: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: [
+        {
+          class: {
+            grade: {
+              name: "asc",
+            },
+          },
+        },
+        {
+          class: {
+            name: "asc",
+          },
+        },
+        {
+          user: {
+            name: "asc",
+          },
+        },
+      ],
+    });
+
+    return NextResponse.json(students);
+  } catch (error) {
+    console.error("Error fetching students:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch students" },
+      { status: 500 }
+    );
   }
 }
 

@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { SMSService } from './sms-service';
 
 const prisma = new PrismaClient();
 
@@ -123,7 +124,18 @@ export const paymentService = {
 
         const student = await prisma.student.findFirst({
           where: { id: studentId, schoolId: school.id },
-          include: { user: true, class: true }
+          include: { 
+            user: true, 
+            class: true,
+            parent: {
+              select: {
+                id: true,
+                name: true,
+                phone: true,
+                email: true,
+              }
+            }
+          }
         });
         if (!student) {
           throw new Error('Student not found');
@@ -275,17 +287,43 @@ export const paymentService = {
           termOutstandingAfter: balancesAfter.termOutstanding,
         };
 
+        // Send SMS notification to parent if phone number exists
+        let smsResult = null;
+        if (student.parent?.phone) {
+          try {
+            smsResult = await SMSService.sendPaymentConfirmation(
+              student.parent.phone,
+              student.parent.name,
+              student.user.name,
+              paymentData.amount,
+              new Date(),
+              school.name,
+              paymentData.paymentMethod
+            );
+            logPayment('SMS_SENT', { 
+              phone: student.parent.phone,
+              success: smsResult.success,
+              messageId: smsResult.messageId 
+            });
+          } catch (smsError) {
+            logPayment('SMS_ERROR', smsError, 'error');
+            // Don't fail the payment if SMS fails
+          }
+        }
+
         logPayment('PAYMENT_COMPLETE', {
           success: true,
           paymentId: payment.id,
           receiptId: receipt.id,
-          finalBalance: balancesAfter.academicYearOutstanding
+          finalBalance: balancesAfter.academicYearOutstanding,
+          smsSent: !!smsResult?.success
         });
 
         return {
           success: true,
           payment: paymentResult,
-          receipt
+          receipt,
+          sms: smsResult
         };
 
       } catch (dbError) {
