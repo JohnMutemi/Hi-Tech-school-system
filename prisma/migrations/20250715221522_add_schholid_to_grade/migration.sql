@@ -1,14 +1,9 @@
 /*
   Warnings:
-
-  - You are about to drop the column `academicYear` on the `Payment` table. All the data in the column will be lost.
-  - You are about to drop the column `term` on the `Payment` table. All the data in the column will be lost.
   - Added the required column `schoolId` to the `Grade` table without a default value. This is not possible if the table is not empty.
-
+  - This migration was manually fixed to avoid dropping non-existent columns from Payment.
 */
 -- AlterTable
 ALTER TABLE "Grade" ADD COLUMN     "schoolId" TEXT NOT NULL;
 
--- AlterTable
-ALTER TABLE "Payment" DROP COLUMN "academicYear",
-DROP COLUMN "term";
+-- NOTE: Dropping columns from Payment was skipped due to schema mismatch.

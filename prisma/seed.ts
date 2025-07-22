@@ -23,8 +23,9 @@ async function main() {
   for (let i = 1; i <= 6; i++) {
     const gradeName = `Grade ${i}`;
     await prisma.grade.create({ data: { name: gradeName } });
-      console.log(`Created grade: ${gradeName}`);
+    console.log(`Created global grade: ${gradeName}`);
   }
+  // Removed: Do NOT create grades for each school. Schools should reference global grades.
 }
 
 main()
