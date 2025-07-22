@@ -12,7 +12,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PaymentForm } from "./payment-form";
 import { toast } from "sonner";
-import { Download, Receipt } from "lucide-react";
+import {
+  Download,
+  Receipt,
+  DollarSign,
+  CreditCard,
+  Phone,
+  Smartphone,
+} from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -38,14 +48,24 @@ export function PaymentModal({
   onReceiptGenerated,
 }: PaymentModalProps) {
   const [isProcessing, setIsProcessing] = useState(false);
-  const [customAmount, setCustomAmount] = useState(amount);
-  const [showCustomAmount, setShowCustomAmount] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState(amount);
+  const [paymentMethod, setPaymentMethod] = useState("mpesa");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [generatedReceipt, setGeneratedReceipt] = useState<any>(null);
 
   const handlePaymentSuccess = (paymentData: any) => {
     toast.success("Payment processed successfully!");
     setGeneratedReceipt(paymentData);
-    onReceiptGenerated?.(paymentData);
+
+    // Call the callback to refresh parent data
+    if (onReceiptGenerated) {
+      onReceiptGenerated(paymentData);
+    }
+
+    // Auto-close modal after a short delay
+    setTimeout(() => {
+      handleClose();
+    }, 3000);
   };
 
   const handlePaymentError = (error: string) => {
@@ -123,69 +143,219 @@ Thank you for your payment!
 
   const handleClose = () => {
     setGeneratedReceipt(null);
-    setCustomAmount(amount);
-    setShowCustomAmount(false);
+    setPaymentAmount(amount);
+    setPaymentMethod("mpesa");
+    setPhoneNumber("");
     onClose();
+  };
+
+  const handleAmountChange = (value: string) => {
+    const numValue = Number(value) || 0;
+    setPaymentAmount(Math.min(Math.max(numValue, 1), amount));
+  };
+
+  const handlePayInFull = () => {
+    setPaymentAmount(amount);
+  };
+
+  const handlePayPartial = () => {
+    setPaymentAmount(Math.floor(amount / 2)); // Default to half payment
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[380px] p-4 rounded-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[500px] p-6 rounded-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-base">Pay School Fees</DialogTitle>
+          <DialogTitle className="text-xl flex items-center gap-2">
+            <CreditCard className="h-5 w-5" />
+            Pay School Fees
+          </DialogTitle>
         </DialogHeader>
-        <div className="mt-1 space-y-2">
-          {/* Amount Selection */}
-          <div className="space-y-0.5">
-            <Label className="text-xs">Payment Amount</Label>
-            <div className="flex gap-1">
+
+        <div className="mt-4 space-y-6">
+          {/* Payment Summary */}
+          <Card className="bg-blue-50 border-blue-200">
+            <CardContent className="p-4">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-blue-800">
+                    Fee Type:
+                  </span>
+                  <span className="text-sm text-blue-900">{feeType}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-blue-800">
+                    Term:
+                  </span>
+                  <Badge
+                    variant="outline"
+                    className="text-blue-800 border-blue-300"
+                  >
+                    {term}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-blue-800">
+                    Academic Year:
+                  </span>
+                  <span className="text-sm text-blue-900">{academicYear}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-blue-800">
+                    Term Due:
+                  </span>
+                  <span className="text-lg font-bold text-blue-900">
+                    KES {amount.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Payment Amount */}
+          <div className="space-y-4">
+            <Label className="text-base font-semibold">Payment Amount</Label>
+
+            {/* Quick Amount Buttons */}
+            <div className="grid grid-cols-2 gap-3">
               <Button
-                variant={!showCustomAmount ? "default" : "outline"}
-                onClick={() => setShowCustomAmount(false)}
-                className="flex-1 h-8 px-2 text-xs"
+                variant="outline"
+                onClick={handlePayInFull}
+                className="h-12 flex flex-col items-center justify-center"
               >
-                Full: KES {amount.toLocaleString()}
+                <DollarSign className="h-5 w-5 mb-1" />
+                <span className="text-sm">Pay in Full</span>
+                <span className="text-xs opacity-80">
+                  KES {amount.toLocaleString()}
+                </span>
               </Button>
+
               <Button
-                variant={showCustomAmount ? "default" : "outline"}
-                onClick={() => setShowCustomAmount(true)}
-                className="flex-1 h-8 px-2 text-xs"
+                variant="outline"
+                onClick={handlePayPartial}
+                className="h-12 flex flex-col items-center justify-center"
               >
-                Custom
+                <CreditCard className="h-5 w-5 mb-1" />
+                <span className="text-sm">Pay Half</span>
+                <span className="text-xs opacity-80">
+                  KES {Math.floor(amount / 2).toLocaleString()}
+                </span>
               </Button>
             </div>
 
-            {showCustomAmount && (
-              <div className="space-y-0.5">
-                <Label htmlFor="customAmount" className="text-xs">
-                  Enter Amount (KES)
+            {/* Custom Amount Input */}
+            <div className="space-y-2">
+              <Label htmlFor="paymentAmount" className="text-sm font-medium">
+                Custom Amount (KES)
+              </Label>
+              <Input
+                id="paymentAmount"
+                type="number"
+                value={paymentAmount}
+                onChange={(e) => handleAmountChange(e.target.value)}
+                placeholder="Enter amount"
+                min="1"
+                max={amount}
+                className="h-10"
+              />
+              <div className="flex justify-between text-xs text-gray-500">
+                <span>Minimum: KES 1</span>
+                <span>Maximum: KES {amount.toLocaleString()}</span>
+              </div>
+            </div>
+
+            {/* Amount Summary */}
+            <div className="bg-gray-50 p-3 rounded-lg space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-600">Amount to pay:</span>
+                <span className="font-semibold text-lg">
+                  KES {paymentAmount.toLocaleString()}
+                </span>
+              </div>
+
+              {paymentAmount < amount && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">Remaining balance:</span>
+                  <span className="font-semibold text-orange-600">
+                    KES {(amount - paymentAmount).toLocaleString()}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Payment Method Selection */}
+          <div className="space-y-4">
+            <Label className="text-base font-semibold">Payment Method</Label>
+
+            <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod}>
+              <div className="space-y-3">
+                <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
+                  <RadioGroupItem value="mpesa" id="mpesa" />
+                  <Label
+                    htmlFor="mpesa"
+                    className="flex items-center gap-2 cursor-pointer"
+                  >
+                    <Smartphone className="h-5 w-5 text-green-600" />
+                    <div>
+                      <div className="font-medium">M-Pesa</div>
+                      <div className="text-xs text-gray-500">
+                        Pay with M-Pesa
+                      </div>
+                    </div>
+                  </Label>
+                </div>
+
+                <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
+                  <RadioGroupItem value="manual" id="manual" />
+                  <Label
+                    htmlFor="manual"
+                    className="flex items-center gap-2 cursor-pointer"
+                  >
+                    <CreditCard className="h-5 w-5 text-blue-600" />
+                    <div>
+                      <div className="font-medium">Manual Payment</div>
+                      <div className="text-xs text-gray-500">
+                        Simulation mode
+                      </div>
+                    </div>
+                  </Label>
+                </div>
+              </div>
+            </RadioGroup>
+
+            {/* M-Pesa Phone Number */}
+            {paymentMethod === "mpesa" && (
+              <div className="space-y-2">
+                <Label htmlFor="phoneNumber" className="text-sm font-medium">
+                  M-Pesa Phone Number
                 </Label>
                 <Input
-                  id="customAmount"
-                  type="number"
-                  value={customAmount}
-                  onChange={(e) => setCustomAmount(Number(e.target.value))}
-                  placeholder="Amount"
-                  min="1"
-                  max={amount}
-                  className="h-8 px-2 text-xs"
+                  id="phoneNumber"
+                  type="tel"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  placeholder="e.g., 254700000000"
+                  className="h-10"
                 />
-                <p className="text-xs text-gray-400">
-                  Max: KES {amount.toLocaleString()}
+                <p className="text-xs text-gray-500">
+                  Enter the phone number registered with M-Pesa
                 </p>
               </div>
             )}
           </div>
 
           {/* Payment Form */}
-          <div className="pt-0.5">
+          <div className="pt-2">
             <PaymentForm
               studentId={studentId}
               schoolCode={schoolCode}
-              amount={customAmount}
+              amount={paymentAmount}
               feeType={feeType}
               term={term}
               academicYear={academicYear}
+              paymentMethod={paymentMethod}
+              phoneNumber={phoneNumber}
               onPaymentSuccess={handlePaymentSuccess}
               onPaymentError={handlePaymentError}
               onStart={handlePaymentStart}
@@ -196,20 +366,35 @@ Thank you for your payment!
 
           {/* Receipt Display & Download */}
           {generatedReceipt && (
-            <div className="border-t pt-4 mt-2">
-              <div className="bg-green-50 p-4 rounded-lg">
-                <div className="flex items-center gap-2 mb-2">
+            <div className="border-t pt-4 mt-4">
+              <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                <div className="flex items-center gap-2 mb-3">
                   <Receipt className="w-5 h-5 text-green-600" />
-                  <h4 className="font-medium text-green-800 text-sm">
-                    Payment Completed!
+                  <h4 className="font-medium text-green-800 text-base">
+                    Payment Completed Successfully!
                   </h4>
                 </div>
-                <p className="text-sm text-green-700 mb-3">
-                  Receipt #: {generatedReceipt.receiptNumber || "N/A"}
-                </p>
+                <div className="space-y-2 mb-4">
+                  <p className="text-sm text-green-700">
+                    <span className="font-medium">Receipt #:</span>{" "}
+                    {generatedReceipt.receiptNumber || "N/A"}
+                  </p>
+                  <p className="text-sm text-green-700">
+                    <span className="font-medium">Amount:</span> KES{" "}
+                    {(generatedReceipt.amount || 0).toLocaleString()}
+                  </p>
+                  <p className="text-sm text-green-700">
+                    <span className="font-medium">Method:</span>{" "}
+                    {(generatedReceipt.paymentMethod || "").toUpperCase()}
+                  </p>
+                  <p className="text-sm text-green-700">
+                    <span className="font-medium">Status:</span>{" "}
+                    {(generatedReceipt.status || "").toUpperCase()}
+                  </p>
+                </div>
                 <Button
                   onClick={handleDownloadReceipt}
-                  className="w-full h-8 text-xs"
+                  className="w-full h-10"
                   variant="outline"
                 >
                   <Download className="w-4 h-4 mr-2" />

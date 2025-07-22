@@ -11,6 +11,8 @@ export async function GET(
   try {
     const { schoolCode, studentId } = params;
     const decodedSchoolCode = decodeURIComponent(schoolCode);
+    const { searchParams } = new URL(request.url);
+    const academicYearId = searchParams.get('academicYearId');
 
     const school = await prisma.school.findUnique({ where: { code: decodedSchoolCode } });
     if (!school) {
@@ -25,6 +27,15 @@ export async function GET(
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
 
+    // Get current academic year if not specified
+    let targetAcademicYearId = academicYearId || null;
+    if (!targetAcademicYearId) {
+      const currentYear = await prisma.academicYear.findFirst({
+        where: { schoolId: school.id, isCurrent: true },
+      });
+      targetAcademicYearId = currentYear?.id || null;
+    }
+
     const feeStructures = await prisma.termlyFeeStructure.findMany({
       where: {
         gradeId: student.class?.gradeId,
@@ -32,12 +43,16 @@ export async function GET(
         NOT: [
           { termId: null },
           { academicYearId: null }
-        ]
+        ],
+        ...(targetAcademicYearId ? { academicYearId: targetAcademicYearId } : {})
       }
     });
 
     const payments = await prisma.payment.findMany({
-      where: { studentId: student.id },
+      where: { 
+        studentId: student.id,
+        ...(targetAcademicYearId ? { academicYearId: targetAcademicYearId } : {})
+      },
       orderBy: { paymentDate: 'asc' },
       select: {
         id: true,
@@ -172,12 +187,14 @@ export async function GET(
       where: {
         studentId: student.id,
         schoolId: school.id,
-        arrearAmount: { gt: 0 },
-        ...(joinAcademicYearId ? { academicYearId: { gte: joinAcademicYearId } } : {})
+        // Remove arrearAmount: { gt: 0 } to include all arrears (positive, zero, negative)
+        ...(joinAcademicYearId ? { academicYearId: { gte: joinAcademicYearId } } : {}),
+        // Do not filter by targetAcademicYearId, sum all arrears
       }
     });
 
     const arrears = arrearsRecords.reduce((sum, record) => sum + record.arrearAmount, 0);
+    const outstanding = academicYearOutstanding + arrears;
 
     return NextResponse.json({
       student: {
@@ -189,7 +206,7 @@ export async function GET(
       },
       termBalances,
       academicYearOutstanding,
-      totalOutstanding: academicYearOutstanding,
+      outstanding,
       arrears,
       carryForwardArrears: 0,
       carryForwardBreakdown: [],

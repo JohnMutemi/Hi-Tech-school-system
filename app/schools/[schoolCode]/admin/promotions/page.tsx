@@ -1,5 +1,10 @@
 "use client";
 
+
+import PromotionWizard from "./wizard/PromotionWizard";
+
+export default function PromotionsPage() {
+  return <PromotionWizard />;
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import {
@@ -1275,4 +1280,5 @@ function ExclusionForm({
       </DialogFooter>
     </div>
   );
+
 }

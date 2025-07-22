@@ -204,26 +204,12 @@ export function SchoolSetupDashboard({
   // Fetch grades from API on component mount
   useEffect(() => {
     async function fetchGrades() {
-      console.log("[Add Class] schoolCode:", schoolData.schoolCode);
-      try {
-        const res = await fetch(`/api/schools/${schoolData.schoolCode}/grades`);
-        if (res.ok) {
-          const data = await res.json();
-          console.log("[Add Class] Fetched grades:", data);
-          setGrades(data);
-        } else {
-          console.error("[Add Class] Failed to fetch grades, status:", res.status);
-          setGrades([]);
-        }
-      } catch (error) {
-        console.error("[Add Class] Error fetching grades:", error);
-        setGrades([]);
-      }
+      const res = await fetch(`/api/grades`);
+      if (!res.ok) throw new Error("Failed to fetch grades");
+      setGrades(await res.json());
     }
-    if (schoolData.schoolCode) {
-      fetchGrades();
-    }
-  }, [schoolData.schoolCode, toast]);
+    fetchGrades();
+  }, []);
 
   // Fetch classes from API on component mount
   useEffect(() => {

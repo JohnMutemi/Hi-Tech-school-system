@@ -1,9 +1,10 @@
 import { PrismaClient } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
+import { calculateStudentOutstanding } from "@/lib/utils/fee-balance";
 
 const prisma = new PrismaClient();
 
-// GET: Get promotion criteria and eligible students
+// GET: Get promotion criteria, eligible students, and progression rules
 export async function GET(req: NextRequest, { params }: { params: { schoolCode: string } }) {
   try {
     const { searchParams } = new URL(req.url);
@@ -26,6 +27,10 @@ export async function GET(req: NextRequest, { params }: { params: { schoolCode: 
     if (action === 'criteria') {
       const criteria = await prisma.promotionCriteria.findMany({
         where: { schoolId: school.id, isActive: true },
+        orderBy: [{ classLevel: 'asc' }, { priority: 'asc' }],
+        include: {
+          creator: { select: { name: true, email: true } }
+        }
       });
       return NextResponse.json(criteria);
     }
@@ -34,6 +39,10 @@ export async function GET(req: NextRequest, { params }: { params: { schoolCode: 
       const progression = await prisma.classProgression.findMany({
         where: { schoolId: school.id, isActive: true },
         orderBy: { order: 'asc' },
+        include: {
+          criteria: true,
+          creator: { select: { name: true, email: true } }
+        }
       });
       return NextResponse.json(progression);
     }
@@ -43,8 +52,14 @@ export async function GET(req: NextRequest, { params }: { params: { schoolCode: 
         where: { student: { schoolId: school.id } },
         include: {
           student: { include: { user: true } },
-          user: true,
-          exclusions: { include: { student: { include: { user: true } } } },
+          user: { select: { name: true, email: true } },
+          appliedCriteria: true,
+          exclusions: { 
+            include: { 
+              student: { include: { user: true } },
+              user: { select: { name: true, email: true } }
+            } 
+          },
         },
         orderBy: { promotionDate: 'desc' },
         take: 50,
@@ -60,21 +75,12 @@ export async function GET(req: NextRequest, { params }: { params: { schoolCode: 
   }
 }
 
-// POST: Execute bulk promotion
+// POST: Execute bulk promotion or create criteria
 export async function POST(req: NextRequest, { params }: { params: { schoolCode: string } }) {
   try {
     const { schoolCode } = params;
     const body = await req.json();
-    const {
-      fromClass,
-      toClass,
-      studentIds,
-      excludedStudents = [],
-      promotedBy,
-      notes,
-      toAcademicYearId,
-      toTermId
-    } = body;
+    const { action, data } = body;
 
     const school = await prisma.school.findUnique({
       where: { code: schoolCode },
@@ -84,167 +90,50 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
       return NextResponse.json({ error: 'School not found' }, { status: 404 });
     }
 
-    if (!fromClass || !toClass || !studentIds || studentIds.length === 0) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
-    }
+    console.log('Promotion POST action:', action, 'Data:', data);
 
-    let academicYearId = toAcademicYearId;
-    let termId = toTermId;
-    if (!academicYearId) {
-      const currentYear = await prisma.academicYear.findFirst({
-        where: { schoolId: school.id, isCurrent: true },
-      });
-      academicYearId = currentYear?.id;
-    }
-    if (!termId && academicYearId) {
-      const currentTerm = await prisma.term.findFirst({
-        where: { academicYearId, isCurrent: true },
-      });
-      termId = currentTerm?.id;
-    }
-
-    const currentYear = new Date().getFullYear().toString();
-    const nextYear = (parseInt(currentYear) + 1).toString();
-
-    let realPromotedBy = promotedBy;
-    if (!realPromotedBy || realPromotedBy === "admin") {
-      const adminUser = await prisma.user.findFirst({
-        where: { role: "admin", schoolId: school.id },
-      });
-      if (!adminUser) {
-        return NextResponse.json({ error: "No admin user found for this school" }, { status: 400 });
+    if (action === 'bulk-promotion') {
+      // Guard: Ensure required fields are present
+      if (!data || !data.fromClass || !data.toClass) {
+        console.error('bulk-promotion: Missing fromClass or toClass', data);
+        return NextResponse.json({ error: 'fromClass and toClass are required for class-by-class promotion.' }, { status: 400 });
       }
-      realPromotedBy = adminUser.id;
+      console.log('bulk-promotion: Executing for', data.studentIds?.length, 'students');
+      const PromotionService = (await import('@/lib/services/promotion-service')).PromotionService;
+      const result = await PromotionService.promoteClassStudents(school.id, data.fromClass, data.toClass, data.studentIds, data.promotedBy);
+      console.log('bulk-promotion: result', result);
+      return NextResponse.json(result);
     }
 
-    const result = await prisma.$transaction(async (tx) => {
-      const promotionLogs = [];
-      const carryForwardEntries = [];
+    if (action === 'create-criteria') {
+      return await createPromotionCriteria(school.id, data);
+    }
 
-      for (const studentId of studentIds) {
-        const student = await tx.student.findUnique({
-          where: { id: studentId },
-          include: {
-            class: { include: { grade: true } },
-            payments: { where: { academicYear: currentYear } },
-          },
-        });
+    if (action === 'create-progression') {
+      return await createClassProgression(school.id, data);
+    }
 
-        if (!student) continue;
-
-        const totalPaid = student.payments.reduce((sum, payment) => sum + payment.amount, 0);
-
-        let outstandingBalance = 0;
-        const currentGrade = student.class?.grade;
-        if (currentGrade) {
-          const feeStructures = await tx.termlyFeeStructure.findMany({
-            where: {
-              gradeId: currentGrade.id,
-              year: currentYear,
-              isActive: true,
-            },
-          });
-
-          const totalFees = feeStructures.reduce((sum, fs) => sum + Number(fs.totalAmount), 0);
-          outstandingBalance = Math.max(0, totalFees - totalPaid);
-
-          if (outstandingBalance > 0) {
-            const carryForwardEntry = await tx.payment.create({
-              data: {
-                studentId: studentId,
-                amount: outstandingBalance,
-                paymentDate: new Date(),
-                paymentMethod: 'CARRY_FORWARD',
-                referenceNumber: `CF-${currentYear}-${nextYear}`,
-                receiptNumber: `CF-${studentId}-${Date.now()}`,
-                description: `Fee Balance Carried Forward from ${currentYear} to ${nextYear}`,
-                receivedBy: 'System',
-                term: 'CARRY_FORWARD',
-                academicYear: nextYear,
-              },
-            });
-            carryForwardEntries.push(carryForwardEntry);
-          }
-        }
-
-        const targetClass = await tx.class.findFirst({
-          where: { name: toClass, schoolId: school.id, isActive: true },
-        });
-
-        if (!targetClass) {
-          throw new Error(`Target class ${toClass} not found`);
-        }
-
-        await tx.student.update({
-          where: { id: studentId },
-          data: {
-            classId: targetClass.id,
-            currentAcademicYearId: academicYearId,
-            currentTermId: termId,
-          },
-        });
-
-        const promotionLog = await tx.promotionLog.create({
-          data: {
-            studentId,
-            fromClass,
-            toClass,
-            fromYear: currentYear,
-            toYear: nextYear,
-            promotedBy: realPromotedBy,
-            criteria: {
-              type: 'bulk_promotion',
-              outstandingBalance: outstandingBalance || 0,
-              carryForwardCreated: outstandingBalance > 0,
-              academicYearId,
-              termId,
-            },
-            notes: outstandingBalance > 0 
-              ? `${notes} (Fee balance of KES ${outstandingBalance.toLocaleString()} carried forward)`
-              : notes,
-            promotionType: 'bulk',
-          },
-        });
-
-        promotionLogs.push(promotionLog);
+    if (action === 'school-wide-bulk-promotion') {
+      const PromotionService = (await import('@/lib/services/promotion-service')).PromotionService;
+      try {
+        const result = await PromotionService.promoteSchoolWide(school.id, data.promotedBy);
+        console.log('school-wide-bulk-promotion: result', result);
+        return NextResponse.json(result);
+      } catch (err: any) {
+        console.error('school-wide-bulk-promotion: Error in PromotionService', err);
+        return NextResponse.json({ error: err.message || 'Failed to execute school-wide promotion' }, { status: 500 });
       }
+    }
 
-      if (excludedStudents.length > 0) {
-        const logId = promotionLogs[0]?.id;
-        if (logId) {
-          for (const exclusion of excludedStudents) {
-            await tx.promotionExclusion.create({
-              data: {
-                promotionLogId: logId,
-                studentId: exclusion.studentId,
-                reason: exclusion.reason,
-                notes: exclusion.notes,
-                excludedBy: realPromotedBy,
-              },
-            });
-          }
-        }
-      }
+    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
 
-      return {
-        success: true,
-        promotedCount: studentIds.length,
-        excludedCount: excludedStudents.length,
-        carryForwardCount: carryForwardEntries.length,
-        totalCarriedForward: carryForwardEntries.reduce((sum: number, entry: any) => sum + entry.amount, 0),
-      };
-    }, {
-      timeout: 20000,
-    });
-
-    return NextResponse.json(result);
   } catch (error: any) {
-    console.error('Bulk promotion error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to execute bulk promotion' }, { status: 500 });
+    console.error('Promotion API error:', error);
+    return NextResponse.json({ error: error.message || 'Failed to execute promotion action' }, { status: 500 });
   }
 }
 
-// PUT: Update promotion criteria
+// PUT: Update promotion criteria or progression rules
 export async function PUT(req: NextRequest, { params }: { params: { schoolCode: string } }) {
   try {
     const { schoolCode } = params;
@@ -259,50 +148,84 @@ export async function PUT(req: NextRequest, { params }: { params: { schoolCode: 
       return NextResponse.json({ error: 'School not found' }, { status: 404 });
     }
 
-    if (action === 'criteria') {
-      const criteria = await prisma.promotionCriteria.upsert({
-        where: {
-          schoolId_classLevel: {
-            schoolId: school.id,
-            classLevel: data.classLevel,
-          },
-        },
-        update: {
-          minGrade: data.minGrade,
-          attendance: data.attendance,
-          feeStatus: data.feeStatus,
-          isActive: data.isActive,
-        },
-        create: {
-          schoolId: school.id,
-          classLevel: data.classLevel,
-          minGrade: data.minGrade,
-          attendance: data.attendance,
-          feeStatus: data.feeStatus,
-          isActive: data.isActive,
-        },
+    if (action === 'update-criteria') {
+      console.log("Updating promotion criteria with data:", data);
+      
+      // Validate required fields
+      if (!data.name || data.name.trim() === '') {
+        return NextResponse.json({ error: "Criteria name is required" }, { status: 400 });
+      }
+      if (!data.classLevel || data.classLevel.trim() === '') {
+        return NextResponse.json({ error: "Class level is required" }, { status: 400 });
+      }
+      if (!data.customCriteria || !Array.isArray(data.customCriteria) || data.customCriteria.length === 0) {
+        return NextResponse.json({ error: "At least one custom criteria is required" }, { status: 400 });
+      }
+
+      // Validate custom criteria
+      for (const criteria of data.customCriteria) {
+        if (!criteria.name || criteria.name.trim() === '') {
+          return NextResponse.json({ error: "All criteria must have a name" }, { status: 400 });
+        }
+        if (!criteria.limit || criteria.limit <= 0) {
+          return NextResponse.json({ error: "All criteria must have a valid limit greater than 0" }, { status: 400 });
+        }
+      }
+
+      // Build the update data object
+      const updateData: any = {
+        name: data.name.trim(),
+        description: data.description?.trim() || null,
+        classLevel: data.classLevel.trim(),
+        customCriteria: data.customCriteria,
+      };
+      
+      // Extract fee balance criteria from customCriteria and set maxOutstandingBalance
+      if (data.customCriteria && Array.isArray(data.customCriteria)) {
+        const feeBalanceCriteria = data.customCriteria.find((c: any) => 
+          c.name.toLowerCase().includes('fee') || 
+          c.name.toLowerCase().includes('balance') ||
+          c.name.toLowerCase().includes('payment')
+        );
+        
+        if (feeBalanceCriteria && feeBalanceCriteria.limit) {
+          updateData.maxOutstandingBalance = parseFloat(feeBalanceCriteria.limit);
+          updateData.requireFullPayment = false; // Use maxOutstandingBalance instead of full payment
+          console.log(`Updating maxOutstandingBalance to ${updateData.maxOutstandingBalance} from custom criteria`);
+        }
+      }
+      
+      // Optional fields
+      if (data.isActive !== undefined) updateData.isActive = data.isActive;
+      if (data.isDefault !== undefined) updateData.isDefault = data.isDefault;
+      if (data.priority !== undefined) updateData.priority = data.priority;
+
+      console.log("Final update data for Prisma:", updateData);
+
+      const criteria = await prisma.promotionCriteria.update({
+        where: { id: data.id },
+        data: updateData,
+        include: {
+          creator: { select: { name: true, email: true } }
+        }
       });
       return NextResponse.json(criteria);
     }
 
-    if (action === 'progression') {
-      const progression = await prisma.classProgression.upsert({
-        where: {
-          schoolId_fromClass: {
-            schoolId: school.id,
-            fromClass: data.fromClass,
-          },
-        },
-        update: {
-          toClass: data.toClass,
-          order: data.order,
-          isActive: data.isActive,
-        },
-        create: {
-          schoolId: school.id,
+    if (action === 'update-progression') {
+      const progression = await prisma.classProgression.update({
+        where: { id: data.id },
+        data: {
           fromClass: data.fromClass,
           toClass: data.toClass,
+          fromGrade: data.fromGrade,
+          toGrade: data.toGrade,
           order: data.order,
+          requireCriteria: data.requireCriteria,
+          criteriaId: data.criteriaId,
+          allowManualOverride: data.allowManualOverride,
+          fromAcademicYear: data.fromAcademicYear,
+          toAcademicYear: data.toAcademicYear,
           isActive: data.isActive,
         },
       });
@@ -316,7 +239,7 @@ export async function PUT(req: NextRequest, { params }: { params: { schoolCode: 
   }
 }
 
-// Helper function
+// Helper function to get eligible students with comprehensive criteria checking
 async function getEligibleStudents(schoolId: string, classLevel: string) {
   const targetClass = await prisma.class.findFirst({
     where: { name: classLevel, schoolId: schoolId, isActive: true },
@@ -328,6 +251,8 @@ async function getEligibleStudents(schoolId: string, classLevel: string) {
   }
 
   const currentYear = new Date().getFullYear();
+  
+  // Get students
   const students = await prisma.student.findMany({
     where: {
       schoolId,
@@ -338,14 +263,36 @@ async function getEligibleStudents(schoolId: string, classLevel: string) {
     include: {
       user: true,
       class: { include: { grade: true } },
-      payments: { where: { academicYear: currentYear } },
     },
   });
 
-  const criteria = await prisma.promotionCriteria.findFirst({
-    where: { schoolId, classLevel: targetClass.grade.name, isActive: true },
-  });
+  if (students.length === 0) {
+    return {
+      students: [],
+      hasCriteria: false,
+      message: `No students found in ${classLevel} for the current academic year.`
+    };
+  }
 
+  // Get promotion criteria for this class level
+  const criteria = await prisma.promotionCriteria.findMany({
+    where: { 
+      schoolId, 
+      classLevel: targetClass.grade.name, 
+      isActive: true 
+    },
+    orderBy: { priority: 'asc' }
+  });
+  
+  console.log(`Found ${criteria.length} criteria for class level ${targetClass.grade.name}:`, criteria.map(c => ({
+    id: c.id,
+    name: c.name,
+    maxOutstandingBalance: c.maxOutstandingBalance,
+    requireFullPayment: c.requireFullPayment,
+    customCriteria: c.customCriteria
+  })));
+
+  // Get fee structures
   const feeStructures = await prisma.termlyFeeStructure.findMany({
     where: {
       gradeId: targetClass.grade.id,
@@ -354,26 +301,399 @@ async function getEligibleStudents(schoolId: string, classLevel: string) {
     },
   });
 
-  return students.map(student => {
-    const totalFees = feeStructures.reduce((sum, fs) => sum + Number(fs.totalAmount), 0);
-    const totalPaid = student.payments.reduce((sum, p) => sum + p.amount, 0);
-    const outstandingBalance = Math.max(0, totalFees - totalPaid);
-    const allTermsPaid = outstandingBalance === 0;
+  // If no criteria are set, return all students as manually promotable
+  if (criteria.length === 0) {
+    const studentsWithManualEligibility = await Promise.all(
+      students.map(async (student) => {
+        // Get student's payments for basic info
+        const payments = await prisma.payment.findMany({
+          where: { studentId: student.id },
+        });
+
+        // DEBUG LOGS
+        console.log(`DEBUG: [Manual] Calculating outstanding for student: ${student.user?.name} (${student.id})`);
+        console.log(`DEBUG: [Manual] Payments:`, payments);
+        console.log(`DEBUG: [Manual] Fee Structures:`, feeStructures);
+        console.log(`DEBUG: [Manual] Params:`, {
+          joinAcademicYearId: student.joinedAcademicYearId,
+          joinTermId: student.joinedTermId,
+          joinDate: student.dateAdmitted,
+          filterAcademicYear: currentYear,
+        });
+
+        const { outstandingBalance } = await calculateStudentOutstanding({
+          student,
+          feeStructures,
+          payments,
+          joinAcademicYearId: student.joinedAcademicYearId || undefined,
+          joinTermId: student.joinedTermId || undefined,
+          joinDate: student.dateAdmitted || undefined,
+          filterAcademicYear: currentYear, // or the relevant year
+        });
+
+        console.log(`DEBUG: [Manual] Outstanding balance for ${student.user?.name}:`, outstandingBalance);
+
+        return {
+          ...student,
+          name: student.user?.name,
+          email: student.user?.email,
+          classLevel: targetClass.grade.name,
+          className: targetClass.name,
+          eligibility: {
+            isEligible: true, // All students eligible for manual promotion
+            primaryCriteria: "Manual Promotion",
+            allCriteriaResults: [{
+              criteriaId: "manual",
+              criteriaName: "Manual Promotion",
+              passed: true,
+              failedReasons: [],
+              details: {
+                averageGrade: 0,
+                outstandingBalance,
+                attendanceRate: 0,
+                disciplinaryCases: 0,
+              }
+            }],
+            summary: {
+              averageGrade: 0,
+              attendanceRate: 0,
+              outstandingBalance,
+              disciplinaryCases: 0,
+            }
+          },
+        };
+      })
+    );
 
     return {
-      ...student,
-      name: student.user?.name,
-      email: student.user?.email,
-      classLevel: targetClass.grade.name,
-      className: targetClass.name,
-      eligibility: {
-        feeStatus: allTermsPaid ? 'paid' : 'unpaid',
-        allTermsPaid,
-        meetsCriteria: !criteria || (allTermsPaid && (!criteria.minGrade || true)),
-        outstandingBalance,
-        totalFees,
-        totalPaid,
-      },
+      students: studentsWithManualEligibility,
+      hasCriteria: false,
+      message: `No promotion criteria set for ${classLevel}. All students are available for manual promotion.`
+    };
+  }
+
+  // Evaluate each student against criteria
+  const studentsWithEligibility = await Promise.all(
+    students.map(async (student) => {
+      // Get student's payments
+      const payments = await prisma.payment.findMany({
+        where: { studentId: student.id },
+      });
+
+      // DEBUG LOGS
+      console.log(`DEBUG: Calculating outstanding for student: ${student.user?.name} (${student.id})`);
+      console.log(`DEBUG: Payments:`, payments);
+      console.log(`DEBUG: Fee Structures:`, feeStructures);
+      console.log(`DEBUG: Params:`, {
+        joinAcademicYearId: student.joinedAcademicYearId,
+        joinTermId: student.joinedTermId,
+        joinDate: student.dateAdmitted,
+        filterAcademicYear: currentYear,
+      });
+
+      // Calculate basic metrics
+      const totalFees = feeStructures.reduce((sum, fs) => sum + Number(fs.totalAmount), 0);
+      const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+      const { outstandingBalance } = await calculateStudentOutstanding({
+        student,
+        feeStructures,
+        payments,
+        joinAcademicYearId: student.joinedAcademicYearId || undefined,
+        joinTermId: student.joinedTermId || undefined,
+        joinDate: student.dateAdmitted || undefined,
+        filterAcademicYear: currentYear, // or the relevant year
+      });
+
+      console.log(`DEBUG: Outstanding balance for ${student.user?.name}:`, outstandingBalance);
+
+      // Mock data for demonstration (in real system, these would come from actual records)
+      const averageGrade = 75.0; // Mock grade
+      const attendanceRate = 85.0; // Mock attendance
+      const disciplinaryCases = 0; // Mock discipline record
+
+      // Evaluate against each criteria
+      const eligibilityResults = criteria.map(criterion => {
+        const results = {
+          criteriaId: criterion.id,
+          criteriaName: criterion.name,
+          passed: true,
+          failedReasons: [] as string[],
+          details: {} as any
+        };
+
+        // Academic Performance Check
+        if (criterion.minAverageGrade && averageGrade < criterion.minAverageGrade) {
+          results.passed = false;
+          results.failedReasons.push(`Average grade ${averageGrade} below minimum ${criterion.minAverageGrade}`);
+        }
+        results.details.averageGrade = averageGrade;
+
+        // Fee Payment Check
+        console.log(`Checking fee balance for student: ${student.user?.name}, balance: ${outstandingBalance}, maxAllowed: ${criterion.maxOutstandingBalance}, requireFull: ${criterion.requireFullPayment}`);
+        if (criterion.requireFullPayment && outstandingBalance > 0) {
+          results.passed = false;
+          results.failedReasons.push(`Outstanding balance ${outstandingBalance} but full payment required`);
+        } else if (criterion.maxOutstandingBalance && outstandingBalance > criterion.maxOutstandingBalance) {
+          results.passed = false;
+          results.failedReasons.push(`Outstanding balance ${outstandingBalance} exceeds maximum ${criterion.maxOutstandingBalance}`);
+        }
+        results.details.outstandingBalance = outstandingBalance;
+
+        // Attendance Check
+        if (criterion.minAttendanceRate && attendanceRate < criterion.minAttendanceRate) {
+          results.passed = false;
+          results.failedReasons.push(`Attendance rate ${attendanceRate}% below minimum ${criterion.minAttendanceRate}%`);
+        }
+        results.details.attendanceRate = attendanceRate;
+
+        // Discipline Check
+        if (criterion.requireCleanRecord && disciplinaryCases > 0) {
+          results.passed = false;
+          results.failedReasons.push(`Has ${disciplinaryCases} disciplinary cases but clean record required`);
+        } else if (criterion.maxDisciplinaryCases && disciplinaryCases > criterion.maxDisciplinaryCases) {
+          results.passed = false;
+          results.failedReasons.push(`Has ${disciplinaryCases} disciplinary cases, maximum allowed is ${criterion.maxDisciplinaryCases}`);
+        }
+        results.details.disciplinaryCases = disciplinaryCases;
+
+        return results;
+      });
+
+      // Overall eligibility (must pass ALL criteria)
+      const isEligible = eligibilityResults.every(result => result.passed);
+      const primaryCriteria = eligibilityResults.find(result => result.passed) || eligibilityResults[0];
+
+      return {
+        ...student,
+        name: student.user?.name,
+        email: student.user?.email,
+        classLevel: targetClass.grade.name,
+        className: targetClass.name,
+        eligibility: {
+          isEligible,
+          primaryCriteria: primaryCriteria?.criteriaName,
+          allCriteriaResults: eligibilityResults,
+          summary: {
+            averageGrade,
+            attendanceRate,
+            outstandingBalance,
+            disciplinaryCases,
+          }
+        },
+      };
+    })
+  );
+
+  return {
+    students: studentsWithEligibility,
+    hasCriteria: true,
+    message: `Found ${studentsWithEligibility.filter(s => s.eligibility.isEligible).length} eligible students out of ${studentsWithEligibility.length} total students.`
+  };
+}
+
+// Helper function to create promotion criteria
+async function createPromotionCriteria(schoolId: string, data: any) {
+  console.log("Creating promotion criteria with data:", data);
+  
+  // Validate required fields
+  if (!data.name || data.name.trim() === '') {
+    throw new Error("Criteria name is required");
+  }
+  if (!data.classLevel || data.classLevel.trim() === '') {
+    throw new Error("Class level is required");
+  }
+  if (!data.customCriteria || !Array.isArray(data.customCriteria) || data.customCriteria.length === 0) {
+    throw new Error("At least one custom criteria is required");
+  }
+
+  // Validate custom criteria
+  for (const criteria of data.customCriteria) {
+    if (!criteria.name || criteria.name.trim() === '') {
+      throw new Error("All criteria must have a name");
+    }
+    if (!criteria.limit || criteria.limit <= 0) {
+      throw new Error("All criteria must have a valid limit greater than 0");
+    }
+  }
+
+  // Build the data object for Prisma
+  const criteriaData: any = {
+    schoolId,
+    name: data.name.trim(),
+    description: data.description?.trim() || null,
+    classLevel: data.classLevel.trim(),
+    customCriteria: data.customCriteria, // Store as JSON
+    isActive: true,
+    isDefault: false,
+    priority: 1,
+  };
+
+  // Extract fee balance criteria from customCriteria and set maxOutstandingBalance
+  if (data.customCriteria && Array.isArray(data.customCriteria)) {
+    const feeBalanceCriteria = data.customCriteria.find((c: any) => 
+      c.name.toLowerCase().includes('fee') || 
+      c.name.toLowerCase().includes('balance') ||
+      c.name.toLowerCase().includes('payment')
+    );
+    
+    if (feeBalanceCriteria && feeBalanceCriteria.limit) {
+      criteriaData.maxOutstandingBalance = parseFloat(feeBalanceCriteria.limit);
+      criteriaData.requireFullPayment = false; // Use maxOutstandingBalance instead of full payment
+      console.log(`Setting maxOutstandingBalance to ${criteriaData.maxOutstandingBalance} from custom criteria`);
+    }
+  }
+
+  console.log("Final criteria data for Prisma:", criteriaData);
+
+  try {
+    const criteria = await prisma.promotionCriteria.create({
+      data: criteriaData,
+      include: {
+        creator: { select: { name: true, email: true } }
+      }
+    });
+    return NextResponse.json(criteria);
+  } catch (error) {
+    console.error("Prisma error creating criteria:", error);
+    throw error;
+  }
+}
+
+// Helper function to create class progression
+async function createClassProgression(schoolId: string, data: any) {
+  const progression = await prisma.classProgression.create({
+    data: {
+      schoolId,
+      fromClass: data.fromClass,
+      toClass: data.toClass,
+      fromGrade: data.fromGrade,
+      toGrade: data.toGrade,
+      order: data.order,
+      requireCriteria: data.requireCriteria,
+      criteriaId: data.criteriaId,
+      allowManualOverride: data.allowManualOverride,
+      fromAcademicYear: data.fromAcademicYear,
+      toAcademicYear: data.toAcademicYear,
+      createdBy: data.createdBy,
+    },
+  });
+  return NextResponse.json(progression);
+}
+
+// Helper function to execute bulk promotion
+async function executeBulkPromotion(schoolId: string, data: any) {
+  if (!data || typeof data !== 'object' || !('fromClass' in data) || !('toClass' in data) || !data.fromClass || !data.toClass) {
+    return NextResponse.json({ error: 'fromClass and toClass are required for class-by-class promotion.' }, { status: 400 });
+  }
+  const {
+    fromClass,
+    toClass,
+    studentIds,
+    excludedStudents = [],
+    promotedBy,
+    notes,
+    criteriaId,
+    manualOverride = false,
+    overrideReason,
+  } = data;
+
+  const currentYear = new Date().getFullYear().toString();
+  const nextYear = (parseInt(currentYear) + 1).toString();
+
+  const result = await prisma.$transaction(async (tx) => {
+    const promotionLogs = [];
+
+    for (const studentId of studentIds) {
+      const student = await tx.student.findUnique({
+        where: { id: studentId },
+        include: {
+          class: { include: { grade: true } },
+        },
+      });
+
+      if (!student) continue;
+
+      // Get target class
+      const targetClass = await tx.class.findFirst({
+        where: { name: toClass, schoolId: schoolId, isActive: true },
+      });
+
+      if (!targetClass) {
+        throw new Error(`Target class ${toClass} not found`);
+      }
+
+      // Update student class
+      await tx.student.update({
+        where: { id: studentId },
+        data: {
+          classId: targetClass.id,
+        },
+      });
+
+      // Get grade information for the student's current class
+      let fromGrade = '';
+      if (student.classId) {
+        const studentClass = await tx.class.findUnique({
+          where: { id: student.classId },
+          include: { grade: true }
+        });
+        fromGrade = studentClass?.grade?.name || '';
+      }
+
+      // Get grade information for the target class
+      const targetClassWithGrade = await tx.class.findUnique({
+        where: { id: targetClass.id },
+        include: { grade: true }
+      });
+
+      // Create promotion log
+      const promotionLog = await tx.promotionLog.create({
+        data: {
+          studentId,
+          fromClass,
+          toClass,
+          fromGrade,
+          toGrade: targetClassWithGrade?.grade?.name || '',
+          fromYear: currentYear,
+          toYear: nextYear,
+          promotedBy,
+          criteriaResults: { type: 'bulk_promotion' },
+          appliedCriteriaId: criteriaId,
+          manualOverride,
+          overrideReason,
+          notes,
+          promotionType: 'bulk',
+        },
+      });
+
+      promotionLogs.push(promotionLog);
+    }
+
+    // Handle exclusions
+    if (excludedStudents.length > 0) {
+      const logId = promotionLogs[0]?.id;
+      if (logId) {
+        for (const exclusion of excludedStudents) {
+          await tx.promotionExclusion.create({
+            data: {
+              promotionLogId: logId,
+              studentId: exclusion.studentId,
+              reason: exclusion.reason,
+              detailedReason: exclusion.detailedReason,
+              criteriaFailed: exclusion.criteriaFailed,
+              excludedBy: promotedBy,
+            },
+          });
+        }
+      }
+    }
+
+    return {
+      success: true,
+      promotedCount: studentIds.length,
+      excludedCount: excludedStudents.length,
     };
   });
+
+  return NextResponse.json(result);
 }

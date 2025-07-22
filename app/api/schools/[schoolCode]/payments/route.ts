@@ -16,152 +16,223 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
       amount,
       paymentMethod,
       feeType,
-      term,
-      academicYear,
-      phoneNumber,
-      transactionId,
-      referenceNumber,
+      academicYear, // Now expecting name instead of ID
+      term,         // Now expecting name instead of ID
       description,
-      academicYearOutstandingBefore,
-      termOutstandingBefore
+      referenceNumber,
+      receivedBy,
+      phoneNumber
     } = body;
 
-    if (!studentId || !amount || !paymentMethod || !feeType || !term || !academicYear) {
-      console.log('Missing required fields:', { studentId, amount, paymentMethod, feeType, term, academicYear });
-      return NextResponse.json(
-        { error: 'Missing required fields: studentId, amount, paymentMethod, feeType, term, academicYear' },
-        { status: 400 }
-      );
+    // Validate required fields
+    if (!studentId || !amount || !paymentMethod || !academicYear || !term) {
+      return NextResponse.json({ 
+        error: 'Missing required fields: studentId, amount, paymentMethod, academicYear, term' 
+      }, { status: 400 });
     }
 
-    const school = await prisma.school.findUnique({
-      where: { code: schoolCode }
-    });
-
+    // Fetch the school first
+    const school = await prisma.school.findUnique({ where: { code: schoolCode } });
     if (!school) {
-      console.log('School not found:', schoolCode);
       return NextResponse.json({ error: 'School not found' }, { status: 404 });
     }
-
     const schoolName = school.name;
 
+    // Fetch the student
     const student = await prisma.student.findFirst({
       where: {
         id: studentId,
         schoolId: school.id,
         isActive: true
       },
-      select: {
-        id: true,
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true
-          }
-        },
-        class: {
-          select: {
-            id: true,
-            name: true,
-            gradeId: true,
-            grade: {
-              select: {
-                id: true,
-                name: true
-              }
-            }
-          }
-        },
-        currentAcademicYearId: true,
-        currentTermId: true,
-        joinedAcademicYearId: true,
-        joinedTermId: true,
-        admissionNumber: true
+      include: {
+        user: true,
+        class: true,
       }
     });
-
+    
     if (!student) {
-      console.log('Student not found:', { studentId, schoolId: school.id });
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
 
-    console.log('Student found:', { 
-      studentId: student.id, 
-      studentName: student.user.name,
-      gradeId: student.class?.gradeId,
-      gradeName: student.class?.grade?.name
-    });
-
-    let remainingAmount = parseFloat(amount);
-    let arrearsCleared = false;
-    let arrearRecord = await prisma.studentArrear.findFirst({
+    // Find or create academic year and term based on names
+    let academicYearRecord = await prisma.academicYear.findFirst({
       where: {
-        studentId: student.id,
         schoolId: school.id,
-        arrearAmount: { gt: 0 }
-      },
-      orderBy: { dateRecorded: 'asc' }
+        name: academicYear
+      }
     });
 
-    if (arrearRecord) {
-      if (remainingAmount >= arrearRecord.arrearAmount) {
-        remainingAmount -= arrearRecord.arrearAmount;
-        await prisma.studentArrear.update({
-          where: { id: arrearRecord.id },
-          data: { arrearAmount: 0 }
-        });
-        arrearsCleared = true;
-      } else {
-        await prisma.studentArrear.update({
-          where: { id: arrearRecord.id },
-          data: { arrearAmount: arrearRecord.arrearAmount - remainingAmount }
-        });
-        return NextResponse.json({
-          success: true,
-          message: 'Payment applied to arrears only',
-          arrearsRemaining: arrearRecord.arrearAmount - remainingAmount
-        }, { status: 201 });
+    if (!academicYearRecord) {
+      // Create academic year if it doesn't exist
+      const year = parseInt(academicYear);
+      if (isNaN(year)) {
+        return NextResponse.json({ error: 'Invalid academic year format' }, { status: 400 });
       }
+      
+      academicYearRecord = await prisma.academicYear.create({
+        data: {
+          schoolId: school.id,
+          name: academicYear,
+          startDate: new Date(year, 0, 1), // January 1st of the year
+          endDate: new Date(year, 11, 31), // December 31st of the year
+          isCurrent: false
+        }
+      });
     }
 
-    const receiptNumber = `RCP-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
-
-    const currentAcademicYearId = student.currentAcademicYearId || student.joinedAcademicYearId;
-    const currentTermId = student.currentTermId || student.joinedTermId;
-
-    const payment = await prisma.payment.create({
-      data: {
-        studentId: student.id,
-        amount: remainingAmount,
-        paymentDate: new Date(),
-        paymentMethod: paymentMethod === 'mpesa' ? 'mobile_money' : paymentMethod,
-        referenceNumber: referenceNumber || `PAY-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        receiptNumber,
-        description: description || `${feeType} - ${term} ${academicYear}` + (arrearsCleared ? ' (Arrears Cleared)' : ''),
-        receivedBy: 'Parent Portal',
-        academicYearId: currentAcademicYearId,
-        termId: currentTermId,
+    let termRecord = await prisma.term.findFirst({
+      where: {
+        academicYearId: academicYearRecord.id,
+        name: term
       }
     });
 
-    const academicYearOutstandingAfter = (academicYearOutstandingBefore ?? 0) - Number(remainingAmount);
-    const termOutstandingAfter = (termOutstandingBefore ?? 0) - Number(remainingAmount);
+    // Add check: If termRecord is not found, return error
+    if (!termRecord) {
+      console.error('Payment API: Term not found for academic year', { term, academicYear: academicYearRecord.name });
+      return NextResponse.json({ error: `Term '${term}' not found for academic year '${academicYearRecord.name}'. Please contact admin.` }, { status: 400 });
+    }
 
+    // Generate receipt number
+    const receiptNumber = `RCP-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+    
+    // Generate reference number if not provided
+    const finalReferenceNumber = referenceNumber || `PAY-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    // --- NEW LOGIC: Fetch current balances before payment ---
+    // Get all termly fee structures for this student/grade for the academic year
+    const feeStructures = await prisma.termlyFeeStructure.findMany({
+      where: {
+        gradeId: student.class?.gradeId,
+        isActive: true,
+        academicYearId: academicYearRecord.id,
+        NOT: [ { termId: null } ]
+      }
+    });
+    // Get all payments for this student for the academic year
+    const payments = await prisma.payment.findMany({
+      where: {
+        studentId: student.id,
+        academicYearId: academicYearRecord.id
+      },
+      orderBy: { paymentDate: 'asc' }
+    });
+    // Build transactions: charges (debit), payments (credit)
+    let transactions = [];
+    for (const fs of feeStructures) {
+      transactions.push({
+        ref: fs.id,
+        description: `INVOICE - ${fs.term || ''} ${fs.year || ''}`,
+        debit: Number(fs.totalAmount),
+        credit: 0,
+        date: fs.createdAt,
+        type: 'invoice',
+        termId: fs.termId,
+        academicYearId: fs.academicYearId,
+        term: fs.term,
+        year: fs.year
+      });
+    }
+    for (const p of payments) {
+      transactions.push({
+        ref: p.receiptNumber || p.referenceNumber || p.id,
+        description: p.description || 'PAYMENT',
+        debit: 0,
+        credit: Number(p.amount),
+        date: p.paymentDate,
+        type: 'payment',
+        termId: p.termId,
+        academicYearId: p.academicYearId,
+        term: undefined,
+        year: undefined
+      });
+    }
+    transactions = transactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    // Calculate running balance
+    let runningBalance = 0;
+    transactions = transactions.map((txn) => {
+      runningBalance += (txn.debit || 0) - (txn.credit || 0);
+      return {
+        ...txn,
+        balance: runningBalance
+      };
+    });
+    const academicYearOutstandingBefore = transactions.length > 0 ? transactions[transactions.length - 1].balance : 0;
+    // --- Find the term fee structure for the payment ---
+    const targetTermFee = feeStructures.find(fs => fs.term === term);
+    // Calculate term balance before
+    let termOutstandingBefore = 0;
+    if (targetTermFee) {
+      const charges = transactions.filter(txn => txn.termId === targetTermFee.termId && txn.type === 'invoice').reduce((sum, txn) => sum + (txn.debit || 0), 0);
+      const paymentsForTerm = transactions.filter(txn => txn.termId === targetTermFee.termId && txn.type === 'payment').reduce((sum, txn) => sum + (txn.credit || 0), 0);
+      termOutstandingBefore = charges - paymentsForTerm;
+    }
+    // --- Apply the payment ---
+    // (We just record the payment; the /fees endpoint will recalculate balances in real time)
+    // Create the payment
+    const payment = await prisma.payment.create({
+      data: {
+        studentId,
+        amount,
+        paymentDate: new Date(),
+        paymentMethod: paymentMethod === 'mpesa' ? 'mobile_money' : paymentMethod,
+        referenceNumber: finalReferenceNumber,
+        receiptNumber,
+        description: description || `${feeType} - ${term} ${academicYear}`,
+        receivedBy: receivedBy || 'Parent Portal',
+        academicYearId: academicYearRecord.id,
+        termId: termRecord.id,
+      }
+    });
+    // --- Recalculate balances after payment ---
+    // Add this payment to the transactions and recalc
+    transactions.push({
+      ref: payment.receiptNumber || payment.referenceNumber || payment.id,
+      description: payment.description || 'PAYMENT',
+      debit: 0,
+      credit: Number(payment.amount),
+      date: payment.paymentDate,
+      type: 'payment',
+      termId: payment.termId,
+      academicYearId: payment.academicYearId,
+      term: term,
+      year: academicYear,
+      balance: 0 // will be recalculated below
+    });
+    transactions = transactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    runningBalance = 0;
+    transactions = transactions.map((txn) => {
+      runningBalance += (txn.debit || 0) - (txn.credit || 0);
+      return {
+        ...txn,
+        balance: runningBalance
+      };
+    });
+    const academicYearOutstandingAfter = transactions.length > 0 ? transactions[transactions.length - 1].balance : 0;
+    // Calculate term balance after
+    let termOutstandingAfter = 0;
+    if (targetTermFee) {
+      const charges = transactions.filter(txn => txn.termId === targetTermFee.termId && txn.type === 'invoice').reduce((sum, txn) => sum + (txn.debit || 0), 0);
+      const paymentsForTerm = transactions.filter(txn => txn.termId === targetTermFee.termId && txn.type === 'payment').reduce((sum, txn) => sum + (txn.credit || 0), 0);
+      termOutstandingAfter = charges - paymentsForTerm;
+    }
+    // --- Create receipt with correct balances and term/year ---
     const receipt = await prisma.receipt.create({
       data: {
         paymentId: payment.id,
         studentId: student.id,
-        receiptNumber,
-        amount: remainingAmount,
+        receiptNumber: payment.receiptNumber,
+        amount: amount,
         paymentDate: new Date(),
-        academicYearOutstandingBefore: academicYearOutstandingBefore ?? 0,
+        academicYearOutstandingBefore,
         academicYearOutstandingAfter,
-        termOutstandingBefore: termOutstandingBefore ?? 0,
+        termOutstandingBefore,
         termOutstandingAfter,
         academicYearId: payment.academicYearId,
         termId: payment.termId,
+        paymentMethod: payment.paymentMethod,
+        referenceNumber: payment.referenceNumber,
       }
     });
 
@@ -207,11 +278,19 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       return NextResponse.json({ error: 'studentId is required' }, { status: 400 });
     }
 
+    const school = await prisma.school.findUnique({ where: { code: params.schoolCode } });
+    if (!school) {
+      return NextResponse.json({ error: 'School not found' }, { status: 404 });
+    }
+    const schoolName = school.name;
+
     const payments = await prisma.payment.findMany({
       where: { studentId },
       include: {
         student: { include: { user: true, class: true } },
         receipt: true,
+        academicYear: true,
+        term: true,
       },
       orderBy: {
         paymentDate: 'desc',
@@ -224,8 +303,8 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       studentName: payment.student?.user?.name,
       className: payment.student?.class?.name,
       admissionNumber: payment.student?.admissionNumber,
-      term: payment.description?.match(/Term \d/)?.[0],
-      academicYear: payment.description?.match(/\d{4}/)?.[0],
+      term: payment.term?.name || payment.description?.match(/Term \d/)?.[0],
+      academicYear: payment.academicYear?.name || payment.description?.match(/\d{4}/)?.[0],
       referenceNumber: payment.referenceNumber,
       receiptNumber: payment.receiptNumber,
       paymentMethod: payment.paymentMethod,

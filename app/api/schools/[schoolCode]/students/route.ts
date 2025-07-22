@@ -204,7 +204,8 @@ export async function PUT(req: NextRequest, { params }: { params: { schoolCode: 
     const {
       name, email, phone, admissionNumber, dateOfBirth, dateAdmitted,
       parentName, parentPhone, parentEmail, address, gender, parentId,
-      classId, status, avatarUrl, emergencyContact, medicalInfo, notes, isActive
+      classId, status, avatarUrl, emergencyContact, medicalInfo, notes, isActive,
+      currentAcademicYearId, currentTermId
     } = body;
 
     if (!studentId) {
@@ -249,6 +250,8 @@ export async function PUT(req: NextRequest, { params }: { params: { schoolCode: 
         notes,
         isActive: typeof isActive === "boolean" ? isActive : (status === "active"),
         updatedAt: new Date(),
+        currentAcademicYearId: currentAcademicYearId ?? student.currentAcademicYearId,
+        currentTermId: currentTermId ?? student.currentTermId,
       },
       include: { user: true, parent: true, class: { include: { grade: true } } }
     });

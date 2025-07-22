@@ -92,6 +92,10 @@ interface FeeStructure {
   gradeName: string;
   academicYearId: string;
   termId: string;
+  academicYear?: {
+    name: string;
+    id: string;
+  };
 }
 
 interface FeeManagementProps {
@@ -237,17 +241,15 @@ export function FeeManagement({
     fetchFeeStructures();
   }, [schoolCode, academicYearId, termId]);
 
+  // Update fetchGrades to fetch global grades
   useEffect(() => {
     async function fetchGrades() {
-      setLoadingGrades(true);
-      const res = await fetch(`/api/schools/${schoolCode}/grades`);
-      if (res.ok) {
-        setGrades(await res.json());
-      }
-      setLoadingGrades(false);
+      const res = await fetch(`/api/grades`);
+      if (!res.ok) throw new Error("Failed to fetch grades");
+      setGrades(await res.json());
     }
-    if (schoolCode) fetchGrades();
-  }, [schoolCode]);
+    fetchGrades();
+  }, []);
 
   // Add state for available terms in the current academic year
   const [availableTerms, setAvailableTerms] = useState<any[]>([]);
@@ -455,6 +457,7 @@ export function FeeManagement({
     const searchText = search.toLowerCase();
     return (
       (fee.term && fee.term.toLowerCase().includes(searchText)) ||
+      (fee.academicYear?.name && fee.academicYear.name.toLowerCase().includes(searchText)) ||
       (fee.year && fee.year.toString().includes(searchText)) ||
       (fee.gradeName && fee.gradeName.toLowerCase().includes(searchText)) ||
       (fee.totalAmount && fee.totalAmount.toString().includes(searchText)) ||
@@ -686,7 +689,9 @@ export function FeeManagement({
                             <p className="font-semibold text-gray-900">
                               {fee.term}
                             </p>
-                            <p className="text-sm text-gray-500">{fee.year}</p>
+                            <p className="text-sm text-gray-500">
+                              {fee.academicYear?.name || fee.year}
+                            </p>
                           </div>
                         </div>
                       </TableCell>
@@ -999,7 +1004,7 @@ export function FeeManagement({
                     <div>
                       <p className="text-xs text-gray-500">Term / Year</p>
                       <p className="font-semibold text-sm text-gray-800">
-                        {viewingFee.term} / {viewingFee.year}
+                        {viewingFee.term} / {viewingFee.academicYear?.name || viewingFee.year}
                       </p>
                     </div>
                   </div>

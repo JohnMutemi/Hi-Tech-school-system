@@ -37,7 +37,7 @@ export async function GET() {
     });
 
     // Transform data to match SchoolData interface
-    const transformedSchools = schools.map(school => ({
+    const transformedSchools = schools.map((school: any) => ({
       id: school.id,
       schoolCode: school.code,
       name: school.name,
@@ -45,10 +45,10 @@ export async function GET() {
       colorTheme: "#3b82f6", // Default theme
       portalUrl: `/schools/${school.code}`,
       description: "",
-      adminEmail: school.users.find(u => u.role === 'admin')?.email || school.email,
+      adminEmail: school.users.find((u: any) => u.role === 'admin')?.email || school.email,
       adminPassword: "", // Don't return password
-      adminFirstName: school.users.find(u => u.role === 'admin')?.name?.split(' ')[0] || "Admin",
-      adminLastName: school.users.find(u => u.role === 'admin')?.name?.split(' ').slice(1).join(' ') || "User",
+      adminFirstName: school.users.find((u: any) => u.role === 'admin')?.name?.split(' ')[0] || "Admin",
+      adminLastName: school.users.find((u: any) => u.role === 'admin')?.name?.split(' ').slice(1).join(' ') || "User",
       createdAt: school.createdAt.toISOString(),
       status: school.isActive ? "active" : "suspended",
       profile: {
@@ -63,7 +63,7 @@ export async function GET() {
         type: "primary" as const
       },
       teachers: [],
-      students: school.students.map(s => ({
+      students: school.students.map((s: any) => ({
         id: s.id,
         name: "",
         email: "",
@@ -80,7 +80,7 @@ export async function GET() {
         status: s.isActive ? "active" : "inactive"
       })),
       subjects: [],
-      classes: school.classes.map(c => ({
+      classes: school.classes.map((c: any) => ({
         id: c.id,
         name: c.name,
         level: "",
@@ -149,21 +149,9 @@ export async function POST(request: NextRequest) {
     });
 
     // Automatically seed grades for the new school
-    const defaultGrades = [
-      { name: 'Grade 1', schoolId: school.id },
-      { name: 'Grade 2', schoolId: school.id },
-      { name: 'Grade 3', schoolId: school.id },
-      { name: 'Grade 4', schoolId: school.id },
-      { name: 'Grade 5', schoolId: school.id },
-      { name: 'Grade 6', schoolId: school.id },
-      { name: 'Grade 7', schoolId: school.id },
-      { name: 'Grade 8', schoolId: school.id },
-    ];
-
-    await prisma.grade.createMany({
-      data: defaultGrades,
-      skipDuplicates: true, // Just in case
-    });
+    // (Removed: grades are now global and seeded once)
+    // const defaultGrades = [...];
+    // await prisma.grade.createMany({ data: defaultGrades, skipDuplicates: true });
 
     // Hash the admin password before saving
     const hashedPassword = await bcrypt.hash(adminPassword, 12);
