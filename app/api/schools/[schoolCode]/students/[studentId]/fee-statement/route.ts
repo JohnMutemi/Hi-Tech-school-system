@@ -163,8 +163,48 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       });
     }
 
+    // 1. Calculate opening arrears (before join date/term)
+    // Use the most recent studentArrear record before the join year as the opening balance.
+    // If none exists (e.g., new student), fallback to sum all arrears for the student.
+    let arrearsBroughtForward = 0;
+    if (joinAcademicYearId) {
+      const lastArrear = await prisma.studentArrear.findFirst({
+        where: {
+          studentId: student.id,
+          academicYearId: { lt: joinAcademicYearId }
+        },
+        orderBy: { academicYearId: 'desc' }
+      });
+      if (lastArrear) {
+        arrearsBroughtForward = lastArrear.arrearAmount || 0;
+      } else {
+        // Fallback: sum all arrears if no record before join year (e.g., new student)
+        const allArrears = await prisma.studentArrear.aggregate({
+          where: { studentId: student.id },
+          _sum: { arrearAmount: true }
+        });
+        arrearsBroughtForward = allArrears._sum.arrearAmount || 0;
+      }
+    }
+
     // Build transactions: charges (debit), payments (credit)
     let transactions: any[] = [];
+    // Insert opening balance if needed
+    if (arrearsBroughtForward !== 0) {
+      transactions.push({
+        ref: '',
+        description: 'Opening Balance (Brought Forward)',
+        debit: arrearsBroughtForward > 0 ? arrearsBroughtForward : 0,
+        credit: arrearsBroughtForward < 0 ? Math.abs(arrearsBroughtForward) : 0,
+        date: joinDate || new Date(),
+        type: 'opening-balance',
+        termId: null,
+        academicYearId: null,
+        termName: '',
+        academicYearName: '',
+        balance: arrearsBroughtForward
+      });
+    }
     // Charges (invoices)
     for (const fs of filteredFeeStructures) {
       transactions.push({

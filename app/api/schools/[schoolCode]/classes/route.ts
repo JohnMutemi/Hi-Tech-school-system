@@ -48,17 +48,31 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
     }
     const body = await request.json();
     const { name, level, academicYear, teacherId, gradeId } = body;
-    if (!name || !academicYear || !gradeId) {
-      return NextResponse.json({ error: "Missing required fields: name, academicYear, and gradeId are required" }, { status: 400 });
+    if (!name || !gradeId) {
+      return NextResponse.json({ error: "Missing required fields: name and gradeId are required" }, { status: 400 });
+    }
+    const data: any = {
+      name,
+      gradeId,
+      schoolId: school.id,
+      academicYear: academicYear || new Date().getFullYear().toString(), // always set
+    };
+    if (teacherId) data.teacherId = teacherId;
+    // Prevent duplicate ALUMNI class creation
+    if (name && name.trim().toLowerCase() === "alumni") {
+      const existingAlumni = await prisma.class.findFirst({
+        where: {
+          schoolId: school.id,
+          academicYear: data.academicYear,
+          name: { equals: "ALUMNI", mode: "insensitive" },
+        },
+      });
+      if (existingAlumni) {
+        return NextResponse.json({ error: "ALUMNI class already exists for this year." }, { status: 409 });
+      }
     }
     const newClass = await prisma.class.create({
-      data: {
-        name,
-        academicYear,
-        teacherId: teacherId || null,
-        schoolId: school.id,
-        gradeId: gradeId,
-      },
+      data,
       include: {
         teacher: {
           select: {

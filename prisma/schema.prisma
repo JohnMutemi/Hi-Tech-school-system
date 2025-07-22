@@ -8,29 +8,30 @@ datasource db {
 }
 
 model School {
-  id                String               @id @default(uuid())
-  name              String
-  code              String               @unique
-  address           String
-  phone             String
-  email             String
-  admissionNumberFormat      String?   // e.g., "{SCHOOL_CODE}-{YEAR}-{SEQ}"
-  lastAdmissionNumber        String?   // e.g., "ABC-2024-001"
-  admissionNumberAutoIncrement Boolean @default(true)
-  logo              String?
-  isActive          Boolean              @default(true)
-  createdAt         DateTime             @default(now())
-  updatedAt         DateTime             @updatedAt
-  academicYears     AcademicYear[]
-  classes           Class[]
-  classProgressions ClassProgression[]
-  feeStructures     FeeStructure[]
-  paymentRequests   PaymentRequest[]
-  promotionCriteria PromotionCriteria[]
-  students          Student[]
-  studentArrears    StudentArrear[]
-  termlyFees        TermlyFeeStructure[]
-  users             User[]
+  id                           String               @id @default(uuid())
+  name                         String
+  code                         String               @unique
+  address                      String
+  phone                        String
+  email                        String
+  logo                         String?
+  isActive                     Boolean              @default(true)
+  createdAt                    DateTime             @default(now())
+  updatedAt                    DateTime             @updatedAt
+  admissionNumberAutoIncrement Boolean              @default(true)
+  admissionNumberFormat        String?
+  lastAdmissionNumber          String?
+  academicYears                AcademicYear[]
+  classes                      Class[]
+  classProgressions            ClassProgression[]
+  feeStructures                FeeStructure[]
+  grades                       Grade[]
+  paymentRequests              PaymentRequest[]
+  promotionCriteria            PromotionCriteria[]
+  students                     Student[]
+  studentArrears               StudentArrear[]
+  termlyFees                   TermlyFeeStructure[]
+  users                        User[]
 }
 
 model User {
@@ -68,10 +69,14 @@ model TeacherProfile {
 }
 
 model Grade {
-  id        String   @id @default(uuid())
-  name      String
-  isAlumni  Boolean  @default(false) // Field from promotions logic
-  classes   Class[]
+
+  id         String               @id @default(uuid())
+  name       String
+  isAlumni   Boolean              @default(false)
+  schoolId   String?
+  classes    Class[]
+  school     School?              @relation(fields: [schoolId], references: [id])
+
   termlyFees TermlyFeeStructure[]
 }
 
@@ -90,62 +95,64 @@ model Class {
   teacher      User?     @relation("TeacherClasses", fields: [teacherId], references: [id])
   students     Student[]
 }
+
 model Student {
   id                    String               @id @default(uuid())
   userId                String               @unique
   schoolId              String
-  classId               String?              // references Class (section/stream)
+  classId               String?
   admissionNumber       String
   dateOfBirth           DateTime?
-  dateAdmitted          DateTime?
   parentId              String?
   isActive              Boolean              @default(true)
-  status                String               @default("active")
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt
-  academicYear          Int?                 @default(2025)
-
-  tempPassword          String?
-  parentName            String?
-  parentPhone           String?
-  parentEmail           String?
   address               String?
   gender                String?
+  parentEmail           String?
+  parentName            String?
+  parentPhone           String?
+  tempPassword          String?
   avatarUrl             String?
+  dateAdmitted          DateTime?
   emergencyContact      String?
   medicalInfo           String?
   notes                 String?
-
-  // Academic tracking fields from `main`
+  status                String               @default("active")
+  academicYear          Int?                 @default(2025)
   currentAcademicYearId String?
   currentTermId         String?
   joinedAcademicYearId  String?
   joinedTermId          String?
-
-  // Relations
-  user                  User                 @relation(fields: [userId], references: [id])
-  school                School               @relation(fields: [schoolId], references: [id])
+  feeStatements         FeeStatement[]
+  payments              Payment[]
+  paymentRequests       PaymentRequest[]
+  promotionExclusions   PromotionExclusion[]
+  promotionLogs         PromotionLog[]
+  receipts              Receipt[]
   class                 Class?               @relation(fields: [classId], references: [id])
-  parent                User?                @relation("ParentStudents", fields: [parentId], references: [id])
   currentAcademicYear   AcademicYear?        @relation(fields: [currentAcademicYearId], references: [id])
   currentTerm           Term?                @relation(fields: [currentTermId], references: [id])
   joinedAcademicYear    AcademicYear?        @relation("JoinedAcademicYear", fields: [joinedAcademicYearId], references: [id])
   joinedTerm            Term?                @relation("JoinedTerm", fields: [joinedTermId], references: [id])
-
-  // Data relationships
-  payments              Payment[]
-  paymentRequests       PaymentRequest[]
+  parent                User?                @relation("ParentStudents", fields: [parentId], references: [id])
+  school                School               @relation(fields: [schoolId], references: [id])
+  user                  User                 @relation(fields: [userId], references: [id])
+  studentArrearsLegacy  StudentArrear[]
+  studentArrears        StudentArrears[]
   studentFees           StudentFee[]
+
   feeStatements         FeeStatement[]
   promotionLogs         PromotionLog[]
   promotionExclusions   PromotionExclusion[]
   receipts              Receipt[]
   studentArrears        StudentArrear[]
   yearlyBalances        StudentYearlyBalance[]
+
 }
 
 model Payment {
-  id              String   @id @default(uuid())
+  id              String        @id @default(uuid())
   studentId       String
   amount          Float
   paymentDate     DateTime
@@ -154,26 +161,34 @@ model Payment {
   receiptNumber   String
   description     String
   receivedBy      String
+
   createdAt       DateTime @default(now())
   academicYearId  String
   termId          String
 
   student         Student  @relation(fields: [studentId], references: [id])
   receipt         Receipt?
+
+  createdAt       DateTime      @default(now())
+  academicYearId  String?
+  termId          String?
+
   academicYear    AcademicYear? @relation(fields: [academicYearId], references: [id])
+  student         Student       @relation(fields: [studentId], references: [id])
   term            Term?         @relation(fields: [termId], references: [id])
+  receipt         Receipt?
 }
 
 model Receipt {
-  id                          String   @id @default(uuid())
-  paymentId                   String   @unique
-  studentId                   String
-  receiptNumber               String
-  amount                      Float
-  paymentDate                 DateTime
-  createdAt                   DateTime @default(now())
-  academicYearOutstandingBefore Float
+  id                            String        @id @default(uuid())
+  paymentId                     String        @unique
+  studentId                     String
+  receiptNumber                 String
+  amount                        Float
+  paymentDate                   DateTime
+  createdAt                     DateTime      @default(now())
   academicYearOutstandingAfter  Float
+
   termOutstandingBefore        Float?
   termOutstandingAfter         Float?
   academicYearId               String?
@@ -185,6 +200,17 @@ model Receipt {
   student                     Student  @relation(fields: [studentId], references: [id])
   academicYear                AcademicYear? @relation(fields: [academicYearId], references: [id])
   term                        Term?         @relation(fields: [termId], references: [id])
+
+  academicYearOutstandingBefore Float
+  termOutstandingAfter          Float?
+  termOutstandingBefore         Float?
+  academicYearId                String?
+  termId                        String?
+  academicYear                  AcademicYear? @relation(fields: [academicYearId], references: [id])
+  payment                       Payment       @relation(fields: [paymentId], references: [id])
+  student                       Student       @relation(fields: [studentId], references: [id])
+  term                          Term?         @relation(fields: [termId], references: [id])
+
 }
 
 model FeeStructure {
@@ -218,7 +244,6 @@ model TermlyFeeStructure {
   gradeId        String
   academicYearId String?
   termId         String?
-
   logs           FeeStructureLog[]
   academicYear   AcademicYear?     @relation(fields: [academicYearId], references: [id])
   creator        User              @relation("UserCreatedTermlyFees", fields: [createdBy], references: [id])
@@ -279,12 +304,12 @@ model PaymentRequest {
   createdAt       DateTime @default(now())
   expiresAt       DateTime
   status          String
-
   school          School   @relation(fields: [schoolId], references: [id])
   student         Student  @relation(fields: [studentId], references: [id])
 }
 
 model PromotionCriteria {
+
   id                    String   @id @default(uuid())
   schoolId              String
   classLevel            String   // e.g., "Grade 1", "Form 1"
@@ -364,12 +389,39 @@ model ClassProgression {
   school                School   @relation(fields: [schoolId], references: [id])
   criteria              PromotionCriteria? @relation(fields: [criteriaId], references: [id])
   creator               User?    @relation("ProgressionCreator", fields: [createdBy], references: [id])
+=======
+  id         String   @id @default(uuid())
+  schoolId   String
+  classLevel String
+  minGrade   Float?
+  attendance Int?
+  feeStatus  String
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  school     School   @relation(fields: [schoolId], references: [id])
+
+  @@unique([schoolId, classLevel])
+}
+
+model ClassProgression {
+  id        String   @id @default(uuid())
+  schoolId  String
+  fromClass String
+  toClass   String
+  order     Int
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  school    School   @relation(fields: [schoolId], references: [id])
+
 
   @@unique([schoolId, fromClass])
   @@index([schoolId, fromGrade, toGrade])
 }
 
 model PromotionLog {
+
   id                    String               @id @default(uuid())
   studentId             String
   fromClass             String
@@ -426,6 +478,35 @@ model PromotionExclusion {
   student               Student      @relation(fields: [studentId], references: [id])
 
   @@index([studentId, excludedAt])
+
+  id            String               @id @default(uuid())
+  studentId     String
+  fromClass     String
+  toClass       String
+  fromYear      String
+  toYear        String
+  promotedBy    String
+  promotionDate DateTime             @default(now())
+  criteria      Json
+  notes         String?
+  promotionType String
+  exclusions    PromotionExclusion[]
+  user          User                 @relation("UserPromotions", fields: [promotedBy], references: [id])
+  student       Student              @relation(fields: [studentId], references: [id])
+}
+
+model PromotionExclusion {
+  id             String       @id @default(uuid())
+  promotionLogId String
+  studentId      String
+  reason         String
+  notes          String?
+  excludedBy     String
+  excludedAt     DateTime     @default(now())
+  user           User         @relation("UserExclusions", fields: [excludedBy], references: [id])
+  promotionLog   PromotionLog @relation(fields: [promotionLogId], references: [id])
+  student        Student      @relation(fields: [studentId], references: [id])
+
 }
 
 model AcademicYear {
@@ -437,15 +518,14 @@ model AcademicYear {
   isCurrent          Boolean              @default(false)
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
-
   school             School               @relation(fields: [schoolId], references: [id])
+  payments           Payment[]
+  receipts           Receipt[]
   students           Student[]
   joinedStudents     Student[]            @relation("JoinedAcademicYear")
   studentArrears     StudentArrear[]
   terms              Term[]
   TermlyFeeStructure TermlyFeeStructure[]
-  payments           Payment[]
-  receipts           Receipt[]
 
   @@unique([schoolId, name])
 }
@@ -459,13 +539,12 @@ model Term {
   isCurrent          Boolean              @default(false)
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
-
+  payments           Payment[]
+  receipts           Receipt[]
   students           Student[]
   joinedStudents     Student[]            @relation("JoinedTerm")
   academicYear       AcademicYear         @relation(fields: [academicYearId], references: [id])
   TermlyFeeStructure TermlyFeeStructure[]
-  payments           Payment[]
-  receipts           Receipt[]
 
   @@unique([academicYearId, name])
 }
@@ -478,13 +557,13 @@ model StudentArrear {
   arrearAmount   Float
   dateRecorded   DateTime     @default(now())
   notes          String?
-
   academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
   school         School       @relation(fields: [schoolId], references: [id])
   student        Student      @relation(fields: [studentId], references: [id])
 
   @@index([studentId, academicYearId])
 }
+
 
 // Rename model StudentArrears to StudentYearlyBalance
 model StudentYearlyBalance {
@@ -500,6 +579,20 @@ model StudentYearlyBalance {
   updatedAt       DateTime @updatedAt
 
   student         Student  @relation(fields: [studentId], references: [id])
+
+model StudentArrears {
+  id               String   @id @default(uuid())
+  studentId        String
+  academicYear     Int
+  openingBalance   Float    @default(0)
+  totalCharged     Float    @default(0)
+  totalPaid        Float    @default(0)
+  closingBalance   Float    @default(0)
+  isCarriedForward Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  student          Student  @relation(fields: [studentId], references: [id])
+
 
   @@unique([studentId, academicYear])
 }

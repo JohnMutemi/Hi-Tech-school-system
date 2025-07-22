@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
+import { calculateStudentOutstanding } from "@/lib/utils/fee-balance";
 
 const prisma = new PrismaClient();
 
@@ -309,9 +310,28 @@ async function getEligibleStudents(schoolId: string, classLevel: string) {
           where: { studentId: student.id },
         });
 
-        const totalFees = feeStructures.reduce((sum, fs) => sum + Number(fs.totalAmount), 0);
-        const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
-        const outstandingBalance = Math.max(0, totalFees - totalPaid);
+        // DEBUG LOGS
+        console.log(`DEBUG: [Manual] Calculating outstanding for student: ${student.user?.name} (${student.id})`);
+        console.log(`DEBUG: [Manual] Payments:`, payments);
+        console.log(`DEBUG: [Manual] Fee Structures:`, feeStructures);
+        console.log(`DEBUG: [Manual] Params:`, {
+          joinAcademicYearId: student.joinedAcademicYearId,
+          joinTermId: student.joinedTermId,
+          joinDate: student.dateAdmitted,
+          filterAcademicYear: currentYear,
+        });
+
+        const { outstandingBalance } = await calculateStudentOutstanding({
+          student,
+          feeStructures,
+          payments,
+          joinAcademicYearId: student.joinedAcademicYearId || undefined,
+          joinTermId: student.joinedTermId || undefined,
+          joinDate: student.dateAdmitted || undefined,
+          filterAcademicYear: currentYear, // or the relevant year
+        });
+
+        console.log(`DEBUG: [Manual] Outstanding balance for ${student.user?.name}:`, outstandingBalance);
 
         return {
           ...student,
@@ -339,8 +359,6 @@ async function getEligibleStudents(schoolId: string, classLevel: string) {
               attendanceRate: 0,
               outstandingBalance,
               disciplinaryCases: 0,
-              totalFees,
-              totalPaid,
             }
           },
         };
@@ -362,10 +380,31 @@ async function getEligibleStudents(schoolId: string, classLevel: string) {
         where: { studentId: student.id },
       });
 
+      // DEBUG LOGS
+      console.log(`DEBUG: Calculating outstanding for student: ${student.user?.name} (${student.id})`);
+      console.log(`DEBUG: Payments:`, payments);
+      console.log(`DEBUG: Fee Structures:`, feeStructures);
+      console.log(`DEBUG: Params:`, {
+        joinAcademicYearId: student.joinedAcademicYearId,
+        joinTermId: student.joinedTermId,
+        joinDate: student.dateAdmitted,
+        filterAcademicYear: currentYear,
+      });
+
       // Calculate basic metrics
       const totalFees = feeStructures.reduce((sum, fs) => sum + Number(fs.totalAmount), 0);
       const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
-      const outstandingBalance = Math.max(0, totalFees - totalPaid);
+      const { outstandingBalance } = await calculateStudentOutstanding({
+        student,
+        feeStructures,
+        payments,
+        joinAcademicYearId: student.joinedAcademicYearId || undefined,
+        joinTermId: student.joinedTermId || undefined,
+        joinDate: student.dateAdmitted || undefined,
+        filterAcademicYear: currentYear, // or the relevant year
+      });
+
+      console.log(`DEBUG: Outstanding balance for ${student.user?.name}:`, outstandingBalance);
 
       // Mock data for demonstration (in real system, these would come from actual records)
       const averageGrade = 75.0; // Mock grade
@@ -439,8 +478,6 @@ async function getEligibleStudents(schoolId: string, classLevel: string) {
             attendanceRate,
             outstandingBalance,
             disciplinaryCases,
-            totalFees,
-            totalPaid,
           }
         },
       };

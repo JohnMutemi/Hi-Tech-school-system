@@ -32,6 +32,7 @@ import {
   School,
   Sparkles,
   Loader2,
+  Download,
 } from "lucide-react";
 
 interface PaymentFormProps {
@@ -41,6 +42,8 @@ interface PaymentFormProps {
   feeType: string;
   term: string;
   academicYear: string;
+  paymentMethod?: "mpesa" | "manual";
+  phoneNumber?: string;
   onPaymentSuccess?: (payment: any) => void;
   onPaymentError?: (error: string) => void;
   onStart?: () => void;
@@ -84,16 +87,23 @@ interface ReceiptData {
 }
 
 // Enhanced logging utility for frontend
-const logPaymentForm = (stage: string, data: any, type: 'info' | 'success' | 'error' | 'warning' = 'info') => {
+const logPaymentForm = (
+  stage: string,
+  data: any,
+  type: "info" | "success" | "error" | "warning" = "info"
+) => {
   const timestamp = new Date().toISOString();
   const logData = {
     timestamp,
     stage,
     type,
-    data: typeof data === 'object' ? JSON.stringify(data, null, 2) : data
+    data: typeof data === "object" ? JSON.stringify(data, null, 2) : data,
   };
-  
-  console.log(`🟡 [PAYMENT-FORM-${stage.toUpperCase()}] ${timestamp}:`, logData);
+
+  console.log(
+    `🟡 [PAYMENT-FORM-${stage.toUpperCase()}] ${timestamp}:`,
+    logData
+  );
 };
 
 export function PaymentForm({
@@ -103,6 +113,8 @@ export function PaymentForm({
   feeType,
   term,
   academicYear,
+  paymentMethod: propPaymentMethod = "manual",
+  phoneNumber: propPhoneNumber = "",
   onPaymentSuccess,
   onPaymentError,
   onStart,
@@ -110,113 +122,151 @@ export function PaymentForm({
   isProcessing = false,
 }: PaymentFormProps) {
   const { toast } = useToast();
-  const [paymentMethod, setPaymentMethod] = useState<"mpesa" | "manual">("manual");
-  const [phoneNumber, setPhoneNumber] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<"mpesa" | "manual">(
+    propPaymentMethod
+  );
+  const [phoneNumber, setPhoneNumber] = useState(propPhoneNumber);
   const [transactionId, setTransactionId] = useState("");
-  const [customAmount, setCustomAmount] = useState<number>(amount);
-  const [useFullAmount, setUseFullAmount] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
   const [studentInfo, setStudentInfo] = useState<any>(null);
   const [schoolInfo, setSchoolInfo] = useState<any>(null);
-  const [progressStage, setProgressStage] = useState<string>('');
+  const [progressStage, setProgressStage] = useState<string>("");
 
-  logPaymentForm('COMPONENT_MOUNT', {
+  // Update local state when props change
+  useEffect(() => {
+    setPaymentMethod(propPaymentMethod);
+    setPhoneNumber(propPhoneNumber);
+  }, [propPaymentMethod, propPhoneNumber]);
+
+  logPaymentForm("COMPONENT_MOUNT", {
     schoolCode,
     studentId,
     amount,
     feeType,
     term,
-    academicYear
+    academicYear,
   });
 
   // Fetch student and school info on component mount
   useEffect(() => {
     const fetchInfo = async () => {
-      logPaymentForm('FETCH_INFO_START', { schoolCode, studentId });
-      
+      logPaymentForm("FETCH_INFO_START", { schoolCode, studentId });
+
       try {
-        setProgressStage('Fetching student information...');
-        
+        setProgressStage("Fetching student information...");
+
         // Fetch student info
-        const studentRes = await fetch(`/api/schools/${schoolCode}/students/${studentId}`);
+        const studentRes = await fetch(
+          `/api/schools/${schoolCode}/students/${studentId}`
+        );
         if (studentRes.ok) {
           const student = await studentRes.json();
           setStudentInfo(student);
-          logPaymentForm('STUDENT_INFO_FETCHED', {
+          logPaymentForm("STUDENT_INFO_FETCHED", {
             studentId: student.id,
             studentName: student.user?.name,
-            className: student.class?.name
+            className: student.class?.name,
           });
         } else {
-          logPaymentForm('STUDENT_INFO_ERROR', { status: studentRes.status }, 'error');
+          logPaymentForm(
+            "STUDENT_INFO_ERROR",
+            { status: studentRes.status },
+            "error"
+          );
         }
 
-        setProgressStage('Fetching school information...');
-        
+        setProgressStage("Fetching school information...");
+
         // Fetch school info
         const schoolRes = await fetch(`/api/schools/${schoolCode}`);
         if (schoolRes.ok) {
           const school = await schoolRes.json();
           setSchoolInfo(school);
-          logPaymentForm('SCHOOL_INFO_FETCHED', {
+          logPaymentForm("SCHOOL_INFO_FETCHED", {
             schoolId: school.id,
-            schoolName: school.name
+            schoolName: school.name,
           });
         } else {
-          logPaymentForm('SCHOOL_INFO_ERROR', { status: schoolRes.status }, 'error');
+          logPaymentForm(
+            "SCHOOL_INFO_ERROR",
+            { status: schoolRes.status },
+            "error"
+          );
         }
 
-        setProgressStage('');
+        setProgressStage("");
       } catch (error) {
-        logPaymentForm('FETCH_INFO_ERROR', error, 'error');
-        setProgressStage('');
+        logPaymentForm("FETCH_INFO_ERROR", error, "error");
+        setProgressStage("");
       }
     };
 
     fetchInfo();
   }, [schoolCode, studentId]);
 
-  const handleAmountChange = (value: string) => {
-    const numValue = parseFloat(value) || 0;
-    setCustomAmount(numValue);
-    setUseFullAmount(false);
-    
-    logPaymentForm('AMOUNT_CHANGED', {
-      oldAmount: amount,
-      newAmount: numValue,
-      useFullAmount: false
-    });
-  };
-
-  const handleFullAmountClick = () => {
-    setCustomAmount(amount);
-    setUseFullAmount(true);
-    
-    logPaymentForm('FULL_AMOUNT_SELECTED', {
-      amount,
-      useFullAmount: true
-    });
-  };
-
   const handlePayment = async () => {
     if (isProcessing) {
-      logPaymentForm('PAYMENT_BLOCKED', { reason: 'Already processing' }, 'warning');
+      logPaymentForm(
+        "PAYMENT_BLOCKED",
+        { reason: "Already processing" },
+        "warning"
+      );
       return;
     }
 
-    logPaymentForm('PAYMENT_START', {
-      amount: customAmount,
+    // Validate M-Pesa requirements
+    if (paymentMethod === "mpesa") {
+      if (!phoneNumber || phoneNumber.trim() === "") {
+        logPaymentForm(
+          "MPESA_VALIDATION_ERROR",
+          { error: "Phone number required for M-Pesa" },
+          "error"
+        );
+        toast({
+          title: "M-Pesa Payment Error",
+          description: "Please enter a valid M-Pesa phone number",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Basic phone number validation for Kenya
+      const phoneRegex = /^254[17]\d{8}$/;
+      if (!phoneRegex.test(phoneNumber.replace(/\s/g, ""))) {
+        logPaymentForm(
+          "MPESA_PHONE_VALIDATION_ERROR",
+          { phoneNumber, error: "Invalid phone number format" },
+          "error"
+        );
+        toast({
+          title: "Invalid Phone Number",
+          description:
+            "Please enter a valid Kenyan phone number (e.g., 254700000000)",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    logPaymentForm("PAYMENT_START", {
+      amount: amount, // Use the amount prop directly
       paymentMethod,
+      phoneNumber: paymentMethod === "mpesa" ? phoneNumber : undefined,
       feeType,
       term,
-      academicYear
+      academicYear,
     });
 
     // Validate required fields
-    if (customAmount <= 0) {
-      logPaymentForm('VALIDATION_ERROR', { error: 'Invalid amount', amount: customAmount }, 'error');
+    if (amount <= 0) {
+      // Use the amount prop directly
+      logPaymentForm(
+        "VALIDATION_ERROR",
+        { error: "Invalid amount", amount: amount }, // Use the amount prop directly
+        "error"
+      );
       toast({
         title: "Validation Error",
         description: "Payment amount must be greater than 0",
@@ -226,132 +276,197 @@ export function PaymentForm({
     }
 
     setIsLoading(true);
-    setProgressStage('Initializing payment...');
+    setProgressStage(
+      paymentMethod === "mpesa"
+        ? "Initiating M-Pesa payment..."
+        : "Initializing payment..."
+    );
     onStart?.();
 
     try {
-      setProgressStage('Preparing payment request...');
-      
+      setProgressStage(
+        paymentMethod === "mpesa"
+          ? "Preparing M-Pesa request..."
+          : "Preparing payment request..."
+      );
+
       const paymentRequest = {
-        paymentType: "manual",
-        amount: customAmount,
-        paymentMethod: "manual",
+        paymentType: paymentMethod,
+        amount: amount, // Use the amount prop directly
+        paymentMethod: paymentMethod,
         feeType,
         academicYear,
         term,
         description: `${feeType} - ${term} ${academicYear}`,
         referenceNumber: transactionId || undefined,
         receivedBy: "Parent Portal",
+        ...(paymentMethod === "mpesa" && {
+          phoneNumber: phoneNumber.replace(/\s/g, ""),
+          mpesaRequestId: `MPESA_${Date.now()}_${Math.random()
+            .toString(36)
+            .substr(2, 9)}`,
+        }),
       };
 
-      logPaymentForm('PAYMENT_REQUEST_PREPARED', paymentRequest);
+      logPaymentForm("PAYMENT_REQUEST_PREPARED", paymentRequest);
 
-      setProgressStage('Sending payment to server...');
-      
+      setProgressStage(
+        paymentMethod === "mpesa"
+          ? "Sending M-Pesa request..."
+          : "Sending payment to server..."
+      );
+
       // Send payment request with proper academic year and term
-      const response = await fetch(`/api/schools/${schoolCode}/students/${studentId}/payments`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(paymentRequest),
-      });
+      const response = await fetch(
+        `/api/schools/${schoolCode}/students/${studentId}/payments`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(paymentRequest),
+        }
+      );
 
-      logPaymentForm('PAYMENT_RESPONSE_RECEIVED', {
+      logPaymentForm("PAYMENT_RESPONSE_RECEIVED", {
         status: response.status,
         statusText: response.statusText,
-        ok: response.ok
+        ok: response.ok,
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        logPaymentForm('PAYMENT_API_ERROR', errorData, 'error');
+        logPaymentForm("PAYMENT_API_ERROR", errorData, "error");
         throw new Error(errorData.error || "Payment failed");
       }
 
-      setProgressStage('Processing payment response...');
-      
+      setProgressStage(
+        paymentMethod === "mpesa"
+          ? "Processing M-Pesa response..."
+          : "Processing payment response..."
+      );
+
       const result = await response.json();
-      
-      logPaymentForm('PAYMENT_SUCCESS', {
+
+      logPaymentForm("PAYMENT_SUCCESS", {
         paymentId: result.payment?.id,
         receiptNumber: result.payment?.receiptNumber,
-        amount: result.payment?.amount
+        amount: result.payment?.amount,
+        paymentMethod: result.payment?.paymentMethod,
       });
-      
+
       // Create receipt data from the API response
       const receiptData: ReceiptData = {
         receiptNumber: result.payment.receiptNumber,
         paymentId: result.payment.id,
         studentId,
         schoolCode,
-        amount: customAmount,
+        amount: amount, // Use the amount prop directly
         paymentMethod: result.payment.paymentMethod,
         feeType,
         term,
         academicYear,
         reference: result.payment.referenceNumber,
-        transactionId: transactionId || undefined,
+        phoneNumber: paymentMethod === "mpesa" ? phoneNumber : undefined,
+        transactionId:
+          paymentMethod === "mpesa"
+            ? result.payment.mpesaTransactionId
+            : transactionId,
         status: "completed",
         issuedAt: new Date(),
         issuedBy: "Parent Portal",
         schoolName: result.payment.schoolName || schoolInfo?.name || "School",
-        studentName: result.payment.studentName || studentInfo?.user?.name || "Student",
+        studentName:
+          result.payment.studentName || studentInfo?.user?.name || "Student",
         currency: "KES",
-        academicYearOutstandingAfter: result.payment.academicYearOutstandingAfter,
+        academicYearOutstandingAfter:
+          result.payment.academicYearOutstandingAfter,
         termOutstandingAfter: result.payment.termOutstandingAfter,
       };
 
       setReceiptData(receiptData);
       setShowReceipt(true);
-      setProgressStage('Payment completed successfully!');
-      
-      logPaymentForm('RECEIPT_CREATED', {
+      setProgressStage(
+        paymentMethod === "mpesa"
+          ? "M-Pesa payment completed successfully!"
+          : "Payment completed successfully!"
+      );
+
+      logPaymentForm("RECEIPT_CREATED", {
         receiptNumber: receiptData.receiptNumber,
-        paymentId: receiptData.paymentId
+        paymentId: receiptData.paymentId,
+        paymentMethod: receiptData.paymentMethod,
       });
-      
+
+      const successMessage =
+        paymentMethod === "mpesa"
+          ? `M-Pesa payment of KES ${amount.toLocaleString()} completed successfully.`
+          : `Payment simulation of KES ${amount.toLocaleString()} completed successfully.`;
+
       toast({
-        title: "Payment Simulation Successful!",
-        description: `Payment simulation of KES ${customAmount.toLocaleString()} completed successfully.`,
+        title:
+          paymentMethod === "mpesa"
+            ? "M-Pesa Payment Successful!"
+            : "Payment Simulation Successful!",
+        description: successMessage,
         variant: "default",
       });
 
       onPaymentSuccess?.(result.payment);
     } catch (error: any) {
-      logPaymentForm('PAYMENT_ERROR', {
-        error: error.message,
-        stack: error.stack
-      }, 'error');
-      
-      setProgressStage('Payment failed');
-      
+      logPaymentForm(
+        "PAYMENT_ERROR",
+        {
+          error: error.message,
+          stack: error.stack,
+          paymentMethod,
+        },
+        "error"
+      );
+
+      setProgressStage(
+        paymentMethod === "mpesa" ? "M-Pesa payment failed" : "Payment failed"
+      );
+
+      const errorMessage =
+        paymentMethod === "mpesa"
+          ? `M-Pesa payment failed: ${error.message}`
+          : `Payment failed: ${error.message}`;
+
       toast({
-        title: "Payment Failed",
-        description: error.message || "Failed to process payment. Please try again.",
+        title:
+          paymentMethod === "mpesa"
+            ? "M-Pesa Payment Failed"
+            : "Payment Failed",
+        description:
+          errorMessage || "Failed to process payment. Please try again.",
         variant: "destructive",
       });
       onPaymentError?.(error.message);
     } finally {
       setIsLoading(false);
       onComplete?.();
-      
+
       // Clear progress stage after a delay
-      setTimeout(() => setProgressStage(''), 3000);
+      setTimeout(() => setProgressStage(""), 3000);
     }
   };
 
   const handleCloseReceipt = () => {
-    logPaymentForm('RECEIPT_CLOSED', { receiptNumber: receiptData?.receiptNumber });
+    logPaymentForm("RECEIPT_CLOSED", {
+      receiptNumber: receiptData?.receiptNumber,
+    });
     setShowReceipt(false);
     setReceiptData(null);
   };
 
   const downloadReceipt = () => {
     if (!receiptData) return;
-    
-    logPaymentForm('RECEIPT_DOWNLOAD', { receiptNumber: receiptData.receiptNumber });
-    
+
+    logPaymentForm("RECEIPT_DOWNLOAD", {
+      receiptNumber: receiptData.receiptNumber,
+    });
+
     // Create receipt content
     const receiptContent = `
 RECEIPT
@@ -363,7 +478,7 @@ Time: ${receiptData.issuedAt.toLocaleTimeString()}
 
 SCHOOL: ${receiptData.schoolName}
 STUDENT: ${receiptData.studentName}
-ADMISSION: ${studentInfo?.admissionNumber || 'N/A'}
+ADMISSION: ${studentInfo?.admissionNumber || "N/A"}
 
 PAYMENT DETAILS:
 Amount: KES ${receiptData.amount.toLocaleString()}
@@ -374,8 +489,12 @@ Academic Year: ${receiptData.academicYear}
 Reference: ${receiptData.reference}
 
 BALANCE AFTER PAYMENT:
-Academic Year Outstanding: KES ${receiptData.academicYearOutstandingAfter?.toLocaleString() || '0'}
-Term Outstanding: KES ${receiptData.termOutstandingAfter?.toLocaleString() || '0'}
+Academic Year Outstanding: KES ${
+      receiptData.academicYearOutstandingAfter?.toLocaleString() || "0"
+    }
+Term Outstanding: KES ${
+      receiptData.termOutstandingAfter?.toLocaleString() || "0"
+    }
 
 Issued by: ${receiptData.issuedBy}
 Status: ${receiptData.status}
@@ -385,9 +504,9 @@ This is a computer-generated receipt.
     `.trim();
 
     // Create and download file
-    const blob = new Blob([receiptContent], { type: 'text/plain' });
+    const blob = new Blob([receiptContent], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
     a.download = `receipt-${receiptData.receiptNumber}.txt`;
     document.body.appendChild(a);
@@ -406,71 +525,42 @@ This is a computer-generated receipt.
         </div>
       )}
 
-      {/* Payment Form */}
+      {/* Payment Summary */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <DollarSign className="h-5 w-5 text-green-600" />
-            <span>Payment Details</span>
+            <span>Payment Summary</span>
           </CardTitle>
           <CardDescription>
-            Complete your fee payment using the payment simulation
+            Review your payment details before proceeding
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Amount Section */}
-          <div className="space-y-2">
-            <Label htmlFor="amount">Payment Amount (KES)</Label>
-            <div className="flex space-x-2">
-              <Input
-                id="amount"
-                type="number"
-                value={customAmount}
-                onChange={(e) => handleAmountChange(e.target.value)}
-                placeholder="Enter amount"
-                className="flex-1"
-                disabled={isLoading}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleFullAmountClick}
-                disabled={isLoading || useFullAmount}
-                className="whitespace-nowrap"
-              >
-                Full Amount
-              </Button>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Outstanding: KES {amount.toLocaleString()} | 
-              Custom: KES {customAmount.toLocaleString()}
-            </p>
-          </div>
-
-          {/* Payment Method */}
-          <div className="space-y-2">
-            <Label>Payment Method</Label>
-            <div className="flex space-x-2">
-              <Button
-                type="button"
-                variant={paymentMethod === "manual" ? "default" : "outline"}
-                onClick={() => setPaymentMethod("manual")}
-                disabled={isLoading}
-                className="flex-1"
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Manual Payment
-              </Button>
-              <Button
-                type="button"
-                variant={paymentMethod === "mpesa" ? "default" : "outline"}
-                onClick={() => setPaymentMethod("mpesa")}
-                disabled={isLoading}
-                className="flex-1"
-              >
-                <Phone className="h-4 w-4 mr-2" />
-                M-Pesa (Disabled)
-              </Button>
+          {/* Payment Summary */}
+          <div className="p-4 bg-gray-50 rounded-lg space-y-3">
+            <h4 className="font-medium text-gray-900">Payment Details</h4>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="text-gray-600">Amount:</div>
+              <div className="font-semibold text-lg">
+                KES {amount.toLocaleString()}
+              </div>
+              <div className="text-gray-600">Method:</div>
+              <div className="font-medium">
+                {paymentMethod === "mpesa" ? "M-Pesa" : "Manual Payment"}
+              </div>
+              <div className="text-gray-600">Fee Type:</div>
+              <div className="font-medium">{feeType}</div>
+              <div className="text-gray-600">Term:</div>
+              <div className="font-medium">{term}</div>
+              <div className="text-gray-600">Academic Year:</div>
+              <div className="font-medium">{academicYear}</div>
+              {paymentMethod === "mpesa" && phoneNumber && (
+                <>
+                  <div className="text-gray-600">Phone Number:</div>
+                  <div className="font-medium">{phoneNumber}</div>
+                </>
+              )}
             </div>
           </div>
 
@@ -486,39 +576,26 @@ This is a computer-generated receipt.
             />
           </div>
 
-          {/* Payment Summary */}
-          <div className="p-4 bg-gray-50 rounded-lg space-y-2">
-            <h4 className="font-medium">Payment Summary</h4>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div>Amount:</div>
-              <div className="font-medium">KES {customAmount.toLocaleString()}</div>
-              <div>Method:</div>
-              <div className="font-medium">{paymentMethod === "manual" ? "Manual Payment" : "M-Pesa"}</div>
-              <div>Fee Type:</div>
-              <div className="font-medium">{feeType}</div>
-              <div>Term:</div>
-              <div className="font-medium">{term}</div>
-              <div>Academic Year:</div>
-              <div className="font-medium">{academicYear}</div>
-            </div>
-          </div>
-
           {/* Submit Button */}
           <Button
             onClick={handlePayment}
-            disabled={isLoading || isProcessing || customAmount <= 0}
+            disabled={isLoading || isProcessing || amount <= 0} // Use the amount prop directly
             className="w-full"
             size="lg"
           >
             {isLoading ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Processing Payment...
+                {paymentMethod === "mpesa"
+                  ? "Processing M-Pesa..."
+                  : "Processing Payment..."}
               </>
             ) : (
               <>
                 <CheckCircle className="h-4 w-4 mr-2" />
-                Process Payment Simulation
+                {paymentMethod === "mpesa"
+                  ? "Pay with M-Pesa"
+                  : "Process Payment"}
               </>
             )}
           </Button>
@@ -528,7 +605,8 @@ This is a computer-generated receipt.
             <div className="flex items-center space-x-2">
               <Sparkles className="h-4 w-4 text-yellow-600" />
               <span className="text-sm text-yellow-800">
-                <strong>Payment Simulation:</strong> This is a test environment. No real money will be charged.
+                <strong>Payment Simulation:</strong> This is a test environment.
+                No real money will be charged.
               </span>
             </div>
           </div>
@@ -542,49 +620,35 @@ This is a computer-generated receipt.
             <div className="p-6 space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold">Payment Receipt</h3>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleCloseReceipt}
-                >
+                <Button variant="ghost" size="sm" onClick={handleCloseReceipt}>
                   ×
                 </Button>
               </div>
-              
+
               <div className="space-y-3 text-sm">
                 <div className="grid grid-cols-2 gap-2">
                   <div className="font-medium">Receipt #:</div>
                   <div>{receiptData.receiptNumber}</div>
                   <div className="font-medium">Amount:</div>
                   <div>KES {receiptData.amount.toLocaleString()}</div>
-                  <div className="font-medium">Date:</div>
-                  <div>{receiptData.issuedAt.toLocaleDateString()}</div>
-                  <div className="font-medium">Time:</div>
-                  <div>{receiptData.issuedAt.toLocaleTimeString()}</div>
-                  <div className="font-medium">Student:</div>
-                  <div>{receiptData.studentName}</div>
-                  <div className="font-medium">School:</div>
-                  <div>{receiptData.schoolName}</div>
-                  <div className="font-medium">Term Outstanding:</div>
-                  <div>KES {receiptData.termOutstandingAfter?.toLocaleString() || '0'}</div>
+                  <div className="font-medium">Method:</div>
+                  <div>{receiptData.paymentMethod}</div>
+                  <div className="font-medium">Status:</div>
+                  <div className="text-green-600 font-medium">
+                    {receiptData.status}
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex space-x-2">
-                <Button
-                  onClick={downloadReceipt}
-                  variant="outline"
-                  className="flex-1"
-                >
-                  <Receipt className="h-4 w-4 mr-2" />
-                  Download
-                </Button>
-                <Button
-                  onClick={handleCloseReceipt}
-                  className="flex-1"
-                >
-                  Close
-                </Button>
+                <div className="pt-3 border-t">
+                  <Button
+                    onClick={downloadReceipt}
+                    className="w-full"
+                    variant="outline"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download Receipt
+                  </Button>
+                </div>
               </div>
             </div>
           </div>

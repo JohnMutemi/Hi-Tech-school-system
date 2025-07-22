@@ -12,19 +12,18 @@ export async function POST(
   try {
     const { schoolCode } = params;
     const body = await request.json();
-    const { studentIds, currentYear, promotedBy } = body;
+    const { students, promotedBy, ineligibleStudents = [] } = body;
 
     // Validate required fields
-    if (!studentIds || !Array.isArray(studentIds) || studentIds.length === 0) {
+    if (!students || !Array.isArray(students) || students.length === 0) {
       return NextResponse.json(
-        { error: 'Student IDs array is required' },
+        { error: 'Students array is required' },
         { status: 400 }
       );
     }
-
-    if (!currentYear || !promotedBy) {
+    if (!promotedBy) {
       return NextResponse.json(
-        { error: 'Current year and promoted by user ID are required' },
+        { error: 'Promoted by user ID is required' },
         { status: 400 }
       );
     }
@@ -42,18 +41,80 @@ export async function POST(
     }
 
     // Execute bulk promotion
-    const result = await PromotionService.executeBulkPromotion(
+    const result = await PromotionService.bulkPromoteStudents(
       school.id,
-      currentYear,
-      studentIds,
+      students,
       promotedBy
     );
 
-    if (result.success) {
-      return NextResponse.json(result, { status: 200 });
-    } else {
-      return NextResponse.json(result, { status: 400 });
+    // Save student arrears for the previous academic year
+    const currentYear = new Date().getFullYear();
+    const previousAcademicYear = await prisma.academicYear.findFirst({
+      where: { schoolId: school.id, name: currentYear.toString() }
+    });
+    if (previousAcademicYear) {
+      // Combine students and ineligibleStudents, dedupe by studentId
+      const allStudents = [...students, ...ineligibleStudents].filter((s, idx, arr) =>
+        arr.findIndex(stu => stu.studentId === s.studentId) === idx
+      );
+      for (const s of allStudents) {
+        // Log before creating StudentArrear
+        console.log('Creating StudentArrear for student:', s.studentId, 'with arrearAmount:', s.outstandingBalance);
+        await prisma.studentArrear.create({
+          data: {
+            studentId: s.studentId,
+            schoolId: school.id,
+            academicYearId: previousAcademicYear.id,
+            arrearAmount: s.outstandingBalance ?? 0,
+            // dateRecorded: default,
+            notes: 'Carried forward after promotion',
+          }
+        });
+      }
     }
+
+    // Set the new academic year and term as active
+    const newAcademicYearName = (currentYear + 1).toString();
+    // Find or create the new academic year
+    let newAcademicYear = await prisma.academicYear.findFirst({
+      where: { schoolId: school.id, name: newAcademicYearName }
+    });
+    if (!newAcademicYear) {
+      newAcademicYear = await prisma.academicYear.create({
+        data: {
+          schoolId: school.id,
+          name: newAcademicYearName,
+          startDate: new Date(currentYear + 1, 0, 1),
+          endDate: new Date(currentYear + 1, 11, 31),
+          isCurrent: false
+        }
+      });
+    }
+    // Set all years to not current, then set the new one as current
+    await prisma.academicYear.updateMany({
+      where: { schoolId: school.id },
+      data: { isCurrent: false }
+    });
+    await prisma.academicYear.update({
+      where: { id: newAcademicYear.id },
+      data: { isCurrent: true }
+    });
+    // Set the new term as current (assume 'Term 1')
+    let newTerm = await prisma.term.findFirst({
+      where: { academicYearId: newAcademicYear.id, name: 'Term 1' }
+    });
+    if (newTerm) {
+      await prisma.term.updateMany({
+        where: { academicYearId: newAcademicYear.id },
+        data: { isCurrent: false }
+      });
+      await prisma.term.update({
+        where: { id: newTerm.id },
+        data: { isCurrent: true }
+      });
+    }
+
+    return NextResponse.json(result, { status: 200 });
 
   } catch (error: any) {
     console.error('Bulk promotion error:', error);
