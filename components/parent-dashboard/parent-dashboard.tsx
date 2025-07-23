@@ -317,24 +317,16 @@ export function ParentDashboard({
             studentsCount: data.students?.length,
           });
           setParent(data.parent);
-          setStudents(data.students);
-
-        const res = await fetch(`/api/schools/${schoolCode}/parents/session`);
-        if (!res.ok) {
-          throw new Error("Not authenticated");
+          setStudents(data.students || []);
+          setSchoolName(data.schoolName || "");
+          if (data.students && data.students.length > 0) {
+            setFocusedChildId(data.students[0].id);
+          }
+          setIsLoading(false);
+        } catch (error) {
+          console.error("Session fetch error:", error);
+          router.push(`/schools/${schoolCode}/parent/login`);
         }
-        const data = await res.json();
-        setParent(data.parent);
-        setStudents(data.students || []);
-        setSchoolName(data.schoolName || "");
-        if (data.students && data.students.length > 0) {
-          setFocusedChildId(data.students[0].id);
-        }
-        setIsLoading(false);
-      } catch (error) {
-        console.error("Session fetch error:", error);
-        router.push(`/schools/${schoolCode}/parent/login`);
-      }
     }
     fetchSession();
   }, [schoolCode, router]);

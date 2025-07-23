@@ -2903,222 +2903,8 @@ export function SchoolSetupDashboard({
                                   <Badge
                                     variant={
                                       teacher.status === "active"
-=======
-                  </DialogContent>
-                </Dialog>
-              </TabsContent>
-
-              {/* Students Tab */}
-              <TabsContent value="students" className="space-y-8 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl shadow-lg p-6">
-                {viewMode.students === "form" ? (
-                  <StudentForm
-                    onSave={updateStudent}
-                    onCancel={() =>
-                      setViewMode((prev) => ({ ...prev, students: "list" }))
-                    }
-                  />
-                ) : editingItem ? (
-                  <StudentForm
-                    student={editingItem}
-                    onSave={updateStudent}
-                    onCancel={() => {
-                      setEditingItem(null);
-                      setViewMode((prev) => ({ ...prev, students: "list" }));
-                    }}
-                  />
-                ) : (
-                  <Card className="bg-white/70 backdrop-blur-lg rounded-2xl shadow-xl border-0 px-2 py-2 md:px-8 md:py-6">
-                    <CardHeader className="px-2 py-2 md:px-6 md:py-4">
-                      <CardTitle className="flex items-center justify-between text-base md:text-lg">
-                        <span>Students ({students.length})</span>
-                        <div className="flex gap-2">
-                          <Button
-                            onClick={() => setShowBulkImportDialog(true)}
-                            variant="outline"
-                            className="w-full md:w-auto py-3 md:py-2 text-base md:text-sm rounded-xl md:rounded-lg"
-                          >
-                            <Upload className="w-4 h-4 mr-2" />
-                            Import CSV/Excel
-                          </Button>
-                          <Button
-                            onClick={() =>
-                              setViewMode((prev) => ({ ...prev, students: "form" }))
-                            }
-                            style={{ backgroundColor: schoolData.colorTheme }}
-                            className="w-full md:w-auto py-3 md:py-2 text-base md:text-sm rounded-xl md:rounded-lg"
-                          >
-                            <Plus className="w-4 h-4 mr-2" />
-                            Add Student
-                          </Button>
-                        </div>
-                      </CardTitle>
-                      <CardDescription>
-                        Manage your school's student records
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-4">
-                        <Input
-                          type="text"
-                          placeholder="Search students..."
-                          value={studentSearch}
-                          onChange={(e) => setStudentSearch(e.target.value)}
-                          className="md:w-1/3"
-                        />
-                        <Select
-                          value={studentClassFilter}
-                          onValueChange={setStudentClassFilter}
-                        >
-                          <SelectTrigger className="md:w-48">
-                            <SelectValue placeholder="Filter by class" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {classOptions.map((cls) => (
-                              <SelectItem key={cls} value={cls}>
-                                {cls}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      {filteredStudents.length === 0 ? (
-                        <div className="text-center py-8">
-                          <GraduationCap className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                          <p className="text-gray-600">
-                            No students found. Try adjusting your search or filter.
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="overflow-x-auto">
-                          <Table className="hidden md:table">
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Name</TableHead>
-                                <TableHead>Admission No.</TableHead>
-                                <TableHead>Class</TableHead>
-                                <TableHead>Grade</TableHead>
-                                <TableHead>Parent Name</TableHead>
-                                <TableHead>Parent Phone</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead>Actions</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {filteredStudents.map((student) => (
-                                <TableRow
-                                  key={student.id}
-                                  className="hover:bg-blue-50/30 transition-colors duration-200"
-                                >
-                                  <TableCell className="font-medium">
-                                    {student.name}
-                                  </TableCell>
-                                  <TableCell>{student.admissionNumber}</TableCell>
-                                  <TableCell className="whitespace-nowrap">
-                                    {student.className || (
-                                      <span className="text-red-500">Missing</span>
-                                    )}
-                                  </TableCell>
-                                  <TableCell className="whitespace-nowrap">
-                                    {student.gradeName || (
-                                      <span className="text-red-500">Missing</span>
-                                    )}
-                                  </TableCell>
-                                  <TableCell>
-                                    {student.parentName || "N/A"}
-                                  </TableCell>
-                                  <TableCell className="whitespace-nowrap">
-                                    {student.parentPhone || "N/A"}
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge
-                                      variant={
-                                        student.status === "active"
-                                          ? "default"
-                                          : "secondary"
-                                      }
-                                    >
-                                      {student.status}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell>
-                                    <div className="flex space-x-2">
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => setViewingItem(student)}
-                                        className="hover:bg-blue-100 active:scale-95"
-                                      >
-                                        View Details
-                                      </Button>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => setEditingItem(student)}
-                                        className="hover:bg-green-100 active:scale-95"
-                                      >
-                                        <Edit className="w-4 h-4" />
-                                      </Button>
-                                      <AlertDialog>
-                                        <AlertDialogTrigger asChild>
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="text-red-600 hover:bg-red-100 active:scale-95"
-                                          >
-                                            <Trash2 className="w-4 h-4" />
-                                          </Button>
-                                        </AlertDialogTrigger>
-                                        <AlertDialogContent>
-                                          <AlertDialogHeader>
-                                            <AlertDialogTitle>
-                                              Delete Student
-                                            </AlertDialogTitle>
-                                            <AlertDialogDescription>
-                                              Are you sure you want to delete{" "}
-                                              {student.name}? This action cannot be
-                                              undone.
-                                            </AlertDialogDescription>
-                                          </AlertDialogHeader>
-                                          <AlertDialogFooter>
-                                            <AlertDialogCancel>
-                                              Cancel
-                                            </AlertDialogCancel>
-                                            <AlertDialogAction
-                                              onClick={() =>
-                                                deleteStudent(student.id)
-                                              }
-                                            >
-                                              Delete
-                                            </AlertDialogAction>
-                                          </AlertDialogFooter>
-                                        </AlertDialogContent>
-                                      </AlertDialog>
-                                    </div>
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                          {/* Mobile Card List */}
-                          <div className="md:hidden space-y-4">
-                            {filteredStudents.map((student) => (
-                              <div
-                                key={student.id}
-                                className="bg-white/90 rounded-xl shadow-md p-4 flex flex-col gap-2 border border-gray-100"
-                              >
-                                <div className="flex items-center justify-between">
-                                  <div className="font-bold text-lg text-gray-800">
-                                    {student.name}
-                                  </div>
-                                  <Badge
-                                    variant={
-                                      student.status === "active"
-
-                                        ? "default"
-                                        : "secondary"
                                     }
                                   >
-
                                     {teacher.status}
                                   </Badge>
                                 </TableCell>
@@ -3444,7 +3230,7 @@ export function SchoolSetupDashboard({
           </TabsContent>
 
           {/* Students Tab */}
-          <TabsContent value="students" className="space-y-6">
+          <TabsContent value="students" className="space-y-8 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl shadow-lg p-6">
             {viewMode.students === "form" ? (
               <StudentForm
                 onSave={updateStudent}
@@ -3577,33 +3363,19 @@ export function SchoolSetupDashboard({
                               </TableCell>
                               <TableCell>
                                 <div className="flex space-x-2">
-
-                                    {student.status}
-                                  </Badge>
-                                </div>
-                                <div className="flex flex-wrap gap-2 text-xs text-gray-600">
-                                  <span>Adm: {student.admissionNumber}</span>
-                                  <span>Class: {student.className || "N/A"}</span>
-                                </div>
-                                <div className="flex flex-wrap gap-2 text-xs text-gray-600">
-                                  <span>Parent: {student.parentName || "N/A"}</span>
-                                  <span>Phone: {student.parentPhone || "N/A"}</span>
-                                </div>
-                                <div className="flex gap-2 pt-2">
-
                                   <Button
                                     variant="outline"
                                     size="sm"
                                     onClick={() => setViewingItem(student)}
-                                    className="flex-1 active:scale-95"
+                                    className="hover:bg-blue-100 active:scale-95"
                                   >
-                                    View
+                                    View Details
                                   </Button>
                                   <Button
                                     variant="outline"
                                     size="sm"
                                     onClick={() => setEditingItem(student)}
-                                    className="flex-1 active:scale-95"
+                                    className="hover:bg-green-100 active:scale-95"
                                   >
                                     <Edit className="w-4 h-4" />
                                   </Button>
@@ -3612,12 +3384,12 @@ export function SchoolSetupDashboard({
                                       <Button
                                         variant="outline"
                                         size="sm"
-                                        className="flex-1 text-red-600 active:scale-95"
+                                        className="text-red-600 hover:bg-red-100 active:scale-95"
                                       >
                                         <Trash2 className="w-4 h-4" />
                                       </Button>
                                     </AlertDialogTrigger>
-                                    <AlertDialogContent className="max-w-full px-2">
+                                    <AlertDialogContent>
                                       <AlertDialogHeader>
                                         <AlertDialogTitle>
                                           Delete Student
@@ -3633,7 +3405,9 @@ export function SchoolSetupDashboard({
                                           Cancel
                                         </AlertDialogCancel>
                                         <AlertDialogAction
-                                          onClick={() => deleteStudent(student.id)}
+                                          onClick={() =>
+                                            deleteStudent(student.id)
+                                          }
                                         >
                                           Delete
                                         </AlertDialogAction>
@@ -3641,407 +3415,50 @@ export function SchoolSetupDashboard({
                                     </AlertDialogContent>
                                   </AlertDialog>
                                 </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                      {/* Mobile Card List */}
+                      <div className="md:hidden space-y-4">
+                        {filteredStudents.map((student) => (
+                          <div
+                            key={student.id}
+                            className="bg-white/90 rounded-xl shadow-md p-4 flex flex-col gap-2 border border-gray-100"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="font-bold text-lg text-gray-800">
+                                {student.name}
                               </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                )}
-                {/* Student View Dialog - make full width and mobile friendly */}
-                <Dialog
-                  open={!!viewingItem && activeTab === "students"}
-                  onOpenChange={() => setViewingItem(null)}
-                >
-                  <DialogContent className="max-w-full md:max-w-4xl px-2 py-4 rounded-2xl">
-                    <DialogHeader>
-                      <DialogTitle className="text-lg md:text-2xl">
-                        Student Details
-                      </DialogTitle>
-                      <DialogDescription>
-                        Complete information for {viewingItem?.name}
-                      </DialogDescription>
-                    </DialogHeader>
-                    {viewingItem && (
-                      <div className="space-y-4 text-base md:text-sm">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div>
-                            <Label className="text-xs font-medium text-gray-600">
-                              Full Name
-                            </Label>
-                            <p className="text-gray-800">{viewingItem.name}</p>
-                          </div>
-                          <div>
-                            <Label className="text-xs font-medium text-gray-600">
-                              Admission Number
-                            </Label>
-                            <p className="text-gray-800">
-                              {viewingItem.admissionNumber}
-                            </p>
-                          </div>
-                          <div>
-                            <Label className="text-xs font-medium text-gray-600">
-                              Class
-                            </Label>
-                            <p className="text-gray-800">
-                              {viewingItem.classId || "N/A"}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div>
-                            <Label className="text-xs font-medium text-gray-600">
-                              Date of Birth
-                            </Label>
-                            <p className="text-gray-800">
-                              {viewingItem.dateOfBirth}
-                            </p>
-                          </div>
-                          <div>
-                            <Label className="text-xs font-medium text-gray-600">
-                              Gender
-                            </Label>
-                            <p className="text-gray-800">{viewingItem.gender}</p>
-                          </div>
-                          <div>
-                            <Label className="text-xs font-medium text-gray-600">
-                              Date Admitted
-                            </Label>
-                            <p className="text-gray-800">
-                              {viewingItem.dateAdmitted}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <Label className="text-xs font-medium text-gray-600">
-                              Student Email
-                            </Label>
-                            <p className="text-gray-800">
-                              {viewingItem.email || "Not provided"}
-                            </p>
-                          </div>
-                          <div>
-                            <Label className="text-xs font-medium text-gray-600">
-                              Student Phone
-                            </Label>
-                            <p className="text-gray-800">
-                              {viewingItem.phone || "Not provided"}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div>
-                            <Label className="text-xs font-medium text-gray-600">
-                              Parent Name
-                            </Label>
-                            <p className="text-gray-800">
-                              {viewingItem.parentName || "N/A"}
-                            </p>
-                          </div>
-                          <div>
-                            <Label className="text-xs font-medium text-gray-600">
-                              Parent Phone
-                            </Label>
-                            <p className="text-gray-800">
-                              {viewingItem.parentPhone || "N/A"}
-                            </p>
-                          </div>
-                          <div>
-                            <Label className="text-xs font-medium text-gray-600">
-                              Parent Email
-                            </Label>
-                            <p className="text-gray-800">
-                              {viewingItem.parentEmail || "Not provided"}
-                            </p>
-                          </div>
-                        </div>
-                        {viewingItem.parent && (
-                          <div className="space-y-2 mt-4">
-                            <div className="font-bold">
-                              Parent Login Credentials
-                            </div>
-                            <div>
-                              <strong>Email:</strong> {viewingItem.parent.email}
-                            </div>
-                            <div>
-                              <strong>Temporary Password:</strong>{" "}
-                              {viewingItem.parent.tempPassword || "N/A"}
-                            </div>
-                          </div>
-                        )}
-                        <div>
-                          <Label className="text-xs font-medium text-gray-600">
-                            Home Address
-                          </Label>
-                          <p className="text-gray-800">
-                            {viewingItem.address || "Not provided"}
-                          </p>
-                        </div>
-                        <div>
-                          <Label className="text-xs font-medium text-gray-600">
-                            Status
-                          </Label>
-                          <Badge
-                            variant={
-                              viewingItem.status === "active"
-                                ? "default"
-                                : "secondary"
-                            }
-                          >
-                            {viewingItem.status}
-                          </Badge>
-                        </div>
-                        <div className="pt-4 flex flex-col items-center">
-                          <a
-                            href={`/schools/${schoolData.schoolCode}/parent/login`}
-                            className="w-full md:w-auto px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition text-center"
-                          >
-                            Go to Parent Login
-                          </a>
-                        </div>
-                      </div>
-                    )}
-                  </DialogContent>
-                </Dialog>
-              </TabsContent>
+                              <Badge
+                                variant={
+                                  student.status === "active"
 
-              {/* Subjects & Classes Tab */}
-              <TabsContent value="subjects" className="space-y-8 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl shadow-lg p-6">
-                <div className="grid md:grid-cols-2 gap-6">
-                  {/* Subjects Section */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center justify-between">
-                        Subjects ({subjects.length})
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button
-                              size="sm"
-                              style={{ backgroundColor: schoolData.colorTheme }}
-                            >
-                              <Plus className="w-4 h-4 mr-2" />
-                              Add Subject
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Add New Subject</DialogTitle>
-                              <DialogDescription>
-                                Create a new subject for your school
-                              </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4">
-                              <div className="space-y-2">
-                                <Label>Subject Name *</Label>
-                                <Input
-                                  value={newSubject.name || ""}
-                                  onChange={(e) =>
-                                    setNewSubject({
-                                      ...newSubject,
-                                      name: e.target.value,
-                                    })
-                                  }
-                                  placeholder="e.g., Mathematics"
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label>Subject Code *</Label>
-                                <Input
-                                  value={newSubject.code || ""}
-                                  onChange={(e) =>
-                                    setNewSubject({
-                                      ...newSubject,
-                                      code: e.target.value,
-                                    })
-                                  }
-                                  placeholder="e.g., MATH101"
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label>Assigned Teacher</Label>
-                                <Select
-                                  value={newSubject.teacherId || ""}
-                                  onValueChange={(value) =>
-                                    setNewSubject({
-                                      ...newSubject,
-                                      teacherId: value,
-                                    })
-                                  }
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Select teacher" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {teachers.map((teacher) => (
-                                      <SelectItem
-                                        key={teacher.id}
-                                        value={teacher.id}
-                                      >
-                                        {teacher.name}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <div className="space-y-2">
-                                <Label>Description</Label>
-                                <Textarea
-                                  value={newSubject.description || ""}
-                                  onChange={(e) =>
-                                    setNewSubject({
-                                      ...newSubject,
-                                      description: e.target.value,
-                                    })
-                                  }
-                                  placeholder="Brief description of the subject"
-                                  rows={2}
-                                />
-                              </div>
-                              <Button
-                                onClick={createSubject}
-                                className="w-full"
-                                style={{ backgroundColor: schoolData.colorTheme }}
+                                    ? "default"
+                                    : "secondary"
+                                }
                               >
-                                Add Subject
-                              </Button>
-                            </div>
-                          </DialogContent>
-                        </Dialog>
-                      </CardTitle>
-                      <CardDescription>
-                        Configure subjects taught in your school
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {subjects.length === 0 ? (
-                        <div className="text-center py-8">
-                          <BookOpen className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                          <p className="text-gray-600">No subjects added yet.</p>
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          {subjects.map((subject) => (
-                            <div
-                              key={subject.id}
-                              className="flex items-center justify-between p-3 border rounded-lg"
-                            >
-                              <div>
-                                <h5 className="font-medium">{subject.name}</h5>
-                                <p className="text-sm text-gray-600">
-                                  {subject.code}
-                                </p>
-                                {subject.teacherId && (
-                                  <p className="text-xs text-gray-500">
-                                    Teacher:{" "}
-                                    {
-                                      teachers.find(
-                                        (t) => t.id === subject.teacherId
-                                      )?.name
-                                    }
-                                  </p>
-                                )}
-                              </div>
+
+                                {teacher.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
                               <div className="flex space-x-2">
-                                <Dialog>
-                                  <DialogTrigger asChild>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => setEditingItem(subject)}
-                                    >
-                                      <Edit className="w-4 h-4" />
-                                    </Button>
-                                  </DialogTrigger>
-                                  <DialogContent>
-                                    <DialogHeader>
-                                      <DialogTitle>Edit Subject</DialogTitle>
-                                      <DialogDescription>
-                                        Update subject information
-                                      </DialogDescription>
-                                    </DialogHeader>
-                                    {editingItem && (
-                                      <div className="space-y-4">
-                                        <div className="space-y-2">
-                                          <Label>Subject Name *</Label>
-                                          <Input
-                                            value={editingItem.name || ""}
-                                            onChange={(e) =>
-                                              setEditingItem({
-                                                ...editingItem,
-                                                name: e.target.value,
-                                              })
-                                            }
-                                            placeholder="e.g., Mathematics"
-                                          />
-                                        </div>
-                                        <div className="space-y-2">
-                                          <Label>Subject Code *</Label>
-                                          <Input
-                                            value={editingItem.code || ""}
-                                            onChange={(e) =>
-                                              setEditingItem({
-                                                ...editingItem,
-                                                code: e.target.value,
-                                              })
-                                            }
-                                            placeholder="e.g., MATH101"
-                                          />
-                                        </div>
-                                        <div className="space-y-2">
-                                          <Label>Assigned Teacher</Label>
-                                          <Select
-                                            value={editingItem.teacherId || ""}
-                                            onValueChange={(value) =>
-                                              setEditingItem({
-                                                ...editingItem,
-                                                teacherId: value,
-                                              })
-                                            }
-                                          >
-                                            <SelectTrigger>
-                                              <SelectValue placeholder="Select teacher" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                              {teachers.map((teacher) => (
-                                                <SelectItem
-                                                  key={teacher.id}
-                                                  value={teacher.id}
-                                                >
-                                                  {teacher.name}
-                                                </SelectItem>
-                                              ))}
-                                            </SelectContent>
-                                          </Select>
-                                        </div>
-                                        <div className="space-y-2">
-                                          <Label>Description</Label>
-                                          <Textarea
-                                            value={editingItem.description || ""}
-                                            onChange={(e) =>
-                                              setEditingItem({
-                                                ...editingItem,
-                                                description: e.target.value,
-                                              })
-                                            }
-                                            placeholder="Brief description of the subject"
-                                            rows={2}
-                                          />
-                                        </div>
-                                        <Button
-                                          onClick={() => updateSubject(editingItem)}
-                                          className="w-full"
-                                          style={{
-                                            backgroundColor: schoolData.colorTheme,
-                                          }}
-                                        >
-                                          Update Subject
-                                        </Button>
-                                      </div>
-                                    )}
-                                  </DialogContent>
-                                </Dialog>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setViewingItem(teacher)}
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setEditingItem(teacher)}
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
                                 <AlertDialog>
                                   <AlertDialogTrigger asChild>
                                     <Button
@@ -4055,18 +3472,22 @@ export function SchoolSetupDashboard({
                                   <AlertDialogContent>
                                     <AlertDialogHeader>
                                       <AlertDialogTitle>
-                                        Delete Subject
+                                        Delete Teacher
                                       </AlertDialogTitle>
                                       <AlertDialogDescription>
                                         Are you sure you want to delete{" "}
-                                        {subject.name}? This action cannot be
+                                        {teacher.name}? This action cannot be
                                         undone.
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
-                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogCancel>
+                                        Cancel
+                                      </AlertDialogCancel>
                                       <AlertDialogAction
-                                        onClick={() => deleteSubject(subject.id)}
+                                        onClick={() =>
+                                          deleteTeacher(teacher.id)
+                                        }
                                       >
                                         Delete
                                       </AlertDialogAction>
@@ -4074,64 +3495,498 @@ export function SchoolSetupDashboard({
                                   </AlertDialogContent>
                                 </AlertDialog>
                               </div>
-                            </div>
-                          ))}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+            {/* Student View Dialog - make full width and mobile friendly */}
+            <Dialog
+              open={!!viewingItem && activeTab === "students"}
+              onOpenChange={() => setViewingItem(null)}
+            >
+              <DialogContent className="max-w-full md:max-w-4xl px-2 py-4 rounded-2xl">
+                <DialogHeader>
+                  <DialogTitle className="text-lg md:text-2xl">
+                    Student Details
+                  </DialogTitle>
+                  <DialogDescription>
+                    Complete information for {viewingItem?.name}
+                  </DialogDescription>
+                </DialogHeader>
+                {viewingItem && (
+                  <div className="space-y-4 text-base md:text-sm">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <Label className="text-xs font-medium text-gray-600">
+                          Full Name
+                        </Label>
+                        <p className="text-gray-800">{viewingItem.name}</p>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-medium text-gray-600">
+                          Admission Number
+                        </Label>
+                        <p className="text-gray-800">
+                          {viewingItem.admissionNumber}
+                        </p>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-medium text-gray-600">
+                          Class
+                        </Label>
+                        <p className="text-gray-800">
+                          {viewingItem.classId || "N/A"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <Label className="text-xs font-medium text-gray-600">
+                          Date of Birth
+                        </Label>
+                        <p className="text-gray-800">
+                          {viewingItem.dateOfBirth}
+                        </p>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-medium text-gray-600">
+                          Gender
+                        </Label>
+                        <p className="text-gray-800">{viewingItem.gender}</p>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-medium text-gray-600">
+                          Date Admitted
+                        </Label>
+                        <p className="text-gray-800">
+                          {viewingItem.dateAdmitted}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-xs font-medium text-gray-600">
+                          Student Email
+                        </Label>
+                        <p className="text-gray-800">
+                          {viewingItem.email || "Not provided"}
+                        </p>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-medium text-gray-600">
+                          Student Phone
+                        </Label>
+                        <p className="text-gray-800">
+                          {viewingItem.phone || "Not provided"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <Label className="text-xs font-medium text-gray-600">
+                          Parent Name
+                        </Label>
+                        <p className="text-gray-800">
+                          {viewingItem.parentName || "N/A"}
+                        </p>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-medium text-gray-600">
+                          Parent Phone
+                        </Label>
+                        <p className="text-gray-800">
+                          {viewingItem.parentPhone || "N/A"}
+                        </p>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-medium text-gray-600">
+                          Parent Email
+                        </Label>
+                        <p className="text-gray-800">
+                          {viewingItem.parentEmail || "Not provided"}
+                        </p>
+                      </div>
+                    </div>
+                    {viewingItem.parent && (
+                      <div className="space-y-2 mt-4">
+                        <div className="font-bold">
+                          Parent Login Credentials
                         </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                        <div>
+                          <strong>Email:</strong> {viewingItem.parent.email}
+                        </div>
+                        <div>
+                          <strong>Temporary Password:</strong>{" "}
+                          {viewingItem.parent.tempPassword || "N/A"}
+                        </div>
+                      </div>
+                    )}
+                    <div>
+                      <Label className="text-xs font-medium text-gray-600">
+                        Home Address
+                      </Label>
+                      <p className="text-gray-800">
+                        {viewingItem.address || "Not provided"}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="text-xs font-medium text-gray-600">
+                        Status
+                      </Label>
+                      <Badge
+                        variant={
+                          viewingItem.status === "active"
+                            ? "default"
+                            : "secondary"
+                        }
+                      >
+                        {viewingItem.status}
+                      </Badge>
+                    </div>
+                    <div className="pt-4 flex flex-col items-center">
+                      <a
+                        href={`/schools/${schoolData.schoolCode}/parent/login`}
+                        className="w-full md:w-auto px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition text-center"
+                      >
+                        Go to Parent Login
+                      </a>
+                    </div>
+                  </div>
+                )}
+              </DialogContent>
+            </Dialog>
+          </TabsContent>
 
-                  {/* Classes Section */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center justify-between">
-                        Classes ({classes.length})
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button
-                              size="sm"
-                              style={{ backgroundColor: schoolData.colorTheme }}
-                              onClick={() =>
-                                setNewClass({
-                                  ...newClass,
-                                  academicYear: new Date().getFullYear().toString(),
+          {/* Subjects & Classes Tab */}
+          <TabsContent value="subjects" className="space-y-8 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl shadow-lg p-6">
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Subjects Section */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    Subjects ({subjects.length})
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button
+                          size="sm"
+                          style={{ backgroundColor: schoolData.colorTheme }}
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add Subject
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Add New Subject</DialogTitle>
+                          <DialogDescription>
+                            Create a new subject for your school
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label>Subject Name *</Label>
+                            <Input
+                              value={newSubject.name || ""}
+                              onChange={(e) =>
+                                setNewSubject({
+                                  ...newSubject,
+                                  name: e.target.value,
+                                })
+                              }
+                              placeholder="e.g., Mathematics"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Subject Code *</Label>
+                            <Input
+                              value={newSubject.code || ""}
+                              onChange={(e) =>
+                                setNewSubject({
+                                  ...newSubject,
+                                  code: e.target.value,
+                                })
+                              }
+                              placeholder="e.g., MATH101"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Assigned Teacher</Label>
+                            <Select
+                              value={newSubject.teacherId || ""}
+                              onValueChange={(value) =>
+                                setNewSubject({
+                                  ...newSubject,
+                                  teacherId: value,
                                 })
                               }
                             >
-                              <Plus className="w-4 h-4 mr-2" />
-                              Add Class
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Add New Class</DialogTitle>
-                              <DialogDescription>
-                                Create a new class for your school
-                              </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4">
-                              <div className="space-y-2">
-                                <Label>Class Name *</Label>
-                                <Input
-                                  value={newClass.name || ""}
-                                  onChange={(e) =>
-                                    setNewClass({
-                                      ...newClass,
-                                      name: e.target.value,
-                                    })
-                                  }
-                                  placeholder="e.g., Grade 5A"
-                                />
-                              </div>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select teacher" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {teachers.map((teacher) => (
+                                  <SelectItem
+                                    key={teacher.id}
+                                    value={teacher.id}
+                                  >
+                                    {teacher.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Description</Label>
+                            <Textarea
+                              value={newSubject.description || ""}
+                              onChange={(e) =>
+                                setNewSubject({
+                                  ...newSubject,
+                                  description: e.target.value,
+                                })
+                              }
+                              placeholder="Brief description of the subject"
+                              rows={2}
+                            />
+                          </div>
+                          <Button
+                            onClick={createSubject}
+                            className="w-full"
+                            style={{ backgroundColor: schoolData.colorTheme }}
+                          >
+                            Add Subject
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </CardTitle>
+                  <CardDescription>
+                    Configure subjects taught in your school
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {subjects.length === 0 ? (
+                    <div className="text-center py-8">
+                      <BookOpen className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-600">No subjects added yet.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {subjects.map((subject) => (
+                        <div
+                          key={subject.id}
+                          className="flex items-center justify-between p-3 border rounded-lg"
+                        >
+                          <div>
+                            <h5 className="font-medium">{subject.name}</h5>
+                            <p className="text-sm text-gray-600">
+                              {subject.code}
+                            </p>
+                            {subject.teacherId && (
+                              <p className="text-xs text-gray-500">
+                                Teacher:{" "}
+                                {
+                                  teachers.find(
+                                    (t) => t.id === subject.teacherId
+                                  )?.name
+                                }
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex space-x-2">
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setEditingItem(subject)}
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent>
+                                <DialogHeader>
+                                  <DialogTitle>Edit Subject</DialogTitle>
+                                  <DialogDescription>
+                                    Update subject information
+                                  </DialogDescription>
+                                </DialogHeader>
+                                {editingItem && (
+                                  <div className="space-y-4">
+                                    <div className="space-y-2">
+                                      <Label>Subject Name *</Label>
+                                      <Input
+                                        value={editingItem.name || ""}
+                                        onChange={(e) =>
+                                          setEditingItem({
+                                            ...editingItem,
+                                            name: e.target.value,
+                                          })
+                                        }
+                                        placeholder="e.g., Mathematics"
+                                      />
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label>Subject Code *</Label>
+                                      <Input
+                                        value={editingItem.code || ""}
+                                        onChange={(e) =>
+                                          setEditingItem({
+                                            ...editingItem,
+                                            code: e.target.value,
+                                          })
+                                        }
+                                        placeholder="e.g., MATH101"
+                                      />
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label>Assigned Teacher</Label>
+                                      <Select
+                                        value={editingItem.teacherId || ""}
+                                        onValueChange={(value) =>
+                                          setEditingItem({
+                                            ...editingItem,
+                                            teacherId: value,
+                                          })
+                                        }
+                                      >
+                                        <SelectTrigger>
+                                          <SelectValue placeholder="Select teacher" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {teachers.map((teacher) => (
+                                            <SelectItem
+                                              key={teacher.id}
+                                              value={teacher.id}
+                                            >
+                                              {teacher.name}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label>Description</Label>
+                                      <Textarea
+                                        value={editingItem.description || ""}
+                                        onChange={(e) =>
+                                          setEditingItem({
+                                            ...editingItem,
+                                            description: e.target.value,
+                                          })
+                                        }
+                                        placeholder="Brief description of the subject"
+                                        rows={2}
+                                      />
+                                    </div>
+                                    <Button
+                                      onClick={() => updateSubject(editingItem)}
+                                      className="w-full"
+                                      style={{
+                                        backgroundColor: schoolData.colorTheme,
+                                      }}
+                                    >
+                                      Update Subject
+                                    </Button>
+                                  </div>
+                                )}
+                              </DialogContent>
+                            </Dialog>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-red-600"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>
+                                    Delete Subject
+                                  </AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete{" "}
+                                    {subject.name}? This action cannot be
+                                    undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => deleteSubject(subject.id)}
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
 
-                     <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="class-grade" className="text-right">
-                          Grade/Level
-                          </Label>
-                          <Select  
-                          value={newClass.gradeId}
-                          onValueChange={(value) =>
-                             setNewClass({ ...newClass, gradeId: value })
+              {/* Classes Section */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    Classes ({classes.length})
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button
+                          size="sm"
+                          style={{ backgroundColor: schoolData.colorTheme }}
+                          onClick={() =>
+                            setNewClass({
+                              ...newClass,
+                              academicYear: new Date().getFullYear().toString(),
+                            })
+                          }
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add Class
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Add New Class</DialogTitle>
+                          <DialogDescription>
+                            Create a new class for your school
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label>Class Name *</Label>
+                            <Input
+                              value={newClass.name || ""}
+                              onChange={(e) =>
+                                setNewClass({
+                                  ...newClass,
+                                  name: e.target.value,
+                                })
+                              }
+                              placeholder="e.g., Grade 5A"
+                            />
+                          </div>
+
+                   <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="class-grade" className="text-right">
+                        Grade/Level
+                        </Label>
+                        <Select  
+                        value={newClass.gradeId}
+                        onValueChange={(value) =>
+                           setNewClass({ ...newClass, gradeId: value })
     }
   >
     <SelectTrigger className="col-span-3">
