@@ -219,10 +219,7 @@ export function ParentDashboard({
     { label: "Settings", icon: Key, section: "settings" },
   ];
 
-  const [studentFeeSummaries, setStudentFeeSummaries] = useState<any>({});
-
-  const [studentFeeData, setStudentFeeData] = useState<any>({});
-
+  const [schoolName, setSchoolName] = useState("");
 
   // Add state for current academic year and term
   const [currentAcademicYear, setCurrentAcademicYear] = useState<any>(null);
@@ -242,9 +239,6 @@ export function ParentDashboard({
 
   // Add state for search
   const [receiptSearch, setReceiptSearch] = useState("");
-
-  // Add state for student fee summaries
-  const [studentFeeSummaries, setStudentFeeSummaries] = useState<any>({});
 
   // Calculate total outstanding fees across all children
   const totalOutstandingFees = students.reduce((total, student) => {
@@ -267,66 +261,34 @@ export function ParentDashboard({
   useEffect(() => {
     async function fetchSession() {
       try {
-
-        console.log("ParentDashboard: Starting fetchSession", {
-          schoolCode,
-          parentId,
-        });
-
-        // If parentId is provided, fetch specific parent data
         if (parentId) {
-          console.log("ParentDashboard: Fetching parent by ID:", parentId);
-          const res = await fetch(
-            `/api/schools/${schoolCode}/parents/${parentId}`
-          );
-          console.log(
-            "ParentDashboard: Parent by ID response status:",
-            res.status
-          );
-
+          const res = await fetch(`/api/schools/${schoolCode}/parents/${parentId}`);
           if (!res.ok) {
-            console.log(
-              "ParentDashboard: Parent by ID failed, redirecting to login"
-            );
             router.replace(`/schools/${schoolCode}/parent/login`);
             return;
           }
           const data = await res.json();
-          console.log("ParentDashboard: Parent data received:", {
-            parent: data.parent,
-            studentsCount: data.students?.length,
-          });
           setParent(data.parent);
           setStudents(data.students);
         } else {
-          console.log("ParentDashboard: Using session-based authentication");
-          // Fallback to session-based authentication
           const res = await fetch(`/api/schools/${schoolCode}/parents/session`);
-          console.log("ParentDashboard: Session response status:", res.status);
-
           if (!res.ok) {
-            console.log(
-              "ParentDashboard: Session failed, redirecting to login"
-            );
             router.replace(`/schools/${schoolCode}/parent/login`);
             return;
           }
           const data = await res.json();
-          console.log("ParentDashboard: Session data received:", {
-            parent: data.parent,
-            studentsCount: data.students?.length,
-          });
           setParent(data.parent);
           setStudents(data.students || []);
           setSchoolName(data.schoolName || "");
           if (data.students && data.students.length > 0) {
             setFocusedChildId(data.students[0].id);
           }
-          setIsLoading(false);
-        } catch (error) {
-          console.error("Session fetch error:", error);
-          router.push(`/schools/${schoolCode}/parent/login`);
         }
+        setIsLoading(false);
+      } catch (error) {
+        console.error("Session fetch error:", error);
+        router.push(`/schools/${schoolCode}/parent/login`);
+      }
     }
     fetchSession();
   }, [schoolCode, router]);
@@ -568,38 +530,6 @@ export function ParentDashboard({
       setReceipts(data);
     } catch (err: any) {
       setReceiptsError(err.message || "Failed to load receipts");
-
-  // Fetch receipts
-  const fetchReceipts = async () => {
-    if (students.length === 0) return;
-    
-    setLoadingReceipts(true);
-    setReceiptsError("");
-    
-    try {
-      const allReceipts: any[] = [];
-      
-      for (const student of students) {
-        try {
-          const res = await fetch(
-            `/api/schools/${schoolCode}/students/${student.id}/receipts`
-          );
-          if (res.ok) {
-            const data = await res.json();
-            allReceipts.push(...data);
-          }
-        } catch (error) {
-          console.error(`Error fetching receipts for student ${student.id}:`, error);
-        }
-      }
-      
-      // Sort receipts by date (newest first)
-      allReceipts.sort((a, b) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime());
-      
-      setReceipts(allReceipts);
-    } catch (error) {
-      console.error("Error fetching receipts:", error);
-      setReceiptsError("Failed to load receipts");
     } finally {
       setLoadingReceipts(false);
     }
@@ -1086,8 +1016,6 @@ export function ParentDashboard({
         // Find the summary for the selected year and term (by ID)
         let feeSummary = data.feeSummary || [];
         // If backend returns termId/academicYearId, filter by those; else fallback to term/year
-
-        let feeSummary = data.feeSummary || [];
 
         let filteredSummary = feeSummary;
         if (
@@ -1589,7 +1517,7 @@ const filteredReceipts = receipts.filter((receipt: any) => {
                     <ChildOverview
                       child={child}
                       outstandingFees={outstandingFees}
-                      feeStructure={getStudentFeeStructure(child.gradeId)}
+                      feeStructure={getStudentFeeStructure(child.id)}
                     />
                   );
                 })()}
