@@ -1,20 +1,45 @@
-import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { NextRequest, NextResponse } from 'next/server';
+import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-export async function GET(req: NextRequest, { params }: { params: { schoolCode: string } }) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { schoolCode: string } }
+) {
   try {
-    const school = await prisma.school.findUnique({ where: { code: params.schoolCode } });
-    if (!school) return NextResponse.json({ error: "School not found" }, { status: 404 });
-    const years = await prisma.academicYear.findMany({
-      where: { schoolId: school.id },
-      orderBy: { startDate: "desc" },
-      include: { terms: true }, // Include terms for each year
+    console.log('🔍 GET /api/schools/[schoolCode]/academic-years called');
+    console.log('📋 Params:', params);
+
+    const school = await prisma.school.findUnique({
+      where: { code: params.schoolCode }
     });
-    return NextResponse.json(years);
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || "Failed to fetch academic years" }, { status: 500 });
+
+    if (!school) {
+      return NextResponse.json(
+        { success: false, error: 'School not found' },
+        { status: 404 }
+      );
+    }
+
+    const academicYears = await prisma.academicYear.findMany({
+      where: { schoolId: school.id },
+      orderBy: { name: 'desc' }
+    });
+
+    console.log(`✅ Found ${academicYears.length} academic years for school ${school.name}`);
+
+    return NextResponse.json({
+      success: true,
+      data: academicYears
+    });
+
+  } catch (error) {
+    console.error('❌ Error fetching academic years:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to fetch academic years' },
+      { status: 500 }
+    );
   }
 }
 

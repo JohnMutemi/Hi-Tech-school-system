@@ -1,22 +1,15 @@
-import { type NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
-  // Log all cookies and the path for debugging
-  console.log('MIDDLEWARE COOKIES:', request.cookies.getAll())
-  console.log('MIDDLEWARE PATH:', request.nextUrl.pathname)
-
-  // Always allow access to the login page
-  if (request.nextUrl.pathname === '/superadmin/login') {
-    return NextResponse.next()
+  const url = request.nextUrl;
+  // Redirect /schools/[schoolCode]/teacher/login to /schools/[schoolCode]/teachers/login
+  const match = url.pathname.match(/^\/schools\/([^/]+)\/teacher\/login$/);
+  if (match) {
+    url.pathname = `/schools/${match[1]}/teachers/login`;
+    return NextResponse.redirect(url);
   }
-
-  // Check for the session cookie
-  const sessionCookie = request.cookies.get('hitechsms-session')
-  if (!sessionCookie) {
-    return NextResponse.redirect(new URL('/superadmin/login', request.url))
-  }
-
-  return NextResponse.next()
+  return NextResponse.next();
 }
 
 export const config = {

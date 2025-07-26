@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { School, User, Eye, EyeOff } from "lucide-react";
 import type { SchoolData } from "@/lib/school-storage";
 import { getSchool } from "@/lib/school-storage";
+import PromotionsSection from "./PromotionsSection";
 import { SchoolSetupDashboard } from "./school-setup-dashboard";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Select } from "@/components/ui/select";

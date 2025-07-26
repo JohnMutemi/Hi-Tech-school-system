@@ -32,6 +32,8 @@ model School {
   studentArrears               StudentArrear[]
   termlyFees                   TermlyFeeStructure[]
   users                        User[]
+  promotionRequests            PromotionRequest[]
+  bulkPromotionConfigs         BulkPromotionConfig[]
 }
 
 model User {
@@ -57,6 +59,8 @@ model User {
   createdCriteria     PromotionCriteria[]  @relation("CriteriaCreator")
   createdProgressions ClassProgression[]   @relation("ProgressionCreator")
   school              School?              @relation(fields: [schoolId], references: [id])
+  submittedPromotionRequests PromotionRequest[] @relation("SubmittedPromotionRequests")
+  approvedPromotionRequests PromotionRequest[] @relation("ApprovedPromotionRequests")
 }
 
 model TeacherProfile {
@@ -75,7 +79,6 @@ model Grade {
   schoolId String?
   classes  Class[]
   school   School? @relation(fields: [schoolId], references: [id])
-
   termlyFees TermlyFeeStructure[]
 }
 
@@ -140,6 +143,7 @@ model Student {
   studentArrears        StudentArrear[]
   studentFees           StudentFee[]
   yearlyBalances        StudentYearlyBalance[]
+  studentPromotionRequests StudentPromotionRequest[]
 }
 
 model Payment {
@@ -154,7 +158,7 @@ model Payment {
   createdAt       DateTime @default(now())
   academicYearId  String
   termId          String
-
+  paymentMethod   String?
   student      Student       @relation(fields: [studentId], references: [id])
   receipt      Receipt?
   academicYear AcademicYear? @relation(fields: [academicYearId], references: [id])
@@ -175,8 +179,8 @@ model Receipt {
   termOutstandingBefore         Float?
   academicYearId                String?
   termId                        String?
-  paymentMethod                 String? // NEW: for reporting
-  referenceNumber               String? // NEW: for reporting
+  paymentMethod                 String?
+  referenceNumber               String?
   payment                       Payment       @relation(fields: [paymentId], references: [id])
   student                       Student       @relation(fields: [studentId], references: [id])
   academicYear                  AcademicYear? @relation(fields: [academicYearId], references: [id])
@@ -281,80 +285,71 @@ model PaymentRequest {
 model PromotionCriteria {
   id          String  @id @default(uuid())
   schoolId    String
-  classLevel  String // e.g., "Grade 1", "Form 1"
-  name        String // e.g., "Standard Promotion Criteria", "Merit Promotion"
+  classLevel  String?  // Made nullable for bulk promotions
+  name        String
   description String?
-
-  // Academic Performance Criteria
-  minAverageGrade    Float? // Minimum average grade (e.g., 50.0, 60.0)
-  minSubjectPasses   Int? // Minimum number of subjects to pass
-  maxSubjectFailures Int? // Maximum number of subjects allowed to fail
-  requireAllSubjects Boolean @default(false) // Must pass all subjects
-
-  // Fee Payment Criteria
-  maxOutstandingBalance Float? // Maximum outstanding balance allowed (e.g., 5000)
-  requireFullPayment    Boolean @default(false) // Must have zero balance
-  allowPartialPayment   Boolean @default(true) // Allow promotion with partial payment
-
-  // Attendance Criteria
-  minAttendanceRate Float? // Minimum attendance percentage (e.g., 80.0)
-  maxAbsenceDays    Int? // Maximum number of absence days allowed
-
-  // Discipline Criteria
-  maxDisciplinaryCases Int? // Maximum number of disciplinary cases
-  requireCleanRecord   Boolean @default(false) // Must have clean disciplinary record
-
-  // Additional Criteria
-  requireParentConsent     Boolean @default(false) // Require parent consent for promotion
-  requireTeacherApproval   Boolean @default(true) // Require teacher approval
-  requirePrincipalApproval Boolean @default(true) // Require principal approval
-
-  // Custom Criteria (JSON field for flexible additional requirements)
-  customCriteria Json? // e.g., {"sportsParticipation": true, "communityService": 10}
-
-  // Status and Metadata
+  minAverageGrade    Float?
+  minSubjectPasses   Int?
+  maxSubjectFailures Int?
+  requireAllSubjects Boolean @default(false)
+  maxOutstandingBalance Float?
+  requireFullPayment    Boolean @default(false)
+  allowPartialPayment   Boolean @default(true)
+  minAttendanceRate Float?
+  maxAbsenceDays    Int?
+  maxDisciplinaryCases Int?
+  requireCleanRecord   Boolean @default(false)
+  requireParentConsent     Boolean @default(false)
+  requireTeacherApproval   Boolean @default(true)
+  requirePrincipalApproval Boolean @default(true)
+  customCriteria Json?
   isActive  Boolean @default(true)
-  isDefault Boolean @default(false) // Default criteria for the class level
-  priority  Int     @default(1) // Priority order for multiple criteria
-
+  isDefault Boolean @default(false)
+  priority  Int     @default(1)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  createdBy String? // User who created this criteria
-
+  createdBy String?
+  // New fields for simplified bulk promotion
+  promotionType String @default("bulk")
+  minGrade Float @default(50.0)
+  maxFeeBalance Float @default(0.0)
   school  School @relation(fields: [schoolId], references: [id])
   creator User?  @relation("CriteriaCreator", fields: [createdBy], references: [id])
-
-  // Opposite relations
   classProgressions ClassProgression[]
   promotionLogs     PromotionLog[]
-
-  @@unique([schoolId, classLevel, name])
   @@index([schoolId, classLevel, isActive])
+}
+
+// New model for bulk promotion configuration
+model BulkPromotionConfig {
+  id                    String   @id @default(uuid())
+  schoolId              String   @unique
+  minGrade              Float    @default(50.0)
+  maxFeeBalance         Float    @default(0.0)
+  maxDisciplinaryCases  Int      @default(0)
+  isActive              Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  school                School   @relation(fields: [schoolId], references: [id])
 }
 
 model ClassProgression {
   id        String  @id @default(uuid())
   schoolId  String
-  fromClass String // e.g., "Grade 1A"
-  toClass   String // e.g., "Grade 2A"
-  fromGrade String // e.g., "Grade 1"
-  toGrade   String // e.g., "Grade 2"
+  fromClass String
+  toClass   String
+  fromGrade String
+  toGrade   String
   order     Int
   isActive  Boolean @default(true)
-
-  // Progression Rules
-  requireCriteria     Boolean @default(true) // Whether to apply promotion criteria
-  criteriaId          String? // Reference to specific PromotionCriteria
-  allowManualOverride Boolean @default(false) // Allow manual promotion override
-
-  // Academic Year Progression
-  fromAcademicYear String // e.g., "2025"
-  toAcademicYear   String // e.g., "2026"
-
+  requireCriteria     Boolean @default(true)
+  criteriaId          String?
+  allowManualOverride Boolean @default(false)
+  fromAcademicYear String
+  toAcademicYear   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   createdBy String?
-
   school   School             @relation(fields: [schoolId], references: [id])
   criteria PromotionCriteria? @relation(fields: [criteriaId], references: [id])
   creator  User?              @relation("ProgressionCreator", fields: [createdBy], references: [id])
@@ -371,27 +366,20 @@ model PromotionLog {
   toYear        String
   promotedBy    String
   promotionDate DateTime @default(now())
-
-  // Detailed Criteria Results
-  criteriaResults   Json // Detailed breakdown of how student met criteria
-  appliedCriteriaId String? // Which criteria was applied
-  manualOverride    Boolean @default(false) // Whether this was manually overridden
-  overrideReason    String? // Reason for manual override
-
-  // Student Performance at Time of Promotion
-  averageGrade       Float? // Student's average grade
-  attendanceRate     Float? // Student's attendance rate
-  outstandingBalance Float? // Outstanding balance at promotion time
-  disciplinaryCases  Int? // Number of disciplinary cases
-
+  criteriaResults   Json
+  appliedCriteriaId String?
+  manualOverride    Boolean @default(false)
+  overrideReason    String?
+  averageGrade       Float?
+  attendanceRate     Float?
+  outstandingBalance Float?
+  disciplinaryCases  Int?
   notes         String?
-  promotionType String // "automatic", "manual", "bulk"
-
+  promotionType String
   exclusions      PromotionExclusion[]
   user            User                 @relation("UserPromotions", fields: [promotedBy], references: [id])
   student         Student              @relation(fields: [studentId], references: [id])
   appliedCriteria PromotionCriteria?   @relation(fields: [appliedCriteriaId], references: [id])
-
   @@index([studentId, promotionDate])
   @@index([fromClass, toClass, promotionDate])
 }
@@ -400,22 +388,18 @@ model PromotionExclusion {
   id             String   @id @default(uuid())
   promotionLogId String
   studentId      String
-  reason         String // "academic", "fees", "attendance", "discipline", "manual"
-  detailedReason String? // Detailed explanation
-  criteriaFailed Json? // Which specific criteria failed
+  reason         String
+  detailedReason String?
+  criteriaFailed Json?
   excludedBy     String
   excludedAt     DateTime @default(now())
-
-  // Exclusion Details
-  academicGrade      Float? // Student's grade if academic reason
-  outstandingBalance Float? // Outstanding balance if fees reason
-  attendanceRate     Float? // Attendance rate if attendance reason
-  disciplinaryCases  Int? // Number of cases if discipline reason
-
+  academicGrade      Float?
+  outstandingBalance Float?
+  attendanceRate     Float?
+  disciplinaryCases  Int?
   user         User         @relation("UserExclusions", fields: [excludedBy], references: [id])
   promotionLog PromotionLog @relation(fields: [promotionLogId], references: [id])
   student      Student      @relation(fields: [studentId], references: [id])
-
   @@index([studentId, excludedAt])
 }
 
@@ -436,7 +420,6 @@ model AcademicYear {
   studentArrears     StudentArrear[]
   terms              Term[]
   TermlyFeeStructure TermlyFeeStructure[]
-
   @@unique([schoolId, name])
 }
 
@@ -455,7 +438,6 @@ model Term {
   joinedStudents     Student[]            @relation("JoinedTerm")
   academicYear       AcademicYear         @relation(fields: [academicYearId], references: [id])
   TermlyFeeStructure TermlyFeeStructure[]
-
   @@unique([academicYearId, name])
 }
 
@@ -470,22 +452,57 @@ model StudentArrear {
   academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
   school         School       @relation(fields: [schoolId], references: [id])
   student        Student      @relation(fields: [studentId], references: [id])
-
   @@index([studentId, academicYearId])
 }
 
-// Rename model StudentArrears to StudentYearlyBalance
 model StudentYearlyBalance {
   id               String   @id @default(uuid())
   studentId        String
   academicYear     Int
-  openingBalance   Float    @default(0) // Balance carried forward from previous year
-  totalCharged     Float    @default(0) // Total fees charged for this year
-  totalPaid        Float    @default(0) // Total payments made for this year
-  closingBalance   Float    @default(0) // Balance at end of year (can be negative for overpayment)
-  isCarriedForward Boolean  @default(false) // Whether this balance was carried forward
+  openingBalance   Float    @default(0)
+  totalCharged     Float    @default(0)
+  totalPaid        Float    @default(0)
+  closingBalance   Float    @default(0)
+  isCarriedForward Boolean  @default(false)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
-
   student Student @relation(fields: [studentId], references: [id])
 }
+
+model PromotionRequest {
+  id            String   @id @default(uuid())
+  schoolId      String
+  fromClass     String
+  toClass       String
+  submittedBy   String
+  submittedAt   DateTime @default(now())
+  approvedBy    String?
+  approvedAt    DateTime?
+  status        String
+  studentCount  Int
+  requestData   Json
+  notes         String?
+  school        School   @relation(fields: [schoolId], references: [id])
+  submittedUser User     @relation("SubmittedPromotionRequests", fields: [submittedBy], references: [id])
+  approvedUser  User?    @relation("ApprovedPromotionRequests", fields: [approvedBy], references: [id])
+  studentPromotionRequests StudentPromotionRequest[]
+  @@index([schoolId, status])
+  @@index([submittedBy, submittedAt])
+}
+
+model StudentPromotionRequest {
+  id                  String   @id @default(uuid())
+  promotionRequestId  String
+  studentId           String
+  fromClass           String
+  toClass             String
+  outstandingBalance  Float
+  isGraduating        Boolean  @default(false)
+  status              String
+  approvedAt          DateTime?
+  notes               String?
+  promotionRequest    PromotionRequest @relation(fields: [promotionRequestId], references: [id])
+  student             Student          @relation(fields: [studentId], references: [id])
+  @@index([studentId, status])
+  @@index([promotionRequestId])
+} 

@@ -60,7 +60,6 @@ export async function GET(
         amount: true,
         createdAt: true,
         paymentDate: true,
-        paymentMethod: true,
         referenceNumber: true,
         receiptNumber: true,
         description: true,
@@ -68,7 +67,8 @@ export async function GET(
         academicYearId: true,
         termId: true,
         academicYear: { select: { name: true } },
-        term: { select: { name: true } }
+        term: { select: { name: true } },
+        receipt: true,
       }
     });
 
@@ -214,7 +214,7 @@ export async function GET(
         id: payment.id,
         amount: payment.amount,
         paymentDate: payment.paymentDate,
-        paymentMethod: payment.paymentMethod,
+        paymentMethod: payment.receipt?.paymentMethod,
         description: payment.description,
         receiptNumber: payment.receiptNumber,
         referenceNumber: payment.referenceNumber

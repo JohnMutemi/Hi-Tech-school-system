@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Card,
   CardContent,
@@ -103,6 +103,55 @@ interface FeeManagementProps {
   colorTheme: string;
   onGoBack?: () => void;
   onFeeStructureCreated?: () => void;
+}
+
+function FeeImportButton({ schoolCode }: { schoolCode: string }) {
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [result, setResult] = useState<{ created?: any[]; errors?: any[] } | null>(null);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch(`/api/schools/${schoolCode}/fee-structure/import`, {
+      method: "POST",
+      body: formData,
+    });
+    const data = await res.json();
+    setResult({ created: data.created, errors: data.errors });
+    alert(data.success ? "Import successful!" : "Import failed.");
+  };
+
+  return (
+    <div className="mb-4">
+      <button onClick={() => fileInput.current?.click()} className="mb-2 px-4 py-2 bg-blue-600 text-white rounded shadow">Import Fee Structures</button>
+      <input
+        type="file"
+        accept=".xlsx,.csv"
+        ref={fileInput}
+        style={{ display: "none" }}
+        onChange={handleFileChange}
+      />
+      {result && (
+        <div className="mt-2 text-sm">
+          {Array.isArray(result.created) && result.created.length > 0 && (
+            <div className="text-green-700 mb-1">Created: {result.created?.map((c, i) => <span key={i}>{c.fee}{i < (result.created?.length ?? 0) - 1 ? ", " : ""}</span>)}</div>
+          )}
+          {result.errors && result.errors.length > 0 && (
+            <div className="text-red-700">
+              Errors:
+              <ul className="list-disc ml-5">
+                {result.errors.map((err, i) => (
+                  <li key={i}>{err.fee}: {err.error}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function FeeManagement({
@@ -406,11 +455,19 @@ export function FeeManagement({
     setEditingFee(fee);
     setFormData({
       term: fee.term,
-      year: fee.year.toString(),
+      year: fee.year ? fee.year.toString() : "",
       gradeId: fee.gradeId,
       totalAmount: fee.totalAmount.toString(),
       academicYearId: fee.academicYearId || academicYearId,
       termId: fee.termId || termId,
+      breakdown: {
+        tuition: "",
+        books: "",
+        lunch: "",
+        uniform: "",
+        transport: "",
+        other: "",
+      },
     });
     setBreakdown(
       Array.isArray(fee.breakdown)

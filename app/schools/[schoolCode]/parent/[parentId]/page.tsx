@@ -1,4 +1,4 @@
-import { ParentDashboard } from "@/components/parent-dashboard/parent-dashboard";
+import  ParentDashboard  from "@/components/parent-dashboard/parent-dashboard";
 
 export default function ParentDashboardPage({
   params,

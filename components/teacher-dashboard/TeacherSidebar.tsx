@@ -27,6 +27,7 @@ import {
   Calendar,
   Bell,
   Menu,
+  ArrowRight,
 } from "lucide-react";
 
 interface TeacherSidebarProps {
@@ -35,6 +36,9 @@ interface TeacherSidebarProps {
   colorTheme: string;
   onLogout: () => void;
   teacher: any;
+  classCount?: number;
+  studentCount?: number;
+  hasPromotionCriteria?: boolean;
 }
 
 const teacherNavItems = [
@@ -88,6 +92,9 @@ export function TeacherSidebar({
   colorTheme,
   onLogout,
   teacher,
+  classCount = 0,
+  studentCount = 0,
+  hasPromotionCriteria = false,
 }: TeacherSidebarProps) {
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -147,12 +154,24 @@ export function TeacherSidebar({
                 <p className="text-blue-200 text-sm truncate">
                   {teacher?.email || "teacher@school.edu"}
                 </p>
-                <div className="flex items-center mt-1">
+                <div className="flex items-center mt-1 gap-2">
                   <Badge
                     variant="secondary"
                     className="bg-green-100 text-green-800 text-xs"
                   >
                     Active
+                  </Badge>
+                  <Badge
+                    variant="secondary"
+                    className="bg-blue-100 text-blue-800 text-xs"
+                  >
+                    {classCount} Classes
+                  </Badge>
+                  <Badge
+                    variant="secondary"
+                    className="bg-purple-100 text-purple-800 text-xs"
+                  >
+                    {studentCount} Students
                   </Badge>
                 </div>
               </div>

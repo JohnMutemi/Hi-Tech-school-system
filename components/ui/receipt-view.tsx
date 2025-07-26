@@ -24,6 +24,9 @@ export function ReceiptView({
     window.print()
   }
 
+  // Type guard for balance
+  const hasBalance = (r: any): r is { balance: number } => typeof r.balance === 'number';
+
   const handleDownload = () => {
     // Create a printable version of the receipt
     const receiptContent = `
@@ -35,6 +38,7 @@ Student Name: ${studentName}
 Admission No: ${admissionNumber}
 Class: ${studentClass}
 Amount Paid: ${receipt.amount.toFixed(2)}
+Outstanding Balance: ${hasBalance(receipt) ? receipt.balance.toLocaleString() : 'N/A'}
 Payment Method: ${receipt.paymentMethod}
 Received By: ${receipt.receivedBy}
 Reference Number: ${receipt.referenceNumber || 'N/A'}
@@ -78,9 +82,7 @@ Description: ${receipt.description}
           <div><strong>Admission No:</strong> {admissionNumber}</div>
           <div><strong>Class:</strong> {studentClass}</div>
           <div><strong>Amount Paid:</strong> {receipt.amount.toFixed(2)}</div>
-          {typeof receipt.balance !== 'undefined' && (
-            <div><strong>Balance after payment:</strong> {receipt.balance.toLocaleString()}</div>
-          )}
+          <div><strong>Outstanding Balance:</strong> {hasBalance(receipt) ? receipt.balance.toLocaleString() : <span className="text-red-500">N/A</span>}</div>
           <div><strong>Payment Method:</strong> {receipt.paymentMethod}</div>
           <div><strong>Received By:</strong> {receipt.receivedBy}</div>
           {receipt.referenceNumber && (

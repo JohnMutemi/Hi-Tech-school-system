@@ -62,6 +62,7 @@ export interface Student {
   address: string
   dateAdmitted: string
   status: "active" | "inactive" | "graduated"
+  class?: { id: string; name: string }
 }
 
 export interface Subject {
@@ -73,15 +74,18 @@ export interface Subject {
   classes: string[]
 }
 
-export interface SchoolClass {
-  id: string
-  name: string
-  level: string
-  capacity: number
-  currentStudents: number
-  classTeacherId?: string
-  subjects: string[]
-}
+export type SchoolClass = {
+  id: string;
+  name: string;
+  level: string;
+  classTeacherId?: string;
+  capacity?: number;
+  academicYearId?: string;
+  currentStudents?: number;
+  subjects?: string[];
+  gradeId?: string;
+  // ...other properties
+};
 
 export interface Grade {
   id: string

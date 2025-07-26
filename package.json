@@ -69,6 +69,8 @@
     "expo-sqlite": "latest",
     "framer-motion": "^12.19.1",
     "gel": "latest",
+    "html2canvas": "^1.4.1",
+    "html2pdf.js": "^0.10.3",
     "input-otp": "1.4.1",
     "iron-session": "^8.0.4",
     "jsonwebtoken": "^9.0.2",
@@ -103,6 +105,8 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@types/html2canvas": "^1.0.0",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22",
     "@types/papaparse": "^5.3.16",
     "@types/react": "^18",

@@ -6,6 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { generateNextAdmissionNumber } from '@/lib/utils/school-generator';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+// @ts-ignore
+import * as XLSX from "xlsx";
+// @ts-ignore
+import Papa from "papaparse";
 
 function getNextAdmissionNumber(lastAdmissionNumber: string): string {
   if (!lastAdmissionNumber) return '001';
@@ -37,6 +42,12 @@ export default function AddStudentPage() {
   const [error, setError] = useState("");
   const [admissionSettings, setAdmissionSettings] = useState<any>(null);
   const [admissionPreview, setAdmissionPreview] = useState("");
+  const [bulkModalOpen, setBulkModalOpen] = useState(false);
+  const [bulkFile, setBulkFile] = useState<File | null>(null);
+  const [bulkRows, setBulkRows] = useState<any[]>([]);
+  const [bulkError, setBulkError] = useState("");
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkSuccess, setBulkSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchGrades() {
@@ -132,13 +143,120 @@ export default function AddStudentPage() {
     setLoading(false);
   };
 
+  // Bulk file handler
+  const handleBulkFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setBulkError("");
+    setBulkRows([]);
+    setBulkSuccess(null);
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBulkFile(file);
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        let rows: any[] = [];
+        if (ext === "csv") {
+          const parsed = Papa.parse(evt.target?.result as string, { header: true });
+          rows = parsed.data;
+        } else if (["xlsx", "xls"].includes(ext || "")) {
+          const wb = XLSX.read(evt.target?.result, { type: "binary" });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          rows = XLSX.utils.sheet_to_json(ws);
+        } else {
+          setBulkError("Unsupported file type");
+          return;
+        }
+        // Validate rows
+        const required = ["name", "admissionNumber", "email", "gradeId", "classId"];
+        const invalid = rows.filter((row: any) => required.some(f => !row[f]));
+        if (invalid.length > 0) {
+          setBulkError(`Some rows are missing required fields: ${required.join(", ")}`);
+        } else {
+          setBulkRows(rows);
+        }
+      } catch (err: any) {
+        setBulkError("Failed to parse file: " + err.message);
+      }
+    };
+    if (ext === "csv") reader.readAsText(file);
+    else reader.readAsBinaryString(file);
+  };
+
+  // Bulk import submit
+  const handleBulkImport = async () => {
+    setBulkLoading(true);
+    setBulkError("");
+    setBulkSuccess(null);
+    let success = 0, fail = 0;
+    for (const row of bulkRows) {
+      const res = await fetch(`/api/schools/${schoolCode}/students`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(row),
+      });
+      if (res.ok) success++;
+      else fail++;
+    }
+    setBulkSuccess(`Imported ${success} students. ${fail > 0 ? fail + ' failed.' : ''}`);
+    setBulkLoading(false);
+    setBulkRows([]);
+    setBulkFile(null);
+  };
+
   return (
     <div className="max-w-xl mx-auto py-8">
       <Card>
         <CardHeader>
-          <CardTitle>Add Student</CardTitle>
+          <CardTitle className="flex items-center justify-between">
+            <span>Add Student</span>
+            <Button size="sm" variant="outline" className="ml-2" onClick={() => setBulkModalOpen(true)}>Import</Button>
+          </CardTitle>
         </CardHeader>
         <CardContent>
+          {/* Bulk Import Modal */}
+          <Dialog open={bulkModalOpen} onOpenChange={setBulkModalOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Bulk Import Students</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3">
+                <input type="file" accept=".csv,.xlsx,.xls" onChange={handleBulkFile} />
+                {bulkError && <div className="text-red-600 text-xs">{bulkError}</div>}
+                {bulkRows.length > 0 && (
+                  <div className="max-h-48 overflow-auto border rounded p-2">
+                    <table className="min-w-full text-xs">
+                      <thead>
+                        <tr>
+                          <th>Name</th>
+                          <th>Admission #</th>
+                          <th>Email</th>
+                          <th>Grade ID</th>
+                          <th>Class ID</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {bulkRows.map((row, i) => (
+                          <tr key={i}>
+                            <td>{row.name}</td>
+                            <td>{row.admissionNumber}</td>
+                            <td>{row.email}</td>
+                            <td>{row.gradeId}</td>
+                            <td>{row.classId}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                {bulkSuccess && <div className="text-green-600 text-xs">{bulkSuccess}</div>}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setBulkModalOpen(false)}>Cancel</Button>
+                <Button className="bg-blue-600 text-white" onClick={handleBulkImport} disabled={bulkRows.length === 0 || bulkLoading}>{bulkLoading ? "Importing..." : "Import Students"}</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
               name="name"
