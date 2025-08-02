@@ -2,6 +2,8 @@ import { PrismaClient } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { generateNextAdmissionNumber } from '@/lib/utils/school-generator';
+import { withSchoolContext } from '@/lib/school-context';
+import { hashDefaultPasswordByRole } from '@/lib/utils/default-passwords';
 
 const prisma = new PrismaClient();
 
@@ -29,18 +31,13 @@ export async function GET(
     const search = searchParams.get("search");
     const role = searchParams.get("role");
 
-    // Find the school
-    const school = await prisma.school.findUnique({
-      where: { code: schoolCode },
-    });
+    // Initialize school context
+    const schoolManager = withSchoolContext(schoolCode);
+    const schoolContext = await schoolManager.initialize();
 
-    if (!school) {
-      return NextResponse.json({ error: "School not found" }, { status: 404 });
-    }
-
-    // Build where clause
+    // Build where clause with school-specific filtering
     const whereClause: any = {
-      schoolId: school.id,
+      schoolId: schoolContext.schoolId,
       isActive: true,
     };
 
@@ -169,10 +166,16 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
       return NextResponse.json({ error: 'School not found' }, { status: 404 });
     }
 
-    // Admission number logic
+    // Admission number logic - use school-specific settings
     let finalAdmissionNumber = admissionNumber;
     if (!finalAdmissionNumber) {
-      finalAdmissionNumber = getNextAdmissionNumber(school.lastAdmissionNumber || '');
+      if (school.admissionNumberAutoIncrement && school.lastAdmissionNumber) {
+        // Use the school's last admission number and increment it
+        finalAdmissionNumber = getNextAdmissionNumber(school.lastAdmissionNumber);
+      } else {
+        // Fallback to default
+        finalAdmissionNumber = 'ADM001';
+      }
     }
 
     // Fetch current academic year and term
@@ -196,7 +199,7 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
           schoolId: school.id,
         },
       });
-      const hashedParentPassword = await bcrypt.hash(parentTempPassword, 12);
+      const hashedParentPassword = await hashDefaultPasswordByRole('parent');
       if (!parentUser) {
         parentUser = await prisma.user.create({
           data: {
@@ -217,7 +220,7 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
       }
     }
 
-    const hashedPassword = await bcrypt.hash('student123', 12);
+    const hashedPassword = await hashDefaultPasswordByRole('student');
 
     const studentUser = await prisma.user.create({
       data: {

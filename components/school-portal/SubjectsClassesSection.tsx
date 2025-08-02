@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -10,6 +11,7 @@ import { Plus, Edit, Trash2 } from "lucide-react";
 import type { Subject, SchoolClass, Grade } from "@/lib/school-storage";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CheckCircle, XCircle } from "lucide-react";
+import { BulkImport } from "@/components/ui/bulk-import";
 
 function ImportResultSummary({ result, onClose }: { result: { created?: any[]; errors?: any[] } | null, onClose?: () => void }) {
   if (!result) return null;
@@ -132,7 +134,7 @@ const defaultClass: SchoolClass = {
   id: "",
   name: "",
   level: "",
-  capacity: 30,
+  
   currentStudents: 0,
   classTeacherId: "",
   subjects: [],
@@ -149,8 +151,12 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast }
   const [error, setError] = useState("");
   const [showSubjectModal, setShowSubjectModal] = useState(false);
   const [showClassModal, setShowClassModal] = useState(false);
+  const [showGradeModal, setShowGradeModal] = useState(false);
   const [newClass, setNewClass] = useState<Partial<SchoolClass>>({});
+  const [newGrade, setNewGrade] = useState<{ name: string }>({ name: "" });
+  const [editingGrade, setEditingGrade] = useState<any>(null);
   const [classError, setClassError] = useState<string>("");
+  const [gradeError, setGradeError] = useState<string>("");
   const [academicYears, setAcademicYears] = useState<{ id: string; name: string }[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
 
@@ -162,9 +168,25 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast }
         if (sRes.ok) setSubjects(await sRes.json());
         const cRes = await fetch(`/api/schools/${schoolCode}/classes`);
         if (cRes.ok) setClasses(await cRes.json());
-        const gRes = await fetch(`/api/grades`);
-        if (gRes.ok) setGrades(await gRes.json());
+        
+        // Fetch grades
+        const gRes = await fetch(`/api/schools/${schoolCode}/grades`);
+        console.log('Grades fetch response status:', gRes.status);
+        console.log('Grades fetch response ok:', gRes.ok);
+        if (gRes.ok) {
+          const gradesData = await gRes.json();
+          console.log('Raw grades data:', gradesData);
+          const gradesArray = Array.isArray(gradesData) ? gradesData : (gradesData.data && Array.isArray(gradesData.data) ? gradesData.data : []);
+          console.log('Processed grades array:', gradesArray);
+          console.log('Fetched grades:', gradesArray);
+          setGrades(gradesArray);
+        } else {
+          console.warn('Grades endpoint not available');
+          console.log('Grades response text:', await gRes.text());
+          setGrades([]);
+        }
       } catch (error) {
+        console.error('Error fetching data:', error);
         toast && toast({ title: "Error", description: "Could not load subjects/classes.", variant: "destructive" });
       }
     }
@@ -173,8 +195,18 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast }
 
   useEffect(() => {
     async function fetchAcademicYears() {
-      const res = await fetch(`/api/schools/${schoolCode}/academic-years`);
-      if (res.ok) setAcademicYears(await res.json());
+      try {
+        const res = await fetch(`/api/schools/${schoolCode}/academic-years`);
+        if (res.ok) {
+          const data = await res.json();
+          setAcademicYears(Array.isArray(data) ? data : (data.data && Array.isArray(data.data) ? data.data : []));
+        } else {
+          setAcademicYears([]);
+        }
+      } catch (error) {
+        console.error('Error fetching academic years:', error);
+        setAcademicYears([]);
+      }
     }
     if (schoolCode) fetchAcademicYears();
   }, [schoolCode]);
@@ -269,7 +301,7 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast }
       name: "",
       level: "",
       classTeacherId: "",
-      capacity: 30,
+  
       academicYearId: "",
     });
     setShowClassModal(true);
@@ -305,7 +337,6 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast }
         gradeId: newClass.gradeId,
         academicYear: newClass.academicYearId,
         teacherId: newClass.classTeacherId,
-        capacity: newClass.capacity || 30,
       };
       const res = await fetch(`/api/schools/${schoolCode}/classes`, {
         method: "POST",
@@ -324,6 +355,75 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast }
       toast({ title: "Error", description: err.message || "Failed to create class.", variant: "destructive" });
     }
   };
+
+  const handleDeleteGrade = async (gradeId: string) => {
+    try {
+      const res = await fetch(`/api/schools/${schoolCode}/grades?id=${gradeId}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+      });
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Failed to delete grade");
+      }
+      
+      // Refresh grades list
+      const gRes = await fetch(`/api/schools/${schoolCode}/grades`);
+      if (gRes.ok) {
+        const gradesData = await gRes.json();
+        const gradesArray = Array.isArray(gradesData) ? gradesData : (gradesData.data && Array.isArray(gradesData.data) ? gradesData.data : []);
+        setGrades(gradesArray);
+      }
+      
+      toast({ title: "Success!", description: "Grade deleted successfully!" });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to delete grade.", variant: "destructive" });
+    }
+  };
+
+  const handleSaveGrade = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setGradeError("");
+    if (!newGrade.name) {
+      setGradeError("Please enter a grade name.");
+      return;
+    }
+    try {
+      const method = editingGrade ? "PUT" : "POST";
+      const url = editingGrade 
+        ? `/api/schools/${schoolCode}/grades?id=${editingGrade.id}`
+        : `/api/schools/${schoolCode}/grades`;
+      
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newGrade),
+      });
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || `Failed to ${editingGrade ? 'update' : 'create'} grade`);
+      }
+      
+      // Refresh grades list
+      const gRes = await fetch(`/api/schools/${schoolCode}/grades`);
+      if (gRes.ok) {
+        const gradesData = await gRes.json();
+        const gradesArray = Array.isArray(gradesData) ? gradesData : (gradesData.data && Array.isArray(gradesData.data) ? gradesData.data : []);
+        setGrades(gradesArray);
+      }
+      
+      setShowGradeModal(false);
+      setNewGrade({ name: "" });
+      setEditingGrade(null);
+      toast({ title: "Success!", description: `Grade ${editingGrade ? 'updated' : 'created'} successfully!` });
+    } catch (err: any) {
+      setGradeError(err.message || `Failed to ${editingGrade ? 'update' : 'create'} grade.`);
+      toast({ title: "Error", description: err.message || `Failed to ${editingGrade ? 'update' : 'create'} grade.`, variant: "destructive" });
+    }
+  };
+
 
   return (
     <Card>
@@ -406,12 +506,124 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast }
           </DialogContent>
         </Dialog>
         </div>
+        
+        {/* Grades Section */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-bold text-lg">Grades</h3>
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => {
+                  const confirm = window.confirm("This will replace all existing grades with Grade 1-6. Continue?");
+                  if (confirm) {
+                    fetch(`/api/schools/${schoolCode}/grades/seed`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' }
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                      if (data.success && data.grades) {
+                        setGrades(data.grades);
+                        toast && toast({ 
+                          title: "Grades Created", 
+                          description: `Successfully created ${data.grades.length} grades for your school.`, 
+                          variant: "default" 
+                        });
+                      } else {
+                        toast && toast({ 
+                          title: "Error", 
+                          description: "Failed to create grades.", 
+                          variant: "destructive" 
+                        });
+                      }
+                    })
+                    .catch(error => {
+                      console.error('Error seeding grades:', error);
+                      toast && toast({ 
+                        title: "Error", 
+                        description: "Failed to create grades. Please try again.", 
+                        variant: "destructive" 
+                      });
+                    });
+                  }
+                }} 
+                disabled={loading}
+                variant="outline" 
+                size="sm"
+                className="h-10"
+              >
+                {loading ? "Creating Grades..." : "Reset to Grade 1-6"}
+              </Button>
+              <Button 
+                onClick={() => {
+                  setEditingGrade(null);
+                  setNewGrade({ name: "" });
+                  setShowGradeModal(true);
+                }} 
+                variant="outline" 
+                size="sm"
+                className="h-10"
+              >
+                + Add Custom Grade
+              </Button>
+            </div>
+          </div>
+          
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Grade Name</TableHead>
+                <TableHead>Classes Count</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {grades.map((grade) => (
+                <TableRow key={grade.id}>
+                  <TableCell className="font-medium">{grade.name}</TableCell>
+                  <TableCell>{(grade as any).classes?.length || 0}</TableCell>
+                  <TableCell>
+                    <Button size="icon" variant="ghost" onClick={() => {
+                      setEditingGrade(grade);
+                      setNewGrade({ name: grade.name });
+                      setShowGradeModal(true);
+                    }}>
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button size="icon" variant="ghost">
+                          <Trash2 className="w-4 h-4 text-red-500" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Grade?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will delete the grade and all associated classes. This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleDeleteGrade(grade.id)}>
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+        
         {/* Classes Section */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <h3 className="font-bold text-lg">Classes</h3>
             <div className="flex gap-2">
-              <ImportClassesButton schoolCode={schoolCode} />
+              <BulkImport entityType="classes" schoolCode={schoolCode} variant="outline" size="sm" />
               <Button onClick={handleAddClass} style={{ backgroundColor: colorTheme }} className="h-10">+ Add Class</Button>
             </div>
           </div>
@@ -419,6 +631,7 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast }
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
+              <TableHead>Grade</TableHead>
               <TableHead>Level</TableHead>
               <TableHead>Capacity</TableHead>
               <TableHead>Current Students</TableHead>
@@ -426,9 +639,10 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast }
             </TableRow>
           </TableHeader>
           <TableBody>
-            {classes.map((cls) => (
+            {classes.map((cls: any) => (
               <TableRow key={cls.id}>
                 <TableCell>{cls.name}</TableCell>
+                <TableCell>{cls.grade?.name || 'N/A'}</TableCell>
                 <TableCell>{cls.level}</TableCell>
                 <TableCell>{cls.capacity}</TableCell>
                 <TableCell>{cls.currentStudents}</TableCell>
@@ -477,9 +691,16 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast }
                     <SelectValue placeholder="Select grade" />
                   </SelectTrigger>
                   <SelectContent>
-                    {grades.map(grade => (
-                      <SelectItem key={grade.id} value={grade.id}>{grade.name}</SelectItem>
-                    ))}
+                    {(() => {
+                      console.log('Grades in dropdown:', grades);
+                      console.log('Grades length:', grades?.length);
+                      return (grades || []).filter(grade => grade && grade.id && grade.name && grade.id.trim() !== '').map(grade => {
+                        console.log('Rendering grade:', grade);
+                        return (
+                          <SelectItem key={grade.id} value={grade.id}>{grade.name}</SelectItem>
+                        );
+                      });
+                    })()}
                   </SelectContent>
                 </Select>
               </div>
@@ -504,19 +725,16 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast }
                   </SelectTrigger>
                   <SelectContent>
                     {teachers.length === 0 ? (
-                      <SelectItem value="" disabled>No teachers found</SelectItem>
+                      <SelectItem value="no-teachers" disabled>No teachers found</SelectItem>
                     ) : (
-                      teachers.map(teacher => (
-                        <SelectItem key={teacher.id} value={teacher.id}>{teacher.name}</SelectItem>
-                      ))
+                                              teachers.filter(teacher => teacher && teacher.id && teacher.name && teacher.id.trim() !== '').map(teacher => (
+                          <SelectItem key={teacher.id} value={teacher.id}>{teacher.name}</SelectItem>
+                        ))
                     )}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label>Capacity</Label>
-                <Input type="number" value={newClass.capacity || 30} onChange={e => setNewClass({ ...newClass, capacity: Number(e.target.value) })} />
-              </div>
+              
               <div className="space-y-2">
                 <Label>Academic Year *</Label>
                 <Select
@@ -528,16 +746,49 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast }
                     <SelectValue placeholder="Select academic year" />
                   </SelectTrigger>
                   <SelectContent>
-                    {academicYears.map(year => (
+                    {(academicYears || []).filter(year => year && year.id && year.name && year.id.trim() !== '').map(year => (
                       <SelectItem key={year.id} value={year.id}>{year.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
+
               {classError && <div className="text-red-600">{classError}</div>}
               <div className="flex justify-end space-x-4">
                 <Button type="button" variant="outline" onClick={() => setShowClassModal(false)}>Cancel</Button>
                   <Button type="submit" style={{ backgroundColor: colorTheme }}>{newClass && newClass.id ? "Update Class" : "Add Class"}</Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+        
+        {/* Grade Modal */}
+        <Dialog open={showGradeModal} onOpenChange={setShowGradeModal}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{editingGrade ? "Edit Grade" : "Add Custom Grade"}</DialogTitle>
+              <DialogDescription>{editingGrade ? "Update the grade name." : "Create a new custom grade for your school."}</DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSaveGrade} className="space-y-4">
+              <div className="space-y-2">
+                <Label>Grade Name *</Label>
+                <Input 
+                  value={newGrade.name} 
+                  onChange={e => setNewGrade({ ...newGrade, name: e.target.value })} 
+                  placeholder="e.g., Grade 7, Form 1, etc."
+                  required 
+                />
+              </div>
+              {gradeError && <div className="text-red-600">{gradeError}</div>}
+              <div className="flex justify-end space-x-4">
+                <Button type="button" variant="outline" onClick={() => {
+                  setShowGradeModal(false);
+                  setNewGrade({ name: "" });
+                  setEditingGrade(null);
+                }}>Cancel</Button>
+                <Button type="submit" style={{ backgroundColor: colorTheme }}>
+                  {editingGrade ? "Update Grade" : "Add Grade"}
+                </Button>
               </div>
             </form>
           </DialogContent>

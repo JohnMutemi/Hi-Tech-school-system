@@ -37,18 +37,41 @@ export default function AnalyticsPage() {
         router.replace('/superadmin/login')
       }
     } else {
+      setIsAuthenticated(true)
       loadAnalytics()
     }
-    setIsLoading(false)
   }, [user, router])
 
-  const loadAnalytics = () => {
-    const allSchools = getAllSchools()
-    setSchools(allSchools)
+  const loadAnalytics = async () => {
+    try {
+      setIsLoading(true)
+      const allSchools = await getAllSchools()
+      setSchools(allSchools || [])
+    } catch (error) {
+      console.error("Error loading schools:", error)
+      setSchools([])
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   // Calculate analytics data
   const calculateAnalytics = () => {
+    // Ensure schools is an array
+    if (!Array.isArray(schools)) {
+      return {
+        totalSchools: 0,
+        recentSchools: 0,
+        totalStudents: 0,
+        totalTeachers: 0,
+        activeSchools: 0,
+        setupSchools: 0,
+        growthRate: 0,
+        avgStudentsPerSchool: 0,
+        avgTeachersPerSchool: 0,
+      }
+    }
+
     const now = new Date()
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
     const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
@@ -101,24 +124,60 @@ export default function AnalyticsPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header with Navigation and Refresh Button */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.back()}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">System Analytics</h1>
+              <p className="text-gray-600">Comprehensive overview of platform performance and school statistics</p>
+            </div>
+          </div>
+          <Button 
+            onClick={loadAnalytics} 
+            disabled={isLoading}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            <div className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`}>
+              {isLoading ? (
+                <div className="w-4 h-4 border-2 border-gray-300 border-t-blue-600 rounded-full"></div>
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              )}
+            </div>
+            Refresh
+          </Button>
+        </div>
+
         {/* Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
           <Card className="border-l-4 border-l-blue-500">
-            <CardContent className="p-6">
+            <CardContent className="p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Total Schools</p>
-                  <p className="text-2xl font-bold">{analytics.totalSchools}</p>
+                  <p className="text-xs md:text-sm text-gray-600">Total Schools</p>
+                  <p className="text-xl md:text-2xl font-bold">{analytics.totalSchools}</p>
                 </div>
-                <School className="w-8 h-8 text-blue-500" />
+                <School className="w-6 h-6 md:w-8 md:h-8 text-blue-500" />
               </div>
               <div className="flex items-center mt-2">
                 {analytics.growthRate >= 0 ? (
-                  <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
+                  <TrendingUp className="w-3 h-3 md:w-4 md:h-4 text-green-500 mr-1" />
                 ) : (
-                  <TrendingDown className="w-4 h-4 text-red-500 mr-1" />
+                  <TrendingDown className="w-3 h-3 md:w-4 md:h-4 text-red-500 mr-1" />
                 )}
-                <span className={`text-sm ${analytics.growthRate >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                <span className={`text-xs md:text-sm ${analytics.growthRate >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {analytics.growthRate >= 0 ? '+' : ''}{analytics.growthRate.toFixed(1)}%
                 </span>
               </div>
@@ -126,16 +185,16 @@ export default function AnalyticsPage() {
           </Card>
 
           <Card className="border-l-4 border-l-green-500">
-            <CardContent className="p-6">
+            <CardContent className="p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Total Students</p>
-                  <p className="text-2xl font-bold">{analytics.totalStudents}</p>
+                  <p className="text-xs md:text-sm text-gray-600">Total Students</p>
+                  <p className="text-xl md:text-2xl font-bold">{analytics.totalStudents}</p>
                 </div>
-                <Users className="w-8 h-8 text-green-500" />
+                <Users className="w-6 h-6 md:w-8 md:h-8 text-green-500" />
               </div>
               <div className="mt-2">
-                <span className="text-sm text-gray-600">
+                <span className="text-xs md:text-sm text-gray-600">
                   Avg: {analytics.avgStudentsPerSchool} per school
                 </span>
               </div>
@@ -143,16 +202,16 @@ export default function AnalyticsPage() {
           </Card>
 
           <Card className="border-l-4 border-l-purple-500">
-            <CardContent className="p-6">
+            <CardContent className="p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Total Teachers</p>
-                  <p className="text-2xl font-bold">{analytics.totalTeachers}</p>
+                  <p className="text-xs md:text-sm text-gray-600">Total Teachers</p>
+                  <p className="text-xl md:text-2xl font-bold">{analytics.totalTeachers}</p>
                 </div>
-                <GraduationCap className="w-8 h-8 text-purple-500" />
+                <GraduationCap className="w-6 h-6 md:w-8 md:h-8 text-purple-500" />
               </div>
               <div className="mt-2">
-                <span className="text-sm text-gray-600">
+                <span className="text-xs md:text-sm text-gray-600">
                   Avg: {analytics.avgTeachersPerSchool} per school
                 </span>
               </div>
@@ -160,16 +219,16 @@ export default function AnalyticsPage() {
           </Card>
 
           <Card className="border-l-4 border-l-orange-500">
-            <CardContent className="p-6">
+            <CardContent className="p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">New Schools</p>
-                  <p className="text-2xl font-bold">{analytics.recentSchools}</p>
+                  <p className="text-xs md:text-sm text-gray-600">New Schools</p>
+                  <p className="text-xl md:text-2xl font-bold">{analytics.recentSchools}</p>
                 </div>
-                <Calendar className="w-8 h-8 text-orange-500" />
+                <Calendar className="w-6 h-6 md:w-8 md:h-8 text-orange-500" />
               </div>
               <div className="mt-2">
-                <span className="text-sm text-gray-600">Last 30 days</span>
+                <span className="text-xs md:text-sm text-gray-600">Last 30 days</span>
               </div>
             </CardContent>
           </Card>
@@ -269,7 +328,12 @@ export default function AnalyticsPage() {
             <CardDescription>Latest schools and their current status</CardDescription>
           </CardHeader>
           <CardContent>
-            {schools.length === 0 ? (
+            {isLoading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p className="text-gray-600">Loading schools...</p>
+              </div>
+            ) : !Array.isArray(schools) || schools.length === 0 ? (
               <div className="text-center py-8">
                 <School className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                 <p className="text-gray-600">No schools have been added yet.</p>

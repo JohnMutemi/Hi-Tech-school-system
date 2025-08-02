@@ -64,6 +64,23 @@ import {
   AccordionContent,
 } from "@/components/ui/accordion";
 import Papa from "papaparse";
+import { BulkImport } from "@/components/ui/bulk-import";
+import { 
+  ResponsiveContainer, 
+  ResponsiveGrid, 
+  ResponsiveCard, 
+  TouchButton, 
+  ResponsiveModal,
+  ResponsiveForm,
+  ResponsiveFormRow,
+  ResponsiveFormGroup,
+  ResponsiveInput,
+  ResponsiveSelect,
+  ResponsiveTable,
+  ResponsiveText,
+  ResponsiveSpacing
+} from '@/components/ui/responsive-components';
+import { useResponsive } from '@/hooks/useResponsive';
 
 interface FeeStructure {
   id: string;
@@ -106,51 +123,13 @@ interface FeeManagementProps {
 }
 
 function FeeImportButton({ schoolCode }: { schoolCode: string }) {
-  const fileInput = useRef<HTMLInputElement>(null);
-  const [result, setResult] = useState<{ created?: any[]; errors?: any[] } | null>(null);
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const formData = new FormData();
-    formData.append("file", file);
-    const res = await fetch(`/api/schools/${schoolCode}/fee-structure/import`, {
-      method: "POST",
-      body: formData,
-    });
-    const data = await res.json();
-    setResult({ created: data.created, errors: data.errors });
-    alert(data.success ? "Import successful!" : "Import failed.");
-  };
-
   return (
-    <div className="mb-4">
-      <button onClick={() => fileInput.current?.click()} className="mb-2 px-4 py-2 bg-blue-600 text-white rounded shadow">Import Fee Structures</button>
-      <input
-        type="file"
-        accept=".xlsx,.csv"
-        ref={fileInput}
-        style={{ display: "none" }}
-        onChange={handleFileChange}
-      />
-      {result && (
-        <div className="mt-2 text-sm">
-          {Array.isArray(result.created) && result.created.length > 0 && (
-            <div className="text-green-700 mb-1">Created: {result.created?.map((c, i) => <span key={i}>{c.fee}{i < (result.created?.length ?? 0) - 1 ? ", " : ""}</span>)}</div>
-          )}
-          {result.errors && result.errors.length > 0 && (
-            <div className="text-red-700">
-              Errors:
-              <ul className="list-disc ml-5">
-                {result.errors.map((err, i) => (
-                  <li key={i}>{err.fee}: {err.error}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+    <BulkImport 
+      entityType="fee-structures" 
+      schoolCode={schoolCode} 
+      variant="outline"
+      size="sm"
+    />
   );
 }
 
@@ -161,38 +140,37 @@ export function FeeManagement({
   onFeeStructureCreated,
 }: FeeManagementProps) {
   const { toast } = useToast();
+  const responsive = useResponsive();
   const [feeStructures, setFeeStructures] = useState<FeeStructure[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [editingFee, setEditingFee] = useState<FeeStructure | null>(null);
-  const [viewingFee, setViewingFee] = useState<FeeStructure | null>(null);
-  const [grades, setGrades] = useState<any[]>([]);
-  const [loadingGrades, setLoadingGrades] = useState(false);
 
   // New: Academic year and term state
   const [academicYearId, setAcademicYearId] = useState<string>("");
   const [termId, setTermId] = useState<string>("");
 
   // Form state
+  const [showForm, setShowForm] = useState(false);
+  const [editingFee, setEditingFee] = useState<FeeStructure | null>(null);
+  const [viewingFee, setViewingFee] = useState<FeeStructure | null>(null);
   const [formData, setFormData] = useState({
-    term: "",
-    year: new Date().getFullYear().toString(),
     gradeId: "",
-    totalAmount: "",
-    breakdown: {
-      tuition: "",
-      books: "",
-      lunch: "",
-      uniform: "",
-      transport: "",
-      other: "",
-    },
     academicYearId: "",
     termId: "",
   });
-
-  // Replace breakdown and breakdownItems state with a dynamic array
   const [breakdown, setBreakdown] = useState([{ name: "", value: "" }]);
+
+  // Search and filter state
+  const [searchText, setSearchText] = useState("");
+  const [filteredFeeStructures] = useState(() => {
+    return feeStructures.filter((fee) =>
+      fee.gradeName.toLowerCase().includes(searchText.toLowerCase()) ||
+      fee.term.toLowerCase().includes(searchText.toLowerCase()) ||
+      (fee.creator?.name &&
+        fee.creator.name.toLowerCase().includes(searchText)) ||
+      (fee.creator?.email &&
+        fee.creator.email.toLowerCase().includes(searchText))
+    );
+  });
 
   // CSV import handler
   const handleCSVImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -290,16 +268,6 @@ export function FeeManagement({
     fetchFeeStructures();
   }, [schoolCode, academicYearId, termId]);
 
-  // Update fetchGrades to fetch global grades
-  useEffect(() => {
-    async function fetchGrades() {
-      const res = await fetch(`/api/grades`);
-      if (!res.ok) throw new Error("Failed to fetch grades");
-      setGrades(await res.json());
-    }
-    fetchGrades();
-  }, []);
-
   // Add state for available terms in the current academic year
   const [availableTerms, setAvailableTerms] = useState<any[]>([]);
 
@@ -331,7 +299,7 @@ export function FeeManagement({
         const res = await fetch(`/api/schools/${schoolCode}/academic-years`);
         if (!res.ok) throw new Error("Failed to fetch academic years");
         const years = await res.json();
-        setAvailableYears(years);
+        setAvailableYears(Array.isArray(years) ? years : (years.data && Array.isArray(years.data) ? years.data : []));
         // Set default year if not editing
         if (!editingFee && years.length > 0) {
           setAcademicYearId(years[0].id);
@@ -402,18 +370,7 @@ export function FeeManagement({
         setShowForm(false);
         setEditingFee(null);
         setFormData({
-          term: "",
-          year: new Date().getFullYear().toString(),
           gradeId: "",
-          totalAmount: "",
-          breakdown: {
-            tuition: "",
-            books: "",
-            lunch: "",
-            uniform: "",
-            transport: "",
-            other: "",
-          },
           academicYearId: academicYearId,
           termId: termId,
         });
@@ -454,20 +411,9 @@ export function FeeManagement({
   const handleEdit = (fee: FeeStructure) => {
     setEditingFee(fee);
     setFormData({
-      term: fee.term,
-      year: fee.year ? fee.year.toString() : "",
       gradeId: fee.gradeId,
-      totalAmount: fee.totalAmount.toString(),
       academicYearId: fee.academicYearId || academicYearId,
       termId: fee.termId || termId,
-      breakdown: {
-        tuition: "",
-        books: "",
-        lunch: "",
-        uniform: "",
-        transport: "",
-        other: "",
-      },
     });
     setBreakdown(
       Array.isArray(fee.breakdown)
@@ -488,43 +434,12 @@ export function FeeManagement({
     setShowForm(false);
     setEditingFee(null);
     setFormData({
-      term: "",
-      year: new Date().getFullYear().toString(),
       gradeId: "",
-      totalAmount: "",
-      breakdown: {
-        tuition: "",
-        books: "",
-        lunch: "",
-        uniform: "",
-        transport: "",
-        other: "",
-      },
       academicYearId: academicYearId,
       termId: termId,
     });
     setBreakdown([{ name: "", value: "" }]);
   };
-
-  // Add search state
-  const [search, setSearch] = useState("");
-
-  // Filtered fee structures based on search
-  const filteredFeeStructures = feeStructures.filter((fee) => {
-    const searchText = search.toLowerCase();
-    return (
-      (fee.term && fee.term.toLowerCase().includes(searchText)) ||
-      (fee.academicYear?.name && fee.academicYear.name.toLowerCase().includes(searchText)) ||
-      (fee.year && fee.year.toString().includes(searchText)) ||
-      (fee.gradeName && fee.gradeName.toLowerCase().includes(searchText)) ||
-      (fee.totalAmount && fee.totalAmount.toString().includes(searchText)) ||
-      (fee.isActive ? "active" : "inactive").includes(searchText) ||
-      (fee.creator?.name &&
-        fee.creator.name.toLowerCase().includes(searchText)) ||
-      (fee.creator?.email &&
-        fee.creator.email.toLowerCase().includes(searchText))
-    );
-  });
 
   return (
     <div className="space-y-8">
@@ -569,112 +484,112 @@ export function FeeManagement({
         <div className="absolute bottom-4 left-4 w-16 h-16 bg-white/5 rounded-full blur-lg"></div>
       </div>
 
-      {/* Enhanced Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="group relative overflow-hidden rounded-2xl border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 bg-gradient-to-br from-green-50 to-emerald-100">
+      {/* Enhanced Stats Cards with Responsive Components */}
+      <ResponsiveGrid cols={{ mobile: 1, tablet: 2, desktop: 3, large: 4 }} gap="lg">
+        <ResponsiveCard className="group relative overflow-hidden rounded-2xl border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 bg-gradient-to-br from-green-50 to-emerald-100">
           <div className="absolute inset-0 bg-gradient-to-r from-green-400/20 to-emerald-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-          <CardContent className="p-6 relative z-10">
+          <div className="p-6 relative z-10">
             <div className="flex items-center space-x-4">
               <div className="p-3 bg-green-500 rounded-2xl shadow-lg">
                 <DollarSign className="w-8 h-8 text-white" />
               </div>
               <div>
-                <p className="text-3xl font-bold text-green-700">
+                <ResponsiveText size="2xl" className="font-bold text-green-700">
                   {feeStructures.length}
-                </p>
-                <p className="text-sm text-green-600 font-medium">
+                </ResponsiveText>
+                <ResponsiveText size="sm" className="text-green-600 font-medium">
                   Total Fee Structures
-                </p>
+                </ResponsiveText>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </ResponsiveCard>
 
-        <Card className="group relative overflow-hidden rounded-2xl border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 bg-gradient-to-br from-blue-50 to-indigo-100">
+        <ResponsiveCard className="group relative overflow-hidden rounded-2xl border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 bg-gradient-to-br from-blue-50 to-indigo-100">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-400/20 to-indigo-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-          <CardContent className="p-6 relative z-10">
+          <div className="p-6 relative z-10">
             <div className="flex items-center space-x-4">
               <div className="p-3 bg-blue-500 rounded-2xl shadow-lg">
                 <CheckCircle className="w-8 h-8 text-white" />
               </div>
               <div>
-                <p className="text-3xl font-bold text-blue-700">
+                <ResponsiveText size="2xl" className="font-bold text-blue-700">
                   {feeStructures.filter((f) => f.isActive).length}
-                </p>
-                <p className="text-sm text-blue-600 font-medium">
+                </ResponsiveText>
+                <ResponsiveText size="sm" className="text-blue-600 font-medium">
                   Active Structures
-                </p>
+                </ResponsiveText>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </ResponsiveCard>
 
-        <Card className="group relative overflow-hidden rounded-2xl border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 bg-gradient-to-br from-purple-50 to-violet-100">
+        <ResponsiveCard className="group relative overflow-hidden rounded-2xl border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 bg-gradient-to-br from-purple-50 to-violet-100">
           <div className="absolute inset-0 bg-gradient-to-r from-purple-400/20 to-violet-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-          <CardContent className="p-6 relative z-10">
+          <div className="p-6 relative z-10">
             <div className="flex items-center space-x-4">
               <div className="p-3 bg-purple-500 rounded-2xl shadow-lg">
                 <Calendar className="w-8 h-8 text-white" />
               </div>
               <div>
-                <p className="text-3xl font-bold text-purple-700">
+                <ResponsiveText size="2xl" className="font-bold text-purple-700">
                   {
                     feeStructures.filter(
                       (f) => f.term === currentTerm && f.year === currentYear
                     ).length
                   }
-                </p>
-                <p className="text-sm text-purple-600 font-medium">
+                </ResponsiveText>
+                <ResponsiveText size="sm" className="text-purple-600 font-medium">
                   Current Term
-                </p>
+                </ResponsiveText>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </ResponsiveCard>
 
-        <Card className="group relative overflow-hidden rounded-2xl border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 bg-gradient-to-br from-orange-50 to-amber-100">
+        <ResponsiveCard className="group relative overflow-hidden rounded-2xl border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 bg-gradient-to-br from-orange-50 to-amber-100">
           <div className="absolute inset-0 bg-gradient-to-r from-orange-400/20 to-amber-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-          <CardContent className="p-6 relative z-10">
+          <div className="p-6 relative z-10">
             <div className="flex items-center space-x-4">
               <div className="p-3 bg-orange-500 rounded-2xl shadow-lg">
                 <Users className="w-8 h-8 text-white" />
               </div>
               <div>
-                <p className="text-3xl font-bold text-orange-700">
+                <ResponsiveText size="2xl" className="font-bold text-orange-700">
                   {new Set(feeStructures.map((f) => f.gradeName)).size}
-                </p>
-                <p className="text-sm text-orange-600 font-medium">Grades</p>
+                </ResponsiveText>
+                <ResponsiveText size="sm" className="text-orange-600 font-medium">Grades</ResponsiveText>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </ResponsiveCard>
+      </ResponsiveGrid>
 
-      {/* Enhanced Fee Structures Table */}
-      <Card className="rounded-3xl border-0 shadow-2xl overflow-hidden bg-gradient-to-br from-white to-gray-50">
-        <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+      {/* Enhanced Fee Structures Table with Responsive Components */}
+      <ResponsiveCard className="rounded-3xl border-0 shadow-2xl overflow-hidden bg-gradient-to-br from-white to-gray-50">
+        <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 p-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <CardTitle className="text-2xl font-bold text-gray-800 flex items-center gap-3">
+              <ResponsiveText size="2xl" className="font-bold text-gray-800 flex items-center gap-3">
                 <TrendingUp className="w-6 h-6 text-blue-600" />
                 Fee Structures Overview
-              </CardTitle>
-              <CardDescription className="text-gray-600">
+              </ResponsiveText>
+              <ResponsiveText size="base" className="text-gray-600">
                 Manage and monitor all fee structures for your school
-              </CardDescription>
+              </ResponsiveText>
             </div>
             <div className="w-full md:w-72">
               <input
                 type="text"
                 className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200"
                 placeholder="Search by term, year, grade, status, creator..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
               />
             </div>
           </div>
-        </CardHeader>
-        <CardContent className="p-0">
+        </div>
+        <div className="p-0">
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -691,7 +606,7 @@ export function FeeManagement({
                 No fee structures found
               </h3>
               <p className="text-gray-500 mb-6">
-                {search
+                {searchText
                   ? "Try a different search term or clear the filter."
                   : "Create your first fee structure to get started"}
               </p>
@@ -835,8 +750,8 @@ export function FeeManagement({
               </Table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ResponsiveCard>
 
       {/* Enhanced Form Dialog */}
       <Dialog open={showForm} onOpenChange={setShowForm}>
@@ -882,7 +797,7 @@ export function FeeManagement({
                   required
                 >
                   <option value="">Select Academic Year</option>
-                  {availableYears.map((year: any) => (
+                  {(availableYears || []).map((year: any) => (
                     <option key={year.id} value={year.id}>
                       {year.name}
                     </option>
@@ -926,18 +841,14 @@ export function FeeManagement({
                   }
                   required
                   className="w-full border rounded px-3 py-2"
-                  disabled={loadingGrades}
                 >
                   <option value="">Select Grade</option>
-                  {loadingGrades ? (
-                    <option>Loading...</option>
-                  ) : (
-                    grades.map((grade) => (
-                      <option key={grade.id} value={grade.id}>
-                        {grade.name}
-                      </option>
-                    ))
-                  )}
+                  <option value="grade-1">Grade 1</option>
+                  <option value="grade-2">Grade 2</option>
+                  <option value="grade-3">Grade 3</option>
+                  <option value="grade-4">Grade 4</option>
+                  <option value="grade-5">Grade 5</option>
+                  <option value="grade-6">Grade 6</option>
                 </select>
               </div>
             </div>

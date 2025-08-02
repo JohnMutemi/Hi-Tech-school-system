@@ -39,8 +39,6 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
         teacherId: teacher?.id,
         academicYear: row['Academic Year'],
         isActive: row['Is Active'] === 'TRUE' || row['Is Active'] === true,
-        createdAt: row['Created At'] ? new Date(row['Created At']) : undefined,
-        updatedAt: row['Updated At'] ? new Date(row['Updated At']) : undefined,
         gradeId: grade.id,
       },
     });

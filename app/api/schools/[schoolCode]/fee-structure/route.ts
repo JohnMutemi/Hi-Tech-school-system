@@ -1,12 +1,15 @@
 import { PrismaClient } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
+import { withSchoolContext } from '@/lib/school-context';
 
 const prisma = new PrismaClient();
 
 // GET: Fetch fee structures for a school
 export async function GET(request: NextRequest, { params }: { params: { schoolCode: string } }) {
   try {
-    const schoolCode = params.schoolCode.toLowerCase();
+    const schoolManager = withSchoolContext(params.schoolCode);
+    await schoolManager.initialize();
+    
     const { searchParams } = new URL(request.url);
     
     const termId = searchParams.get('termId');
@@ -15,20 +18,8 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     const year = searchParams.get('year');
     const gradeId = searchParams.get('gradeId');
 
-    // Find the school
-    const school = await prisma.school.findUnique({
-      where: { code: schoolCode }
-    });
-
-    if (!school) {
-      return NextResponse.json({ error: 'School not found' }, { status: 404 });
-    }
-
-    // Build query filters
-    const whereClause: any = {
-      schoolId: school.id,
-      isActive: true
-    };
+    // Build query filters with school context
+    const whereClause: any = schoolManager.getSchoolWhereClause({ isActive: true });
     if (academicYearId) whereClause.academicYearId = academicYearId;
     if (termId) whereClause.termId = termId;
     if (gradeId) whereClause.gradeId = gradeId;
@@ -87,7 +78,9 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
 // POST: Create or update a fee structure
 export async function POST(request: NextRequest, { params }: { params: { schoolCode: string } }) {
   try {
-    const schoolCode = params.schoolCode.toLowerCase();
+    const schoolManager = withSchoolContext(params.schoolCode);
+    const schoolContext = await schoolManager.initialize();
+    
     const body = await request.json();
     
     let {
@@ -122,19 +115,12 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
       totalAmount = calcTotal;
     }
 
-    // Find the school
-    const school = await prisma.school.findUnique({
-      where: { code: schoolCode }
-    });
 
-    if (!school) {
-      return NextResponse.json({ error: 'School not found' }, { status: 404 });
-    }
 
     // If academicYearId/termId not provided, get current
     if (!academicYearId || !termId) {
       const currentYear = await prisma.academicYear.findFirst({
-        where: { schoolId: school.id, isCurrent: true },
+        where: { schoolId: schoolContext.schoolId, isCurrent: true },
       });
       if (currentYear) {
         if (!academicYearId) academicYearId = currentYear.id;
@@ -167,7 +153,7 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
     // In a real app, you'd get this from the authenticated session
     const adminUser = await prisma.user.findFirst({
       where: {
-        schoolId: school.id,
+        schoolId: schoolContext.schoolId,
         role: 'admin'
       }
     });
@@ -196,7 +182,7 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
     if (academicYearId && termId) {
       existingFeeStructure = await prisma.termlyFeeStructure.findFirst({
         where: {
-          schoolId: school.id,
+          schoolId: schoolContext.schoolId,
           academicYearId,
           termId,
           gradeId
@@ -207,7 +193,7 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
     if (!existingFeeStructure && year && term) {
       existingFeeStructure = await prisma.termlyFeeStructure.findFirst({
         where: {
-          schoolId: school.id,
+          schoolId: schoolContext.schoolId,
           year: parseInt(year),
           term,
           gradeId
@@ -255,7 +241,7 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
           breakdown,
           isActive,
           createdBy: adminUser.id,
-          schoolId: school.id,
+          schoolId: schoolContext.schoolId,
           academicYearId: academicYearId || undefined,
           termId: termId || undefined,
         },

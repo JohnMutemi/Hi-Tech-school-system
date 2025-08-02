@@ -19,7 +19,7 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
     const createdClasses = [];
     const existingClasses = [];
 
-    for (let i = 1; i <= 9; i++) {
+    for (let i = 1; i <= 6; i++) {
       const className = `Grade ${i}`;
       
       const existingClass = await prisma.class.findFirst({

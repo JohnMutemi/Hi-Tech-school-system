@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { users, students, schools } from '@/lib/db/schema';
 import { eq, and, or } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
+import { hashDefaultPasswordByRole } from '@/lib/utils/default-passwords';
 
 const prisma = new PrismaClient();
 
@@ -57,13 +58,17 @@ export async function PUT(req: NextRequest, { params }: { params: { schoolCode: 
 
 export async function POST(req: NextRequest, { params }: { params: { schoolCode: string } }) {
   const data = await req.json();
-  // data: { name, email, password, ... }
+  // data: { name, email, phone, ... }
   const school = await prisma.school.findUnique({ where: { code: params.schoolCode } });
   if (!school) return NextResponse.json({ error: 'School not found' }, { status: 404 });
+
+  // Use default parent password
+  const hashedPassword = await hashDefaultPasswordByRole('parent');
 
   const parent = await prisma.user.create({
     data: {
       ...data,
+      password: hashedPassword,
       role: 'parent',
       schoolId: school.id,
     },

@@ -91,6 +91,7 @@ import StaffSection from "./StaffSection";
 import StudentsSection from "./StudentsSection";
 import SubjectsClassesSection from "./SubjectsClassesSection";
 import PromotionsSection from "./PromotionsSection";
+import AlumniSection from "./AlumniSection";
 
 interface SchoolSetupDashboardProps {
   schoolData: SchoolData;
@@ -184,9 +185,17 @@ export function SchoolSetupDashboard({
   // Fetch grades from API on component mount
   useEffect(() => {
     async function fetchGrades() {
-      const res = await fetch(`/api/grades`);
-      if (!res.ok) throw new Error("Failed to fetch grades");
-      // setGrades(await res.json()); // Grades are now managed by SchoolProfileSection
+      try {
+        const res = await fetch(`/api/schools/${schoolData.schoolCode}/grades`);
+        if (!res.ok) {
+          console.warn("Grades endpoint not available, this is normal for new schools");
+          return;
+        }
+        
+        // setGrades(await res.json()); // Grades are now managed by SchoolProfileSection
+      } catch (error) {
+        console.warn("Could not fetch grades:", error);
+      }
     }
     fetchGrades();
   }, []);
@@ -558,7 +567,12 @@ export function SchoolSetupDashboard({
 
               {/* Promotions Tab */}
               <TabsContent value="promotions" className="space-y-8 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl shadow-lg p-6">
-                <PromotionsSection schoolCode={schoolData.schoolCode} colorTheme={schoolData.colorTheme} toast={toast} />
+                <PromotionsSection schoolCode={schoolData.schoolCode} />
+              </TabsContent>
+
+              {/* Alumni Tab */}
+              <TabsContent value="alumni" className="space-y-8 bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl shadow-lg p-6">
+                <AlumniSection schoolCode={schoolData.schoolCode} />
               </TabsContent>
 
              

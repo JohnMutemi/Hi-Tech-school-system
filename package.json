@@ -7,7 +7,10 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
-    "seed:superadmin": "npx prisma db seed"
+    "seed:superadmin": "npx prisma db seed",
+    "audit:school-isolation": "tsx scripts/audit-school-isolation.ts",
+    "test:school-isolation": "tsx scripts/test-school-isolation.ts",
+    "cleanup:grades": "node scripts/cleanup-grades.js"
   },
   "dependencies": {
     "@aws-sdk/client-rds-data": "latest",

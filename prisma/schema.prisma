@@ -34,6 +34,8 @@ model School {
   users                        User[]
   promotionRequests            PromotionRequest[]
   bulkPromotionConfigs         BulkPromotionConfig[]
+  alumni                       Alumni[]
+  subjects                     Subject[]
 }
 
 model User {
@@ -61,6 +63,7 @@ model User {
   school              School?              @relation(fields: [schoolId], references: [id])
   submittedPromotionRequests PromotionRequest[] @relation("SubmittedPromotionRequests")
   approvedPromotionRequests PromotionRequest[] @relation("ApprovedPromotionRequests")
+  teacherSubjects            Subject[]         @relation("TeacherSubjects")
 }
 
 model TeacherProfile {
@@ -144,6 +147,7 @@ model Student {
   studentFees           StudentFee[]
   yearlyBalances        StudentYearlyBalance[]
   studentPromotionRequests StudentPromotionRequest[]
+  alumni                 Alumni[]
 }
 
 model Payment {
@@ -505,4 +509,40 @@ model StudentPromotionRequest {
   student             Student          @relation(fields: [studentId], references: [id])
   @@index([studentId, status])
   @@index([promotionRequestId])
+}
+
+model Subject {
+  id          String   @id @default(uuid())
+  name        String
+  code        String
+  description String?
+  teacherId   String?
+  schoolId    String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  teacher     User?    @relation("TeacherSubjects", fields: [teacherId], references: [id])
+  school      School   @relation(fields: [schoolId], references: [id])
+  @@unique([schoolId, code])
+  @@index([schoolId, name])
+}
+
+model Alumni {
+  id                  String   @id @default(uuid())
+  schoolId            String
+  studentId           String
+  graduationYear      String
+  finalGrade          String
+  achievements        Json?    // Array of achievement strings
+  contactEmail        String?
+  contactPhone        String?
+  currentInstitution  String?
+  currentOccupation   String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  school              School   @relation(fields: [schoolId], references: [id])
+  student             Student  @relation(fields: [studentId], references: [id])
+  @@unique([studentId, graduationYear])
+  @@index([schoolId, graduationYear])
+  @@index([graduationYear, finalGrade])
 } 

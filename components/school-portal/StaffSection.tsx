@@ -5,10 +5,12 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Edit, Trash2, Eye, ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useRef, useState ,useEffect} from "react";
 import { CheckCircle, XCircle } from "lucide-react";
+import { BulkImport } from "@/components/ui/bulk-import";
 
 function ImportResultSummary({ result, onClose }: { result: { created?: any[]; errors?: any[] } | null, onClose?: () => void }) {
   if (!result) return null;
@@ -151,24 +153,38 @@ export default function StaffSection({ schoolCode, colorTheme, toast }: any) {
   }, [schoolCode, toast]);
 
   // Handler for import result
-  const handleImportResult = (data: any) => {
+  const handleImportResult = async (data: any) => {
     setImportResult({ created: data.created, errors: data.errors });
     setShowImportResult(true);
-    if (Array.isArray(data.created)) {
-      // Optionally, fetch teachers from backend instead
-      setImportedTeachers(data.created.map((t: any) => ({
-        name: t.teacher,
-        email: t.email || '',
-        phone: t.phone || '',
-        qualification: t.qualification || '',
-        dateJoined: t.dateJoined || '',
-        status: 'Active',
-      })));
+    
+    // Refresh teachers list from database after successful import
+    if (data.success && Array.isArray(data.created) && data.created.length > 0) {
+      try {
+        const tRes = await fetch(`/api/schools/${schoolCode}/teachers`);
+        if (tRes.ok) {
+          const updatedTeachers = await tRes.json();
+          setTeachers(updatedTeachers);
+          // Clear imported teachers since we now have fresh data from DB
+          setImportedTeachers([]);
+          // Show success message
+          toast && toast({ 
+            title: "Import Successful!", 
+            description: `Successfully imported ${data.created.length} teachers.` 
+          });
+        }
+      } catch (error) {
+        console.error('Failed to refresh teachers list:', error);
+        toast && toast({ 
+          title: "Warning", 
+          description: "Teachers imported but failed to refresh the list. Please refresh the page.", 
+          variant: "destructive" 
+        });
+      }
     }
   };
 
-  // Combine imported and fetched teachers for display
-  const allTeachers = [...importedTeachers, ...teachers];
+  // Use teachers from database (imported teachers are now merged into the main list)
+  const allTeachers = teachers;
 
   // Teacher CRUD handlers
   const createTeacher = async (teacherData: any) => {
@@ -329,13 +345,43 @@ export default function StaffSection({ schoolCode, colorTheme, toast }: any) {
                 <Input value={formData.phone || ""} onChange={e => setFormData({ ...formData, phone: e.target.value })} placeholder="+254 700 000 000" />
               </div>
               <div className="space-y-2">
+                <Label>Employee ID</Label>
+                <Input value={formData.employeeId || ""} onChange={e => setFormData({ ...formData, employeeId: e.target.value })} placeholder="e.g., T001" />
+              </div>
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
                 <Label>Qualification</Label>
                 <Input value={formData.qualification || ""} onChange={e => setFormData({ ...formData, qualification: e.target.value })} placeholder="e.g., Bachelor of Education" />
               </div>
+              <div className="space-y-2">
+                <Label>Date Joined</Label>
+                <Input type="date" value={formData.dateJoined || ""} onChange={e => setFormData({ ...formData, dateJoined: e.target.value })} />
+              </div>
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Assigned Class</Label>
+                <Input value={formData.assignedClass || ""} onChange={e => setFormData({ ...formData, assignedClass: e.target.value })} placeholder="e.g., Class 1A" />
+              </div>
+              <div className="space-y-2">
+                <Label>Academic Year</Label>
+                <Input value={formData.academicYear || ""} onChange={e => setFormData({ ...formData, academicYear: e.target.value })} placeholder="e.g., 2024" />
+              </div>
             </div>
             <div className="space-y-2">
-              <Label>Date Joined</Label>
-              <Input type="date" value={formData.dateJoined || ""} onChange={e => setFormData({ ...formData, dateJoined: e.target.value })} />
+              <Label>Status</Label>
+              <Select value={formData.status || "active"} onValueChange={value => setFormData({ ...formData, status: value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="on_leave">On Leave</SelectItem>
+                  <SelectItem value="terminated">Terminated</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex justify-end space-x-4">
               <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
@@ -421,7 +467,13 @@ export default function StaffSection({ schoolCode, colorTheme, toast }: any) {
           <CardTitle className="flex items-center justify-between">
             <span>Teachers</span>
             <div className="flex gap-2">
-              <ImportTeachersButton schoolCode={schoolCode} onSuccess={handleImportResult} />
+              <BulkImport 
+              entityType="teachers" 
+              schoolCode={schoolCode} 
+              onSuccess={handleImportResult}
+              variant="outline"
+              size="sm"
+            />
               <Button onClick={handleAddTeacher} style={{ backgroundColor: colorTheme }}>+ Add Teacher</Button>
             </div>
           </CardTitle>
@@ -526,18 +578,28 @@ export default function StaffSection({ schoolCode, colorTheme, toast }: any) {
 
       {/* Teacher Credentials Modal */}
       <Dialog open={showTeacherCredentials} onOpenChange={setShowTeacherCredentials}>
-        <DialogContent>
+        <DialogContent className="max-w-md bg-white/90 rounded-2xl shadow-2xl">
           <DialogHeader>
-            <DialogTitle>Teacher Credentials</DialogTitle>
-            <DialogDescription>Share these credentials with the teacher. They will use them to log in for the first time.</DialogDescription>
+            <DialogTitle>Access Credentials</DialogTitle>
+            <DialogDescription>Share these credentials with the teacher for their first login.</DialogDescription>
           </DialogHeader>
           {lastTeacherCredentials && (
-            <div className="space-y-2">
-              <div><strong>Email:</strong> {lastTeacherCredentials.email}</div>
-              <div><strong>Temporary Password:</strong> {lastTeacherCredentials.tempPassword}</div>
+            <div className="mb-4 space-y-2">
+              <h4 className="font-semibold mb-1">Teacher</h4>
+              <div className="flex items-center gap-2">
+                <label className="text-xs w-20">Email:</label>
+                <input className="font-mono border rounded px-2 py-1 w-full" value={lastTeacherCredentials.email} readOnly onFocus={e => e.target.select()} />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-xs w-20">Password:</label>
+                <input className="font-mono border rounded px-2 py-1 w-full" value={lastTeacherCredentials.tempPassword} readOnly onFocus={e => e.target.select()} />
+              </div>
+              <div className="flex gap-2 mt-2">
+                <a href={`/schools/${schoolCode}/teachers/login`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline text-xs">Go to Teacher Login</a>
+              </div>
             </div>
           )}
-          <Button onClick={() => setShowTeacherCredentials(false)} className="mt-4">Close</Button>
+          <Button onClick={() => setShowTeacherCredentials(false)} className="mt-4 w-full">Close</Button>
         </DialogContent>
       </Dialog>
 
@@ -584,28 +646,91 @@ export default function StaffSection({ schoolCode, colorTheme, toast }: any) {
 
       {/* View Modal */}
       <Dialog open={!!viewingItem} onOpenChange={() => setViewingItem(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Teacher Details</DialogTitle>
+            <DialogDescription>Complete information about the teacher and their login credentials.</DialogDescription>
           </DialogHeader>
-          <div>
-            <div><strong>Name:</strong> {viewingItem?.name}</div>
-            <div><strong>Email:</strong> {viewingItem?.email}</div>
-            <div><strong>Phone:</strong> {viewingItem?.phone}</div>
-            <div><strong>Qualification:</strong> {viewingItem?.qualification}</div>
-            <div><strong>Date Joined:</strong> {viewingItem?.dateJoined ? new Date(viewingItem.dateJoined).toLocaleDateString() : ''}</div>
-            <div className="mt-4 p-2 bg-blue-50 rounded">
-              <div><strong>Login Email:</strong> {viewingItem?.email}</div>
-              <div><strong>Default Password:</strong> <span className="font-mono">teacher123</span></div>
-              <a
-                href={`/schools/${schoolCode}/teachers/login`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-block mt-2 px-3 py-1 bg-blue-600 text-white rounded"
-              >
-                Go to Teacher Login
-              </a>
+          {viewingItem && (
+            <div className="space-y-6">
+              {/* Teacher Information */}
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <h3 className="font-semibold text-lg mb-3 text-blue-800">Teacher Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <span className="font-medium text-gray-700">Full Name:</span>
+                    <p className="text-gray-900">{viewingItem.name}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Email:</span>
+                    <p className="text-gray-900">{viewingItem.email}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Phone:</span>
+                    <p className="text-gray-900">{viewingItem.phone || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Employee ID:</span>
+                    <p className="text-gray-900">{viewingItem.employeeId || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Qualification:</span>
+                    <p className="text-gray-900">{viewingItem.qualification || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Date Joined:</span>
+                    <p className="text-gray-900">{viewingItem.dateJoined ? new Date(viewingItem.dateJoined).toLocaleDateString() : 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Status:</span>
+                    <p className="text-gray-900">{viewingItem.status || 'Active'}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Assigned Class:</span>
+                    <p className="text-gray-900">{viewingItem.assignedClass || 'N/A'}</p>
+                  </div>
+                </div>
+                {viewingItem.academicYear && (
+                  <div className="mt-4">
+                    <span className="font-medium text-gray-700">Academic Year:</span>
+                    <p className="text-gray-900">{viewingItem.academicYear}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Login Credentials */}
+              <div className="bg-yellow-50 p-4 rounded-lg">
+                <h3 className="font-semibold text-lg mb-3 text-yellow-800">Login Credentials</h3>
+                <div className="space-y-2">
+                  <div>
+                    <span className="font-medium text-gray-700">Teacher Login:</span>
+                    <div className="mt-1 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs w-20">Email:</label>
+                        <input className="font-mono border rounded px-2 py-1 w-full text-sm" value={viewingItem.email} readOnly onFocus={e => e.target.select()} />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs w-20">Password:</label>
+                        <input className="font-mono border rounded px-2 py-1 w-full text-sm" value="teacher123" readOnly onFocus={e => e.target.select()} />
+                      </div>
+                      <div className="flex gap-2 mt-2">
+                        <a 
+                          href={`/schools/${schoolCode}/teachers/login`} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-blue-600 underline text-xs"
+                        >
+                          Go to Teacher Login
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
+          )}
+          <div className="flex justify-end mt-6">
+            <Button onClick={() => setViewingItem(null)}>Close</Button>
           </div>
         </DialogContent>
       </Dialog>
