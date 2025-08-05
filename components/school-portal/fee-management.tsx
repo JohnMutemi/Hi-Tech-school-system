@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -139,6 +139,7 @@ export function FeeManagement({
   onGoBack,
   onFeeStructureCreated,
 }: FeeManagementProps) {
+  console.log('🎓 FeeManagement component initialized with schoolCode:', schoolCode);
   const { toast } = useToast();
   const responsive = useResponsive();
   const [feeStructures, setFeeStructures] = useState<FeeStructure[]>([]);
@@ -147,6 +148,7 @@ export function FeeManagement({
   // New: Academic year and term state
   const [academicYearId, setAcademicYearId] = useState<string>("");
   const [termId, setTermId] = useState<string>("");
+  const [availableGrades, setAvailableGrades] = useState<any[]>([]);
 
   // Form state
   const [showForm, setShowForm] = useState(false);
@@ -161,7 +163,7 @@ export function FeeManagement({
 
   // Search and filter state
   const [searchText, setSearchText] = useState("");
-  const [filteredFeeStructures] = useState(() => {
+  const filteredFeeStructures = useMemo(() => {
     return feeStructures.filter((fee) =>
       fee.gradeName.toLowerCase().includes(searchText.toLowerCase()) ||
       fee.term.toLowerCase().includes(searchText.toLowerCase()) ||
@@ -170,7 +172,7 @@ export function FeeManagement({
       (fee.creator?.email &&
         fee.creator.email.toLowerCase().includes(searchText))
     );
-  });
+  }, [feeStructures, searchText]);
 
   // CSV import handler
   const handleCSVImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -232,21 +234,29 @@ export function FeeManagement({
   }, [schoolCode]);
 
   // Fetch fee structures
-  const fetchFeeStructures = async () => {
+  const fetchFeeStructures = useCallback(async () => {
     try {
       setLoading(true);
       // Show all fee structures by default (no filters)
       let url = `/api/schools/${schoolCode}/fee-structure`;
+      console.log('🔍 Fetching fee structures from:', url);
+      
       // If you add filter UI later, add params here
       // const params = [];
       // if (academicYearId) params.push(`academicYearId=${academicYearId}`);
       // if (termId) params.push(`termId=${termId}`);
       // if (params.length) url += `?${params.join("&")}`;
       const response = await fetch(url);
+      console.log('📊 Response status:', response.status);
+      
       if (response.ok) {
         const data = await response.json();
+        console.log('✅ Fee structures received:', data);
+        console.log('📊 Number of fee structures:', data.length);
         setFeeStructures(data);
       } else {
+        const errorText = await response.text();
+        console.error('❌ API error:', errorText);
         toast({
           title: "Error",
           description: "Failed to fetch fee structures",
@@ -254,6 +264,7 @@ export function FeeManagement({
         });
       }
     } catch (error) {
+      console.error('❌ Fetch error:', error);
       toast({
         title: "Error",
         description: "Failed to fetch fee structures",
@@ -262,11 +273,12 @@ export function FeeManagement({
     } finally {
       setLoading(false);
     }
-  };
+  }, [schoolCode]);
 
   useEffect(() => {
+    console.log('🔄 useEffect triggered - fetching fee structures');
     fetchFeeStructures();
-  }, [schoolCode, academicYearId, termId]);
+  }, [fetchFeeStructures, academicYearId, termId]);
 
   // Add state for available terms in the current academic year
   const [availableTerms, setAvailableTerms] = useState<any[]>([]);
@@ -334,6 +346,21 @@ export function FeeManagement({
     }
     fetchTerms();
   }, [schoolCode, academicYearId, editingFee]);
+
+  // Fetch available grades
+  useEffect(() => {
+    async function fetchGrades() {
+      try {
+        const res = await fetch(`/api/schools/${schoolCode}/grades`);
+        if (!res.ok) throw new Error("Failed to fetch grades");
+        const grades = await res.json();
+        setAvailableGrades(Array.isArray(grades) ? grades : []);
+      } catch {
+        setAvailableGrades([]);
+      }
+    }
+    fetchGrades();
+  }, [schoolCode]);
 
   // Handle form submit
   const handleSubmit = async (e: React.FormEvent) => {
@@ -843,12 +870,11 @@ export function FeeManagement({
                   className="w-full border rounded px-3 py-2"
                 >
                   <option value="">Select Grade</option>
-                  <option value="grade-1">Grade 1</option>
-                  <option value="grade-2">Grade 2</option>
-                  <option value="grade-3">Grade 3</option>
-                  <option value="grade-4">Grade 4</option>
-                  <option value="grade-5">Grade 5</option>
-                  <option value="grade-6">Grade 6</option>
+                  {availableGrades.map((grade: any) => (
+                    <option key={grade.id} value={grade.id}>
+                      {grade.name}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>

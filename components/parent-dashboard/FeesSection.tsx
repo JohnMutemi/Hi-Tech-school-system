@@ -10,12 +10,15 @@ interface FeesSectionProps {
   students: any[];
   selectedId: string;
   setSelectedId: (id: string) => void;
+  payments: any[];
+  loadingPayments: boolean;
+  paymentsError: string;
+  refreshPayments: (studentId: string) => void;
 }
 
-export default function FeesSection({ schoolCode, students = [], selectedId, setSelectedId }: FeesSectionProps) {
+export default function FeesSection({ schoolCode, students = [], selectedId, setSelectedId, payments, loadingPayments, paymentsError, refreshPayments }: FeesSectionProps) {
   const selectedStudent = students.find((child: any) => child.id === selectedId) || students[0];
   const [feeData, setFeeData] = useState<any>(null);
-  const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [payAmount, setPayAmount] = useState("");
@@ -33,13 +36,12 @@ export default function FeesSection({ schoolCode, students = [], selectedId, set
         const res = await fetch(`/api/schools/${schoolCode}/students/${selectedStudent.id}/fees`);
         const data = await res.json();
         setFeeData(data);
+        console.log('FeesSection feeData', data); // <-- Debug log
         // Fetch payment history
-        const payRes = await fetch(`/api/schools/${schoolCode}/students/${selectedStudent.id}/payments`);
-        const payData = await payRes.json();
-        setPayments(payData.payments || []);
+        refreshPayments(selectedStudent.id);
       } catch (e) {
         setFeeData(null);
-        setPayments([]);
+        // setPayments([]); // This line is removed as per new_code
       }
       setLoading(false);
     }
@@ -77,10 +79,7 @@ export default function FeesSection({ schoolCode, students = [], selectedId, set
           setPayMethod("cash");
         }, 1500);
         // Optimistically update UI
-        const feeRes = await fetch(`/api/schools/${schoolCode}/students/${selectedStudent.id}/fees`);
-        setFeeData(await feeRes.json());
-        const payRes = await fetch(`/api/schools/${schoolCode}/students/${selectedStudent.id}/payments`);
-        setPayments((await payRes.json()).payments || []);
+        refreshPayments(selectedId);
       } else {
         const err = await res.json();
         setPayError(err.error || "Payment failed");
@@ -122,6 +121,35 @@ export default function FeesSection({ schoolCode, students = [], selectedId, set
               {/* Fee Structure Breakdown */}
               {loading ? (
                 <div className="flex items-center gap-2 text-green-600"><Loader2 className="animate-spin" /> Loading fee data...</div>
+              ) : Array.isArray(feeData) && feeData.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm border rounded-xl bg-white">
+                    <thead>
+                      <tr className="bg-green-100">
+                        <th className="px-2 py-1 text-left text-green-800">Term</th>
+                        <th className="px-2 py-1 text-left text-green-800">Year</th>
+                        <th className="px-2 py-1 text-left text-green-800">Fee Amount</th>
+                        <th className="px-2 py-1 text-left text-green-800">Outstanding</th>
+                        <th className="px-2 py-1 text-left text-green-800">Status</th>
+                        <th className="px-2 py-1 text-left text-green-800">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {feeData.map((term: any, idx: number) => (
+                        <tr key={term.id || idx} className="border-b">
+                          <td className="px-2 py-1">{term.term || "-"}</td>
+                          <td className="px-2 py-1">{term.year || "-"}</td>
+                          <td className="px-2 py-1">Ksh {Number(term.totalAmount).toLocaleString()}</td>
+                          <td className="px-2 py-1">Ksh {Number(term.balance ?? 0).toLocaleString()}</td>
+                          <td className="px-2 py-1">{Number(term.balance) > 0 ? <Badge variant="destructive">Pending</Badge> : <Badge variant="default">Cleared</Badge>}</td>
+                          <td className="px-2 py-1">
+                            <Button size="sm" className="bg-green-600 text-white" onClick={() => setPaymentModalOpen(true)} disabled={Number(term.balance) <= 0}>Pay Now</Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               ) : feeData && feeData.termBalances && feeData.termBalances.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="min-w-full text-sm border rounded-xl bg-white">
@@ -157,7 +185,11 @@ export default function FeesSection({ schoolCode, students = [], selectedId, set
               {/* Payment History */}
               <div className="mt-8">
                 <h3 className="font-bold text-lg text-green-800 mb-2">Payment History</h3>
-                {payments.length === 0 ? (
+                {loadingPayments ? (
+                  <div className="flex items-center gap-2 text-green-600"><Loader2 className="animate-spin" /> Loading payment history...</div>
+                ) : paymentsError ? (
+                  <div className="text-red-600 text-sm">{paymentsError}</div>
+                ) : payments.length === 0 ? (
                   <div className="text-gray-500 text-sm">No payments found.</div>
                 ) : (
                   <div className="overflow-x-auto">

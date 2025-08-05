@@ -202,15 +202,17 @@ export async function GET(
     const joinTermId = student.joinedTermId;
     const joinDate = student.dateAdmitted ? new Date(student.dateAdmitted) : null;
 
-    filteredFeeStructures = filteredFeeStructures.filter(fs => {
-      if (!fs.academicYearId || !fs.term) return false;
-      if (joinAcademicYearId && fs.academicYearId < joinAcademicYearId) return false;
-      if (joinAcademicYearId && fs.academicYearId === joinAcademicYearId && joinTermId) {
-        const termOrder: Record<string, number> = { 'Term 1': 1, 'Term 2': 2, 'Term 3': 3 };
-        return termOrder[fs.term] >= termOrder[joinTermId];
-      }
-      return true;
-    });
+    // filteredFeeStructures = filteredFeeStructures.filter(fs => {
+    //   if (!fs.academicYearId || !fs.term) return false;
+    //   if (joinAcademicYearId && fs.academicYearId < joinAcademicYearId) return false;
+    //   if (joinAcademicYearId && fs.academicYearId === joinAcademicYearId && joinTermId) {
+    //     const termOrder: Record<string, number> = { 'Term 1': 1, 'Term 2': 2, 'Term 3': 3 };
+    //     return termOrder[fs.term] >= termOrder[joinTermId];
+    //   }
+    //   return true;
+    // });
+    // BYPASS FILTER FOR DEBUGGING
+    // Now all fee structures for the grade/year/term will be included
 
     let filteredPayments = payments;
     if (joinAcademicYearId && joinTermId) {

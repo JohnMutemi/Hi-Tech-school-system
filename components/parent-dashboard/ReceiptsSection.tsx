@@ -1,31 +1,56 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Receipt, Loader2, Download } from "lucide-react";
-import { useState, useRef } from "react";
+import { useRef } from "react";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 
 interface ReceiptsSectionProps {
-  receipts: any[];
-  loadingReceipts?: boolean;
-  receiptsError?: string;
-  receiptSearch?: string;
-  setReceiptSearch?: (s: string) => void;
+  students: any[];
+  selectedId: string;
+  setSelectedId: (id: string) => void;
+  schoolCode: string;
+  payments: any[];
+  loadingPayments: boolean;
+  paymentsError: string;
+  refreshPayments: (studentId: string) => void;
 }
 
 export default function ReceiptsSection({
-  receipts = [],
-  loadingReceipts = false,
-  receiptsError = "",
-  receiptSearch = "",
-  setReceiptSearch,
+  students = [],
+  selectedId,
+  setSelectedId,
+  schoolCode,
 }: ReceiptsSectionProps) {
+  const [receipts, setReceipts] = useState<any[]>([]);
+  const [loadingReceipts, setLoadingReceipts] = useState(false);
+  const [receiptsError, setReceiptsError] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<any>(null);
   const [downloadFormat, setDownloadFormat] = useState("A4");
   const [step, setStep] = useState<"format" | "preview">("format");
   const receiptRef = useRef<HTMLDivElement>(null);
+
+  // Fetch receipts for selected child
+  useEffect(() => {
+    async function fetchReceipts() {
+      if (!selectedId) return setReceipts([]);
+      setLoadingReceipts(true);
+      setReceiptsError("");
+      try {
+        const res = await fetch(`/api/schools/${schoolCode}/students/${selectedId}/receipts`);
+        if (!res.ok) throw new Error("Failed to fetch receipts");
+        const data = await res.json();
+        setReceipts(Array.isArray(data) ? data : []);
+      } catch (e: any) {
+        setReceiptsError(e.message || "Failed to load receipts");
+        setReceipts([]);
+      }
+      setLoadingReceipts(false);
+    }
+    fetchReceipts();
+  }, [schoolCode, selectedId]);
 
   // No search, just show all receipts
   const filteredReceipts = receipts;
@@ -102,11 +127,26 @@ export default function ReceiptsSection({
           <CardTitle className="flex items-center gap-2 text-blue-800"><Receipt className="w-6 h-6 text-blue-600" /> Receipts</CardTitle>
         </CardHeader>
         <CardContent>
+          {/* Child Selector Dropdown */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Select Child</label>
+            <select
+              className="w-full max-w-xs p-2 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-gray-900"
+              value={selectedId}
+              onChange={e => setSelectedId(e.target.value)}
+            >
+              {students.map((child: any) => (
+                <option key={child.id} value={child.id}>
+                  {child.name || child.user?.name || child.id}
+                </option>
+              ))}
+            </select>
+          </div>
           {loadingReceipts ? (
             <div className="flex items-center gap-2 text-blue-600"><Loader2 className="animate-spin" /> Loading receipts...</div>
           ) : receiptsError ? (
             <div className="text-red-600 text-sm">{receiptsError}</div>
-          ) : filteredReceipts.length === 0 ? (
+          ) : receipts.length === 0 ? (
             <div className="text-gray-500 text-sm">No receipts found.</div>
           ) : (
             <div className="overflow-x-auto">
@@ -121,7 +161,7 @@ export default function ReceiptsSection({
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredReceipts.map((r: any) => (
+                  {receipts.map((r: any) => (
                     <tr key={r.id} className="border-b">
                       <td className="px-2 py-1">{r.paymentDate ? new Date(r.paymentDate).toLocaleDateString() : "-"}</td>
                       <td className="px-2 py-1">Ksh {r.amount?.toLocaleString() || "-"}</td>

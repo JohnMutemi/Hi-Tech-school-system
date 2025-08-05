@@ -60,7 +60,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { PaymentModal } from "@/components/payment/payment-modal";
-import { ParentFeesPanel } from "./ParentFeesPanel";
+import FeesSection from "@/components/parent-dashboard/FeesSection";
 import {
   Accordion,
   AccordionContent,
@@ -98,56 +98,114 @@ function ChildOverview({
   // Mock data for grade and attendance (replace with real data if available)
   const recentGrade = child.recentGrade || "B+";
   const attendance = child.attendance || 96;
+
+  // If feeStructure is an object, convert to array for uniformity
+  const feeStructures = Array.isArray(feeStructure)
+    ? feeStructure
+    : feeStructure
+    ? [feeStructure]
+    : [];
+
   return (
-    <div className="mb-8 flex flex-col md:flex-row gap-6 items-stretch">
-      <div className="flex-1 bg-white rounded-lg shadow p-6 flex flex-col md:flex-row gap-6 items-center">
-        <Avatar className="w-20 h-20 mr-4">
-          <img
-            src={child.avatarUrl || "/placeholder-user.jpg"}
-            alt={child.fullName || child.name}
-            className="rounded-full object-cover w-full h-full"
-          />
-        </Avatar>
-        <div className="flex-1">
-          <div className="font-bold text-lg">
-            {child.fullName || child.name}
+    <div className="space-y-6">
+      {/* Student Basic Info */}
+      <div className="mb-8 flex flex-col md:flex-row gap-6 items-stretch">
+        <div className="flex-1 bg-white rounded-lg shadow p-6 flex flex-col md:flex-row gap-6 items-center">
+          <Avatar className="w-20 h-20 mr-4">
+            <img
+              src={child.avatarUrl || "/placeholder-user.jpg"}
+              alt={child.fullName || child.name}
+              className="rounded-full object-cover w-full h-full"
+            />
+          </Avatar>
+          <div className="flex-1">
+            <div className="font-bold text-lg">
+              {child.fullName || child.name}
+            </div>
+            <div className="text-blue-700 font-semibold text-sm">
+              {child.gradeName}
+            </div>
+            <div className="text-xs text-gray-500">
+              Adm: {child.admissionNumber}
+            </div>
+            <div className="text-xs text-gray-700 mt-2">
+              Gender: {child.gender}
+              <br />
+              Date of Birth:{" "}
+              {child.dateOfBirth ? child.dateOfBirth.split("T")[0] : ""}
+              <br />
+              Date Admitted:{" "}
+              {child.dateAdmitted ? child.dateAdmitted.split("T")[0] : ""}
+            </div>
           </div>
-          <div className="text-blue-700 font-semibold text-sm">
-            {child.gradeName}
-          </div>
-          <div className="text-xs text-gray-500">
-            Adm: {child.admissionNumber}
-          </div>
-          <div className="text-xs text-gray-700 mt-2">
-            Gender: {child.gender}
-            <br />
-            Date of Birth:{" "}
-            {child.dateOfBirth ? child.dateOfBirth.split("T")[0] : ""}
-            <br />
-            Date Admitted:{" "}
-            {child.dateAdmitted ? child.dateAdmitted.split("T")[0] : ""}
+        </div>
+        <div className="flex-1 bg-white rounded-lg shadow p-6 flex flex-col gap-4 justify-center">
+          <div className="font-semibold text-gray-700 mb-2">Quick Stats</div>
+          <div className="flex flex-col gap-2">
+            <div className="flex justify-between items-center bg-blue-50 rounded px-3 py-2">
+              <span>Outstanding Fees</span>
+              <span className="text-red-600 font-bold">
+                KES {outstandingFees.toLocaleString()}
+              </span>
+            </div>
+            <div className="flex justify-between items-center bg-purple-50 rounded px-3 py-2">
+              <span>Recent Grade</span>
+              <span className="font-bold">{recentGrade}</span>
+            </div>
+            <div className="flex justify-between items-center bg-green-50 rounded px-3 py-2">
+              <span>Attendance</span>
+              <span className="font-bold text-green-700">{attendance}%</span>
+            </div>
           </div>
         </div>
       </div>
-      <div className="flex-1 bg-white rounded-lg shadow p-6 flex flex-col gap-4 justify-center">
-        <div className="font-semibold text-gray-700 mb-2">Quick Stats</div>
-        <div className="flex flex-col gap-2">
-          <div className="flex justify-between items-center bg-blue-50 rounded px-3 py-2">
-            <span>Outstanding Fees</span>
-            <span className="text-red-600 font-bold">
-              KES {outstandingFees.toLocaleString()}
-            </span>
-          </div>
-          <div className="flex justify-between items-center bg-purple-50 rounded px-3 py-2">
-            <span>Recent Grade</span>
-            <span className="font-bold">{recentGrade}</span>
-          </div>
-          <div className="flex justify-between items-center bg-green-50 rounded px-3 py-2">
-            <span>Attendance</span>
-            <span className="font-bold text-green-700">{attendance}%</span>
-          </div>
-        </div>
-      </div>
+
+      {/* Fee Structure Section */}
+      <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200 shadow-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-blue-800">
+            <DollarSign className="w-5 h-5" />
+            Fee Structure - {child.gradeName}
+          </CardTitle>
+          <CardDescription>
+            Complete fee breakdown by academic year and term
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {feeStructures.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm border rounded-xl bg-white">
+                <thead>
+                  <tr className="bg-blue-100">
+                    <th className="px-2 py-1 text-left text-blue-800">Term</th>
+                    <th className="px-2 py-1 text-left text-blue-800">Year</th>
+                    <th className="px-2 py-1 text-left text-blue-800">Fee Amount</th>
+                    <th className="px-2 py-1 text-left text-blue-800">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {feeStructures.map((fs, idx) => (
+                    <tr key={fs.id || idx} className="border-b">
+                      <td className="px-2 py-1">{fs.term || "-"}</td>
+                      <td className="px-2 py-1">{fs.year || "-"}</td>
+                      <td className="px-2 py-1">Ksh {Number(fs.totalAmount).toLocaleString()}</td>
+                      <td className="px-2 py-1">{fs.isActive ? <Badge variant="default">Active</Badge> : <Badge variant="secondary">Inactive</Badge>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <DollarSign className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+              <p className="text-gray-500 mb-2">No fee structure found</p>
+              <p className="text-sm text-gray-400">
+                Fee structure for {child.gradeName} has not been configured yet.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -223,6 +281,7 @@ export function ParentDashboard({
   ];
 
   const [studentFeeData, setStudentFeeData] = useState<any>({});
+  const [studentFeeSummaries, setStudentFeeSummaries] = useState<any>({});
 
   // Add state for current academic year and term
   const [currentAcademicYear, setCurrentAcademicYear] = useState<any>(null);
@@ -369,51 +428,69 @@ export function ParentDashboard({
   const fetchFeeStructures = async (studentList: any[]) => {
     try {
       setLoadingFees(true);
-      // Get unique grade IDs from students
-      const gradeIds = [
+      
+      // Get unique grade names from students (more reliable than grade IDs)
+      const gradeNames = [
         ...new Set(
           studentList
-            .map((student) => student.gradeId)
-            .filter((gradeId) => gradeId) // Filter out null/undefined values
+            .map((student) => student.gradeName)
+            .filter((gradeName) => gradeName && gradeName !== 'Not Assigned') // Filter out null/undefined values
         ),
       ];
 
-      console.log("Fetching fee structures for grade IDs:", gradeIds);
+      console.log("Fetching fee structures for grade names:", gradeNames);
 
-      // Get current year
+      if (gradeNames.length === 0) {
+        console.log("No valid grade names found for students");
+        setFeeStructures([]);
+        return;
+      }
+
+      // Get current year - TEMPORARILY HARDCODED FOR TESTING
       const currentDate = new Date();
-      const currentYear = currentDate.getFullYear();
+      const currentYear = 2025; // Hardcoded for testing - change back to currentDate.getFullYear() later
 
       console.log(`Fetching fee structures for year: ${currentYear}`);
 
-      // Fetch fee structures for all terms (Term 1, Term 2, Term 3) for each grade ID
-      const feePromises = gradeIds.flatMap((gradeId) => {
+      // Fetch fee structures for all terms (Term 1, Term 2, Term 3) for each grade name
+      const feePromises = gradeNames.flatMap((gradeName) => {
         const terms = ["Term 1", "Term 2", "Term 3"];
         return terms.map(async (term) => {
-          const response = await fetch(
-            `/api/schools/${schoolCode}/fee-structure?term=${term}&year=${currentYear}&gradeId=${gradeId}`
-          );
-          if (response.ok) {
-            const data = await response.json();
-            console.log(
-              `Fee structures for grade ID ${gradeId}, ${term}:`,
-              data
+          try {
+            // Use grade name parameter for more reliable filtering
+            const queryParams = `term=${term}&year=${currentYear}&gradeName=${encodeURIComponent(gradeName)}`;
+              
+            const response = await fetch(
+              `/api/schools/${schoolCode}/fee-structure?${queryParams}`
             );
+            
+            if (response.ok) {
+              const data = await response.json();
+              console.log(
+                `Fee structures for grade ${gradeName}, ${term}:`,
+                data
+              );
 
-            // Find active fee structure
-            const activeFeeStructure = data.find((fee: any) => fee.isActive);
-            console.log(
-              `Active fee structure for grade ID ${gradeId}, ${term}:`,
-              activeFeeStructure
-            );
+              // Find active fee structure for this grade
+              const activeFeeStructure = data.find((fee: any) => 
+                fee.isActive && fee.gradeName === gradeName
+              );
+              console.log(
+                `Active fee structure for grade ${gradeName}, ${term}:`,
+                activeFeeStructure
+              );
 
-            return activeFeeStructure || null;
-          } else {
-            console.error(
-              `Failed to fetch fee structures for grade ID ${gradeId}, ${term}:`,
-              response.status,
-              response.statusText
-            );
+              return activeFeeStructure || null;
+            } else {
+              console.error(
+                `Failed to fetch fee structures for grade ${gradeName}, ${term}:`,
+                response.status,
+                response.statusText
+              );
+              return null;
+            }
+          } catch (error) {
+            console.error(`Error fetching fee structures for ${gradeName}, ${term}:`, error);
             return null;
           }
         });
@@ -425,6 +502,7 @@ export function ParentDashboard({
       setFeeStructures(allFees);
     } catch (error) {
       console.error("Failed to fetch fee structures:", error);
+      setFeeStructures([]);
     } finally {
       setLoadingFees(false);
     }
@@ -804,41 +882,6 @@ const handleDownloadReceipt = async (receipt: any) => {
   const url = URL.createObjectURL(blob);
   const newWindow = window.open(url, "_blank");
   if (newWindow) newWindow.focus();
-};
-
-
-              <div class="summary">
-                  <div class="summary-item">
-                      <span class="label">Term Balance Before Payment:</span>
-                      <span>KES ${balanceBefore != null ? balanceBefore.toLocaleString() : '0.00'}</span>
-                  </div>
-                  <div class="summary-item">
-                      <span class="label">Amount Paid:</span>
-                      <span style="font-weight: bold;">KES ${amountPaid != null ? amountPaid.toLocaleString() : '0.00'}</span>
-                  </div>
-                  <div class="summary-item total">
-                      <span>Term Balance After Payment:</span>
-                      <span>KES ${balanceAfter != null ? balanceAfter.toLocaleString() : '0.00'}</span>
-                  </div>
-              </div>
-
-              <div class="footer">
-                  <p>Issued by School System on ${new Date().toLocaleDateString()}</p>
-                  <p>Thank you for your payment!</p>
-              </div>
-              <button class="print-button" onclick="window.print()">Print or Save as PDF</button>
-          </div>
-      </body>
-      </html>
-    `;
-
-    const receiptWindow = window.open('', '_blank');
-    if (receiptWindow) {
-        receiptWindow.document.write(htmlContent);
-        receiptWindow.document.close();
-    } else {
-        toast({ title: "Popup Blocked", description: "Please allow popups to view the receipt." });
-    }
   };
 
   // Fetch receipts when focused child changes
@@ -1377,26 +1420,23 @@ const outstandingFees = currentTermSummary ? currentTermSummary.balance : 0;
             </div>
           )}
           {selectedSection === "fees" && (
-{selectedSection === "fees" && (
-  <div className="max-w-4xl mx-auto">
-    <h2 className="text-2xl font-bold mb-6 text-center">Fee Structure</h2>
-    {students.length === 0 ? (
-      <Card className="mb-6">
-        <CardContent>No children found.</CardContent>
-      </Card>
-    ) : (
-      <ParentFeesPanel
-        schoolCode={schoolCode}
-        students={students}
-        focusedChildId={focusedChildId}
-        studentFeeSummaries={studentFeeSummaries}
-        refreshFeeData={fetchStudentFeeSummaries}
-      />
-    )}
-  </div>
-)}
-
-{selectedSection === "receipts" && (
+            <div className="max-w-4xl mx-auto">
+              <h2 className="text-2xl font-bold mb-6 text-center">Fee Structure</h2>
+              {students.length === 0 ? (
+                <Card className="mb-6">
+                  <CardContent>No children found.</CardContent>
+                </Card>
+              ) : (
+                <FeesSection
+                  schoolCode={schoolCode}
+                  students={students}
+                  selectedId={focusedChildId || students[0]?.id || ""}
+                  setSelectedId={setFocusedChildId}
+                />
+              )}
+            </div>
+          )}
+          {selectedSection === "receipts" && (
   <div className="max-w-4xl mx-auto">
     <h2 className="text-2xl font-bold mb-6 text-center">
       Payment History & Receipts
@@ -1552,8 +1592,6 @@ const outstandingFees = currentTermSummary ? currentTermSummary.balance : 0;
       </div>
     )}
   </div>
-)}
-
           )}
           {selectedSection === "receipts" && renderReceiptsTable()}
           {selectedSection === "performance" && (

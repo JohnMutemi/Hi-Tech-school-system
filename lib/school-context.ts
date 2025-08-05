@@ -247,30 +247,15 @@ export class SchoolDataManager {
         OR: [
           // School-specific grades
           {
-            schoolId: this.schoolContext.schoolId,
-            name: {
-              in: ['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6']
-            }
+            schoolId: this.schoolContext.schoolId
           },
           // Platform-level grades (available to all schools)
           {
-            schoolId: null,
-            name: {
-              in: ['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6']
-            }
+            schoolId: null
           }
         ]
       },
-      include: {
-        classes: {
-          where: {
-            OR: [
-              { schoolId: this.schoolContext.schoolId },
-              { schoolId: null } // Include platform-level classes if any
-            ]
-          }
-        }
-      },
+
       orderBy: {
         name: 'asc'
       }

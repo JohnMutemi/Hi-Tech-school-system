@@ -20,7 +20,7 @@ export default function OverviewSection(props: any) {
         const res = await fetch(`/api/schools/${schoolCode}/students/${selectedStudent.id}/fees`);
         const data = await res.json();
         setFeeData(data);
-        console.log("Overview feeData", data);
+        console.log('OverviewSection feeData', data); // <-- Debug log
       } catch {
         setFeeData(null);
       }
@@ -131,6 +131,31 @@ export default function OverviewSection(props: any) {
             <div className="flex items-center gap-2 text-blue-600">
               <svg className="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
               Loading fee structure...
+            </div>
+          ) : Array.isArray(feeData) && feeData.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm border rounded-xl bg-white">
+                <thead>
+                  <tr className="bg-blue-100">
+                    <th className="px-2 py-1 text-left text-blue-800">Term</th>
+                    <th className="px-2 py-1 text-left text-blue-800">Year</th>
+                    <th className="px-2 py-1 text-left text-blue-800">Fee Amount</th>
+                    <th className="px-2 py-1 text-left text-blue-800">Outstanding</th>
+                    <th className="px-2 py-1 text-left text-blue-800">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {feeData.map((term: any, idx: number) => (
+                    <tr key={term.id || idx} className="border-b">
+                      <td className="px-2 py-1">{term.term || "-"}</td>
+                      <td className="px-2 py-1">{term.year || "-"}</td>
+                      <td className="px-2 py-1">Ksh {Number(term.totalAmount).toLocaleString()}</td>
+                      <td className="px-2 py-1">Ksh {Number(term.balance ?? 0).toLocaleString()}</td>
+                      <td className="px-2 py-1">{Number(term.balance) > 0 ? <Badge variant="destructive">Pending</Badge> : <Badge variant="default">Cleared</Badge>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           ) : feeData && feeData.termBalances && feeData.termBalances.length > 0 ? (
             <div className="overflow-x-auto">

@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
 import { withSchoolContext } from '@/lib/school-context';
+import { getOrCreateSchoolGrade } from '@/lib/school-grade-utils';
 
 const prisma = new PrismaClient();
 
@@ -17,6 +18,7 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     const term = searchParams.get('term');
     const year = searchParams.get('year');
     const gradeId = searchParams.get('gradeId');
+    const gradeName = searchParams.get('gradeName');
 
     // Build query filters with school context
     const whereClause: any = schoolManager.getSchoolWhereClause({ isActive: true });
@@ -26,6 +28,19 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     // Legacy support
     if (!termId && term) whereClause.term = term;
     if (!academicYearId && year) whereClause.year = parseInt(year);
+    
+    // If gradeName is provided but no gradeId, try to find or create the grade by name
+    if (gradeName && !gradeId) {
+      try {
+        const grade = await getOrCreateSchoolGrade(schoolManager.getContext().schoolId, gradeName);
+        if (grade) {
+          whereClause.gradeId = grade.id;
+        }
+      } catch (error) {
+        console.error(`Error getting/creating grade for ${gradeName}:`, error);
+        // Continue without grade filtering if there's an error
+      }
+    }
 
     // Fetch fee structures
     const feeStructures = await prisma.termlyFeeStructure.findMany({
