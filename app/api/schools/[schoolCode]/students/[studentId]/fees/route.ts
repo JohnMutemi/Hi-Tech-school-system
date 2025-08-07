@@ -10,7 +10,8 @@ export async function GET(
 ) {
   try {
     const { searchParams } = new URL(request.url);
-    const academicYearId = searchParams.get('academicYearId');
+    const academicYearIdParam = searchParams.get('academicYearId');
+    const academicYearNameParam = searchParams.get('academicYear'); // e.g. "2025"
 
     const prisma = new PrismaClient();
 
@@ -69,29 +70,43 @@ export async function GET(
       }, { status: 400 });
     }
 
-    // Get current academic year
-    const currentYear = await prisma.academicYear.findFirst({
-      where: { schoolId: school.id, isCurrent: true },
-    });
+    // Resolve target academic year (by id if provided, else by name if provided, else current)
+    let targetAcademicYearId: string | null = academicYearIdParam;
+    if (!targetAcademicYearId) {
+      if (academicYearNameParam) {
+        const ayByName = await prisma.academicYear.findFirst({
+          where: { schoolId: school.id, name: academicYearNameParam },
+        });
+        targetAcademicYearId = ayByName?.id || null;
+      } else {
+        const currentYear = await prisma.academicYear.findFirst({
+          where: { schoolId: school.id, isCurrent: true },
+        });
+        targetAcademicYearId = currentYear?.id || null;
+      }
+    }
 
-    console.log('Current Academic Year:', currentYear?.name);
-
-    // Get fee structures for this grade and current year by YEAR NAME (not academic year ID)
+    // Get fee structures for this student's grade and target academic year (using academicYearId)
     let feeStructures = await prisma.termlyFeeStructure.findMany({
       where: {
         gradeId: targetGradeId,
         isActive: true,
-        year: parseInt(currentYear?.name || '2025') // Use year name instead of academic year ID
+        ...(targetAcademicYearId ? { academicYearId: targetAcademicYearId } : {}),
+        NOT: [
+          { termId: null },
+          { academicYearId: null },
+        ],
       },
       include: {
-        grade: true
-      }
+        grade: true,
+        academicYear: { select: { name: true } },
+      },
     });
 
     console.log(`=== FEE STRUCTURE FETCHING ===`);
     console.log(`Student Grade: ${studentGradeName} (ID: ${targetGradeId})`);
-    console.log(`Current Year: ${currentYear?.name}`);
-    console.log(`Found ${feeStructures.length} fee structures for this grade and year ${currentYear?.name}`);
+    console.log(`AcademicYearId filter: ${targetAcademicYearId || 'ALL'}`);
+    console.log(`Found ${feeStructures.length} fee structures for this grade${targetAcademicYearId ? ` and academicYearId ${targetAcademicYearId}` : ''}`);
     
     // Show all fee structures found
     feeStructures.forEach((fs, index) => {
@@ -177,7 +192,7 @@ export async function GET(
     const payments = await prisma.payment.findMany({
       where: { 
         studentId: student.id,
-        ...(academicYearId ? { academicYearId: academicYearId } : {})
+        ...(targetAcademicYearId ? { academicYearId: targetAcademicYearId } : {})
       },
       orderBy: { paymentDate: 'asc' },
       select: {
@@ -289,14 +304,20 @@ export async function GET(
         .filter(txn => txn.termId === fs.termId && txn.academicYearId === fs.academicYearId && txn.type === 'payment')
         .reduce((sum, txn) => sum + (txn.credit || 0), 0);
 
-      let balance = charges - paymentsForTerm + carryForward;
+      // Calculate base balance for this term
+      let baseBalance = charges - paymentsForTerm;
+      
+      // Apply carry forward from previous terms
+      let balance = baseBalance + carryForward;
       let carryToNext = 0;
+      
+      // If balance is negative (overpayment), carry forward to next term
       if (balance < 0) {
-        carryToNext = balance;
+        carryToNext = balance; // This will be negative
         balance = 0;
       }
       
-      console.log(`Term ${fs.term}: Charges=${charges}, Payments=${paymentsForTerm}, Balance=${balance}`);
+      console.log(`Term ${fs.term}: Charges=${charges}, Payments=${paymentsForTerm}, BaseBalance=${baseBalance}, CarryForward=${carryForward}, FinalBalance=${balance}, CarryToNext=${carryToNext}`);
       
       const result = {
         termId: fs.termId,
@@ -304,8 +325,13 @@ export async function GET(
         term: fs.term,
         year: fs.year,
         totalAmount: fs.totalAmount,
-        balance
+        balance: Math.max(0, balance), // Ensure balance is never negative
+        baseBalance: baseBalance,
+        carryForward: carryForward,
+        carryToNext: carryToNext
       };
+      
+      // Update carry forward for next term
       carryForward = carryToNext;
       return result;
     });

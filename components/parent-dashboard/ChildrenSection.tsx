@@ -3,7 +3,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Users, User, GraduationCap, Calendar, Mail, Phone, MapPin } from "lucide-react";
 
 export default function ChildrenSection(props: any) {
-  const { students = [] } = props;
+  const { students = [], schoolCode = "" } = props;
   const [selectedId, setSelectedId] = useState(students[0]?.id || "");
   const selectedStudent = students.find((child: any) => child.id === selectedId) || students[0];
 
@@ -161,6 +161,8 @@ export default function ChildrenSection(props: any) {
                         </div>
                       </div>
                     )}
+
+
                   </div>
                 </div>
               )}

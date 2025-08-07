@@ -100,13 +100,13 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
     // Generate reference number if not provided
     const finalReferenceNumber = referenceNumber || `PAY-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-    // --- NEW LOGIC: Fetch current balances before payment ---
-    // Get all termly fee structures for this student/grade for the academic year
+    // --- NEW LOGIC: Fetch balances for the payment's academic year ---
+    // Get all termly fee structures for this student/grade for the payment's academic year
     const feeStructures = await prisma.termlyFeeStructure.findMany({
       where: {
         gradeId: student.class?.gradeId,
         isActive: true,
-        academicYearId: academicYearRecord.id,
+        academicYearId: academicYearRecord.id, // Use payment's academic year
         NOT: [ { termId: null } ]
       }
     });

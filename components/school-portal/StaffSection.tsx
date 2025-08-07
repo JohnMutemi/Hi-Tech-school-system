@@ -648,14 +648,22 @@ export default function StaffSection({ schoolCode, colorTheme, toast }: any) {
       <Dialog open={!!viewingItem} onOpenChange={() => setViewingItem(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Teacher Details</DialogTitle>
-            <DialogDescription>Complete information about the teacher and their login credentials.</DialogDescription>
+            <DialogTitle>
+              {viewingItem && (teachers.find(t => t.id === viewingItem.id) ? 'Teacher Details' : 'Bursar Details')}
+            </DialogTitle>
+            <DialogDescription>
+              {viewingItem && (teachers.find(t => t.id === viewingItem.id) 
+                ? 'Complete information about the teacher and their login credentials.'
+                : 'Complete information about the bursar and their login credentials.')}
+            </DialogDescription>
           </DialogHeader>
           {viewingItem && (
             <div className="space-y-6">
-              {/* Teacher Information */}
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <h3 className="font-semibold text-lg mb-3 text-blue-800">Teacher Information</h3>
+              {/* Staff Information */}
+              <div className={`p-4 rounded-lg ${teachers.find(t => t.id === viewingItem.id) ? 'bg-blue-50' : 'bg-green-50'}`}>
+                <h3 className={`font-semibold text-lg mb-3 ${teachers.find(t => t.id === viewingItem.id) ? 'text-blue-800' : 'text-green-800'}`}>
+                  {teachers.find(t => t.id === viewingItem.id) ? 'Teacher Information' : 'Bursar Information'}
+                </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <span className="font-medium text-gray-700">Full Name:</span>
@@ -669,28 +677,36 @@ export default function StaffSection({ schoolCode, colorTheme, toast }: any) {
                     <span className="font-medium text-gray-700">Phone:</span>
                     <p className="text-gray-900">{viewingItem.phone || 'N/A'}</p>
                   </div>
-                  <div>
-                    <span className="font-medium text-gray-700">Employee ID:</span>
-                    <p className="text-gray-900">{viewingItem.employeeId || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-700">Qualification:</span>
-                    <p className="text-gray-900">{viewingItem.qualification || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-700">Date Joined:</span>
-                    <p className="text-gray-900">{viewingItem.dateJoined ? new Date(viewingItem.dateJoined).toLocaleDateString() : 'N/A'}</p>
-                  </div>
+                  {teachers.find(t => t.id === viewingItem.id) && (
+                    <>
+                      <div>
+                        <span className="font-medium text-gray-700">Employee ID:</span>
+                        <p className="text-gray-900">{viewingItem.employeeId || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-700">Qualification:</span>
+                        <p className="text-gray-900">{viewingItem.qualification || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-700">Date Joined:</span>
+                        <p className="text-gray-900">{viewingItem.dateJoined ? new Date(viewingItem.dateJoined).toLocaleDateString() : 'N/A'}</p>
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-700">Assigned Class:</span>
+                        <p className="text-gray-900">{viewingItem.assignedClass || 'N/A'}</p>
+                      </div>
+                    </>
+                  )}
                   <div>
                     <span className="font-medium text-gray-700">Status:</span>
                     <p className="text-gray-900">{viewingItem.status || 'Active'}</p>
                   </div>
                   <div>
-                    <span className="font-medium text-gray-700">Assigned Class:</span>
-                    <p className="text-gray-900">{viewingItem.assignedClass || 'N/A'}</p>
+                    <span className="font-medium text-gray-700">Role:</span>
+                    <p className="text-gray-900 capitalize">{teachers.find(t => t.id === viewingItem.id) ? 'Teacher' : 'Bursar'}</p>
                   </div>
                 </div>
-                {viewingItem.academicYear && (
+                {viewingItem.academicYear && teachers.find(t => t.id === viewingItem.id) && (
                   <div className="mt-4">
                     <span className="font-medium text-gray-700">Academic Year:</span>
                     <p className="text-gray-900">{viewingItem.academicYear}</p>
@@ -703,30 +719,73 @@ export default function StaffSection({ schoolCode, colorTheme, toast }: any) {
                 <h3 className="font-semibold text-lg mb-3 text-yellow-800">Login Credentials</h3>
                 <div className="space-y-2">
                   <div>
-                    <span className="font-medium text-gray-700">Teacher Login:</span>
+                    <span className="font-medium text-gray-700">
+                      {teachers.find(t => t.id === viewingItem.id) ? 'Teacher Login:' : 'Bursar Login:'}
+                    </span>
                     <div className="mt-1 space-y-2">
                       <div className="flex items-center gap-2">
                         <label className="text-xs w-20">Email:</label>
-                        <input className="font-mono border rounded px-2 py-1 w-full text-sm" value={viewingItem.email} readOnly onFocus={e => e.target.select()} />
+                        <input 
+                          className="font-mono border rounded px-2 py-1 w-full text-sm bg-white" 
+                          value={viewingItem.email} 
+                          readOnly 
+                          onFocus={e => e.target.select()} 
+                        />
                       </div>
                       <div className="flex items-center gap-2">
                         <label className="text-xs w-20">Password:</label>
-                        <input className="font-mono border rounded px-2 py-1 w-full text-sm" value="teacher123" readOnly onFocus={e => e.target.select()} />
+                        <input 
+                          className="font-mono border rounded px-2 py-1 w-full text-sm bg-white" 
+                          value={teachers.find(t => t.id === viewingItem.id) ? 'teacher123' : 'bursar123'} 
+                          readOnly 
+                          onFocus={e => e.target.select()} 
+                        />
                       </div>
                       <div className="flex gap-2 mt-2">
                         <a 
-                          href={`/schools/${schoolCode}/teachers/login`} 
+                          href={teachers.find(t => t.id === viewingItem.id) 
+                            ? `/schools/${schoolCode}/teachers/login` 
+                            : `/schools/${schoolCode}/bursar/login`} 
                           target="_blank" 
                           rel="noopener noreferrer"
-                          className="text-blue-600 underline text-xs"
+                          className="text-blue-600 underline text-xs hover:text-blue-800"
                         >
-                          Go to Teacher Login
+                          {teachers.find(t => t.id === viewingItem.id) 
+                            ? 'Go to Teacher Login' 
+                            : 'Go to Bursar Login'}
                         </a>
+                        {!teachers.find(t => t.id === viewingItem.id) && (
+                          <span className="text-xs text-gray-500">|</span>
+                        )}
+                        {!teachers.find(t => t.id === viewingItem.id) && (
+                          <a 
+                            href={`/schools/${schoolCode}/bursar`} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-green-600 underline text-xs hover:text-green-800"
+                          >
+                            Go to Bursar Dashboard
+                          </a>
+                        )}
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
+
+              {/* Additional Info for Bursars */}
+              {!teachers.find(t => t.id === viewingItem.id) && (
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h3 className="font-semibold text-lg mb-3 text-gray-800">Bursar Responsibilities</h3>
+                  <ul className="text-sm text-gray-700 space-y-1">
+                    <li>• Manage student fee payments and collections</li>
+                    <li>• Generate and print payment receipts</li>
+                    <li>• Track outstanding balances and payment history</li>
+                    <li>• Process cash, check, and mobile money payments</li>
+                    <li>• Generate financial reports for school administration</li>
+                  </ul>
+                </div>
+              )}
             </div>
           )}
           <div className="flex justify-end mt-6">

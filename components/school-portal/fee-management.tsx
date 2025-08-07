@@ -88,6 +88,7 @@ interface FeeStructure {
   year: number;
   gradeId: string;
   totalAmount: number;
+  amount?: number; // Add amount property for API compatibility
   breakdown: Record<string, number>;
   isActive: boolean;
   createdAt: string;
@@ -250,10 +251,13 @@ export function FeeManagement({
       console.log('📊 Response status:', response.status);
       
       if (response.ok) {
-        const data = await response.json();
-        console.log('✅ Fee structures received:', data);
-        console.log('📊 Number of fee structures:', data.length);
-        setFeeStructures(data);
+        const result = await response.json();
+        console.log('✅ Fee structures received:', result);
+        
+        // Handle both old and new response formats
+        const data = result.data || result; // New format has .data property, old format is direct array
+        console.log('📊 Number of fee structures:', Array.isArray(data) ? data.length : 0);
+        setFeeStructures(Array.isArray(data) ? data : []);
       } else {
         const errorText = await response.text();
         console.error('❌ API error:', errorText);
@@ -706,7 +710,7 @@ export function FeeManagement({
                         <div className="flex items-center space-x-2">
                           <DollarSign className="w-4 h-4 text-green-600" />
                           <span className="font-bold text-green-700">
-                            {fee.totalAmount.toLocaleString()}
+                            {(fee.totalAmount || fee.amount || 0).toLocaleString()}
                           </span>
                         </div>
                       </TableCell>
