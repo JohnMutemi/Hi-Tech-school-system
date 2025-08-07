@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { DollarSign, Loader2, CheckCircle2 } from "lucide-react";
+import { DollarSign, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 
 interface FeesSectionProps {
@@ -26,6 +26,8 @@ export default function FeesSection({ schoolCode, students = [], selectedId, set
   const [payLoading, setPayLoading] = useState(false);
   const [payError, setPayError] = useState("");
   const [paySuccess, setPaySuccess] = useState("");
+  const [selectedTerm, setSelectedTerm] = useState<any>(null);
+  const [paymentResult, setPaymentResult] = useState<any>(null);
 
   // Fetch fee structure and payments for selected student
   useEffect(() => {
@@ -48,7 +50,7 @@ export default function FeesSection({ schoolCode, students = [], selectedId, set
     fetchData();
   }, [schoolCode, selectedStudent]);
 
-  // Payment simulation
+  // Payment simulation with enhanced logic
   async function handleSimulatePayment() {
     if (!payAmount || isNaN(Number(payAmount)) || Number(payAmount) <= 0) {
       setPayError("Enter a valid amount");
@@ -58,28 +60,71 @@ export default function FeesSection({ schoolCode, students = [], selectedId, set
       setPayError("Select a payment method");
       return;
     }
+    if (!selectedTerm) {
+      setPayError("Please select a term to pay for");
+      return;
+    }
+    
     setPayLoading(true);
     setPayError("");
     setPaySuccess("");
+    setPaymentResult(null);
+    
     try {
       // Simulate 3s delay for realism
       await new Promise(resolve => setTimeout(resolve, 3000));
+      
       const res = await fetch(`/api/schools/${schoolCode}/students/${selectedStudent.id}/payments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: Number(payAmount), paymentMethod: payMethod, description: "Simulated Payment" })
+        body: JSON.stringify({ 
+          amount: Number(payAmount), 
+          paymentMethod: payMethod, 
+          description: `Payment for ${selectedTerm.term} ${selectedTerm.year}`,
+          term: selectedTerm.term,
+          academicYear: String(selectedTerm.year)
+        })
       });
+      
       if (res.ok) {
-        setPaySuccess("Payment successful!");
-        toast({ title: "Payment Successful", description: `Ksh ${Number(payAmount).toLocaleString()} paid successfully.` });
-        // Show green tick for 1.5s before closing
+        const result = await res.json();
+        setPaymentResult(result);
+        
+        // Show success message with overpayment details
+        let successMessage = `Payment successful! Ksh ${Number(payAmount).toLocaleString()} paid.`;
+        
+        if (result.overpaymentAmount > 0) {
+          successMessage += ` Overpayment of Ksh ${result.overpaymentAmount.toLocaleString()} applied to subsequent terms.`;
+        }
+        
+        if (result.nextTermApplied) {
+          successMessage += ` Applied Ksh ${result.nextTermApplied.amount.toLocaleString()} to ${result.nextTermApplied.term} ${result.nextTermApplied.year}.`;
+        }
+        
+        setPaySuccess(successMessage);
+        toast({ 
+          title: "Payment Successful", 
+          description: successMessage,
+          duration: 5000
+        });
+        
+        // Show green tick for 2s before closing
         setTimeout(() => {
           setPaymentModalOpen(false);
           setPayAmount("");
           setPayMethod("cash");
-        }, 1500);
-        // Optimistically update UI
+          setSelectedTerm(null);
+          setPaymentResult(null);
+        }, 2000);
+        
+        // Refresh data to show updated balances
         refreshPayments(selectedId);
+        
+        // Refresh fee data to update outstanding amounts
+        const feeRes = await fetch(`/api/schools/${schoolCode}/students/${selectedStudent.id}/fees`);
+        const feeData = await feeRes.json();
+        setFeeData(feeData);
+        
       } else {
         const err = await res.json();
         setPayError(err.error || "Payment failed");
@@ -90,22 +135,65 @@ export default function FeesSection({ schoolCode, students = [], selectedId, set
     setPayLoading(false);
   }
 
+  // Calculate outstanding amount for a term
+  const getTermOutstanding = (term: any) => {
+    if (!feeData) return 0;
+    
+    if (Array.isArray(feeData)) {
+      const termData = feeData.find((t: any) => t.term === term.term && t.year === term.year);
+      return termData ? Number(termData.balance || 0) : 0;
+    }
+    
+    if (feeData.termBalances) {
+      const termData = feeData.termBalances.find((t: any) => t.term === term.term && t.year === term.year);
+      return termData ? Number(termData.balance || 0) : 0;
+    }
+    
+    return 0;
+  };
+
+  // Check if term is fully paid
+  const isTermFullyPaid = (term: any) => {
+    return getTermOutstanding(term) <= 0;
+  };
+
+  // Get fee amount for a term
+  const getTermFeeAmount = (term: any) => {
+    if (!feeData) return 0;
+    
+    if (Array.isArray(feeData)) {
+      const termData = feeData.find((t: any) => t.term === term.term && t.year === term.year);
+      return termData ? Number(termData.totalAmount || 0) : 0;
+    }
+    
+    if (feeData.termBalances) {
+      const termData = feeData.termBalances.find((t: any) => t.term === term.term && t.year === term.year);
+      return termData ? Number(termData.totalAmount || 0) : 0;
+    }
+    
+    return 0;
+  };
+
   return (
-    <div className="space-y-8">
-      <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200 shadow">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-green-800"><DollarSign className="w-6 h-6 text-green-600" /> Fee Management</CardTitle>
+    <div className="h-full flex flex-col space-y-8">
+      <Card className="flex-1 bg-gradient-to-br from-cyan-50/90 via-blue-50/90 to-teal-50/90 border-cyan-200/60 shadow-lg backdrop-blur-sm">
+        <CardHeader className="pb-6">
+          <CardTitle className="flex items-center gap-3 text-cyan-800 text-xl">
+            <DollarSign className="w-7 h-7 text-cyan-600" /> 
+            Fee Management
+          </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-6 h-full flex flex-col">
+          {/* Enhanced Child Selection */}
           {students.length > 0 && (
-            <div className="w-full sm:w-64 mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Select Child</label>
+            <div className="bg-white/70 rounded-lg p-4 border border-green-100">
+              <label className="block text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Select Child</label>
               <select
-                className="w-full p-2 border border-green-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 bg-white text-gray-900"
+                className="w-full p-4 border-2 border-green-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-green-200 focus:border-green-400 bg-white text-gray-900 text-lg font-medium transition-all duration-200"
                 value={selectedId}
                 onChange={e => setSelectedId(e.target.value)}
               >
-                <option value="">-- Select --</option>
+                <option value="">-- Select Child --</option>
                 {students.map((child: any) => (
                   <option key={child.id} value={child.id}>
                     {child.name || child.user?.name || child.id}
@@ -135,18 +223,44 @@ export default function FeesSection({ schoolCode, students = [], selectedId, set
                       </tr>
                     </thead>
                     <tbody>
-                      {feeData.map((term: any, idx: number) => (
-                        <tr key={term.id || idx} className="border-b">
-                          <td className="px-2 py-1">{term.term || "-"}</td>
-                          <td className="px-2 py-1">{term.year || "-"}</td>
-                          <td className="px-2 py-1">Ksh {Number(term.totalAmount).toLocaleString()}</td>
-                          <td className="px-2 py-1">Ksh {Number(term.balance ?? 0).toLocaleString()}</td>
-                          <td className="px-2 py-1">{Number(term.balance) > 0 ? <Badge variant="destructive">Pending</Badge> : <Badge variant="default">Cleared</Badge>}</td>
-                          <td className="px-2 py-1">
-                            <Button size="sm" className="bg-green-600 text-white" onClick={() => setPaymentModalOpen(true)} disabled={Number(term.balance) <= 0}>Pay Now</Button>
-                          </td>
-                        </tr>
-                      ))}
+                      {feeData.map((term: any, idx: number) => {
+                        const outstanding = Number(term.balance ?? 0);
+                        const isPaid = outstanding <= 0;
+                        const feeAmount = Number(term.totalAmount);
+                        
+                        return (
+                          <tr key={term.id || idx} className="border-b">
+                            <td className="px-2 py-1">{term.term || "-"}</td>
+                            <td className="px-2 py-1">{term.year || "-"}</td>
+                            <td className="px-2 py-1">Ksh {feeAmount.toLocaleString()}</td>
+                            <td className="px-2 py-1">
+                              <span className={outstanding > 0 ? "text-red-600 font-semibold" : "text-green-600 font-semibold"}>
+                                Ksh {outstanding.toLocaleString()}
+                              </span>
+                            </td>
+                            <td className="px-2 py-1">
+                              {isPaid ? 
+                                <Badge variant="default" className="bg-green-100 text-green-800">Cleared</Badge> : 
+                                <Badge variant="destructive">Pending</Badge>
+                              }
+                            </td>
+                            <td className="px-2 py-1">
+                              <Button 
+                                size="sm" 
+                                className="bg-green-600 text-white hover:bg-green-700" 
+                                onClick={() => {
+                                  setSelectedTerm(term);
+                                  setPayAmount(outstanding.toString());
+                                  setPaymentModalOpen(true);
+                                }} 
+                                disabled={isPaid}
+                              >
+                                {isPaid ? "Paid" : "Pay Now"}
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -164,18 +278,44 @@ export default function FeesSection({ schoolCode, students = [], selectedId, set
                       </tr>
                     </thead>
                     <tbody>
-                      {feeData.termBalances.map((term: any, idx: number) => (
-                        <tr key={idx} className="border-b">
-                          <td className="px-2 py-1">{term.term || "-"}</td>
-                          <td className="px-2 py-1">{term.year || "-"}</td>
-                          <td className="px-2 py-1">Ksh {Number(term.totalAmount).toLocaleString()}</td>
-                          <td className="px-2 py-1">Ksh {Number(term.balance).toLocaleString()}</td>
-                          <td className="px-2 py-1">{Number(term.balance) > 0 ? <Badge variant="destructive">Pending</Badge> : <Badge variant="default">Cleared</Badge>}</td>
-                          <td className="px-2 py-1">
-                            <Button size="sm" className="bg-green-600 text-white" onClick={() => setPaymentModalOpen(true)} disabled={Number(term.balance) <= 0}>Pay Now</Button>
-                          </td>
-                        </tr>
-                      ))}
+                      {feeData.termBalances.map((term: any, idx: number) => {
+                        const outstanding = Number(term.balance);
+                        const isPaid = outstanding <= 0;
+                        const feeAmount = Number(term.totalAmount);
+                        
+                        return (
+                          <tr key={idx} className="border-b">
+                            <td className="px-2 py-1">{term.term || "-"}</td>
+                            <td className="px-2 py-1">{term.year || "-"}</td>
+                            <td className="px-2 py-1">Ksh {feeAmount.toLocaleString()}</td>
+                            <td className="px-2 py-1">
+                              <span className={outstanding > 0 ? "text-red-600 font-semibold" : "text-green-600 font-semibold"}>
+                                Ksh {outstanding.toLocaleString()}
+                              </span>
+                            </td>
+                            <td className="px-2 py-1">
+                              {isPaid ? 
+                                <Badge variant="default" className="bg-green-100 text-green-800">Cleared</Badge> : 
+                                <Badge variant="destructive">Pending</Badge>
+                              }
+                            </td>
+                            <td className="px-2 py-1">
+                              <Button 
+                                size="sm" 
+                                className="bg-green-600 text-white hover:bg-green-700" 
+                                onClick={() => {
+                                  setSelectedTerm(term);
+                                  setPayAmount(outstanding.toString());
+                                  setPaymentModalOpen(true);
+                                }} 
+                                disabled={isPaid}
+                              >
+                                {isPaid ? "Paid" : "Pay Now"}
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -246,11 +386,25 @@ export default function FeesSection({ schoolCode, students = [], selectedId, set
           )}
         </CardContent>
       </Card>
-      {/* Payment Modal (simulation) */}
+      {/* Enhanced Payment Modal */}
       {paymentModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full">
-            <h2 className="text-lg font-bold mb-4">Simulate Payment for {selectedStudent?.name || selectedStudent?.user?.name}</h2>
+            <h2 className="text-lg font-bold mb-4">
+              Payment for {selectedStudent?.name || selectedStudent?.user?.name}
+            </h2>
+            
+            {selectedTerm && (
+              <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+                <h3 className="font-semibold text-blue-800 mb-2">Selected Term</h3>
+                <div className="text-sm text-blue-700">
+                  <p><strong>Term:</strong> {selectedTerm.term} {selectedTerm.year}</p>
+                  <p><strong>Fee Amount:</strong> Ksh {Number(selectedTerm.totalAmount).toLocaleString()}</p>
+                  <p><strong>Outstanding:</strong> Ksh {Number(selectedTerm.balance || 0).toLocaleString()}</p>
+                </div>
+              </div>
+            )}
+            
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
               <div className="flex gap-3 mb-2">
@@ -278,24 +432,57 @@ export default function FeesSection({ schoolCode, students = [], selectedId, set
                 </label>
               </div>
             </div>
-            <input
-              type="number"
-              className="w-full p-2 border border-green-200 rounded-lg mb-4"
-              placeholder="Enter amount"
-              value={payAmount}
-              onChange={e => setPayAmount(e.target.value)}
-              min={1}
-              disabled={payLoading}
-            />
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Payment Amount</label>
+              <input
+                type="number"
+                className="w-full p-2 border border-green-200 rounded-lg"
+                placeholder="Enter amount"
+                value={payAmount}
+                onChange={e => setPayAmount(e.target.value)}
+                min={1}
+                disabled={payLoading}
+              />
+              {selectedTerm && Number(payAmount) > Number(selectedTerm.balance || 0) && (
+                <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <div className="flex items-center gap-2 text-yellow-800 text-sm">
+                    <AlertCircle className="w-4 h-4" />
+                    <span>
+                      Overpayment detected! Excess amount will be applied to subsequent terms.
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+            
             {payError && <div className="text-red-600 text-sm mb-2">{payError}</div>}
             {paySuccess && (
               <div className="flex items-center gap-2 text-green-600 text-sm mb-2">
                 <CheckCircle2 className="w-5 h-5" /> {paySuccess}
               </div>
             )}
+            
+            {paymentResult && (
+              <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <h4 className="font-semibold text-green-800 mb-2">Payment Summary</h4>
+                <div className="text-sm text-green-700 space-y-1">
+                  <p><strong>Total Paid:</strong> Ksh {paymentResult.totalPaid?.toLocaleString()}</p>
+                  {paymentResult.overpaymentAmount > 0 && (
+                    <p><strong>Overpayment:</strong> Ksh {paymentResult.overpaymentAmount.toLocaleString()}</p>
+                  )}
+                  {paymentResult.nextTermApplied && (
+                    <p><strong>Applied to:</strong> {paymentResult.nextTermApplied.term} {paymentResult.nextTermApplied.year}</p>
+                  )}
+                </div>
+              </div>
+            )}
+            
             <div className="flex gap-2 justify-end">
               <Button variant="outline" onClick={() => setPaymentModalOpen(false)} disabled={payLoading}>Cancel</Button>
-              <Button className="bg-green-600 text-white flex items-center gap-2" onClick={handleSimulatePayment} disabled={payLoading || !payMethod}>{payLoading ? (<><Loader2 className="animate-spin w-4 h-4" /> Processing...</>) : "Simulate Payment"}</Button>
+              <Button className="bg-green-600 text-white flex items-center gap-2" onClick={handleSimulatePayment} disabled={payLoading || !payMethod || !selectedTerm}>
+                {payLoading ? (<><Loader2 className="animate-spin w-4 h-4" /> Processing...</>) : "Process Payment"}
+              </Button>
             </div>
           </div>
         </div>

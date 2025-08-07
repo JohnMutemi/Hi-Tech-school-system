@@ -7,7 +7,7 @@ export async function POST(
 ) {
   try {
     const body = await request.json();
-    const { selectedStudents, criteria, promotedBy } = body;
+    const { selectedStudents, criteria } = body;
 
     if (!selectedStudents || !Array.isArray(selectedStudents)) {
       return NextResponse.json(
@@ -29,21 +29,11 @@ export async function POST(
       );
     }
 
-    if (!promotedBy) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Promoted by user ID is required'
-        },
-        { status: 400 }
-      );
-    }
-
     const result = await executeBulkPromotion(
       params.schoolCode,
       selectedStudents,
       criteria,
-      promotedBy
+      'System' // Default promoter value
     );
 
     return NextResponse.json({

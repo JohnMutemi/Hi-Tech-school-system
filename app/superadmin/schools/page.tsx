@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { School, Plus, Search, Eye, Edit, Trash2, Users, GraduationCap, Calendar, LogIn, Copy } from "lucide-react"
+import { School, Plus, Search, Eye, Edit, Trash2, Users, GraduationCap, Calendar, LogIn, Copy, Shield, ShieldOff } from "lucide-react"
 import Link from "next/link"
 import { useUser } from "@/hooks/use-user"
 import { useRouter } from "next/navigation"
@@ -18,6 +18,9 @@ export default function SchoolsManagementPage() {
   const { toast } = useToast()
   const [schools, setSchools] = useState<any[]>([])
   const [searchTerm, setSearchTerm] = useState("")
+  const [isToggling, setIsToggling] = useState<string | null>(null)
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false)
+  const [schoolToToggle, setSchoolToToggle] = useState<any>(null)
 
   useEffect(() => {
     if (!user || (user && (!user.isLoggedIn || user.role !== 'super_admin'))) {
@@ -89,6 +92,49 @@ export default function SchoolsManagementPage() {
       title: "URL Copied",
       description: `Portal URL for ${school.name} copied to clipboard`,
     })
+  }
+
+  const handleToggleSchoolStatus = (school: any) => {
+    setSchoolToToggle(school)
+    setShowConfirmDialog(true)
+  }
+
+  const confirmToggleStatus = async () => {
+    if (!schoolToToggle) return
+
+    setIsToggling(schoolToToggle.id)
+    try {
+      const response = await fetch(`/api/schools/${schoolToToggle.schoolCode}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: schoolToToggle.status === 'active' ? 'suspended' : 'active'
+        }),
+      })
+
+      if (response.ok) {
+        await loadSchools() // Reload schools to reflect the status change
+        const newStatus = schoolToToggle.status === 'active' ? 'suspended' : 'active'
+        toast({
+          title: "School Status Updated",
+          description: `${schoolToToggle.name} has been ${newStatus === 'active' ? 'activated' : 'deactivated'}.`,
+        })
+      } else {
+        throw new Error('Failed to update school status')
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update school status. Please try again.",
+        variant: "destructive"
+      })
+    } finally {
+      setIsToggling(null)
+      setShowConfirmDialog(false)
+      setSchoolToToggle(null)
+    }
   }
 
   if (!user || (user && (!user.isLoggedIn || user.role !== 'super_admin'))) {
@@ -276,11 +322,27 @@ export default function SchoolsManagementPage() {
                         <TableCell>{new Date(school.createdAt).toLocaleDateString()}</TableCell>
                         <TableCell>
                           <div className="flex items-center space-x-2">
-                            <Button variant="ghost" size="icon" onClick={() => handleAutofillLogin(school)}>
+                            <Button variant="ghost" size="icon" onClick={() => handleAutofillLogin(school)} title="Login to school portal">
                               <LogIn className="w-4 h-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" onClick={() => copyPortalUrl(school)}>
+                            <Button variant="ghost" size="icon" onClick={() => copyPortalUrl(school)} title="Copy portal URL">
                               <Copy className="w-4 h-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => handleToggleSchoolStatus(school)}
+                              disabled={isToggling === school.id}
+                              title={school.status === 'active' ? 'Deactivate school' : 'Activate school'}
+                              className={school.status === 'active' ? 'text-red-600 hover:text-red-700' : 'text-green-600 hover:text-green-700'}
+                            >
+                              {isToggling === school.id ? (
+                                <div className="w-4 h-4 animate-spin rounded-full border-2 border-gray-300 border-t-current" />
+                              ) : school.status === 'active' ? (
+                                <ShieldOff className="w-4 h-4" />
+                              ) : (
+                                <Shield className="w-4 h-4" />
+                              )}
                             </Button>
                             <Button variant="ghost" size="icon" disabled>
                               <Edit className="w-4 h-4" />
@@ -299,6 +361,49 @@ export default function SchoolsManagementPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Confirmation Dialog */}
+      {showConfirmDialog && schoolToToggle && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">
+              {schoolToToggle.status === 'active' ? 'Deactivate School' : 'Activate School'}
+            </h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to {schoolToToggle.status === 'active' ? 'deactivate' : 'activate'} "{schoolToToggle.name}"?
+              {schoolToToggle.status === 'active' && 
+                ' This will prevent users from accessing the school portal.'
+              }
+            </p>
+            <div className="flex justify-end space-x-3">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setShowConfirmDialog(false)
+                  setSchoolToToggle(null)
+                }}
+                disabled={isToggling === schoolToToggle.id}
+              >
+                Cancel
+              </Button>
+              <Button 
+                variant={schoolToToggle.status === 'active' ? 'destructive' : 'default'}
+                onClick={confirmToggleStatus}
+                disabled={isToggling === schoolToToggle.id}
+              >
+                {isToggling === schoolToToggle.id ? (
+                  <>
+                    <div className="w-4 h-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
+                    {schoolToToggle.status === 'active' ? 'Deactivating...' : 'Activating...'}
+                  </>
+                ) : (
+                  schoolToToggle.status === 'active' ? 'Deactivate' : 'Activate'
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

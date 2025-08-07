@@ -40,10 +40,8 @@ export async function ensureSchoolGrades(schoolId: string) {
           return await prisma.grade.create({
             data: {
               name: platformGrade.name,
-              description: platformGrade.description || `Grade ${platformGrade.name}`,
               schoolId: schoolId,
-              level: platformGrade.level,
-              order: platformGrade.order
+              isAlumni: platformGrade.isAlumni || false
             }
           });
         })
@@ -87,10 +85,8 @@ export async function getOrCreateSchoolGrade(schoolId: string, gradeName: string
       grade = await prisma.grade.create({
         data: {
           name: grade.name,
-          description: grade.description || `Grade ${grade.name}`,
           schoolId: schoolId,
-          level: grade.level,
-          order: grade.order
+          isAlumni: grade.isAlumni || false
         }
       });
     }

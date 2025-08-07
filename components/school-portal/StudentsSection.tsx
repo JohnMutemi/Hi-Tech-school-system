@@ -8,6 +8,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Edit, Trash2, Eye } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import type { Student } from "@/lib/school-storage";
 import type { Subject, Teacher } from "@/lib/school-storage";
 import { BulkImport } from "@/components/ui/bulk-import";
@@ -341,13 +352,34 @@ export default function StudentsSection({ schoolCode, colorTheme, toast }: Stude
                       <Eye className="w-4 h-4 text-blue-500" />
                     </Button>
                     {/* Edit logic can be added here */}
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => deleteStudent(student.id)}
-                    >
-                      <Trash2 className="w-4 h-4 text-red-500" />
-                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          title="Delete Student"
+                        >
+                          <Trash2 className="w-4 h-4 text-red-500" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Student</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to delete {student.user?.name || student.name}? This action cannot be undone and will permanently remove the student and their associated data.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction 
+                            onClick={() => deleteStudent(student.id)}
+                            className="bg-red-600 hover:bg-red-700"
+                          >
+                            Delete Student
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </TableCell>
               </TableRow>

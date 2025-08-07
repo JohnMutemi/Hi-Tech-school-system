@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { calculateStudentOutstanding } from '@/lib/utils/fee-balance';
+import { ensureSchoolGrades } from '../school-grade-utils';
 
 const prisma = new PrismaClient();
 
@@ -33,17 +34,121 @@ export interface BulkPromotionResult {
   };
 }
 
-// Grade progression rules
-const PROGRESSION_RULES: Record<string, string> = {
-  '1A': '2A',
-  '2A': '3A', 
-  '3A': '4A',
-  '4A': '5A',
-  '5A': '6A',
-  '6A': 'Alumni'
-};
+// Dynamic class progression - will be built based on actual classes in the school
+const ELIGIBLE_GRADES = ['Grade 1A', 'Grade 1B', 'Grade 2A', 'Grade 2B', 'Grade 3A', 'Grade 3B', 'Grade 3C', 'Grade 4A', 'Grade 4B', 'Grade 4C', 'Grade 5A', 'Grade 5B', 'Grade 6A', 'Grade 6B'];
 
-const ELIGIBLE_GRADES = ['1A', '2A', '3A', '4A', '5A', '6A', 'Grade 1A', 'Grade 2A', 'Grade 3A', 'Grade 4A', 'Grade 5A', 'Grade 6A'];
+/**
+ * Find the next class for promotion based on dynamic class progression
+ */
+async function findNextClassForPromotion(
+  schoolId: string, 
+  currentClassName: string, 
+  nextAcademicYear: string
+): Promise<{ nextGrade: any; nextClass: any } | null> {
+  console.log(`🔍 Finding next class for: ${currentClassName} in year: ${nextAcademicYear}`);
+  
+  // Get all active classes in the school
+  const allClasses = await prisma.class.findMany({
+    where: {
+      schoolId,
+      isActive: true
+    },
+    include: {
+      grade: true
+    },
+    orderBy: {
+      name: 'asc'
+    }
+  });
+  
+  console.log(`📚 Available classes in school: ${allClasses.map(c => c.name).join(', ')}`);
+  
+  // Find the current class
+  const currentClass = allClasses.find(c => c.name === currentClassName);
+  if (!currentClass) {
+    console.log(`❌ Current class ${currentClassName} not found in school`);
+    return null;
+  }
+  
+  // Extract grade level and section from class name (e.g., "Grade 1A" -> grade: 1, section: "A")
+  const classMatch = currentClassName.match(/Grade\s+(\d+)([A-Z])/);
+  if (!classMatch) {
+    console.log(`❌ Cannot parse class name format: ${currentClassName}`);
+    return null;
+  }
+  
+  const currentGradeLevel = parseInt(classMatch[1]);
+  const currentSection = classMatch[2];
+  
+  console.log(`📊 Current class breakdown: Grade ${currentGradeLevel}, Section ${currentSection}`);
+  
+  // Check if this is Grade 6 (highest level) - promote to Alumni
+  if (currentGradeLevel === 6) {
+    console.log(`🎓 Student is in Grade 6 (${currentClassName}) - promoting to Alumni`);
+    
+    // Find or create Alumni grade
+    let alumniGrade = await prisma.grade.findFirst({
+      where: {
+        OR: [
+          { name: 'Alumni', schoolId: schoolId },
+          { name: 'Alumni', schoolId: null }
+        ]
+      }
+    });
+    
+    if (!alumniGrade) {
+      console.log(`➕ Creating Alumni grade`);
+      alumniGrade = await prisma.grade.create({
+        data: {
+          name: 'Alumni',
+          schoolId: schoolId,
+          isAlumni: true
+        }
+      });
+    }
+    
+    return { 
+      nextGrade: alumniGrade, 
+      nextClass: null // Alumni doesn't have a class, just a grade
+    };
+  }
+  
+  // Calculate next grade level
+  const nextGradeLevel = currentGradeLevel + 1;
+  const nextClassName = `Grade ${nextGradeLevel}${currentSection}`;
+  
+  console.log(`🔄 Looking for next class: ${nextClassName}`);
+  
+  // Find the next class
+  const nextClass = allClasses.find(c => c.name === nextClassName);
+  
+  if (nextClass) {
+    console.log(`✅ Found next class: ${nextClass.name} (Grade: ${nextClass.grade.name})`);
+    return { nextGrade: nextClass.grade, nextClass };
+  }
+  
+  // Next class doesn't exist - check if we should create it
+  console.log(`❌ Next class ${nextClassName} not found`);
+  
+  // Find the grade for the next level
+  const nextGrade = await prisma.grade.findFirst({
+    where: {
+      OR: [
+        { name: `Grade ${nextGradeLevel}`, schoolId: schoolId },
+        { name: `Grade ${nextGradeLevel}`, schoolId: null }
+      ]
+    }
+  });
+  
+  if (!nextGrade) {
+    console.log(`❌ Grade ${nextGradeLevel} not found - cannot create next class`);
+    return null;
+  }
+  
+  console.log(`💡 Next class ${nextClassName} doesn't exist but grade ${nextGrade.name} is available`);
+  console.log(`💡 To fix this, create a class named "${nextClassName}" in the school`);
+  return null;
+}
 
 /**
  * Calculate student's average grade (placeholder - can be enhanced later)
@@ -63,64 +168,64 @@ async function getStudentFeeBalance(studentId: string): Promise<number> {
       where: { id: studentId },
       include: {
         school: true,
-        class: true,
+        class: {
+          include: { grade: true }
+        },
         user: true
       }
     });
 
-    if (!student) return 0;
+    if (!student || !student.class || !student.class.grade) return 0;
 
     // Get current academic year
     const currentAcademicYear = await prisma.academicYear.findFirst({
-      where: { 
-        schoolId: student.schoolId,
-        isCurrent: true 
-      }
+      where: { schoolId: student.schoolId, isCurrent: true }
+    });
+    if (!currentAcademicYear) return 0;
+
+    // Fetch only active fee structures for the student's grade and current year (by year name)
+    let feeStructures = await prisma.termlyFeeStructure.findMany({
+      where: {
+        gradeId: student.class.gradeId,
+        isActive: true,
+        year: parseInt(currentAcademicYear.name)
+      },
+      include: { grade: true }
     });
 
-    if (!currentAcademicYear) {
-      console.log('⚠️ No current academic year found for school:', student.schoolId);
-      return 0;
+    // Deduplicate by term, keeping only one per term
+    const feeStructuresByTerm = new Map();
+    for (const fs of feeStructures) {
+      if (!feeStructuresByTerm.has(fs.term)) {
+        feeStructuresByTerm.set(fs.term, fs);
+      }
     }
+    const finalFeeStructures = Array.from(feeStructuresByTerm.values());
 
-    console.log(`🔍 Calculating fee balance for student ${student.user.name} in academic year: ${currentAcademicYear.name}`);
-
-    // Get fee structures for the current academic year
-    const feeStructures = await prisma.termlyFeeStructure.findMany({
-      where: { 
-        schoolId: student.schoolId,
-        academicYearId: currentAcademicYear.id
-      },
-      include: {
-        academicYear: true
-      }
-    });
-
-    console.log(`📊 Found ${feeStructures.length} fee structures for current academic year`);
-
-    // Get payments for the student in current academic year
+    // Get all payments for the student in the current academic year
     const payments = await prisma.payment.findMany({
-      where: { 
-        studentId,
+      where: {
+        studentId: student.id,
         academicYearId: currentAcademicYear.id
       },
+      orderBy: { paymentDate: 'asc' },
       include: {
         academicYear: true,
         term: true
       }
     });
 
-    console.log(`💰 Found ${payments.length} payments for current academic year`);
-
+    // Use the same outstanding calculation as the parent dashboard
     const { outstandingBalance } = await calculateStudentOutstanding({
       student,
-      feeStructures,
+      feeStructures: finalFeeStructures,
       payments,
       joinAcademicYearId: student.joinedAcademicYearId || undefined,
-      joinTermId: student.joinedTermId || undefined
+      joinTermId: student.joinedTermId || undefined,
+      joinDate: student.dateAdmitted ? new Date(student.dateAdmitted) : undefined,
+      filterAcademicYear: parseInt(currentAcademicYear.name)
     });
 
-    console.log(`💵 Student ${student.user.name} outstanding balance: $${outstandingBalance}`);
     return outstandingBalance;
   } catch (error) {
     console.error('❌ Error calculating fee balance:', error);
@@ -144,6 +249,8 @@ export async function calculateStudentEligibility(
   studentId: string, 
   criteria: BulkPromotionCriteria
 ): Promise<StudentEligibility> {
+  console.log(`🔍 Checking eligibility for student ${studentId}`);
+  
   const student = await prisma.student.findUnique({
     where: { id: studentId },
     include: {
@@ -157,6 +264,7 @@ export async function calculateStudentEligibility(
   });
 
   if (!student || !student.class) {
+    console.log(`❌ Student or class not found for ${studentId}`);
     return {
       studentId,
       studentName: 'Unknown',
@@ -172,23 +280,32 @@ export async function calculateStudentEligibility(
     };
   }
 
-  const currentGrade = student.class.name; // Use class name instead of grade name
+  const currentClass = student.class.name; // Use class name for dynamic progression
+  console.log(`📚 Student ${student.user.name} is in class: ${currentClass}`);
+  console.log(`📋 Eligible classes: ${ELIGIBLE_GRADES.join(', ')}`);
   
-  // Check if student is in eligible grade for promotion
-  if (!ELIGIBLE_GRADES.includes(currentGrade)) {
+  // Check if student is in eligible class for promotion
+  if (!ELIGIBLE_GRADES.includes(currentClass)) {
+    console.log(`❌ Class ${currentClass} is not eligible for promotion`);
     return {
       studentId,
       studentName: student.user.name,
       currentClass: student.class.name,
-      currentGrade,
+      currentGrade: student.class.grade.name,
       averageGrade: 0,
       feeBalance: 0,
       disciplinaryCases: 0,
       isEligible: false,
-      reason: `Grade ${currentGrade} is not eligible for promotion`,
+      reason: `Class ${currentClass} is not eligible for promotion`,
       userId: student.userId,
       admissionNumber: student.admissionNumber
     };
+  }
+
+  // Special handling for Grade 6 students - they should be promoted to Alumni regardless of fees
+  const isGrade6Student = currentClass.startsWith('Grade 6');
+  if (isGrade6Student) {
+    console.log(`🎓 Grade 6 student detected: ${student.user.name} - will be promoted to Alumni`);
   }
 
   // Calculate criteria values
@@ -196,27 +313,40 @@ export async function calculateStudentEligibility(
   const feeBalance = await getStudentFeeBalance(studentId);
   const disciplinaryCases = await getDisciplinaryCases(studentId);
 
+  console.log(`📊 Student ${student.user.name} criteria: Grade=${averageGrade}%, Fee=${feeBalance}, Cases=${disciplinaryCases}`);
+  console.log(`📋 Required criteria: Grade>=${criteria.minGrade}%, Fee<=${criteria.maxFeeBalance}, Cases<=${criteria.maxDisciplinaryCases}`);
+
   // Check eligibility based on criteria
   const gradeEligible = averageGrade >= criteria.minGrade;
   const feeEligible = feeBalance <= criteria.maxFeeBalance;
   const disciplineEligible = disciplinaryCases <= criteria.maxDisciplinaryCases;
 
-  const isEligible = gradeEligible && feeEligible && disciplineEligible;
+  // Grade 6 students can be promoted to Alumni regardless of fees
+  const isEligible = isGrade6Student ? 
+    (gradeEligible && disciplineEligible) : // Grade 6: ignore fees, check grade and discipline
+    (gradeEligible && feeEligible && disciplineEligible); // Other grades: check all criteria
 
   let reason = '';
   if (!isEligible) {
     const reasons = [];
     if (!gradeEligible) reasons.push(`Grade ${averageGrade}% below minimum ${criteria.minGrade}%`);
-    if (!feeEligible) reasons.push(`Fee balance $${feeBalance} exceeds maximum $${criteria.maxFeeBalance}`);
+    if (!feeEligible && !isGrade6Student) reasons.push(`Fee balance $${feeBalance} exceeds maximum $${criteria.maxFeeBalance}`);
     if (!disciplineEligible) reasons.push(`${disciplinaryCases} disciplinary cases exceed maximum ${criteria.maxDisciplinaryCases}`);
     reason = reasons.join(', ');
+    console.log(`❌ Student ${student.user.name} is ineligible: ${reason}`);
+  } else {
+    if (isGrade6Student) {
+      console.log(`✅ Grade 6 student ${student.user.name} is eligible for Alumni promotion (fees waived)`);
+    } else {
+      console.log(`✅ Student ${student.user.name} is eligible for promotion`);
+    }
   }
 
   return {
     studentId,
     studentName: student.user.name,
     currentClass: student.class.name,
-    currentGrade,
+    currentGrade: student.class.grade.name,
     averageGrade,
     feeBalance,
     disciplinaryCases,
@@ -264,12 +394,10 @@ export async function getEligibleStudents(
   };
 
   // If academic year is specified, filter by that academic year
+  // Note: Since classes are now permanent, we don't filter by academic year
+  // Students can be promoted regardless of the academic year
   if (academicYearId) {
-    studentWhere.class = {
-      academicYear: {
-        equals: academicYearId
-      }
-    };
+    console.log('⚠️ Academic year filtering disabled - classes are now permanent');
   }
 
   // First, let's get ALL students to see what we have
@@ -370,96 +498,132 @@ export async function executeBulkPromotion(
           continue;
         }
 
-        const currentGrade = student.class.grade.name;
-        const nextGrade = PROGRESSION_RULES[currentGrade];
-
-        if (!nextGrade) {
+        const currentClass = student.class.name;
+        
+        // Get the next academic year from the school's academic years
+        const allAcademicYears = await prisma.academicYear.findMany({
+          where: { schoolId: school.id },
+          orderBy: { name: 'asc' }
+        });
+        
+        // Find the current academic year
+        const currentAcademicYear = allAcademicYears.find(ay => ay.isCurrent);
+        if (!currentAcademicYear) {
           excluded.push({
             ...eligibility,
             isEligible: false,
-            reason: `No progression rule for grade ${currentGrade}`
+            reason: 'Current academic year not found'
           });
           continue;
         }
-
-        // Find the next grade and class
-        const nextGradeRecord = await prisma.grade.findFirst({
-          where: {
-            schoolId: school.id,
-            name: nextGrade
-          }
-        });
-
-        if (!nextGradeRecord) {
-          excluded.push({
-            ...eligibility,
-            isEligible: false,
-            reason: `Next grade ${nextGrade} not found`
-          });
-          continue;
-        }
-
-        // Get the next academic year (current year + 1)
-        const currentYear = new Date().getFullYear();
-        const nextAcademicYear = await prisma.academicYear.findFirst({
-          where: {
-            schoolId: school.id,
-            name: (currentYear + 1).toString()
-          }
-        });
-
+        
+        // Find the next academic year in the sequence
+        const currentYearIndex = allAcademicYears.findIndex(ay => ay.id === currentAcademicYear.id);
+        const nextAcademicYear = allAcademicYears[currentYearIndex + 1];
+        
         if (!nextAcademicYear) {
           excluded.push({
             ...eligibility,
             isEligible: false,
-            reason: `Next academic year ${currentYear + 1} not found`
+            reason: `No next academic year found after ${currentAcademicYear.name}`
           });
           continue;
         }
 
-        // Find or create the next class in the next academic year
-        let nextClass = await prisma.class.findFirst({
+        // Use dynamic class-based progression system
+        const nextClassResult = await findNextClassForPromotion(
+          school.id, 
+          currentClass, 
+          nextAcademicYear.name
+        );
+
+        if (!nextClassResult) {
+          excluded.push({
+            ...eligibility,
+            isEligible: false,
+            reason: `No next class found for class ${currentClass}`
+          });
+          continue;
+        }
+
+        const { nextGrade, nextClass } = nextClassResult;
+
+        // Update student's class (or remove class if promoted to Alumni)
+        const updateData: any = {};
+        if (nextClass) {
+          updateData.classId = nextClass.id;
+        } else {
+          // Student promoted to Alumni - remove class assignment and mark as graduated
+          updateData.classId = null;
+          updateData.isActive = false;
+          updateData.status = 'graduated';
+        }
+        
+        await prisma.student.update({
+          where: { id: studentId },
+          data: updateData
+        });
+
+        // If student is promoted to Alumni, create Alumni record
+        if (!nextClass && nextGrade.name === 'Alumni') {
+          console.log(`🎓 Creating Alumni record for ${student.user.name}`);
+          
+          // Calculate final grade (using the eligibility grade for now)
+          const finalGrade = eligibility.averageGrade >= 80 ? 'A' : 
+                            eligibility.averageGrade >= 70 ? 'B' : 
+                            eligibility.averageGrade >= 60 ? 'C' : 
+                            eligibility.averageGrade >= 50 ? 'D' : 'F';
+          
+          // Create Alumni record
+          await prisma.alumni.create({
+            data: {
+              schoolId: school.id,
+              studentId: studentId,
+              graduationYear: nextAcademicYear.name,
+              finalGrade: finalGrade,
+              achievements: [],
+              contactEmail: student.parentEmail || null,
+              contactPhone: student.parentPhone || null,
+              currentInstitution: null,
+              currentOccupation: null
+            }
+          });
+          
+          console.log(`✅ Alumni record created for ${student.user.name} (Grade: ${finalGrade})`);
+        }
+
+        // Find or create a system user for automated promotions
+        let systemUser = await prisma.user.findFirst({
           where: {
-            schoolId: school.id,
-            gradeId: nextGradeRecord.id,
-            name: nextGrade,
-            academicYear: nextAcademicYear.name
+            email: 'system@school.com',
+            role: 'admin'
           }
         });
 
-        if (!nextClass) {
-          // Create the next class if it doesn't exist
-          nextClass = await prisma.class.create({
+        if (!systemUser) {
+          console.log('➕ Creating system user for automated promotions');
+          systemUser = await prisma.user.create({
             data: {
-              name: nextGrade,
-              schoolId: school.id,
-              gradeId: nextGradeRecord.id,
-              academicYear: nextAcademicYear.name,
+              name: 'System Administrator',
+              email: 'system@school.com',
+              password: 'system-generated-password',
+              role: 'admin',
               isActive: true
             }
           });
-          console.log(`✅ Created new class: ${nextGrade} for academic year ${nextAcademicYear.name}`);
         }
-
-        // Update student's class
-        await prisma.student.update({
-          where: { id: studentId },
-          data: {
-            classId: nextClass.id
-          }
-        });
 
         // Create promotion log
         await prisma.promotionLog.create({
           data: {
             studentId,
             fromClass: student.class.name,
-            toClass: nextClass.name,
-            fromGrade: currentGrade,
-            toGrade: nextGrade,
-            fromYear: student.class.academicYear,
-            toYear: nextClass.academicYear,
-            promotedBy,
+            toClass: nextClass?.name || 'Alumni',
+            fromGrade: student.class.grade.name,
+            toGrade: nextGrade.name,
+            fromYear: currentAcademicYear.name,
+            toYear: nextAcademicYear.name,
+            promotedBy: systemUser.id,
             promotionType: 'bulk',
             criteriaResults: {
               minGrade: criteria.minGrade,
@@ -468,7 +632,7 @@ export async function executeBulkPromotion(
               studentGrade: eligibility.averageGrade,
               studentFeeBalance: eligibility.feeBalance,
               studentDisciplinaryCases: eligibility.disciplinaryCases,
-              academicYearProgression: `${student.class.academicYear} → ${nextClass.academicYear}`
+              academicYearProgression: `${currentAcademicYear.name} → ${nextAcademicYear.name}`
             },
             averageGrade: eligibility.averageGrade,
             outstandingBalance: eligibility.feeBalance,
@@ -476,7 +640,7 @@ export async function executeBulkPromotion(
           }
         });
 
-        console.log(`✅ Promoted ${student.user.name} from ${student.class.name} (${student.class.academicYear}) to ${nextClass.name} (${nextClass.academicYear})`);
+        console.log(`✅ Promoted ${student.user.name} from ${student.class.name} (${currentAcademicYear.name}) to ${nextClass?.name || 'Alumni'} (${nextAcademicYear.name})`);
 
         promoted.push(eligibility);
 

@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useUser } from "@/hooks/use-user";
 import { 
   ChevronRight, 
   ChevronLeft, 
@@ -94,11 +95,12 @@ interface PromotionHistory {
   averageGrade: number;
   outstandingBalance: number;
   disciplinaryCases: number;
-  createdAt: string;
+  promotionDate: string;
 }
 
 export default function PromotionsSection({ schoolCode }: { schoolCode: string }) {
   const { toast } = useToast();
+  const { user } = useUser();
   const [currentStep, setCurrentStep] = useState(1);
   const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
   const [selectedAcademicYear, setSelectedAcademicYear] = useState<string>("");
@@ -125,6 +127,21 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
   const [showCriteriaModal, setShowCriteriaModal] = useState(false);
   const [editingCriteria, setEditingCriteria] = useState<PromotionCriteria | null>(null);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+
+  // Helper function to get academic year label
+  const getAcademicYearLabel = (year: AcademicYear) => {
+    if (year.isCurrent) return "Current Year";
+    
+    // Find the current academic year
+    const currentYear = academicYears.find(y => y.isCurrent);
+    if (!currentYear) return "Previous Year";
+    
+    // Compare year numbers
+    const currentYearNum = parseInt(currentYear.name);
+    const yearNum = parseInt(year.name);
+    
+    return yearNum > currentYearNum ? "Upcoming Year" : "Previous Year";
+  };
 
   // Step 1: Load academic years and criteria
   useEffect(() => {
@@ -591,7 +608,7 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
                           <div>
                             <div className="font-semibold">{year.name}</div>
                             <div className="text-sm text-gray-500">
-                              {year.isCurrent ? "Current Year" : "Previous Year"}
+                              {getAcademicYearLabel(year)}
                             </div>
                             {year.startDate && year.endDate && (
                               <div className="text-xs text-gray-400">
@@ -1150,7 +1167,7 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
                         </TableCell>
                         <TableCell>${history.outstandingBalance.toLocaleString()}</TableCell>
                         <TableCell>{history.promotedBy}</TableCell>
-                        <TableCell>{new Date(history.createdAt).toLocaleDateString()}</TableCell>
+                        <TableCell>{new Date(history.promotionDate).toLocaleDateString()}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

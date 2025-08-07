@@ -172,7 +172,15 @@ export async function POST(
             academicYearOutstandingAfter: result.receipt.academicYearOutstandingAfter,
             termOutstandingBefore: result.receipt.termOutstandingBefore,
             termOutstandingAfter: result.receipt.termOutstandingAfter
-          }
+          },
+          // Enhanced payment information
+          paymentDistribution: result.paymentDistribution || [],
+          overpaymentAmount: result.overpaymentAmount || 0,
+          nextTermApplied: result.nextTermApplied || null,
+          totalPaid: result.totalPaid || result.payment.amount,
+          remainingBalance: result.remainingBalance || 0,
+          allPayments: result.allPayments || [],
+          allReceipts: result.allReceipts || []
         };
 
         logApiRequest('POST', `/api/schools/${schoolCode}/students/${studentId}/payments`, {
@@ -222,6 +230,7 @@ export async function GET(
     const academicYearId = searchParams.get("academicYearId");
     const limit = parseInt(searchParams.get("limit") || "50");
     const offset = parseInt(searchParams.get("offset") || "0");
+    const debug = searchParams.get("debug") === "true";
 
     // Find the school
     const school = await prisma.school.findUnique({
@@ -283,6 +292,46 @@ export async function GET(
     const totalCount = await prisma.payment.count({
       where: whereClause,
     });
+
+    // If debug mode, return detailed payment information
+    if (debug) {
+      const feeStructures = await prisma.termlyFeeStructure.findMany({
+        where: {
+          gradeId: student.class?.gradeId,
+          isActive: true,
+        },
+        include: {
+          termRef: true,
+        },
+      });
+
+      return NextResponse.json({
+        payments: payments.map(p => ({
+          id: p.id,
+          amount: p.amount,
+          paymentDate: p.paymentDate,
+          termId: p.termId,
+          termName: p.term?.name,
+          academicYearId: p.academicYearId,
+          academicYearName: p.academicYear?.name,
+          description: p.description,
+        })),
+        feeStructures: feeStructures.map(fs => ({
+          id: fs.id,
+          term: fs.term,
+          year: fs.year,
+          termId: fs.termId,
+          termName: fs.termRef?.name,
+          totalAmount: fs.totalAmount,
+        })),
+        pagination: {
+          total: totalCount,
+          limit,
+          offset,
+          hasMore: offset + limit < totalCount,
+        },
+      });
+    }
 
     return NextResponse.json({
       payments,

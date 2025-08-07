@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { 
   GraduationCap, 
@@ -27,7 +28,8 @@ import {
   Eye,
   RefreshCw,
   Plus,
-  Crown
+  Crown,
+  DollarSign
 } from "lucide-react";
 
 interface Alumni {
@@ -42,6 +44,12 @@ interface Alumni {
   contactPhone?: string;
   currentInstitution?: string;
   currentOccupation?: string;
+  feeBalance: {
+    totalPayments: number;
+    totalArrears: number;
+    outstandingBalance: number;
+    hasOutstandingFees: boolean;
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -68,8 +76,12 @@ export default function AlumniSection({ schoolCode }: AlumniSectionProps) {
     totalAlumni: 0,
     totalYears: 0,
     thisYearGraduates: 0,
-    topPerformers: 0
+    topPerformers: 0,
+    alumniWithOutstandingFees: 0,
+    totalOutstandingFees: 0
   });
+  const [viewingAlumni, setViewingAlumni] = useState<Alumni | null>(null);
+  const [cleaningUp, setCleaningUp] = useState(false);
 
   // Load alumni data
   useEffect(() => {
@@ -138,6 +150,39 @@ export default function AlumniSection({ schoolCode }: AlumniSectionProps) {
     }
   };
 
+  const cleanupAlumniStudents = async () => {
+    setCleaningUp(true);
+    try {
+      const response = await fetch(`/api/schools/${schoolCode}/students/cleanup-alumni`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        toast({
+          title: "Cleanup Complete",
+          description: data.message,
+        });
+      } else {
+        const errorText = await response.text();
+        toast({
+          title: "Error",
+          description: `Failed to cleanup: ${errorText}`,
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to cleanup alumni students",
+        variant: "destructive"
+      });
+    } finally {
+      setCleaningUp(false);
+    }
+  };
+
   // Filter alumni based on search and year
   const filteredAlumni = alumni.filter(alum => {
     const matchesSearch = alum.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -173,6 +218,19 @@ export default function AlumniSection({ schoolCode }: AlumniSectionProps) {
             Promote Grade 6
           </Button>
           <Button
+            onClick={cleanupAlumniStudents}
+            disabled={cleaningUp}
+            variant="outline"
+            className="flex items-center gap-2 border-orange-300 text-orange-700 hover:bg-orange-50"
+          >
+            {cleaningUp ? (
+              <RefreshCw className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+            {cleaningUp ? 'Cleaning...' : 'Cleanup Alumni'}
+          </Button>
+          <Button
             variant="outline"
             onClick={loadAlumni}
             disabled={loading}
@@ -185,7 +243,7 @@ export default function AlumniSection({ schoolCode }: AlumniSectionProps) {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-0 shadow-lg">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -230,6 +288,19 @@ export default function AlumniSection({ schoolCode }: AlumniSectionProps) {
                 <p className="text-2xl font-bold text-amber-900">{stats.topPerformers}</p>
               </div>
               <Trophy className="h-8 w-8 text-amber-600" />
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-gradient-to-br from-red-50 to-red-100 border-0 shadow-lg">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-red-600">Outstanding Fees</p>
+                <p className="text-2xl font-bold text-red-900">{stats.alumniWithOutstandingFees}</p>
+                <p className="text-xs text-red-700">${stats.totalOutstandingFees.toLocaleString()}</p>
+              </div>
+              <BookOpen className="h-8 w-8 text-red-600" />
             </div>
           </CardContent>
         </Card>
@@ -297,6 +368,7 @@ export default function AlumniSection({ schoolCode }: AlumniSectionProps) {
                         <TableHead>Admission #</TableHead>
                         <TableHead>Graduation Year</TableHead>
                         <TableHead>Final Grade</TableHead>
+                        <TableHead>Fee Balance</TableHead>
                         <TableHead>Achievements</TableHead>
                         <TableHead>Current Status</TableHead>
                         <TableHead>Actions</TableHead>
@@ -329,6 +401,19 @@ export default function AlumniSection({ schoolCode }: AlumniSectionProps) {
                             </Badge>
                           </TableCell>
                           <TableCell>
+                            <div className="text-sm">
+                              {alum.feeBalance.hasOutstandingFees ? (
+                                <Badge variant="destructive" className="text-xs">
+                                  ${alum.feeBalance.outstandingBalance.toLocaleString()}
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-xs text-green-600">
+                                  Paid
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
                             <div className="flex gap-1">
                               {alum.achievements.slice(0, 2).map((achievement, index) => (
                                 <Badge key={index} variant="outline" className="text-xs">
@@ -353,7 +438,12 @@ export default function AlumniSection({ schoolCode }: AlumniSectionProps) {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Button variant="outline" size="sm">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => setViewingAlumni(alum)}
+                              title="View Details"
+                            >
                               <Eye className="h-4 w-4" />
                             </Button>
                           </TableCell>
@@ -502,6 +592,158 @@ export default function AlumniSection({ schoolCode }: AlumniSectionProps) {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Alumni View Modal */}
+      <Dialog open={!!viewingAlumni} onOpenChange={() => setViewingAlumni(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <GraduationCap className="h-5 w-5" />
+              Alumni Details
+            </DialogTitle>
+            <DialogDescription>
+              Detailed information about {viewingAlumni?.studentName}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {viewingAlumni && (
+            <div className="space-y-6">
+              {/* Basic Information */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">Student Name</Label>
+                  <div className="text-sm bg-gray-50 p-2 rounded">{viewingAlumni.studentName}</div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">Admission Number</Label>
+                  <div className="text-sm bg-gray-50 p-2 rounded">{viewingAlumni.admissionNumber}</div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">Graduation Year</Label>
+                  <div className="text-sm bg-gray-50 p-2 rounded">{viewingAlumni.graduationYear}</div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">Final Grade</Label>
+                  <div className="text-sm bg-gray-50 p-2 rounded">
+                    <Badge variant="outline">{viewingAlumni.finalGrade}</Badge>
+                  </div>
+                </div>
+              </div>
+
+              {/* Contact Information */}
+              {(viewingAlumni.contactEmail || viewingAlumni.contactPhone) && (
+                <div className="space-y-3">
+                  <h4 className="font-medium text-gray-900 flex items-center gap-2">
+                    <Mail className="h-4 w-4" />
+                    Contact Information
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {viewingAlumni.contactEmail && (
+                      <div className="space-y-1">
+                        <Label className="text-xs font-medium text-gray-600">Email</Label>
+                        <div className="text-sm bg-blue-50 p-2 rounded">{viewingAlumni.contactEmail}</div>
+                      </div>
+                    )}
+                    {viewingAlumni.contactPhone && (
+                      <div className="space-y-1">
+                        <Label className="text-xs font-medium text-gray-600">Phone</Label>
+                        <div className="text-sm bg-blue-50 p-2 rounded">{viewingAlumni.contactPhone}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Current Status */}
+              {(viewingAlumni.currentInstitution || viewingAlumni.currentOccupation) && (
+                <div className="space-y-3">
+                  <h4 className="font-medium text-gray-900 flex items-center gap-2">
+                    <MapPin className="h-4 w-4" />
+                    Current Status
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {viewingAlumni.currentInstitution && (
+                      <div className="space-y-1">
+                        <Label className="text-xs font-medium text-gray-600">Current Institution</Label>
+                        <div className="text-sm bg-green-50 p-2 rounded">{viewingAlumni.currentInstitution}</div>
+                      </div>
+                    )}
+                    {viewingAlumni.currentOccupation && (
+                      <div className="space-y-1">
+                        <Label className="text-xs font-medium text-gray-600">Current Occupation</Label>
+                        <div className="text-sm bg-green-50 p-2 rounded">{viewingAlumni.currentOccupation}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Fee Balance Information */}
+              <div className="space-y-3">
+                <h4 className="font-medium text-gray-900 flex items-center gap-2">
+                  <DollarSign className="h-4 w-4" />
+                  Fee Balance Information
+                </h4>
+                <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-green-600">
+                        ${viewingAlumni.feeBalance.totalPayments.toLocaleString()}
+                      </div>
+                      <div className="text-xs text-gray-600">Total Payments</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-orange-600">
+                        ${viewingAlumni.feeBalance.totalArrears.toLocaleString()}
+                      </div>
+                      <div className="text-xs text-gray-600">Total Arrears</div>
+                    </div>
+                    <div className="text-center">
+                      <div className={`text-2xl font-bold ${viewingAlumni.feeBalance.hasOutstandingFees ? 'text-red-600' : 'text-green-600'}`}>
+                        ${viewingAlumni.feeBalance.outstandingBalance.toLocaleString()}
+                      </div>
+                      <div className="text-xs text-gray-600">Outstanding Balance</div>
+                    </div>
+                  </div>
+                  
+                  {viewingAlumni.feeBalance.hasOutstandingFees ? (
+                    <div className="text-center p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <div className="text-red-700 font-medium">⚠️ Outstanding Fees</div>
+                      <div className="text-sm text-red-600">
+                        This alumni has outstanding fees of ${viewingAlumni.feeBalance.outstandingBalance.toLocaleString()}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="text-green-700 font-medium">✅ Fees Cleared</div>
+                      <div className="text-sm text-green-600">
+                        All fees have been paid in full
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Achievements */}
+              {viewingAlumni.achievements.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="font-medium text-gray-900 flex items-center gap-2">
+                    <Trophy className="h-4 w-4" />
+                    Achievements
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {viewingAlumni.achievements.map((achievement, index) => (
+                      <Badge key={index} variant="outline" className="bg-yellow-50 text-yellow-800">
+                        {achievement}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 } 

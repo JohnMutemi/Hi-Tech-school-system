@@ -39,6 +39,10 @@ export async function GET(
     const whereClause: any = {
       schoolId: schoolContext.schoolId,
       isActive: true,
+      // Also exclude students who have been promoted to alumni
+      status: {
+        not: 'graduated'
+      }
     };
 
     // Filter by class if specified
@@ -379,20 +383,78 @@ export async function DELETE(req: NextRequest, { params }: { params: { schoolCod
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
     
-    // Manually delete related records if no cascade rule exists
-    // Example: await prisma.payment.deleteMany({ where: { studentId } });
+    // Delete related records in the correct order to avoid foreign key constraint violations
+    // 1. Delete promotion exclusions first (they reference promotion logs)
+    await prisma.promotionExclusion.deleteMany({
+      where: { studentId: studentId },
+    });
 
+    // 2. Delete promotion logs
+    await prisma.promotionLog.deleteMany({
+      where: { studentId: studentId },
+    });
+
+    // 3. Delete student promotion requests
+    await prisma.studentPromotionRequest.deleteMany({
+      where: { studentId: studentId },
+    });
+
+    // 4. Delete student arrears
+    await prisma.studentArrear.deleteMany({
+      where: { studentId: studentId },
+    });
+
+    // 5. Delete student yearly balances
+    await prisma.studentYearlyBalance.deleteMany({
+      where: { studentId: studentId },
+    });
+
+    // 6. Delete student fees
+    await prisma.studentFee.deleteMany({
+      where: { studentId: studentId },
+    });
+
+    // 7. Delete receipts
+    await prisma.receipt.deleteMany({
+      where: { studentId: studentId },
+    });
+
+    // 8. Delete payments
+    await prisma.payment.deleteMany({
+      where: { studentId: studentId },
+    });
+
+    // 9. Delete payment requests
+    await prisma.paymentRequest.deleteMany({
+      where: { studentId: studentId },
+    });
+
+    // 10. Delete fee statements
+    await prisma.feeStatement.deleteMany({
+      where: { studentId: studentId },
+    });
+
+    // 11. Delete alumni records (if any)
+    await prisma.alumni.deleteMany({
+      where: { studentId: studentId },
+    });
+
+    // 12. Finally delete the student
     await prisma.student.delete({
       where: { id: studentId },
     });
     
+    // 13. Delete the associated user
     await prisma.user.delete({
       where: { id: student.userId },
     });
     
-    return NextResponse.json({ success: true, message: "Student and associated user deleted." });
+    return NextResponse.json({ success: true, message: "Student and all associated records deleted successfully." });
   } catch (error: any) {
     console.error('Error deleting student:', error);
-    return NextResponse.json({ error: 'Failed to delete student' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Failed to delete student', 
+      details: error.message 
+    }, { status: 500 });
   }
 }

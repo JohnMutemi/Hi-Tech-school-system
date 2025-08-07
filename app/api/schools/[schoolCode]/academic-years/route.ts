@@ -29,9 +29,54 @@ export async function GET(
 
     console.log(`✅ Found ${academicYears.length} academic years for school ${school.name}`);
 
+    // Determine which year should be current based on current date
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    
+    // Find the academic year that should be current based on dates
+    let shouldBeCurrentYear = null;
+    for (const year of academicYears) {
+      const startDate = new Date(year.startDate);
+      const endDate = new Date(year.endDate);
+      
+      if (currentDate >= startDate && currentDate <= endDate) {
+        shouldBeCurrentYear = year.id;
+        break;
+      }
+    }
+    
+    // If no year is found based on dates, use the year that matches current year
+    if (!shouldBeCurrentYear) {
+      const matchingYear = academicYears.find(year => year.name === currentYear.toString());
+      if (matchingYear) {
+        shouldBeCurrentYear = matchingYear.id;
+      }
+    }
+
+    // Update the isCurrent field for all years
+    if (shouldBeCurrentYear) {
+      await prisma.academicYear.updateMany({
+        where: { schoolId: school.id },
+        data: { isCurrent: false }
+      });
+      
+      await prisma.academicYear.update({
+        where: { id: shouldBeCurrentYear },
+        data: { isCurrent: true }
+      });
+      
+      console.log(`✅ Updated current academic year to: ${shouldBeCurrentYear}`);
+    }
+
+    // Fetch the updated data
+    const updatedAcademicYears = await prisma.academicYear.findMany({
+      where: { schoolId: school.id },
+      orderBy: { name: 'desc' }
+    });
+
     return NextResponse.json({
       success: true,
-      data: academicYears
+      data: updatedAcademicYears
     });
 
   } catch (error) {

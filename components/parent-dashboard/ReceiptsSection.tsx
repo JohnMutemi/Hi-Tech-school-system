@@ -121,17 +121,20 @@ export default function ReceiptsSection({
   }
 
   return (
-    <div className="space-y-8">
-      <Card className="bg-gradient-to-br from-blue-50 to-emerald-50 border-blue-200 shadow">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-blue-800"><Receipt className="w-6 h-6 text-blue-600" /> Receipts</CardTitle>
+    <div className="h-full flex flex-col space-y-8">
+      <Card className="flex-1 bg-gradient-to-br from-cyan-50/90 via-blue-50/90 to-teal-50/90 border-cyan-200/60 shadow-lg backdrop-blur-sm">
+        <CardHeader className="pb-6">
+          <CardTitle className="flex items-center gap-3 text-cyan-800 text-xl">
+            <Receipt className="w-7 h-7 text-cyan-600" /> 
+            Receipts & Payment History
+          </CardTitle>
         </CardHeader>
-        <CardContent>
-          {/* Child Selector Dropdown */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Select Child</label>
+        <CardContent className="space-y-6 h-full flex flex-col">
+          {/* Enhanced Child Selection */}
+          <div className="bg-white/70 rounded-lg p-4 border border-cyan-100">
+            <label className="block text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Select Child</label>
             <select
-              className="w-full max-w-xs p-2 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-gray-900"
+              className="w-full p-4 border-2 border-cyan-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-cyan-200 focus:border-cyan-400 bg-white text-gray-900 text-lg font-medium transition-all duration-200"
               value={selectedId}
               onChange={e => setSelectedId(e.target.value)}
             >
@@ -142,40 +145,71 @@ export default function ReceiptsSection({
               ))}
             </select>
           </div>
-          {loadingReceipts ? (
-            <div className="flex items-center gap-2 text-blue-600"><Loader2 className="animate-spin" /> Loading receipts...</div>
-          ) : receiptsError ? (
-            <div className="text-red-600 text-sm">{receiptsError}</div>
-          ) : receipts.length === 0 ? (
-            <div className="text-gray-500 text-sm">No receipts found.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm border rounded-xl bg-white">
-                <thead>
-                  <tr className="bg-blue-100">
-                    <th className="px-2 py-1 text-left text-blue-800">Date</th>
-                    <th className="px-2 py-1 text-left text-blue-800">Amount</th>
-                    <th className="px-2 py-1 text-left text-blue-800">Method</th>
-                    <th className="px-2 py-1 text-left text-blue-800">Reference</th>
-                    <th className="px-2 py-1 text-left text-blue-800">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {receipts.map((r: any) => (
-                    <tr key={r.id} className="border-b">
-                      <td className="px-2 py-1">{r.paymentDate ? new Date(r.paymentDate).toLocaleDateString() : "-"}</td>
-                      <td className="px-2 py-1">Ksh {r.amount?.toLocaleString() || "-"}</td>
-                      <td className="px-2 py-1">{r.method || r.paymentMethod || "-"}</td>
-                      <td className="px-2 py-1">{r.reference || r.referenceNumber || "-"}</td>
-                      <td className="px-2 py-1">
-                        <Button size="sm" variant="outline" onClick={() => handleDownload(r)}><Download className="w-4 h-4 mr-1" /> Download</Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <div className="flex-1 flex flex-col justify-center min-h-[300px]">
+            {loadingReceipts ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <Loader2 className="animate-spin h-12 w-12 text-cyan-600 mb-4" />
+                <p className="text-cyan-600 font-medium text-lg">Loading receipts...</p>
+              </div>
+            ) : receiptsError ? (
+              <div className="text-center py-12">
+                <Receipt className="w-16 h-16 text-red-300 mx-auto mb-4" />
+                <p className="text-red-600 font-medium text-lg">Error loading receipts</p>
+                <p className="text-red-500 text-sm mt-2">{receiptsError}</p>
+              </div>
+            ) : receipts.length === 0 ? (
+              <div className="text-center py-12">
+                <Receipt className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-500 font-medium text-lg">No receipts found</p>
+                <p className="text-gray-400 text-sm mt-2">Payment receipts will appear here once transactions are made.</p>
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl border-2 border-cyan-100 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full">
+                    <thead>
+                      <tr className="bg-gradient-to-r from-cyan-500 to-blue-600 text-white">
+                        <th className="px-6 py-4 text-left font-semibold">Date</th>
+                        <th className="px-6 py-4 text-left font-semibold">Amount</th>
+                        <th className="px-6 py-4 text-left font-semibold">Method</th>
+                        <th className="px-6 py-4 text-left font-semibold">Reference</th>
+                        <th className="px-6 py-4 text-left font-semibold">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {receipts.map((r: any, idx: number) => (
+                        <tr key={r.id} className={`border-b border-cyan-100 ${idx % 2 === 0 ? 'bg-cyan-25' : 'bg-white'} hover:bg-cyan-50 transition-colors duration-150`}>
+                          <td className="px-6 py-4 font-medium text-gray-900">
+                            {r.paymentDate ? new Date(r.paymentDate).toLocaleDateString() : "-"}
+                          </td>
+                          <td className="px-6 py-4 font-semibold text-green-700">
+                            Ksh {r.amount?.toLocaleString() || "-"}
+                          </td>
+                          <td className="px-6 py-4 text-gray-700">
+                            {r.method || r.paymentMethod || "-"}
+                          </td>
+                          <td className="px-6 py-4 font-mono text-gray-600">
+                            {r.reference || r.referenceNumber || "-"}
+                          </td>
+                          <td className="px-6 py-4">
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              onClick={() => handleDownload(r)}
+                              className="border-cyan-200 text-cyan-600 hover:bg-cyan-50 hover:border-cyan-300"
+                            >
+                              <Download className="w-4 h-4 mr-2" /> 
+                              Download
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
       {/* Receipt Modal - Stepper */}

@@ -157,7 +157,7 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast }
   const [editingGrade, setEditingGrade] = useState<any>(null);
   const [classError, setClassError] = useState<string>("");
   const [gradeError, setGradeError] = useState<string>("");
-  const [academicYears, setAcademicYears] = useState<{ id: string; name: string }[]>([]);
+
   const [teachers, setTeachers] = useState<any[]>([]);
 
   // Fetch subjects, classes, and grades from backend
@@ -193,23 +193,7 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast }
     if (schoolCode) fetchData();
   }, [schoolCode, toast]);
 
-  useEffect(() => {
-    async function fetchAcademicYears() {
-      try {
-        const res = await fetch(`/api/schools/${schoolCode}/academic-years`);
-        if (res.ok) {
-          const data = await res.json();
-          setAcademicYears(Array.isArray(data) ? data : (data.data && Array.isArray(data.data) ? data.data : []));
-        } else {
-          setAcademicYears([]);
-        }
-      } catch (error) {
-        console.error('Error fetching academic years:', error);
-        setAcademicYears([]);
-      }
-    }
-    if (schoolCode) fetchAcademicYears();
-  }, [schoolCode]);
+
 
   // Fetch teachers from backend
   useEffect(() => {
@@ -301,8 +285,7 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast }
       name: "",
       level: "",
       classTeacherId: "",
-  
-      academicYearId: "",
+      gradeId: "",
     });
     setShowClassModal(true);
     setClassError("");
@@ -327,7 +310,7 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast }
   const handleSaveClass = async (e: React.FormEvent) => {
     e.preventDefault();
     setClassError("");
-    if (!newClass.name || !newClass.gradeId || !newClass.academicYearId) {
+    if (!newClass.name || !newClass.gradeId) {
       setClassError("Please fill in all required fields.");
       return;
     }
@@ -335,7 +318,6 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast }
       const apiData = {
         name: newClass.name,
         gradeId: newClass.gradeId,
-        academicYear: newClass.academicYearId,
         teacherId: newClass.classTeacherId,
       };
       const res = await fetch(`/api/schools/${schoolCode}/classes`, {
@@ -735,23 +717,7 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast }
                 </Select>
               </div>
               
-              <div className="space-y-2">
-                <Label>Academic Year *</Label>
-                <Select
-                  value={newClass.academicYearId || ""}
-                  onValueChange={value => setNewClass({ ...newClass, academicYearId: value })}
-                  required
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select academic year" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(academicYears || []).filter(year => year && year.id && year.name && year.id.trim() !== '').map(year => (
-                      <SelectItem key={year.id} value={year.id}>{year.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+
 
               {classError && <div className="text-red-600">{classError}</div>}
               <div className="flex justify-end space-x-4">

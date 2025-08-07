@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { calculateStudentEligibility, getBulkPromotionConfig } from '@/lib/services/bulk-promotion-service';
 
 const prisma = new PrismaClient();
 
@@ -8,58 +9,55 @@ export async function POST(
   { params }: { params: { schoolCode: string } }
 ) {
   try {
-    console.log('🔍 POST /api/schools/[schoolCode]/alumni/promote called');
-    console.log('📋 Params:', params);
-    
     const school = await prisma.school.findUnique({
       where: { code: params.schoolCode }
     });
 
     if (!school) {
-      console.log('❌ School not found:', params.schoolCode);
       return NextResponse.json(
-        {
-          success: false,
-          error: 'School not found'
-        },
+        { success: false, error: 'School not found' },
         { status: 404 }
       );
     }
 
-    console.log('✅ School found:', school.name);
-
     // Get current academic year
     const currentAcademicYear = await prisma.academicYear.findFirst({
-      where: { 
+      where: {
         schoolId: school.id,
-        isCurrent: true 
+        isCurrent: true
       }
     });
 
     if (!currentAcademicYear) {
-      console.log('❌ No current academic year found');
       return NextResponse.json(
-        {
-          success: false,
-          error: 'No current academic year found'
-        },
+        { success: false, error: 'No current academic year found' },
         { status: 400 }
       );
     }
 
-    const graduationYear = currentAcademicYear.name;
-    console.log(`🎓 Promoting Grade 6 students for graduation year: ${graduationYear}`);
+    // 1. Find the progression rule for Alumni
+    const alumniProgression = await prisma.classProgression.findFirst({
+      where: {
+        schoolId: school.id,
+        toClass: "Alumni",
+        isActive: true,
+        fromAcademicYear: currentAcademicYear.name
+      }
+    });
 
-    // Find Grade 6 students who are active and not already alumni
-    const grade6Students = await prisma.student.findMany({
+    if (!alumniProgression) {
+      return NextResponse.json(
+        { success: false, error: 'No progression rule to Alumni found' },
+        { status: 400 }
+      );
+    }
+
+    // 2. Find students in the fromClass/fromGrade
+    const studentsToPromote = await prisma.student.findMany({
       where: {
         schoolId: school.id,
         isActive: true,
-        class: {
-          name: {
-            in: ['6A', 'Grade 6A', '6', 'Grade 6']
-          }
-        }
+        class: { name: alumniProgression.fromClass }
       },
       include: {
         user: true,
@@ -67,60 +65,83 @@ export async function POST(
       }
     });
 
-    console.log(`📊 Found ${grade6Students.length} Grade 6 students`);
-
-    if (grade6Students.length === 0) {
-      return NextResponse.json(
-        {
-          success: true,
-          promotedCount: 0,
-          graduationYear,
-          message: 'No Grade 6 students found to promote'
-        }
-      );
-    }
-
-    // Check which students are already alumni
-    const existingAlumni = await prisma.alumni.findMany({
-      where: {
-        schoolId: school.id,
-        graduationYear,
-        studentId: {
-          in: grade6Students.map(s => s.id)
-        }
-      }
-    });
-
-    const existingAlumniIds = existingAlumni.map(a => a.studentId);
-    const studentsToPromote = grade6Students.filter(s => !existingAlumniIds.includes(s.id));
-
-    console.log(`📊 ${studentsToPromote.length} students eligible for promotion`);
-
     if (studentsToPromote.length === 0) {
       return NextResponse.json(
         {
           success: true,
           promotedCount: 0,
-          graduationYear,
-          message: 'All Grade 6 students are already alumni'
+          graduationYear: currentAcademicYear.name,
+          message: 'No students found to promote to alumni'
         }
       );
     }
 
-    // Create alumni records for eligible students
+    // 3. Check which students are already alumni
+    const existingAlumni = await prisma.alumni.findMany({
+      where: {
+        schoolId: school.id,
+        graduationYear: currentAcademicYear.name,
+        studentId: {
+          in: studentsToPromote.map(s => s.id)
+        }
+      }
+    });
+
+    const existingAlumniIds = existingAlumni.map(a => a.studentId);
+    const notYetAlumni = studentsToPromote.filter(s => !existingAlumniIds.includes(s.id));
+
+    if (notYetAlumni.length === 0) {
+      return NextResponse.json(
+        {
+          success: true,
+          promotedCount: 0,
+          graduationYear: currentAcademicYear.name,
+          message: 'All eligible students are already alumni'
+        }
+      );
+    }
+
+    // 4. Get promotion criteria for the school
+    const promotionConfig = await getBulkPromotionConfig(params.schoolCode);
+    if (!promotionConfig) {
+      return NextResponse.json(
+        { success: false, error: 'Promotion criteria not configured' },
+        { status: 400 }
+      );
+    }
+
+    // 5. Apply eligibility criteria
+    const eligibleStudents = [];
+    for (const student of notYetAlumni) {
+      const eligibility = await calculateStudentEligibility(student.id, promotionConfig);
+      if (eligibility.isEligible) eligibleStudents.push(student);
+    }
+
+    if (eligibleStudents.length === 0) {
+      return NextResponse.json(
+        {
+          success: true,
+          promotedCount: 0,
+          graduationYear: currentAcademicYear.name,
+          message: 'No eligible students to promote to alumni'
+        }
+      );
+    }
+
+    // 6. Promote eligible students to Alumni
     const alumniRecords = await Promise.all(
-      studentsToPromote.map(async (student) => {
+      eligibleStudents.map(async (student) => {
         // Calculate final grade (placeholder - can be enhanced later)
-        const finalGrade = 'B'; // Default grade, can be calculated from actual records
-        
+        const finalGrade = 'B'; // Or calculate from actual records
+
         // Create alumni record
         return prisma.alumni.create({
           data: {
             schoolId: school.id,
             studentId: student.id,
-            graduationYear,
+            graduationYear: currentAcademicYear.name,
             finalGrade,
-            achievements: [], // Empty array for now
+            achievements: [],
             createdAt: new Date(),
             updatedAt: new Date()
           }
@@ -128,11 +149,11 @@ export async function POST(
       })
     );
 
-    // Update students to inactive (graduated)
+    // 7. Update students to inactive (graduated)
     await prisma.student.updateMany({
       where: {
         id: {
-          in: studentsToPromote.map(s => s.id)
+          in: eligibleStudents.map(s => s.id)
         }
       },
       data: {
@@ -141,13 +162,13 @@ export async function POST(
       }
     });
 
-    console.log(`✅ Successfully promoted ${alumniRecords.length} students to alumni`);
+    // Optionally: log the promotion in PromotionLog
 
     return NextResponse.json({
       success: true,
       promotedCount: alumniRecords.length,
-      graduationYear,
-      message: `Successfully promoted ${alumniRecords.length} Grade 6 students to alumni`
+      graduationYear: currentAcademicYear.name,
+      message: `Successfully promoted ${alumniRecords.length} students to alumni`
     });
   } catch (error) {
     console.error('❌ Error promoting students to alumni:', error);

@@ -62,7 +62,7 @@ export default function ParentDashboard({ schoolCode, parentId }: { schoolCode: 
   };
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-b from-cyan-900 via-cyan-800 to-blue-900">
+    <div className="flex min-h-screen bg-gradient-to-br from-cyan-900 via-cyan-800 to-blue-900">
       <ParentSidebar
         activeTab={activeTab}
         onTabChange={setActiveTab}
@@ -74,18 +74,34 @@ export default function ParentDashboard({ schoolCode, parentId }: { schoolCode: 
         avatarError={avatarError}
         avatarUrl={avatarUrl}
       />
-      <div className="flex-1 flex flex-col min-h-screen pl-0 lg:pl-28 xl:pl-40 2xl:pl-56 bg-cyan-50/60">
-        {/* Main Header */}
-        <header className="w-full px-4 sm:px-8 pt-8 pb-4 flex flex-col sm:flex-row items-start sm:items-center gap-2">
-          <div className="flex flex-col">
-            <span className="text-cyan-600 text-xl font-semibold">{parent?.schoolName || parent?.parentName || ''}</span>
+      <div className="flex-1 flex flex-col min-h-screen pl-0 lg:pl-28 xl:pl-40 2xl:pl-56">
+        {/* Floating Date Widget with radiant styling - Sticky */}
+        <div className="fixed top-4 right-4 z-40">
+          <div className="bg-gradient-to-r from-cyan-500/90 via-blue-500/90 to-purple-500/90 backdrop-blur-md rounded-xl px-6 py-3 border border-white/40 shadow-2xl transform hover:scale-105 transition-all duration-300 animate-pulse">
+            <div className="text-white font-bold text-sm">
+              {new Date().toLocaleDateString('en-US', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })}
+            </div>
+            <div className="text-cyan-100 text-xs mt-1 opacity-80">
+              {new Date().toLocaleTimeString('en-US', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                hour12: true 
+              })}
+            </div>
           </div>
-        </header>
-        <div className="flex flex-1 items-center justify-center">
-          <main className="w-full max-w-7xl mx-auto bg-white rounded-3xl shadow-2xl border-8 border-white p-10 sm:p-14 lg:p-16 pt-16 flex flex-col justify-center" style={{minHeight: '75vh'}}>
-            {renderContent()}
-          </main>
         </div>
+
+        {/* Main Content Area with improved spacing */}
+        <main className="flex-1 p-3 sm:p-4 pt-16 overflow-y-auto">
+          <div className="max-w-7xl mx-auto h-full overflow-y-auto min-h-screen">
+            {renderContent()}
+          </div>
+        </main>
       </div>
     </div>
   );

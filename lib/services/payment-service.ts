@@ -112,7 +112,7 @@ export const paymentService = {
       });
       if (!student) throw new Error('Student not found');
       const academicYearRecord = await prisma.academicYear.findFirst({
-        where: { schoolId: school.id, name: paymentData.academicYear || new Date().getFullYear().toString() }
+        where: { schoolId: school.id, name: String(paymentData.academicYear || new Date().getFullYear()) }
       });
       if (!academicYearRecord) throw new Error('Academic year not found');
       const gradeId = student.class?.gradeId;
@@ -142,75 +142,217 @@ export const paymentService = {
         const paid = payments.filter(p => p.termId === fs.termId).reduce((sum, p) => sum + Number(p.amount), 0);
         return {
           feeStructure: fs,
-          outstanding: Number(fs.totalAmount) - paid
+          outstanding: Math.max(0, Number(fs.totalAmount) - paid),
+          paid: paid,
+          totalAmount: Number(fs.totalAmount)
         };
       });
 
-      // Find the current term index
-      let startTermIdx = 0;
+      // Find the specific term to pay for
+      let targetTermIdx = -1;
       if (paymentData.term) {
-        startTermIdx = feeStructures.findIndex(fs => fs.term === paymentData.term);
-        if (startTermIdx === -1) startTermIdx = 0;
+        targetTermIdx = feeStructures.findIndex(fs => 
+          fs.term === paymentData.term && 
+          String(fs.year) === paymentData.academicYear
+        );
+        
+        logPayment('TERM_SEARCH', {
+          requestedTerm: paymentData.term,
+          requestedYear: paymentData.academicYear,
+          targetTermIdx,
+          availableTerms: feeStructures.map(fs => ({ term: fs.term, year: fs.year }))
+        });
+      }
+      
+      // If specific term not found, start from first unpaid term
+      let startTermIdx = 0;
+      if (targetTermIdx !== -1) {
+        startTermIdx = targetTermIdx;
+      } else {
+        // Find first unpaid term
+        for (let i = 0; i < termBalances.length; i++) {
+          if (termBalances[i].outstanding > 0) {
+            startTermIdx = i;
+            break;
+          }
+        }
       }
 
-      // Apply payment across terms
+      // Apply payment to specific term first, then handle overpayments
       let amountLeft = paymentData.amount;
       const paymentRecords = [];
       const receiptRecords = [];
-      for (let i = startTermIdx; i < termBalances.length && amountLeft > 0; i++) {
-        const { feeStructure, outstanding } = termBalances[i];
-        if (outstanding <= 0) continue; // Already paid
-        const payAmount = Math.min(amountLeft, outstanding);
-        amountLeft -= payAmount;
-        // Create payment
-        const receiptNumber = `RCP-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
-        const referenceNumber = `PAY-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        const payment = await prisma.payment.create({
-          data: {
-            studentId,
+      const paymentDistribution = [];
+      let overpaymentAmount = 0;
+      let nextTermApplied = null;
+
+      // First, apply payment to the specific term if provided
+      if (targetTermIdx !== -1 && amountLeft > 0) {
+        const { feeStructure, outstanding, paid, totalAmount } = termBalances[targetTermIdx];
+        
+        if (outstanding > 0) {
+          const payAmount = Math.min(amountLeft, outstanding);
+          amountLeft -= payAmount;
+          
+          // Create payment for specific term
+          const receiptNumber = `RCP-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+          const referenceNumber = `PAY-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          
+          logPayment('PAYMENT_CREATION', {
+            term: feeStructure.term,
+            year: feeStructure.year,
+            termId: feeStructure.termId,
             amount: payAmount,
-            paymentDate: new Date(),
-            paymentMethod: paymentData.paymentMethod || "cash", // Always provide a string
-            referenceNumber,
-            receiptNumber,
-            description: paymentData.description,
-            receivedBy: paymentData.receivedBy,
-            academicYearId: academicYearRecord.id,
-            termId: feeStructure.termId!,
-          }
-        });
-        // Calculate balances before/after
-        const balancesBefore = await paymentService.calculateBalances(studentId, academicYearRecord.id, feeStructure.termId!);
-        const balancesAfter = await paymentService.calculateBalances(studentId, academicYearRecord.id, feeStructure.termId!);
-        // Create receipt
-        const receipt = await prisma.receipt.create({
-          data: {
-            paymentId: payment.id,
-            studentId,
-            receiptNumber,
-            amount: payAmount,
-            paymentDate: new Date(),
-            academicYearOutstandingBefore: balancesBefore.academicYearOutstanding,
-            academicYearOutstandingAfter: balancesAfter.academicYearOutstanding,
-            termOutstandingBefore: balancesBefore.termOutstanding,
-            termOutstandingAfter: balancesAfter.termOutstanding,
-            academicYearId: academicYearRecord.id,
-            termId: feeStructure.termId!,
-            paymentMethod: paymentData.paymentMethod, // Set here only
-            referenceNumber,
-          }
-        });
-        paymentRecords.push(payment);
-        receiptRecords.push(receipt);
+            description: paymentData.description
+          });
+          
+          const payment = await prisma.payment.create({
+            data: {
+              studentId,
+              amount: payAmount,
+              paymentDate: new Date(),
+              paymentMethod: paymentData.paymentMethod || "cash",
+              referenceNumber,
+              receiptNumber,
+              description: paymentData.description,
+              receivedBy: paymentData.receivedBy,
+              academicYearId: academicYearRecord.id,
+              termId: feeStructure.termId!,
+            }
+          });
+
+          // Calculate balances before/after
+          const balancesBefore = await paymentService.calculateBalances(studentId, academicYearRecord.id, feeStructure.termId!);
+          const balancesAfter = await paymentService.calculateBalances(studentId, academicYearRecord.id, feeStructure.termId!);
+          
+          // Create receipt
+          const receipt = await prisma.receipt.create({
+            data: {
+              paymentId: payment.id,
+              studentId,
+              receiptNumber,
+              amount: payAmount,
+              paymentDate: new Date(),
+              academicYearOutstandingBefore: balancesBefore.academicYearOutstanding,
+              academicYearOutstandingAfter: balancesAfter.academicYearOutstanding,
+              termOutstandingBefore: balancesBefore.termOutstanding,
+              termOutstandingAfter: balancesAfter.termOutstanding,
+              academicYearId: academicYearRecord.id,
+              termId: feeStructure.termId!,
+              paymentMethod: paymentData.paymentMethod,
+              referenceNumber,
+            }
+          });
+
+          paymentRecords.push(payment);
+          receiptRecords.push(receipt);
+          
+          // Track payment distribution
+          paymentDistribution.push({
+            term: feeStructure.term,
+            year: feeStructure.year,
+            termId: feeStructure.termId,
+            amountApplied: payAmount,
+            outstandingBefore: outstanding,
+            outstandingAfter: Math.max(0, outstanding - payAmount),
+            isFullyPaid: (outstanding - payAmount) <= 0
+          });
+        }
       }
-      // Optionally: If amountLeft > 0 after all terms, carry forward to next academic year (not implemented here)
-      // Return the last payment/receipt for UI, and all records for history
+
+      // Then handle overpayments by applying remaining amount to subsequent terms
+      if (amountLeft > 0) {
+        for (let i = startTermIdx + 1; i < termBalances.length && amountLeft > 0; i++) {
+          const { feeStructure, outstanding, paid, totalAmount } = termBalances[i];
+          
+          if (outstanding <= 0) continue; // Already paid
+          
+          const payAmount = Math.min(amountLeft, outstanding);
+          amountLeft -= payAmount;
+          
+          // Create payment for overpayment
+          const receiptNumber = `RCP-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+          const referenceNumber = `PAY-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          
+          const payment = await prisma.payment.create({
+            data: {
+              studentId,
+              amount: payAmount,
+              paymentDate: new Date(),
+              paymentMethod: paymentData.paymentMethod || "cash",
+              referenceNumber,
+              receiptNumber,
+              description: `${paymentData.description} (Overpayment applied to ${feeStructure.term})`,
+              receivedBy: paymentData.receivedBy,
+              academicYearId: academicYearRecord.id,
+              termId: feeStructure.termId!,
+            }
+          });
+
+          // Calculate balances before/after
+          const balancesBefore = await paymentService.calculateBalances(studentId, academicYearRecord.id, feeStructure.termId!);
+          const balancesAfter = await paymentService.calculateBalances(studentId, academicYearRecord.id, feeStructure.termId!);
+          
+          // Create receipt
+          const receipt = await prisma.receipt.create({
+            data: {
+              paymentId: payment.id,
+              studentId,
+              receiptNumber,
+              amount: payAmount,
+              paymentDate: new Date(),
+              academicYearOutstandingBefore: balancesBefore.academicYearOutstanding,
+              academicYearOutstandingAfter: balancesAfter.academicYearOutstanding,
+              termOutstandingBefore: balancesBefore.termOutstanding,
+              termOutstandingAfter: balancesAfter.termOutstanding,
+              academicYearId: academicYearRecord.id,
+              termId: feeStructure.termId!,
+              paymentMethod: paymentData.paymentMethod,
+              referenceNumber,
+            }
+          });
+
+          paymentRecords.push(payment);
+          receiptRecords.push(receipt);
+          
+          // Track overpayment distribution
+          paymentDistribution.push({
+            term: feeStructure.term,
+            year: feeStructure.year,
+            termId: feeStructure.termId,
+            amountApplied: payAmount,
+            outstandingBefore: outstanding,
+            outstandingAfter: Math.max(0, outstanding - payAmount),
+            isFullyPaid: (outstanding - payAmount) <= 0,
+            isOverpayment: true
+          });
+
+          overpaymentAmount += payAmount;
+          nextTermApplied = {
+            term: feeStructure.term,
+            year: feeStructure.year,
+            amount: payAmount
+          };
+        }
+      }
+
+      // If there's still amount left, it's an overpayment for future terms
+      if (amountLeft > 0) {
+        overpaymentAmount = amountLeft;
+      }
+
+      // Return detailed payment information
       return {
         success: true,
         payment: paymentRecords[paymentRecords.length - 1],
         receipt: receiptRecords[receiptRecords.length - 1],
         allPayments: paymentRecords,
-        allReceipts: receiptRecords
+        allReceipts: receiptRecords,
+        paymentDistribution,
+        overpaymentAmount,
+        nextTermApplied,
+        totalPaid: paymentData.amount,
+        remainingBalance: amountLeft
       };
     } catch (error) {
       logPayment('PAYMENT_ERROR', error, 'error');

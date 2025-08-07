@@ -28,7 +28,7 @@ export async function GET(
 
     console.log('✅ School found:', school.name);
 
-    // Get all alumni for this school
+    // Get all alumni for this school with fee balance information
     const alumni = await prisma.alumni.findMany({
       where: { 
         schoolId: school.id 
@@ -36,14 +36,38 @@ export async function GET(
       include: {
         student: {
           include: {
-            user: true
+            user: true,
+            payments: {
+              where: {
+                academicYear: {
+                  name: {
+                    in: ['2025', '2026'] // Include recent academic years
+                  }
+                }
+              },
+              include: {
+                academicYear: true
+              }
+            },
+            studentArrears: {
+              where: {
+                academicYear: {
+                  name: {
+                    in: ['2025', '2026'] // Include recent academic years
+                  }
+                }
+              },
+              include: {
+                academicYear: true
+              }
+            }
           }
         }
       },
-      orderBy: { 
-        graduationYear: 'desc',
-        createdAt: 'desc'
-      }
+      orderBy: [
+        { graduationYear: 'desc' },
+        { createdAt: 'desc' }
+      ]
     });
 
     console.log(`📊 Found ${alumni.length} alumni records`);
@@ -61,29 +85,54 @@ export async function GET(
       }
     });
 
-    const stats = {
+    const stats: any = {
       totalAlumni: alumni.length,
       totalYears: graduationYears.length,
       thisYearGraduates: alumni.filter(a => a.graduationYear === currentYear).length,
       topPerformers: alumni.filter(a => a.finalGrade === 'A').length
     };
 
-    // Format alumni data
-    const formattedAlumni = alumni.map(alum => ({
-      id: alum.id,
-      studentId: alum.studentId,
-      studentName: alum.student.user.name,
-      admissionNumber: alum.student.admissionNumber,
-      graduationYear: alum.graduationYear,
-      finalGrade: alum.finalGrade,
-      achievements: alum.achievements || [],
-      contactEmail: alum.contactEmail,
-      contactPhone: alum.contactPhone,
-      currentInstitution: alum.currentInstitution,
-      currentOccupation: alum.currentOccupation,
-      createdAt: alum.createdAt.toISOString(),
-      updatedAt: alum.updatedAt.toISOString()
-    }));
+    // Format alumni data with fee balance information
+    const formattedAlumni = alumni.map(alum => {
+      // Calculate total payments made
+      const totalPayments = alum.student.payments.reduce((sum, payment) => sum + payment.amount, 0);
+      
+      // Calculate total arrears
+      const totalArrears = alum.student.studentArrears.reduce((sum, arrear) => sum + arrear.arrearAmount, 0);
+      
+      // Calculate outstanding balance (arrears minus payments)
+      const outstandingBalance = Math.max(0, totalArrears - totalPayments);
+      
+      return {
+        id: alum.id,
+        studentId: alum.studentId,
+        studentName: alum.student.user.name,
+        admissionNumber: alum.student.admissionNumber,
+        graduationYear: alum.graduationYear,
+        finalGrade: alum.finalGrade,
+        achievements: alum.achievements || [],
+        contactEmail: alum.contactEmail,
+        contactPhone: alum.contactPhone,
+        currentInstitution: alum.currentInstitution,
+        currentOccupation: alum.currentOccupation,
+        feeBalance: {
+          totalPayments,
+          totalArrears,
+          outstandingBalance,
+          hasOutstandingFees: outstandingBalance > 0
+        },
+        createdAt: alum.createdAt.toISOString(),
+        updatedAt: alum.updatedAt.toISOString()
+      };
+    });
+
+    // Calculate fee-related statistics
+    const alumniWithOutstandingFees = formattedAlumni.filter(a => a.feeBalance.hasOutstandingFees);
+    const totalOutstandingFees = formattedAlumni.reduce((sum, a) => sum + a.feeBalance.outstandingBalance, 0);
+    
+    // Update stats with fee information
+    stats.alumniWithOutstandingFees = alumniWithOutstandingFees.length;
+    stats.totalOutstandingFees = totalOutstandingFees;
 
     // Format graduation years data
     const formattedGraduationYears = graduationYears.map(year => ({

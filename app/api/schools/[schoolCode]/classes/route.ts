@@ -48,7 +48,7 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
     const schoolContext = await schoolManager.initialize();
     
     const body = await request.json();
-    const { name, academicYear, teacherId, gradeId } = body;
+    const { name, teacherId, gradeId } = body;
     if (!name || !gradeId) {
       return NextResponse.json({ error: "Missing required fields: name and gradeId are required" }, { status: 400 });
     }
@@ -57,7 +57,6 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
       name,
       gradeId,
       schoolId: schoolContext.schoolId, // Use school context
-      academicYear: academicYear || new Date().getFullYear().toString(),
       isActive: true,
     };
     if (teacherId) data.teacherId = teacherId;
@@ -67,7 +66,6 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
       const existingAlumni = await prisma.class.findFirst({
         where: {
           schoolId: schoolContext.schoolId,
-          academicYear: data.academicYear,
           name: { equals: "ALUMNI", mode: "insensitive" },
         },
       });
@@ -109,7 +107,7 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
     await schoolManager.initialize();
     
     const body = await request.json();
-    const { id, name, academicYear, teacherId, gradeId } = body;
+    const { id, name, teacherId, gradeId } = body;
     if (!id) {
       return NextResponse.json({ error: "Class ID is required" }, { status: 400 });
     }
@@ -124,7 +122,6 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
       where: { id },
       data: {
         name,
-        academicYear,
         teacherId: teacherId || null,
         gradeId: gradeId,
         isActive: true,

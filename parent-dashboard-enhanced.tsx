@@ -61,6 +61,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { PaymentModal } from "@/components/payment/payment-modal";
 import FeesSection from "@/components/parent-dashboard/FeesSection";
+import ChildrenSection from "@/components/parent-dashboard/ChildrenSection";
 import {
   Accordion,
   AccordionContent,
@@ -100,11 +101,11 @@ function ChildOverview({
   const attendance = child.attendance || 96;
   
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Student Basic Info */}
-      <div className="mb-8 flex flex-col md:flex-row gap-6 items-stretch">
-        <div className="flex-1 bg-white rounded-lg shadow p-6 flex flex-col md:flex-row gap-6 items-center">
-          <Avatar className="w-20 h-20 mr-4">
+      <div className="mb-6 flex flex-col md:flex-row gap-4 items-stretch">
+        <div className="flex-1 bg-white rounded-lg shadow p-4 flex flex-col md:flex-row gap-4 items-center">
+          <Avatar className="w-16 h-16 mr-3">
             <img
               src={child.avatarUrl || "/placeholder-user.jpg"}
               alt={child.fullName || child.name}
@@ -112,7 +113,7 @@ function ChildOverview({
             />
           </Avatar>
           <div className="flex-1">
-            <div className="font-bold text-lg">
+            <div className="font-bold text-base">
               {child.fullName || child.name}
             </div>
             <div className="text-blue-700 font-semibold text-sm">
@@ -121,7 +122,7 @@ function ChildOverview({
             <div className="text-xs text-gray-500">
               Adm: {child.admissionNumber}
             </div>
-            <div className="text-xs text-gray-700 mt-2">
+            <div className="text-xs text-gray-700 mt-1">
               Gender: {child.gender}
               <br />
               Date of Birth:{" "}
@@ -132,22 +133,22 @@ function ChildOverview({
             </div>
           </div>
         </div>
-        <div className="flex-1 bg-white rounded-lg shadow p-6 flex flex-col gap-4 justify-center">
+        <div className="flex-1 bg-white rounded-lg shadow p-4 flex flex-col gap-3 justify-center">
           <div className="font-semibold text-gray-700 mb-2">Quick Stats</div>
           <div className="flex flex-col gap-2">
             <div className="flex justify-between items-center bg-blue-50 rounded px-3 py-2">
-              <span>Outstanding Fees</span>
-              <span className="text-red-600 font-bold">
+              <span className="text-sm">Outstanding Fees</span>
+              <span className="text-red-600 font-bold text-sm">
                 KES {outstandingFees.toLocaleString()}
               </span>
             </div>
             <div className="flex justify-between items-center bg-purple-50 rounded px-3 py-2">
-              <span>Recent Grade</span>
-              <span className="font-bold">{recentGrade}</span>
+              <span className="text-sm">Recent Grade</span>
+              <span className="font-bold text-sm">{recentGrade}</span>
             </div>
             <div className="flex justify-between items-center bg-green-50 rounded px-3 py-2">
-              <span>Attendance</span>
-              <span className="font-bold text-green-700">{attendance}%</span>
+              <span className="text-sm">Attendance</span>
+              <span className="font-bold text-green-700 text-sm">{attendance}%</span>
             </div>
           </div>
         </div>
@@ -155,8 +156,8 @@ function ChildOverview({
 
       {/* Fee Structure Section */}
       <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200 shadow-lg">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-blue-800">
+        <CardHeader className="pb-4">
+          <CardTitle className="flex items-center gap-2 text-blue-800 text-lg">
             <DollarSign className="w-5 h-5" />
             Fee Structure - {child.gradeName}
           </CardTitle>
@@ -166,24 +167,24 @@ function ChildOverview({
         </CardHeader>
         <CardContent>
           {feeStructure ? (
-            <div className="space-y-6">
+            <div className="space-y-4">
               {/* Fee Structure Summary */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div className="bg-white rounded-lg p-4 border border-blue-200">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div className="bg-white rounded-lg p-3 border border-blue-200">
                   <div className="text-sm text-gray-600 mb-1">Total Fee Amount</div>
-                  <div className="text-2xl font-bold text-blue-600">
+                  <div className="text-xl font-bold text-blue-600">
                     KES {feeStructure.totalAmount?.toLocaleString() || "0"}
                   </div>
                 </div>
-                <div className="bg-white rounded-lg p-4 border border-blue-200">
+                <div className="bg-white rounded-lg p-3 border border-blue-200">
                   <div className="text-sm text-gray-600 mb-1">Academic Year</div>
-                  <div className="text-lg font-semibold text-gray-800">
+                  <div className="text-base font-semibold text-gray-800">
                     {feeStructure.year || "N/A"}
                   </div>
                 </div>
-                <div className="bg-white rounded-lg p-4 border border-blue-200">
+                <div className="bg-white rounded-lg p-3 border border-blue-200">
                   <div className="text-sm text-gray-600 mb-1">Term</div>
-                  <div className="text-lg font-semibold text-gray-800">
+                  <div className="text-base font-semibold text-gray-800">
                     {feeStructure.term || "N/A"}
                   </div>
                 </div>
@@ -191,15 +192,15 @@ function ChildOverview({
 
               {/* Fee Breakdown */}
               {feeStructure.breakdown && Object.keys(feeStructure.breakdown).length > 0 && (
-                <div className="bg-white rounded-lg p-6 border border-blue-200">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Fee Breakdown</h3>
-                  <div className="space-y-3">
+                <div className="bg-white rounded-lg p-4 border border-blue-200">
+                  <h3 className="text-base font-semibold text-gray-800 mb-3">Fee Breakdown</h3>
+                  <div className="space-y-2">
                     {Object.entries(feeStructure.breakdown).map(([feeType, amount]) => (
                       <div key={feeType} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
-                        <span className="font-medium text-gray-700 capitalize">
+                        <span className="font-medium text-gray-700 capitalize text-sm">
                           {feeType.replace(/([A-Z])/g, ' $1').trim()}
                         </span>
-                        <span className="font-semibold text-gray-900">
+                        <span className="font-semibold text-gray-900 text-sm">
                           KES {Number(amount).toLocaleString()}
                         </span>
                       </div>
@@ -209,9 +210,9 @@ function ChildOverview({
               )}
 
               {/* Fee Structure Details */}
-              <div className="bg-white rounded-lg p-6 border border-blue-200">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">Structure Details</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div className="bg-white rounded-lg p-4 border border-blue-200">
+                <h3 className="text-base font-semibold text-gray-800 mb-3">Structure Details</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                   <div>
                     <span className="font-medium text-gray-600">Grade Level:</span>
                     <span className="ml-2 text-gray-800">{feeStructure.gradeName || "N/A"}</span>
@@ -220,9 +221,9 @@ function ChildOverview({
                     <span className="font-medium text-gray-600">Status:</span>
                     <span className="ml-2">
                       {feeStructure.isActive ? (
-                        <Badge variant="default" className="bg-green-100 text-green-800">Active</Badge>
+                        <Badge variant="default" className="bg-green-100 text-green-800 text-xs">Active</Badge>
                       ) : (
-                        <Badge variant="secondary" className="bg-gray-100 text-gray-800">Inactive</Badge>
+                        <Badge variant="secondary" className="bg-gray-100 text-gray-800 text-xs">Inactive</Badge>
                       )}
                     </span>
                   </div>
@@ -242,8 +243,8 @@ function ChildOverview({
               </div>
             </div>
           ) : (
-            <div className="text-center py-8">
-              <DollarSign className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+            <div className="text-center py-6">
+              <DollarSign className="w-10 h-10 mx-auto mb-3 text-gray-300" />
               <p className="text-gray-500 mb-2">No fee structure found</p>
               <p className="text-sm text-gray-400">
                 Fee structure for {child.gradeName} has not been configured yet.
@@ -573,8 +574,8 @@ export function ParentDashboard({
       {/* Sidebar */}
       <aside className="fixed inset-y-0 left-0 z-20 w-64 bg-white border-r p-4 transform transition-transform md:relative md:translate-x-0">
         {/* Profile at top */}
-        <div className="flex flex-col items-center mb-8">
-          <Avatar className="w-28 h-28 mb-3 ring-4 ring-blue-200 shadow-lg relative group">
+        <div className="flex flex-col items-center mb-6">
+          <Avatar className="w-20 h-20 mb-3 ring-4 ring-blue-200 shadow-lg relative group">
             <img
               src={avatarUrl || "/placeholder-user.jpg"}
               alt={parent.parentName || "Parent Avatar"}
@@ -605,7 +606,7 @@ export function ParentDashboard({
               </div>
             )}
           </Avatar>
-          <div className="text-xl font-bold text-gray-900">
+          <div className="text-lg font-bold text-gray-900">
             {parent.parentName}
           </div>
           <div className="text-blue-700 font-semibold text-sm">
@@ -613,7 +614,7 @@ export function ParentDashboard({
           </div>
         </div>
         {/* Navigation */}
-        <nav className="mt-6 space-y-2">
+        <nav className="mt-4 space-y-2">
           {sidebarNav.map((item) => (
             <Button
               key={item.section}
@@ -661,106 +662,93 @@ export function ParentDashboard({
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
-        <main className="flex-grow p-4 md:p-6">
-          {selectedSection === "children" && (
-            <div>
-              {/* Children summary at the top */}
-              {students.length > 0 && (
-                <Card className="mb-6">
-                  <CardContent>
-                    <div className="flex flex-wrap gap-4 items-center justify-between">
-                      <div>
-                        <b>Children:</b> {students.length}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-              {/* Dropdown for selecting child */}
-              {students.length > 0 && (
-                <div className="mb-6 flex items-center gap-4">
-                  <label
-                    htmlFor="child-select"
-                    className="font-semibold text-gray-700"
-                  >
-                    Select Child:
-                  </label>
-                  <select
-                    id="child-select"
-                    className="border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    value={focusedChildId || students[0].id}
-                    onChange={(e) => setFocusedChildId(e.target.value)}
-                  >
-                    {students.map((child) => (
-                      <option key={child.id} value={child.id}>
-                        {child.fullName || child.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              {/* Child Overview Panel */}
-              {students.length > 0 &&
-                (() => {
-                  const child =
-                    students.find((c) => c.id === focusedChildId) ||
-                    students[0];
-                  const outstandingFees = 0; // This would be calculated from actual fee data
+        {/* Floating Date Widget with radiant styling - Sticky */}
+        <div className="fixed top-4 right-4 z-40">
+          <div className="bg-gradient-to-r from-cyan-500/90 via-blue-500/90 to-purple-500/90 backdrop-blur-md rounded-xl px-6 py-3 border border-white/40 shadow-2xl transform hover:scale-105 transition-all duration-300 animate-pulse">
+            <div className="text-white font-bold text-sm">
+              {new Date().toLocaleDateString('en-US', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })}
+            </div>
+            <div className="text-cyan-100 text-xs mt-1 opacity-80">
+              {new Date().toLocaleTimeString('en-US', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                hour12: true 
+              })}
+            </div>
+          </div>
+        </div>
 
-                  return (
-                    <ChildOverview
-                      child={child}
-                      outstandingFees={outstandingFees}
-                      feeStructure={getStudentFeeStructure(child.id)}
-                    />
-                  );
-                })()}
+        <main className="flex-grow p-3 sm:p-4 pt-16 overflow-y-auto">
+          {selectedSection === "children" && (
+            <div className="h-full overflow-y-auto">
+              {/* Use the proper ChildrenSection component */}
+              <ChildrenSection students={students} />
             </div>
           )}
           {selectedSection === "fees" && (
-            <div className="max-w-4xl mx-auto">
-              <h2 className="text-2xl font-bold mb-6 text-center">Fee Structure</h2>
-              {students.length === 0 ? (
-                <Card className="mb-6">
-                  <CardContent>No children found.</CardContent>
-                </Card>
-              ) : (
-                <FeesSection
-                  schoolCode={schoolCode}
-                  students={students}
-                  selectedId={focusedChildId}
-                  setSelectedId={setFocusedChildId}
-                />
-              )}
+            <div className="h-full overflow-y-auto">
+              <div className="max-w-4xl mx-auto">
+                <h2 className="text-2xl font-bold mb-4 text-center">Fee Structure</h2>
+                {students.length === 0 ? (
+                  <Card className="mb-4">
+                    <CardContent>No children found.</CardContent>
+                  </Card>
+                ) : (
+                  <FeesSection
+                    schoolCode={schoolCode}
+                    students={students}
+                    selectedId={focusedChildId || ""}
+                    setSelectedId={setFocusedChildId}
+                    payments={[]}
+                    loadingPayments={false}
+                    paymentsError=""
+                    refreshPayments={() => {}}
+                  />
+                )}
+              </div>
             </div>
           )}
           {selectedSection === "receipts" && (
-            <div className="max-w-4xl mx-auto">
-              <h2 className="text-2xl font-bold mb-6 text-center">
-                Payment History & Receipts
-              </h2>
-              <Card className="mb-6">
-                <CardContent>
-                  <p className="text-gray-500">Receipts functionality will be implemented here.</p>
-                </CardContent>
-              </Card>
+            <div className="h-full overflow-y-auto">
+              <div className="max-w-4xl mx-auto">
+                <h2 className="text-2xl font-bold mb-4 text-center">
+                  Payment History & Receipts
+                </h2>
+                <Card className="mb-4">
+                  <CardContent>
+                    <p className="text-gray-500">Receipts functionality will be implemented here.</p>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           )}
           {selectedSection === "performance" && (
-            <div>
-              {focusedChildId
-                ? `Performance for child ID: ${focusedChildId}`
-                : "Select a child to view performance."}
+            <div className="h-full overflow-y-auto">
+              <div className="max-w-4xl mx-auto">
+                <h2 className="text-2xl font-bold mb-4 text-center">Academic Performance</h2>
+                <Card className="mb-4">
+                  <CardContent>
+                    <p className="text-gray-500">Performance functionality will be implemented here.</p>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           )}
           {selectedSection === "settings" && (
-            <div>
-              <h2 className="text-2xl font-bold mb-6">Settings</h2>
-              <Card>
-                <CardContent>
-                  <p className="text-gray-500">Settings functionality will be implemented here.</p>
-                </CardContent>
-              </Card>
+            <div className="h-full overflow-y-auto">
+              <div className="max-w-4xl mx-auto">
+                <h2 className="text-2xl font-bold mb-4 text-center">Account Settings</h2>
+                <Card className="mb-4">
+                  <CardContent>
+                    <p className="text-gray-500">Settings functionality will be implemented here.</p>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           )}
         </main>
