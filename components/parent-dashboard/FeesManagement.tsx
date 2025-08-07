@@ -3,7 +3,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { DollarSign, CreditCard, History, Download, Receipt, Calendar, BookOpen, AlertCircle, RefreshCw } from "lucide-react";
+import { DollarSign, CreditCard, History, Download, Receipt, Calendar, BookOpen, AlertCircle, RefreshCw, CheckCircle } from "lucide-react";
 import PaymentHub from "@/components/payment/PaymentHub";
 
 interface FeesManagementProps {
@@ -47,19 +47,32 @@ export default function FeesManagement({ students, schoolCode, selectedId, setSe
         : (data?.termBalances?.[0]?.year ? String(data.termBalances[0].year) : "");
       setCurrentAcademicYear(yearFromBalances || new Date().getFullYear().toString());
 
-      // Normalize to term cards
+      // Calculate current term balance (initial balance - payments)
       const balancesArray = Array.isArray(data) ? data : (data?.termBalances || []);
-      const mapped = (balancesArray || []).map((t: any) => ({
-        term: t.term,
-        amount: Number(t.totalAmount || t.amount || 0),
-        outstanding: Number(
-          t.balance ?? t.outstanding ?? Math.max(0, Number(t.totalAmount || t.amount || 0) - Number(t.paidAmount || 0))
-        ),
-        dueDate: t.dueDate || new Date().toISOString(),
-        status: Number(t.balance || 0) > 0 ? "Pending" : "Paid",
-        breakdown: t.breakdown || {},
-      }));
+      const mapped = (balancesArray || []).map((t: any) => {
+        const totalAmount = Number(t.totalAmount || t.amount || 0);
+        // Backend returns 'balance' as outstanding amount, calculate paid amount
+        const outstanding = Number(t.balance || t.outstanding || 0);
+        const paidAmount = Math.max(0, totalAmount - outstanding);
+        
+        return {
+          term: t.term,
+          amount: totalAmount,
+          paidAmount: paidAmount,
+          outstanding: outstanding,
+          dueDate: t.dueDate || new Date().toISOString(),
+          status: outstanding <= 0 ? "Paid" : "Pending",
+          breakdown: t.breakdown || {},
+          termId: t.termId,
+          academicYearId: t.academicYearId,
+        };
+      });
       setTermlyFees(mapped);
+
+      // Track total academic year balance
+      const totalAcademicYearBalance = mapped.reduce((sum: number, term: any) => sum + term.outstanding, 0);
+      console.log('Total academic year outstanding balance:', totalAcademicYearBalance);
+      
     } catch (error) {
       console.error("Error fetching fee data:", error);
       setFeesError("Failed to load fee structure. Please try again.");
@@ -212,29 +225,70 @@ export default function FeesManagement({ students, schoolCode, selectedId, setSe
                                       </div>
                                       <div className="text-sm text-gray-500">Total Amount</div>
                                     </div>
-                                    
+
+                                    {/* Payment Progress */}
                                     <div className="space-y-2">
-                                      {termFee.breakdown && Object.entries(termFee.breakdown).map(([key, value]) => (
-                                        <div key={key} className="flex justify-between text-sm">
-                                          <span className="capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
-                                          <span className="font-medium">KES {Number(value).toLocaleString()}</span>
-                                        </div>
-                                      ))}
+                                      <div className="flex justify-between text-sm">
+                                        <span>Paid:</span>
+                                        <span className="font-medium text-blue-600">KES {(termFee.paidAmount || 0).toLocaleString()}</span>
+                                      </div>
+                                      <div className="flex justify-between text-sm">
+                                        <span>Outstanding:</span>
+                                        <span className={`font-medium ${termFee.outstanding > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                          KES {termFee.outstanding.toLocaleString()}
+                                        </span>
+                                      </div>
+                                      
+                                      {/* Progress Bar */}
+                                      <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                                        <div 
+                                          className="bg-green-600 h-2 rounded-full transition-all duration-300" 
+                                          style={{ 
+                                            width: `${termFee.amount > 0 ? ((termFee.paidAmount || 0) / termFee.amount) * 100 : 0}%` 
+                                          }}
+                                        ></div>
+                                      </div>
+                                      <div className="text-xs text-gray-500 text-center">
+                                        {termFee.amount > 0 ? Math.round(((termFee.paidAmount || 0) / termFee.amount) * 100) : 0}% Paid
+                                      </div>
                                     </div>
+                                    
+                                    {/* Fee Breakdown */}
+                                    {termFee.breakdown && Object.keys(termFee.breakdown).length > 0 && (
+                                      <div className="space-y-1">
+                                        <div className="text-xs font-medium text-gray-700 mb-1">Breakdown:</div>
+                                        {Object.entries(termFee.breakdown).map(([key, value]) => (
+                                          <div key={key} className="flex justify-between text-xs">
+                                            <span className="capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                                            <span>KES {Number(value).toLocaleString()}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
                                     
                                     <div className="pt-3 border-t">
                                       <div className="flex justify-between text-sm text-gray-600 mb-2">
                                         <span>Due Date:</span>
                                         <span>{new Date(termFee.dueDate).toLocaleDateString()}</span>
                                       </div>
-                                      <Button
-                                        onClick={() => handlePayNow(termFee.term)}
-                                        className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-60"
-                                        disabled={Number(termFee.outstanding || 0) <= 0}
-                                      >
-                                        <CreditCard className="w-4 h-4 mr-2" />
-                                        {Number(termFee.outstanding || 0) > 0 ? 'Pay Now' : 'Paid'}
-                                      </Button>
+                                      
+                                      {termFee.outstanding <= 0 ? (
+                                        <Button
+                                          className="w-full bg-green-100 text-green-800 cursor-not-allowed"
+                                          disabled
+                                        >
+                                          <CheckCircle className="w-4 h-4 mr-2" />
+                                          Fully Paid
+                                        </Button>
+                                      ) : (
+                                        <Button
+                                          onClick={() => handlePayNow(termFee.term)}
+                                          className="w-full bg-green-600 hover:bg-green-700"
+                                        >
+                                          <CreditCard className="w-4 h-4 mr-2" />
+                                          Pay KES {termFee.outstanding.toLocaleString()}
+                                        </Button>
+                                      )}
                                     </div>
                                   </CardContent>
                                 </Card>
@@ -252,10 +306,24 @@ export default function FeesManagement({ students, schoolCode, selectedId, setSe
                             initialSelectedTerm={selectedTermForPayment}
                             initialAmount={suggestedAmount}
                             initialAcademicYear={currentAcademicYear}
-                            onPaymentComplete={(receipt) => {
+                            onPaymentComplete={async (receipt) => {
                               console.log("Payment completed:", receipt);
+                              
+                              // Refresh fee data to show updated balances
+                              await fetchOverviewFeeData();
+                              
+                              // Close payment hub and switch to fees tab to show updated data
                               setShowPaymentHub(false);
-                              // You can add additional logic here like showing a success message
+                              setActiveTab('fees');
+                              
+                              // Show success message with payment details
+                              const termData = termlyFees.find(t => t.term === selectedTermForPayment);
+                              const message = receipt.carryForward && receipt.carryForward > 0
+                                ? `Payment successful! KES ${receipt.amount.toLocaleString()} paid. Overpayment of KES ${receipt.carryForward.toLocaleString()} carried forward to next term.`
+                                : `Payment successful! KES ${receipt.amount.toLocaleString()} paid for ${selectedTermForPayment}.`;
+                              
+                              // You could add a toast notification here
+                              console.log(message);
                             }}
                           />
                         ) : (

@@ -164,16 +164,16 @@ export function FeeManagement({
 
   // Search and filter state
   const [searchText, setSearchText] = useState("");
-  const filteredFeeStructures = useMemo(() => {
-    return feeStructures.filter((fee) =>
-      fee.gradeName.toLowerCase().includes(searchText.toLowerCase()) ||
-      fee.term.toLowerCase().includes(searchText.toLowerCase()) ||
-      (fee.creator?.name &&
-        fee.creator.name.toLowerCase().includes(searchText)) ||
-      (fee.creator?.email &&
-        fee.creator.email.toLowerCase().includes(searchText))
-    );
-  }, [feeStructures, searchText]);
+     const filteredFeeStructures = useMemo(() => {
+     return feeStructures.filter((fee) =>
+       (fee.gradeName && fee.gradeName.toLowerCase().includes(searchText.toLowerCase())) ||
+       (fee.term && fee.term.toLowerCase().includes(searchText.toLowerCase())) ||
+       (fee.creator?.name &&
+         fee.creator.name.toLowerCase().includes(searchText.toLowerCase())) ||
+       (fee.creator?.email &&
+         fee.creator.email.toLowerCase().includes(searchText.toLowerCase()))
+     );
+   }, [feeStructures, searchText]);
 
   // CSV import handler
   const handleCSVImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -563,13 +563,13 @@ export function FeeManagement({
                 <Calendar className="w-8 h-8 text-white" />
               </div>
               <div>
-                <ResponsiveText size="2xl" className="font-bold text-purple-700">
-                  {
-                    feeStructures.filter(
-                      (f) => f.term === currentTerm && f.year === currentYear
-                    ).length
-                  }
-                </ResponsiveText>
+                                 <ResponsiveText size="2xl" className="font-bold text-purple-700">
+                   {
+                     feeStructures.filter(
+                       (f) => f.term === currentTerm && (f.year === currentYear || (f.academicYear?.name && f.academicYear.name.includes(currentYear.toString())))
+                     ).length
+                   }
+                 </ResponsiveText>
                 <ResponsiveText size="sm" className="text-purple-600 font-medium">
                   Current Term
                 </ResponsiveText>
@@ -586,9 +586,9 @@ export function FeeManagement({
                 <Users className="w-8 h-8 text-white" />
               </div>
               <div>
-                <ResponsiveText size="2xl" className="font-bold text-orange-700">
-                  {new Set(feeStructures.map((f) => f.gradeName)).size}
-                </ResponsiveText>
+                                 <ResponsiveText size="2xl" className="font-bold text-orange-700">
+                   {new Set(feeStructures.map((f) => f.gradeName).filter(Boolean)).size}
+                 </ResponsiveText>
                 <ResponsiveText size="sm" className="text-orange-600 font-medium">Grades</ResponsiveText>
               </div>
             </div>
@@ -690,10 +690,10 @@ export function FeeManagement({
                           </div>
                           <div>
                             <p className="font-semibold text-gray-900">
-                              {fee.term}
+                              {fee.term || 'N/A'}
                             </p>
                             <p className="text-sm text-gray-500">
-                              {fee.academicYear?.name || fee.year}
+                              {fee.academicYear?.name || fee.year || 'N/A'}
                             </p>
                           </div>
                         </div>
@@ -703,7 +703,7 @@ export function FeeManagement({
                           variant="outline"
                           className="bg-purple-50 text-purple-700 border-purple-200 font-medium"
                         >
-                          {fee.gradeName}
+                          {fee.gradeName || 'N/A'}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -736,10 +736,10 @@ export function FeeManagement({
                       <TableCell>
                         <div>
                           <p className="font-medium text-gray-900">
-                            {fee.creator.name}
+                            {fee.creator?.name || 'N/A'}
                           </p>
                           <p className="text-sm text-gray-500">
-                            {fee.creator.email}
+                            {fee.creator?.email || 'N/A'}
                           </p>
                         </div>
                       </TableCell>
@@ -1002,7 +1002,7 @@ export function FeeManagement({
                     <div>
                       <p className="text-xs text-gray-500">Term / Year</p>
                       <p className="font-semibold text-sm text-gray-800">
-                        {viewingFee.term} / {viewingFee.academicYear?.name || viewingFee.year}
+                        {viewingFee.term || 'N/A'} / {viewingFee.academicYear?.name || viewingFee.year || 'N/A'}
                       </p>
                     </div>
                   </div>
@@ -1011,7 +1011,7 @@ export function FeeManagement({
                     <div>
                       <p className="text-xs text-gray-500">Grade</p>
                       <p className="font-semibold text-sm text-gray-800">
-                        {viewingFee.gradeName}
+                        {viewingFee.gradeName || 'N/A'}
                       </p>
                     </div>
                   </div>
@@ -1090,7 +1090,7 @@ export function FeeManagement({
                   value="history"
                   className="space-y-2 mt-2 max-h-48 overflow-y-auto"
                 >
-                  {viewingFee.logs.length > 0 ? (
+                  {viewingFee.logs && viewingFee.logs.length > 0 ? (
                     <div className="space-y-2">
                       {viewingFee.logs.map((log, idx) => (
                         <div
@@ -1102,12 +1102,11 @@ export function FeeManagement({
                           </div>
                           <div className="flex-1 text-left">
                             <p className="font-medium text-xs text-gray-900">
-                              {log.action.charAt(0).toUpperCase() +
-                                log.action.slice(1)}{" "}
-                              by {log.user.name}
+                              {log.action ? log.action.charAt(0).toUpperCase() + log.action.slice(1) : 'Action'}{" "}
+                              by {log.user?.name || 'Unknown'}
                             </p>
                             <p className="text-xs text-gray-500">
-                              {new Date(log.timestamp).toLocaleString()}
+                              {log.timestamp ? new Date(log.timestamp).toLocaleString() : 'No date'}
                             </p>
                           </div>
                         </div>
@@ -1127,10 +1126,10 @@ export function FeeManagement({
                         Created By
                       </div>
                       <div className="font-semibold text-xs text-blue-800">
-                        {viewingFee.creator.name}
+                        {viewingFee.creator?.name || 'N/A'}
                       </div>
                       <div className="text-sm text-blue-600">
-                        {viewingFee.creator.email}
+                        {viewingFee.creator?.email || 'N/A'}
                       </div>
                     </div>
                     <div className="bg-green-50 rounded-lg p-3">

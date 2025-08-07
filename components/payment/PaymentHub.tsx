@@ -257,28 +257,53 @@ export default function PaymentHub({ studentId, schoolCode, onPaymentComplete, i
       // Process payment through API
       const paymentData = {
         studentId,
-        schoolCode,
         amount: paymentState.paymentAmount,
-        paymentMethod: paymentState.paymentMethod,
+        paymentMethod: paymentState.paymentMethod === "mpesa" ? "mobile_money" : paymentState.paymentMethod,
         phoneNumber: paymentState.phoneNumber,
-        transactionId,
+        feeType: "School Fees",
         term: paymentState.selectedTerm || balanceData?.currentTerm || "Term 1",
         academicYear: initialAcademicYear || new Date().getFullYear().toString(),
+        description: `School fees payment for ${paymentState.selectedTerm || balanceData?.currentTerm || "Term 1"} ${initialAcademicYear || new Date().getFullYear().toString()}`,
+        referenceNumber: transactionId || `PAY-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         receivedBy: 'Parent Portal',
       };
 
-      const response = await fetch(`/api/schools/${schoolCode}/payments/process`, {
+      const response = await fetch(`/api/schools/${schoolCode}/payments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(paymentData),
       });
 
       if (response.ok) {
-        const receipt = await response.json();
+        const responseData = await response.json();
+        // The API returns { message, payment, receipt } structure
+        const receipt = {
+          receiptNumber: responseData.payment?.receiptNumber || responseData.receipt?.receiptNumber,
+          paymentId: responseData.payment?.id,
+          studentId: responseData.payment?.studentId || studentId,
+          schoolCode,
+          amount: responseData.payment?.amount || paymentState.paymentAmount,
+          paymentMethod: responseData.payment?.paymentMethod || paymentState.paymentMethod,
+          feeType: "School Fees",
+          term: responseData.payment?.term || paymentState.selectedTerm,
+          academicYear: responseData.payment?.academicYear || initialAcademicYear,
+          reference: responseData.payment?.referenceNumber,
+          phoneNumber: responseData.payment?.phoneNumber || paymentState.phoneNumber,
+          status: "completed",
+          issuedAt: new Date(),
+          issuedBy: "Parent Portal",
+          schoolName: responseData.payment?.schoolName || "",
+          studentName: responseData.payment?.studentName || "",
+          currency: "KES",
+          carryForward: 0, // This would need to be calculated if overpayment logic is implemented
+          balance: responseData.payment?.academicYearOutstandingAfter || 0,
+          academicYearOutstandingAfter: responseData.payment?.academicYearOutstandingAfter || 0,
+          termOutstandingAfter: responseData.payment?.termOutstandingAfter || 0,
+        };
         
         toast({
           title: "Payment Successful",
-          description: `Payment of ${paymentState.paymentAmount.toLocaleString()} processed successfully`,
+          description: `Payment of KES ${paymentState.paymentAmount.toLocaleString()} processed successfully`,
         });
 
         // Reset form
