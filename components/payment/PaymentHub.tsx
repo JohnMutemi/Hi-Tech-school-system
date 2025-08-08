@@ -25,6 +25,7 @@ import {
   ArrowRight,
   ArrowLeft,
 } from "lucide-react";
+import ReceiptComponent from "./ReceiptComponent";
 
 interface PaymentHubProps {
   studentId: string;
@@ -104,6 +105,8 @@ export default function PaymentHub({ studentId, schoolCode, onPaymentComplete, i
   const [isLoading, setIsLoading] = useState(false);
   const [balanceData, setBalanceData] = useState<BalanceData | null>(null);
   const [paymentHistory, setPaymentHistory] = useState<PaymentHistoryItem[]>([]);
+  const [showReceipt, setShowReceipt] = useState(false);
+  const [selectedReceipt, setSelectedReceipt] = useState<ReceiptData | null>(null);
   const [paymentState, setPaymentState] = useState({
     step: 1,
     selectedTerm: "",
@@ -197,6 +200,93 @@ export default function PaymentHub({ studentId, schoolCode, onPaymentComplete, i
   const handleAmountChange = (amount: string) => {
     const numAmount = parseFloat(amount) || 0;
     setPaymentState(prev => ({ ...prev, paymentAmount: numAmount }));
+  };
+
+  const convertPaymentToReceipt = async (payment: PaymentHistoryItem): Promise<ReceiptData> => {
+    // Fetch additional details if needed
+    let schoolName = "";
+    let parentName = "";
+    let admissionNumber = "";
+    let studentName = "";
+    let termOutstandingBefore = 0;
+    let termOutstandingAfter = 0;
+    let academicYearOutstandingBefore = 0;
+    let academicYearOutstandingAfter = 0;
+    let carryForward = 0;
+    
+    try {
+      // Get student details
+      const studentResponse = await fetch(`/api/schools/${schoolCode}/students/${studentId}`);
+      if (studentResponse.ok) {
+        const studentData = await studentResponse.json();
+        studentName = studentData.user?.name || studentData.name || "N/A";
+        admissionNumber = studentData.admissionNumber || "N/A";
+        parentName = studentData.parentName || studentData.user?.name || "Parent/Guardian";
+      }
+
+      // Get school details
+      const schoolResponse = await fetch(`/api/schools/${schoolCode}`);
+      if (schoolResponse.ok) {
+        const schoolData = await schoolResponse.json();
+        schoolName = schoolData.name || "School";
+      }
+
+      // Try to get receipt details with balance information
+      const receiptResponse = await fetch(`/api/schools/${schoolCode}/payments/${payment.id}/receipt`);
+      if (receiptResponse.ok) {
+        const receiptData = await receiptResponse.json();
+        termOutstandingBefore = receiptData.termOutstandingBefore || 0;
+        termOutstandingAfter = receiptData.termOutstandingAfter || 0;
+        academicYearOutstandingBefore = receiptData.academicYearOutstandingBefore || 0;
+        academicYearOutstandingAfter = receiptData.academicYearOutstandingAfter || 0;
+        carryForward = receiptData.carryForwardAmount || 0;
+      }
+    } catch (error) {
+      console.error("Error fetching additional details:", error);
+    }
+
+    return {
+      receiptNumber: payment.receiptNumber,
+      paymentId: payment.id,
+      studentId: studentId,
+      schoolCode: schoolCode,
+      amount: payment.amount,
+      paymentMethod: payment.paymentMethod,
+      feeType: "School Fees",
+      term: payment.term,
+      academicYear: payment.academicYear,
+      reference: payment.reference,
+      phoneNumber: (payment as any).phoneNumber,
+      transactionId: (payment as any).transactionId,
+      status: payment.status,
+      issuedAt: payment.paymentDate,
+      issuedBy: "School Portal",
+      schoolName: schoolName,
+      studentName: studentName,
+      admissionNumber: admissionNumber,
+      parentName: parentName,
+      currency: "KES",
+      termOutstandingBefore: termOutstandingBefore,
+      termOutstandingAfter: termOutstandingAfter,
+      academicYearOutstandingBefore: academicYearOutstandingBefore,
+      academicYearOutstandingAfter: academicYearOutstandingAfter,
+      carryForward: carryForward,
+    };
+  };
+
+  const handleViewReceipt = async (payment: PaymentHistoryItem) => {
+    try {
+      const receiptData = await convertPaymentToReceipt(payment);
+      setSelectedReceipt(receiptData);
+      setShowReceipt(true);
+    } catch (error) {
+      console.error("Error preparing receipt:", error);
+      toast({
+        title: "Error",
+        description: "Failed to prepare receipt for download",
+        variant: "destructive",
+      });
+    }
   };
 
   const handlePhoneNumberChange = (phone: string) => {
@@ -343,29 +433,7 @@ export default function PaymentHub({ studentId, schoolCode, onPaymentComplete, i
     }
   };
 
-  const downloadReceipt = async (paymentId: string) => {
-    try {
-      const response = await fetch(`/api/schools/${schoolCode}/payments/${paymentId}/receipt`);
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `receipt-${paymentId}.html`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-      }
-    } catch (error) {
-      console.error("Error downloading receipt:", error);
-      toast({
-        title: "Download Failed",
-        description: "Failed to download receipt",
-        variant: "destructive",
-      });
-    }
-  };
+
 
   const renderPaymentForm = () => (
     <div className="space-y-6">
@@ -537,7 +605,7 @@ export default function PaymentHub({ studentId, schoolCode, onPaymentComplete, i
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => downloadReceipt(payment.id)}
+                    onClick={() => handleViewReceipt(payment)}
                   >
                     <Download className="w-4 h-4 mr-2" />
                     Receipt
@@ -584,6 +652,17 @@ export default function PaymentHub({ studentId, schoolCode, onPaymentComplete, i
           {renderPaymentHistory()}
         </TabsContent>
       </Tabs>
+
+      {/* Receipt Modal */}
+      {showReceipt && selectedReceipt && (
+        <ReceiptComponent
+          receiptData={selectedReceipt}
+          onClose={() => {
+            setShowReceipt(false);
+            setSelectedReceipt(null);
+          }}
+        />
+      )}
     </div>
   );
 } 
