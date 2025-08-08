@@ -295,7 +295,7 @@ export async function GET(
     });
 
     let carryForward = 0;
-    const termBalances = filteredFeeStructures.map((fs) => {
+    const termBalances = filteredFeeStructures.map((fs, index) => {
       const charges = transactions
         .filter(txn => txn.termId === fs.termId && txn.academicYearId === fs.academicYearId && txn.type === 'invoice')
         .reduce((sum, txn) => sum + (txn.debit || 0), 0);
@@ -304,6 +304,13 @@ export async function GET(
         .filter(txn => txn.termId === fs.termId && txn.academicYearId === fs.academicYearId && txn.type === 'payment')
         .reduce((sum, txn) => sum + (txn.credit || 0), 0);
 
+      // Debug logging for payment matching
+      const termPayments = transactions.filter(txn => txn.termId === fs.termId && txn.academicYearId === fs.academicYearId && txn.type === 'payment');
+      console.log(`Term ${fs.term} (${fs.termId}): Found ${termPayments.length} payments totaling KES ${paymentsForTerm}`);
+      termPayments.forEach(payment => {
+        console.log(`  Payment: ${payment.ref}, Amount: ${payment.credit}, TermId: ${payment.termId}, AcademicYearId: ${payment.academicYearId}`);
+      });
+
       // Calculate base balance for this term
       let baseBalance = charges - paymentsForTerm;
       
@@ -311,14 +318,23 @@ export async function GET(
       let balance = baseBalance + carryForward;
       let carryToNext = 0;
       
-      // If balance is negative (overpayment), carry forward to next term
+      // Normal carry-forward logic for all terms
       if (balance < 0) {
-        carryToNext = balance; // This will be negative
+        carryToNext = balance; // This will be negative (overpayment)
         balance = 0;
       }
       
-      console.log(`Term ${fs.term}: Charges=${charges}, Payments=${paymentsForTerm}, BaseBalance=${baseBalance}, CarryForward=${carryForward}, FinalBalance=${balance}, CarryToNext=${carryToNext}`);
+      // Calculate effective paid amount (includes carry-forward effects)
+      let effectivePaidAmount = paymentsForTerm;
+      if (carryForward < 0) {
+        // If we received carry-forward (overpayment from previous terms), add it to paid amount
+        effectivePaidAmount = paymentsForTerm + Math.abs(carryForward);
+      }
       
+      console.log(`Term ${fs.term}: Charges=${charges}, Payments=${paymentsForTerm}, BaseBalance=${baseBalance}, CarryForward=${carryForward}, FinalBalance=${balance}, CarryToNext=${carryToNext}, EffectivePaid=${effectivePaidAmount}`);
+      
+      const isLastTerm = index === filteredFeeStructures.length - 1;
+
       const result = {
         termId: fs.termId,
         academicYearId: fs.academicYearId,
@@ -328,11 +344,15 @@ export async function GET(
         balance: Math.max(0, balance), // Ensure balance is never negative
         baseBalance: baseBalance,
         carryForward: carryForward,
-        carryToNext: carryToNext
+        carryToNext: carryToNext,
+        paidAmount: effectivePaidAmount, // Add effective paid amount
+        academicYearOutstanding: academicYearOutstanding // Add for reference
       };
       
-      // Update carry forward for next term
-      carryForward = carryToNext;
+      // Update carry forward for next term (unless it's the last term)
+      if (!isLastTerm) {
+        carryForward = carryToNext;
+      }
       return result;
     });
 

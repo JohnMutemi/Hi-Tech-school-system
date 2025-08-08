@@ -51,9 +51,12 @@ export default function FeesManagement({ students, schoolCode, selectedId, setSe
       const balancesArray = Array.isArray(data) ? data : (data?.termBalances || []);
       const mapped = (balancesArray || []).map((t: any) => {
         const totalAmount = Number(t.totalAmount || t.amount || 0);
-        // Backend returns 'balance' as outstanding amount, calculate paid amount
         const outstanding = Number(t.balance || t.outstanding || 0);
-        const paidAmount = Math.max(0, totalAmount - outstanding);
+        
+        // Use backend-calculated paidAmount if available, otherwise calculate
+        const paidAmount = t.paidAmount !== undefined 
+          ? Number(t.paidAmount) 
+          : Math.max(0, totalAmount - outstanding);
         
         return {
           term: t.term,
