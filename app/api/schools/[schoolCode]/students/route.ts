@@ -2,6 +2,8 @@ import { PrismaClient } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { generateNextAdmissionNumber } from '@/lib/utils/school-generator';
+import { withSchoolContext } from '@/lib/school-context';
+import { hashDefaultPasswordByRole } from '@/lib/utils/default-passwords';
 
 const prisma = new PrismaClient();
 
@@ -29,19 +31,18 @@ export async function GET(
     const search = searchParams.get("search");
     const role = searchParams.get("role");
 
-    // Find the school
-    const school = await prisma.school.findUnique({
-      where: { code: schoolCode },
-    });
+    // Initialize school context
+    const schoolManager = withSchoolContext(schoolCode);
+    const schoolContext = await schoolManager.initialize();
 
-    if (!school) {
-      return NextResponse.json({ error: "School not found" }, { status: 404 });
-    }
-
-    // Build where clause
+    // Build where clause with school-specific filtering
     const whereClause: any = {
-      schoolId: school.id,
+      schoolId: schoolContext.schoolId,
       isActive: true,
+      // Also exclude students who have been promoted to alumni
+      status: {
+        not: 'graduated'
+      }
     };
 
     // Filter by class if specified
@@ -169,10 +170,16 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
       return NextResponse.json({ error: 'School not found' }, { status: 404 });
     }
 
-    // Admission number logic
+    // Admission number logic - use school-specific settings
     let finalAdmissionNumber = admissionNumber;
     if (!finalAdmissionNumber) {
-      finalAdmissionNumber = getNextAdmissionNumber(school.lastAdmissionNumber || '');
+      if (school.admissionNumberAutoIncrement && school.lastAdmissionNumber) {
+        // Use the school's last admission number and increment it
+        finalAdmissionNumber = getNextAdmissionNumber(school.lastAdmissionNumber);
+      } else {
+        // Fallback to default
+        finalAdmissionNumber = 'ADM001';
+      }
     }
 
     // Fetch current academic year and term
@@ -196,7 +203,7 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
           schoolId: school.id,
         },
       });
-      const hashedParentPassword = await bcrypt.hash(parentTempPassword, 12);
+      const hashedParentPassword = await hashDefaultPasswordByRole('parent');
       if (!parentUser) {
         parentUser = await prisma.user.create({
           data: {
@@ -217,7 +224,7 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
       }
     }
 
-    const hashedPassword = await bcrypt.hash('student123', 12);
+    const hashedPassword = await hashDefaultPasswordByRole('student');
 
     const studentUser = await prisma.user.create({
       data: {
@@ -376,20 +383,78 @@ export async function DELETE(req: NextRequest, { params }: { params: { schoolCod
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
     
-    // Manually delete related records if no cascade rule exists
-    // Example: await prisma.payment.deleteMany({ where: { studentId } });
+    // Delete related records in the correct order to avoid foreign key constraint violations
+    // 1. Delete promotion exclusions first (they reference promotion logs)
+    await prisma.promotionExclusion.deleteMany({
+      where: { studentId: studentId },
+    });
 
+    // 2. Delete promotion logs
+    await prisma.promotionLog.deleteMany({
+      where: { studentId: studentId },
+    });
+
+    // 3. Delete student promotion requests
+    await prisma.studentPromotionRequest.deleteMany({
+      where: { studentId: studentId },
+    });
+
+    // 4. Delete student arrears
+    await prisma.studentArrear.deleteMany({
+      where: { studentId: studentId },
+    });
+
+    // 5. Delete student yearly balances
+    await prisma.studentYearlyBalance.deleteMany({
+      where: { studentId: studentId },
+    });
+
+    // 6. Delete student fees
+    await prisma.studentFee.deleteMany({
+      where: { studentId: studentId },
+    });
+
+    // 7. Delete receipts
+    await prisma.receipt.deleteMany({
+      where: { studentId: studentId },
+    });
+
+    // 8. Delete payments
+    await prisma.payment.deleteMany({
+      where: { studentId: studentId },
+    });
+
+    // 9. Delete payment requests
+    await prisma.paymentRequest.deleteMany({
+      where: { studentId: studentId },
+    });
+
+    // 10. Delete fee statements
+    await prisma.feeStatement.deleteMany({
+      where: { studentId: studentId },
+    });
+
+    // 11. Delete alumni records (if any)
+    await prisma.alumni.deleteMany({
+      where: { studentId: studentId },
+    });
+
+    // 12. Finally delete the student
     await prisma.student.delete({
       where: { id: studentId },
     });
     
+    // 13. Delete the associated user
     await prisma.user.delete({
       where: { id: student.userId },
     });
     
-    return NextResponse.json({ success: true, message: "Student and associated user deleted." });
+    return NextResponse.json({ success: true, message: "Student and all associated records deleted successfully." });
   } catch (error: any) {
     console.error('Error deleting student:', error);
-    return NextResponse.json({ error: 'Failed to delete student' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Failed to delete student', 
+      details: error.message 
+    }, { status: 500 });
   }
 }

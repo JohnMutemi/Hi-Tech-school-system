@@ -72,9 +72,10 @@ export function AcademicCalendarCrud({ schoolCode }: { schoolCode: string }) {
       const res = await fetch(`/api/schools/${schoolCode}/academic-years`);
       if (!res.ok) throw new Error("Failed to fetch academic years");
       const data = await res.json();
-      setYears(data);
+      setYears(Array.isArray(data) ? data : (data.data && Array.isArray(data.data) ? data.data : []));
     } catch (err: any) {
       setError(err.message || "Unknown error");
+      setYears([]);
     } finally {
       setLoading(false);
     }
@@ -493,7 +494,7 @@ export function AcademicCalendarCrud({ schoolCode }: { schoolCode: string }) {
             </tr>
           </thead>
           <tbody>
-            {years.map((year) => (
+            {(years || []).map((year) => (
               <tr key={year.id} className={year.isCurrent ? "bg-green-50" : ""}>
                 <td className="p-2 border font-semibold">{year.name}</td>
                 <td className="p-2 border">

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { School, Users, GraduationCap, BookOpen, DollarSign, Sparkles, Calendar, Settings, ArrowRight, LogOut, Menu } from "lucide-react";
+import { School, Users, GraduationCap, BookOpen, DollarSign, Sparkles, Calendar, Settings, ArrowRight, LogOut, Menu, Crown } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -22,6 +22,7 @@ const NAV_ITEMS = [
   { id: "subjects", label: "Subjects & Classes", icon: BookOpen },
   { id: "fees", label: "Fee Management", icon: DollarSign },
   { id: "promotions", label: "Promotions", icon: ArrowRight },
+  { id: "alumni", label: "Alumni", icon: Crown },
   { id: "academic-calendar", label: "Academic Calendar", icon: Calendar },
   { id: "settings", label: "Settings", icon: Settings },
 ];

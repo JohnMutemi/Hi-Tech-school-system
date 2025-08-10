@@ -40,6 +40,9 @@ export function useParentDashboard(schoolCode: string, parentId?: string) {
   const [loadingReceipts, setLoadingReceipts] = useState(false);
   const [receiptsError, setReceiptsError] = useState("");
   const [receiptSearch, setReceiptSearch] = useState("");
+  const [payments, setPayments] = useState<any[]>([]);
+  const [loadingPayments, setLoadingPayments] = useState(false);
+  const [paymentsError, setPaymentsError] = useState("");
 
   // Fetch parent and children
   useEffect(() => {
@@ -88,6 +91,26 @@ export function useParentDashboard(schoolCode: string, parentId?: string) {
     }
     fetchAllReceipts();
   }, [schoolCode, students]);
+
+  // Fetch payments for a given student
+  const refreshPayments = async (studentId: string) => {
+    if (!studentId) {
+      setPayments([]);
+      return;
+    }
+    setLoadingPayments(true);
+    setPaymentsError("");
+    try {
+      const res = await fetch(`/api/schools/${schoolCode}/students/${studentId}/payments`);
+      if (!res.ok) throw new Error("Failed to fetch payments");
+      const data = await res.json();
+      setPayments(Array.isArray(data.payments) ? data.payments : data);
+    } catch (e: any) {
+      setPaymentsError(e.message || "Failed to load payments");
+      setPayments([]);
+    }
+    setLoadingPayments(false);
+  };
 
   // Avatar change handler
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -196,6 +219,10 @@ export function useParentDashboard(schoolCode: string, parentId?: string) {
     setReceiptsError,
     receiptSearch,
     setReceiptSearch,
+    payments,
+    loadingPayments,
+    paymentsError,
+    refreshPayments,
     handleAvatarChange,
     handleLogout,
     // Add all handlers and utility functions here

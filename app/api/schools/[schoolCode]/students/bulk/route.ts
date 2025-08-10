@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { hashDefaultPasswordByRole } from "@/lib/utils/default-passwords";
 const prisma = new PrismaClient();
 
 export async function POST(request: NextRequest, { params }: { params: { schoolCode: string } }) {
@@ -23,9 +24,9 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
   const results = [];
   for (const student of students) {
     try {
-      // Hash passwords
-      const hashedParentPassword = await bcrypt.hash("parent123", 12);
-      const hashedStudentPassword = await bcrypt.hash("student123", 12);
+      // Hash passwords using utility functions
+      const hashedParentPassword = await hashDefaultPasswordByRole("parent");
+      const hashedStudentPassword = await hashDefaultPasswordByRole("student");
       // Check/create parent
       let parent = await prisma.user.findFirst({
         where: { phone: student.parentPhone, role: "parent", schoolId: school.id }

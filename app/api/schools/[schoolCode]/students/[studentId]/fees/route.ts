@@ -5,48 +5,189 @@ const prisma = new PrismaClient();
 
 // GET: Fetch fee balances and payment history for a student
 export async function GET(
-  request: NextRequest, 
+  request: Request,
   { params }: { params: { schoolCode: string; studentId: string } }
 ) {
   try {
-    const { schoolCode, studentId } = params;
-    const decodedSchoolCode = decodeURIComponent(schoolCode);
     const { searchParams } = new URL(request.url);
-    const academicYearId = searchParams.get('academicYearId');
+    const academicYearIdParam = searchParams.get('academicYearId');
+    const academicYearNameParam = searchParams.get('academicYear'); // e.g. "2025"
 
-    const school = await prisma.school.findUnique({ where: { code: decodedSchoolCode } });
+    const prisma = new PrismaClient();
+
+    // Get school
+    const school = await prisma.school.findFirst({
+      where: { code: params.schoolCode },
+    });
+
     if (!school) {
       return NextResponse.json({ error: 'School not found' }, { status: 404 });
     }
 
+    // Get student with class and grade info
     const student = await prisma.student.findFirst({
-      where: { id: studentId, schoolId: school.id, isActive: true },
-      include: { user: true, class: { include: { grade: true } } }
+      where: { id: params.studentId },
+      include: {
+        class: {
+          include: {
+            grade: true
+          }
+        },
+        user: true
+      }
     });
+
     if (!student) {
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
 
-    // Get current academic year if not specified
-    let targetAcademicYearId = academicYearId || null;
-    if (!targetAcademicYearId) {
-      const currentYear = await prisma.academicYear.findFirst({
-        where: { schoolId: school.id, isCurrent: true },
-      });
-      targetAcademicYearId = currentYear?.id || null;
+    console.log('=== FEES DEBUG ===');
+    console.log('Student:', {
+      id: student.id,
+      name: student.user?.name,
+      classId: student.class?.id,
+      className: student.class?.name,
+      gradeId: student.class?.gradeId,
+      gradeName: student.class?.grade?.name
+    });
+
+    // Use student's actual grade level
+    const targetGradeId = student.class?.gradeId;
+    const studentGradeName = student.class?.grade?.name;
+    
+    console.log(`Using student's grade level: ${studentGradeName} (ID: ${targetGradeId})`);
+
+    if (!targetGradeId) {
+      return NextResponse.json({ 
+        error: 'Student is not assigned to a grade',
+        student: {
+          id: student.id,
+          name: student.user?.name,
+          admissionNumber: student.admissionNumber,
+          gradeName: 'Not Assigned',
+          className: student.class?.name || 'Not Assigned'
+        }
+      }, { status: 400 });
     }
 
-    const feeStructures = await prisma.termlyFeeStructure.findMany({
+    // Resolve target academic year (by id if provided, else by name if provided, else current)
+    let targetAcademicYearId: string | null = academicYearIdParam;
+    if (!targetAcademicYearId) {
+      if (academicYearNameParam) {
+        const ayByName = await prisma.academicYear.findFirst({
+          where: { schoolId: school.id, name: academicYearNameParam },
+        });
+        targetAcademicYearId = ayByName?.id || null;
+      } else {
+        const currentYear = await prisma.academicYear.findFirst({
+          where: { schoolId: school.id, isCurrent: true },
+        });
+        targetAcademicYearId = currentYear?.id || null;
+      }
+    }
+
+    // Get fee structures for this student's grade and target academic year (using academicYearId)
+    let feeStructures = await prisma.termlyFeeStructure.findMany({
       where: {
-        gradeId: student.class?.gradeId,
+        gradeId: targetGradeId,
         isActive: true,
+        ...(targetAcademicYearId ? { academicYearId: targetAcademicYearId } : {}),
         NOT: [
           { termId: null },
-          { academicYearId: null }
+          { academicYearId: null },
         ],
-        ...(targetAcademicYearId ? { academicYearId: targetAcademicYearId } : {})
+      },
+      include: {
+        grade: true,
+        academicYear: { select: { name: true } },
+      },
+    });
+
+    console.log(`=== FEE STRUCTURE FETCHING ===`);
+    console.log(`Student Grade: ${studentGradeName} (ID: ${targetGradeId})`);
+    console.log(`AcademicYearId filter: ${targetAcademicYearId || 'ALL'}`);
+    console.log(`Found ${feeStructures.length} fee structures for this grade${targetAcademicYearId ? ` and academicYearId ${targetAcademicYearId}` : ''}`);
+    
+    // Show all fee structures found
+    feeStructures.forEach((fs, index) => {
+      console.log(`${index + 1}. ID: ${fs.id}`);
+      console.log(`   Grade: ${fs.grade?.name}`);
+      console.log(`   Term: ${fs.term}`);
+      console.log(`   Amount: ${fs.totalAmount}`);
+      console.log(`   Year: ${fs.year}`);
+      console.log(`   AcademicYearId: ${fs.academicYearId}`);
+      console.log('---');
+    });
+
+    // Remove duplicates by keeping only one fee structure per term
+    const feeStructuresByTerm = new Map();
+    
+    console.log(`=== SELECTING ONE PER TERM ===`);
+    for (const fs of feeStructures) {
+      if (!feeStructuresByTerm.has(fs.term)) {
+        feeStructuresByTerm.set(fs.term, fs);
+        console.log(`✅ Selected for ${fs.term}: ID=${fs.id}, Amount=${fs.totalAmount}`);
+      } else {
+        console.log(`⏭️ Skipped duplicate for ${fs.term}: ID=${fs.id}, Amount=${fs.totalAmount}`);
+      }
+    }
+
+    // Convert to array and sort by term order
+    const termOrder: Record<string, number> = { 'Term 1': 1, 'Term 2': 2, 'Term 3': 3 };
+    const finalFeeStructures = Array.from(feeStructuresByTerm.values())
+      .sort((a, b) => (termOrder[a.term] || 0) - (termOrder[b.term] || 0));
+
+    console.log(`=== FINAL SELECTION ===`);
+    console.log(`Final fee structures: ${finalFeeStructures.length} structures`);
+    finalFeeStructures.forEach((fs, index) => {
+      console.log(`${index + 1}. ${fs.term}: Amount ${fs.totalAmount}, ID ${fs.id}, Grade ${fs.grade?.name}`);
+    });
+
+    // Use the fee structures found
+    let filteredFeeStructures = finalFeeStructures;
+    console.log(`Using ${filteredFeeStructures.length} fee structures for current academic year`);
+
+    // Debug: Check ALL fee structures for this grade (without filters)
+    const allFeeStructuresForGrade = await prisma.termlyFeeStructure.findMany({
+      where: {
+        gradeId: student.class?.gradeId,
+        isActive: true
       }
     });
+    
+    console.log('=== ALL FEE STRUCTURES FOR GRADE ===');
+    console.log('Grade ID:', student.class?.gradeId);
+    console.log('Total fee structures for this grade:', allFeeStructuresForGrade.length);
+    console.log('All fee structures:', allFeeStructuresForGrade.map(fs => ({
+      id: fs.id,
+      gradeId: fs.gradeId,
+      term: fs.term,
+      year: fs.year,
+      academicYearId: fs.academicYearId,
+      termId: fs.termId,
+      totalAmount: fs.totalAmount,
+      isActive: fs.isActive
+    })));
+
+    // Debug: Check academic years and terms
+    const academicYears = await prisma.academicYear.findMany({
+      where: { schoolId: school.id }
+    });
+    console.log('Academic Years:', academicYears.map(ay => ({
+      id: ay.id,
+      name: ay.name,
+      isCurrent: ay.isCurrent
+    })));
+
+    const terms = await prisma.term.findMany({
+      where: { academicYearId: { in: academicYears.map(ay => ay.id) } }
+    });
+    console.log('Terms:', terms.map(t => ({
+      id: t.id,
+      name: t.name,
+      academicYearId: t.academicYearId,
+      isCurrent: t.isCurrent
+    })));
 
     const payments = await prisma.payment.findMany({
       where: { 
@@ -76,25 +217,17 @@ export async function GET(
     const joinTermId = student.joinedTermId;
     const joinDate = student.dateAdmitted ? new Date(student.dateAdmitted) : null;
 
-    let filteredFeeStructures = feeStructures;
-    if (joinAcademicYearId && joinTermId) {
-      const joinTermObj = feeStructures.find(t => t.termId === joinTermId);
-      const joinTermName = joinTermObj?.term;
-      const termOrder: Record<string, number> = { 'Term 1': 1, 'Term 2': 2, 'Term 3': 3 };
-
-      filteredFeeStructures = filteredFeeStructures.filter(fs => {
-        if (!fs.academicYearId || !fs.term) return false;
-        if (fs.academicYearId < joinAcademicYearId) return false;
-        if (fs.academicYearId === joinAcademicYearId && joinTermName) {
-          return termOrder[fs.term] >= termOrder[joinTermName];
-        }
-        return true;
-      });
-    } else if (joinDate) {
-      filteredFeeStructures = filteredFeeStructures.filter(fs => {
-        return fs.createdAt && new Date(fs.createdAt) >= joinDate;
-      });
-    }
+    // filteredFeeStructures = filteredFeeStructures.filter(fs => {
+    //   if (!fs.academicYearId || !fs.term) return false;
+    //   if (joinAcademicYearId && fs.academicYearId < joinAcademicYearId) return false;
+    //   if (joinAcademicYearId && fs.academicYearId === joinAcademicYearId && joinTermId) {
+    //     const termOrder: Record<string, number> = { 'Term 1': 1, 'Term 2': 2, 'Term 3': 3 };
+    //     return termOrder[fs.term] >= termOrder[joinTermId];
+    //   }
+    //   return true;
+    // });
+    // BYPASS FILTER FOR DEBUGGING
+    // Now all fee structures for the grade/year/term will be included
 
     let filteredPayments = payments;
     if (joinAcademicYearId && joinTermId) {
@@ -118,7 +251,7 @@ export async function GET(
         description: `INVOICE - ${fs.term || ''} ${fs.year || ''}`,
         debit: Number(fs.totalAmount),
         credit: 0,
-        date: fs.createdAt,
+        date: fs.createdAt, // Use createdAt for invoice date
         type: 'invoice',
         termId: fs.termId,
         academicYearId: fs.academicYearId,
@@ -155,8 +288,14 @@ export async function GET(
 
     const academicYearOutstanding = transactions.length > 0 ? transactions[transactions.length - 1].balance : 0;
 
+    console.log('=== PROCESSING TERM BALANCES ===');
+    console.log(`Processing ${filteredFeeStructures.length} fee structures:`);
+    filteredFeeStructures.forEach((fs: any, index) => {
+      console.log(`Fee structure ${index + 1}: ID=${fs.id}, Term=${fs.term}, Amount=${fs.totalAmount}, AcademicYearId=${fs.academicYearId}, TermId=${fs.termId}`);
+    });
+
     let carryForward = 0;
-    const termBalances = filteredFeeStructures.map((fs) => {
+    const termBalances = filteredFeeStructures.map((fs, index) => {
       const charges = transactions
         .filter(txn => txn.termId === fs.termId && txn.academicYearId === fs.academicYearId && txn.type === 'invoice')
         .reduce((sum, txn) => sum + (txn.debit || 0), 0);
@@ -165,21 +304,55 @@ export async function GET(
         .filter(txn => txn.termId === fs.termId && txn.academicYearId === fs.academicYearId && txn.type === 'payment')
         .reduce((sum, txn) => sum + (txn.credit || 0), 0);
 
-      let balance = charges - paymentsForTerm + carryForward;
+      // Debug logging for payment matching
+      const termPayments = transactions.filter(txn => txn.termId === fs.termId && txn.academicYearId === fs.academicYearId && txn.type === 'payment');
+      console.log(`Term ${fs.term} (${fs.termId}): Found ${termPayments.length} payments totaling KES ${paymentsForTerm}`);
+      termPayments.forEach(payment => {
+        console.log(`  Payment: ${payment.ref}, Amount: ${payment.credit}, TermId: ${payment.termId}, AcademicYearId: ${payment.academicYearId}`);
+      });
+
+      // Calculate base balance for this term
+      let baseBalance = charges - paymentsForTerm;
+      
+      // Apply carry forward from previous terms
+      let balance = baseBalance + carryForward;
       let carryToNext = 0;
+      
+      // Normal carry-forward logic for all terms
       if (balance < 0) {
-        carryToNext = balance;
+        carryToNext = balance; // This will be negative (overpayment)
         balance = 0;
       }
+      
+      // Calculate effective paid amount (includes carry-forward effects)
+      let effectivePaidAmount = paymentsForTerm;
+      if (carryForward < 0) {
+        // If we received carry-forward (overpayment from previous terms), add it to paid amount
+        effectivePaidAmount = paymentsForTerm + Math.abs(carryForward);
+      }
+      
+      console.log(`Term ${fs.term}: Charges=${charges}, Payments=${paymentsForTerm}, BaseBalance=${baseBalance}, CarryForward=${carryForward}, FinalBalance=${balance}, CarryToNext=${carryToNext}, EffectivePaid=${effectivePaidAmount}`);
+      
+      const isLastTerm = index === filteredFeeStructures.length - 1;
+
       const result = {
         termId: fs.termId,
         academicYearId: fs.academicYearId,
         term: fs.term,
         year: fs.year,
         totalAmount: fs.totalAmount,
-        balance
+        balance: Math.max(0, balance), // Ensure balance is never negative
+        baseBalance: baseBalance,
+        carryForward: carryForward,
+        carryToNext: carryToNext,
+        paidAmount: effectivePaidAmount, // Add effective paid amount
+        academicYearOutstanding: academicYearOutstanding // Add for reference
       };
-      carryForward = carryToNext;
+      
+      // Update carry forward for next term (unless it's the last term)
+      if (!isLastTerm) {
+        carryForward = carryToNext;
+      }
       return result;
     });
 
@@ -197,11 +370,11 @@ export async function GET(
     const outstanding = academicYearOutstanding + arrears;
 
     return NextResponse.json({
-      student: {
-        id: student.id,
-        name: student.user.name,
-        admissionNumber: student.admissionNumber,
-        gradeName: student.class?.grade?.name || 'Not Assigned',
+              student: {
+          id: student.id,
+          name: student.user?.name,
+          admissionNumber: student.admissionNumber,
+          gradeName: student.class?.grade?.name || 'Not Assigned',
         className: student.class?.name || 'Not Assigned'
       },
       termBalances,

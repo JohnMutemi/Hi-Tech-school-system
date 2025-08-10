@@ -42,9 +42,6 @@ export async function GET(
           }
         }
       },
-      orderBy: {
-        createdAt: 'desc'
-      },
       take: 100 // Limit to last 100 promotions
     });
 
@@ -64,7 +61,7 @@ export async function GET(
       averageGrade: record.averageGrade,
       outstandingBalance: record.outstandingBalance,
       disciplinaryCases: record.disciplinaryCases,
-      createdAt: record.createdAt.toISOString()
+      promotionDate: record.promotionDate
     }));
 
     return NextResponse.json({

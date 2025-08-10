@@ -1,19 +1,17 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { withSchoolContext } from '@/lib/school-context';
 
 const prisma = new PrismaClient();
 
 // GET: List all subjects for a school
 export async function GET(request: NextRequest, { params }: { params: { schoolCode: string } }) {
   try {
-    const school = await prisma.school.findUnique({ where: { code: params.schoolCode.toLowerCase() } });
-    if (!school) {
-      return NextResponse.json({ error: "School not found" }, { status: 404 });
-    }
+    const schoolManager = withSchoolContext(params.schoolCode);
+    await schoolManager.initialize();
     
-    // Since there's no Subject model in Prisma, we'll return an empty array for now
-    // You may want to add a Subject model to your Prisma schema later
-    return NextResponse.json([]);
+    const subjects = await schoolManager.getSubjects();
+    return NextResponse.json(subjects);
   } catch (error) {
     console.error("Error fetching subjects:", error);
     return NextResponse.json({ error: "Failed to fetch subjects" }, { status: 500 });
@@ -23,10 +21,8 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
 // POST: Create a new subject
 export async function POST(request: NextRequest, { params }: { params: { schoolCode: string } }) {
   try {
-    const school = await prisma.school.findUnique({ where: { code: params.schoolCode.toLowerCase() } });
-    if (!school) {
-      return NextResponse.json({ error: "School not found" }, { status: 404 });
-    }
+    const schoolManager = withSchoolContext(params.schoolCode);
+    const schoolContext = await schoolManager.initialize();
     
     const body = await request.json();
     const { name, code, description, teacherId } = body;
@@ -35,11 +31,39 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
       return NextResponse.json({ error: "Missing required fields: name and code are required" }, { status: 400 });
     }
     
-    // Since there's no Subject model in Prisma, we'll return an error for now
-    // You may want to add a Subject model to your Prisma schema
-    return NextResponse.json({ 
-      error: "Subject creation not implemented. Please add Subject model to Prisma schema first." 
-    }, { status: 501 });
+    // Check if subject code already exists for this school
+    const existingSubject = await prisma.subject.findFirst({
+      where: {
+        schoolId: schoolContext.schoolId,
+        code: code
+      }
+    });
+    
+    if (existingSubject) {
+      return NextResponse.json({ error: "Subject code already exists for this school" }, { status: 409 });
+    }
+    
+    const newSubject = await prisma.subject.create({
+      data: {
+        name,
+        code,
+        description,
+        teacherId: teacherId || null,
+        schoolId: schoolContext.schoolId,
+        isActive: true
+      },
+      include: {
+        teacher: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      }
+    });
+    
+    return NextResponse.json(newSubject, { status: 201 });
   } catch (error) {
     console.error("Error creating subject:", error);
     return NextResponse.json({ error: "Failed to create subject" }, { status: 500 });
@@ -49,10 +73,8 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
 // PUT: Update a subject
 export async function PUT(request: NextRequest, { params }: { params: { schoolCode: string } }) {
   try {
-    const school = await prisma.school.findUnique({ where: { code: params.schoolCode.toLowerCase() } });
-    if (!school) {
-      return NextResponse.json({ error: "School not found" }, { status: 404 });
-    }
+    const schoolManager = withSchoolContext(params.schoolCode);
+    await schoolManager.initialize();
     
     const body = await request.json();
     const { id, name, code, description, teacherId } = body;
@@ -61,10 +83,32 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
       return NextResponse.json({ error: "Subject ID is required" }, { status: 400 });
     }
     
-    // Since there's no Subject model in Prisma, we'll return an error for now
-    return NextResponse.json({ 
-      error: "Subject update not implemented. Please add Subject model to Prisma schema first." 
-    }, { status: 501 });
+    // Validate that the subject belongs to this school
+    const isValidSubject = await schoolManager.validateSchoolOwnership(id, prisma.subject);
+    if (!isValidSubject) {
+      return NextResponse.json({ error: "Subject not found or access denied" }, { status: 404 });
+    }
+    
+    const updatedSubject = await prisma.subject.update({
+      where: { id },
+      data: {
+        name,
+        code,
+        description,
+        teacherId: teacherId || null,
+      },
+      include: {
+        teacher: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      }
+    });
+    
+    return NextResponse.json(updatedSubject);
   } catch (error) {
     console.error("Error updating subject:", error);
     return NextResponse.json({ error: "Failed to update subject" }, { status: 500 });
@@ -74,20 +118,22 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
 // DELETE: Delete a subject
 export async function DELETE(request: NextRequest, { params }: { params: { schoolCode: string } }) {
   try {
-    const school = await prisma.school.findUnique({ where: { code: params.schoolCode.toLowerCase() } });
-    if (!school) {
-      return NextResponse.json({ error: "School not found" }, { status: 404 });
-    }
+    const schoolManager = withSchoolContext(params.schoolCode);
+    await schoolManager.initialize();
     
     const { id } = await request.json();
     if (!id) {
       return NextResponse.json({ error: "Subject ID is required" }, { status: 400 });
     }
     
-    // Since there's no Subject model in Prisma, we'll return an error for now
-    return NextResponse.json({ 
-      error: "Subject deletion not implemented. Please add Subject model to Prisma schema first." 
-    }, { status: 501 });
+    // Validate that the subject belongs to this school
+    const isValidSubject = await schoolManager.validateSchoolOwnership(id, prisma.subject);
+    if (!isValidSubject) {
+      return NextResponse.json({ error: "Subject not found or access denied" }, { status: 404 });
+    }
+    
+    await prisma.subject.delete({ where: { id } });
+    return NextResponse.json({ message: "Subject deleted successfully" });
   } catch (error) {
     console.error("Error deleting subject:", error);
     return NextResponse.json({ error: "Failed to delete subject" }, { status: 500 });

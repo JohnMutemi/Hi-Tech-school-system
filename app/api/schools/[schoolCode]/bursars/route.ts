@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { hashDefaultPasswordByRole } from '@/lib/utils/default-passwords';
 
 const prisma = new PrismaClient();
 
@@ -54,7 +55,7 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
     const body = await request.json();
     const { name, email, phone, tempPassword } = body;
 
-    if (!name || !email || !tempPassword) {
+    if (!name || !email) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
       return NextResponse.json({ error: 'Bursar with this email already exists' }, { status: 409 });
     }
 
-    const hashedPassword = await bcrypt.hash(tempPassword, 12);
+    const hashedPassword = await hashDefaultPasswordByRole('bursar');
 
     const newBursar = await prisma.user.create({
       data: {
@@ -97,7 +98,7 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
 
     return NextResponse.json({
       ...newBursar,
-      tempPassword // Return the plain password for display to admin
+      tempPassword: 'bursar123' // Return the default password for display to admin
     }, { status: 201 });
   } catch (error) {
     console.error('Error creating bursar:', error);

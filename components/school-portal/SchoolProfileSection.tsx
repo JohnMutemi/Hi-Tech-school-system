@@ -84,27 +84,40 @@ export default function SchoolProfileSection({ schoolCode, colorTheme, toast }: 
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <span className="flex items-center gap-2">
-            <School className="w-5 h-5" />
-            School Profile
+    <Card className="bg-gradient-to-br from-white/90 to-white/70 backdrop-blur-lg rounded-3xl shadow-xl border border-white/20">
+      <CardHeader className="px-8 py-8">
+        <CardTitle className="flex items-center justify-between text-2xl font-bold">
+          <span className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center">
+              <School className="w-6 h-6 text-white" />
+            </div>
+            <span className="bg-gradient-to-r from-blue-900 to-cyan-900 bg-clip-text text-transparent">
+              School Profile
+            </span>
           </span>
           {profileSaved && !isEditingProfile && (
-            <Button onClick={() => setIsEditingProfile(true)} variant="outline" style={{ borderColor: colorTheme, color: colorTheme }}>
+            <Button 
+              onClick={() => setIsEditingProfile(true)} 
+              variant="outline" 
+              className="border-2 hover:bg-blue-50 transition-all duration-300"
+              style={{ borderColor: colorTheme, color: colorTheme }}
+            >
               <Edit className="w-4 h-4 mr-2" />
               Update Profile
             </Button>
           )}
           {profileSaved && isEditingProfile && (
-            <Button onClick={() => setIsEditingProfile(false)} variant="outline">
+            <Button 
+              onClick={() => setIsEditingProfile(false)} 
+              variant="outline"
+              className="border-2 hover:bg-gray-50 transition-all duration-300"
+            >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Cancel Edit
             </Button>
           )}
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-lg text-gray-600">
           {profileSaved && !isEditingProfile
             ? "Complete school information and administrative details"
             : isEditingProfile
@@ -112,33 +125,33 @@ export default function SchoolProfileSection({ schoolCode, colorTheme, toast }: 
             : "Complete your school's basic information and contact details"}
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-8 pb-8">
         {profileSaved && !isEditingProfile ? (
           <div className="grid md:grid-cols-2 gap-8">
             <div className="space-y-6">
               <div>
-                <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                <h4 className="font-bold text-gray-900 mb-6 flex items-center gap-3 text-lg">
+                  <div className="w-3 h-3 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full"></div>
                   Contact & Location
                 </h4>
                 <div className="space-y-4">
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <Label className="text-sm font-medium text-gray-600 mb-1">Campus Address</Label>
-                    <p className="text-gray-900 font-medium">{schoolProfile.address || "Address not set"}</p>
+                  <div className="bg-gradient-to-br from-blue-50/80 to-cyan-50/80 rounded-xl p-6 border border-blue-100/50 shadow-sm">
+                    <Label className="text-sm font-semibold text-blue-700 mb-2">Campus Address</Label>
+                    <p className="text-gray-900 font-semibold text-lg">{schoolProfile.address || "Address not set"}</p>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <Label className="text-sm font-medium text-gray-600 mb-1">Contact Phone</Label>
-                    <p className="text-gray-900 font-medium">{schoolProfile.phone || "Phone not set"}</p>
+                  <div className="bg-gradient-to-br from-blue-50/80 to-cyan-50/80 rounded-xl p-6 border border-blue-100/50 shadow-sm">
+                    <Label className="text-sm font-semibold text-blue-700 mb-2">Contact Phone</Label>
+                    <p className="text-gray-900 font-semibold text-lg">{schoolProfile.phone || "Phone not set"}</p>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <Label className="text-sm font-medium text-gray-600 mb-1">Email Address</Label>
-                    <p className="text-gray-900 font-medium">{schoolProfile.email || "Email not set"}</p>
+                  <div className="bg-gradient-to-br from-blue-50/80 to-cyan-50/80 rounded-xl p-6 border border-blue-100/50 shadow-sm">
+                    <Label className="text-sm font-semibold text-blue-700 mb-2">Email Address</Label>
+                    <p className="text-gray-900 font-semibold text-lg">{schoolProfile.email || "Email not set"}</p>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <Label className="text-sm font-medium text-gray-600 mb-1">Website</Label>
-                    <p className="text-gray-900 font-medium">
+                  <div className="bg-gradient-to-br from-blue-50/80 to-cyan-50/80 rounded-xl p-6 border border-blue-100/50 shadow-sm">
+                    <Label className="text-sm font-semibold text-blue-700 mb-2">Website</Label>
+                    <p className="text-gray-900 font-semibold text-lg">
                       {schoolProfile.website ? (
-                        <a href={schoolProfile.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                        <a href={schoolProfile.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 hover:underline transition-colors">
                           {schoolProfile.website}
                         </a>
                       ) : (
@@ -151,37 +164,37 @@ export default function SchoolProfileSection({ schoolCode, colorTheme, toast }: 
             </div>
             <div className="space-y-6">
               <div>
-                <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <h4 className="font-bold text-gray-900 mb-6 flex items-center gap-3 text-lg">
+                  <div className="w-3 h-3 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-full"></div>
                   School Information
                 </h4>
                 <div className="space-y-4">
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <Label className="text-sm font-medium text-gray-600 mb-1">Principal</Label>
-                    <p className="text-gray-900 font-medium">{schoolProfile.principalName || "Principal not set"}</p>
+                  <div className="bg-gradient-to-br from-emerald-50/80 to-teal-50/80 rounded-xl p-6 border border-emerald-100/50 shadow-sm">
+                    <Label className="text-sm font-semibold text-emerald-700 mb-2">Principal</Label>
+                    <p className="text-gray-900 font-semibold text-lg">{schoolProfile.principalName || "Principal not set"}</p>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <Label className="text-sm font-medium text-gray-600 mb-1">Founded</Label>
-                    <p className="text-gray-900 font-medium">{schoolProfile.establishedYear || "Year not set"}</p>
+                  <div className="bg-gradient-to-br from-emerald-50/80 to-teal-50/80 rounded-xl p-6 border border-emerald-100/50 shadow-sm">
+                    <Label className="text-sm font-semibold text-emerald-700 mb-2">Founded</Label>
+                    <p className="text-gray-900 font-semibold text-lg">{schoolProfile.establishedYear || "Year not set"}</p>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <Label className="text-sm font-medium text-gray-600 mb-1">Institution Type</Label>
-                    <p className="text-gray-900 font-medium capitalize">{schoolProfile.type || "Type not set"}</p>
+                  <div className="bg-gradient-to-br from-emerald-50/80 to-teal-50/80 rounded-xl p-6 border border-emerald-100/50 shadow-sm">
+                    <Label className="text-sm font-semibold text-emerald-700 mb-2">Institution Type</Label>
+                    <p className="text-gray-900 font-semibold text-lg capitalize">{schoolProfile.type || "Type not set"}</p>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <Label className="text-sm font-medium text-gray-600 mb-1">School Motto</Label>
-                    <p className="text-gray-900 font-medium italic">"{schoolProfile.motto || "Motto not set"}"</p>
+                  <div className="bg-gradient-to-br from-emerald-50/80 to-teal-50/80 rounded-xl p-6 border border-emerald-100/50 shadow-sm">
+                    <Label className="text-sm font-semibold text-emerald-700 mb-2">School Motto</Label>
+                    <p className="text-gray-900 font-semibold text-lg italic">"{schoolProfile.motto || "Motto not set"}"</p>
                   </div>
                 </div>
               </div>
               {schoolProfile.description && (
                 <div>
-                  <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                  <h4 className="font-bold text-gray-900 mb-6 flex items-center gap-3 text-lg">
+                    <div className="w-3 h-3 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-full"></div>
                     About Our School
                   </h4>
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <p className="text-gray-700 text-sm leading-relaxed">{schoolProfile.description}</p>
+                  <div className="bg-gradient-to-br from-purple-50/80 to-indigo-50/80 rounded-xl p-6 border border-purple-100/50 shadow-sm">
+                    <p className="text-gray-700 text-base leading-relaxed">{schoolProfile.description}</p>
                   </div>
                 </div>
               )}
@@ -193,11 +206,11 @@ export default function SchoolProfileSection({ schoolCode, colorTheme, toast }: 
               e.preventDefault();
               await handleSave();
             }}
-            className="space-y-4"
+            className="space-y-6"
           >
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="address">School Address *</Label>
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <Label htmlFor="address" className="text-base font-semibold text-gray-700">School Address *</Label>
                 <Textarea
                   id="address"
                   value={schoolProfile.address}
@@ -215,24 +228,26 @@ export default function SchoolProfileSection({ schoolCode, colorTheme, toast }: 
                 />
               </div>
             </div>
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">School Email *</Label>
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <Label htmlFor="email" className="text-base font-semibold text-gray-700">School Email *</Label>
                 <Input
                   id="email"
                   type="email"
                   value={schoolProfile.email}
                   onChange={(e) => setSchoolProfile({ ...schoolProfile, email: e.target.value })}
                   placeholder="info@school.edu"
+                  className="border-2 border-gray-200 rounded-xl focus:border-blue-400 focus:ring-4 focus:ring-blue-100 transition-all duration-300"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="website">Website (Optional)</Label>
+              <div className="space-y-4">
+                <Label htmlFor="website" className="text-base font-semibold text-gray-700">Website (Optional)</Label>
                 <Input
                   id="website"
                   value={schoolProfile.website}
                   onChange={(e) => setSchoolProfile({ ...schoolProfile, website: e.target.value })}
                   placeholder="https://www.school.edu"
+                  className="border-2 border-gray-200 rounded-xl focus:border-blue-400 focus:ring-4 focus:ring-blue-100 transition-all duration-300"
                 />
               </div>
             </div>

@@ -17,6 +17,7 @@ export default function AdmissionNumberSettings({ schoolCode }: { schoolCode: st
   const [success, setSuccess] = useState('');
   const [settings, setSettings] = useState({
     lastAdmissionNumber: '',
+    admissionNumberAutoIncrement: true,
   });
   const [nextPreview, setNextPreview] = useState('');
 
@@ -28,9 +29,16 @@ export default function AdmissionNumberSettings({ schoolCode }: { schoolCode: st
       .then(data => {
         setSettings({
           lastAdmissionNumber: data.lastAdmissionNumber || '',
+          admissionNumberAutoIncrement: data.admissionNumberAutoIncrement !== false,
         });
         setLoading(false);
-        setTimeout(() => setNextPreview(getNextAdmissionNumber(data.lastAdmissionNumber || '')), 0);
+        
+        // Generate preview based on school settings
+        if (data.admissionNumberAutoIncrement && data.lastAdmissionNumber) {
+          setNextPreview(getNextAdmissionNumber(data.lastAdmissionNumber));
+        } else {
+          setNextPreview('ADM001');
+        }
       })
       .catch(() => {
         setError('Failed to load settings');
@@ -39,11 +47,19 @@ export default function AdmissionNumberSettings({ schoolCode }: { schoolCode: st
   }, [schoolCode]);
 
   useEffect(() => {
-    setNextPreview(getNextAdmissionNumber(settings.lastAdmissionNumber));
-  }, [settings.lastAdmissionNumber]);
+    if (settings.admissionNumberAutoIncrement && settings.lastAdmissionNumber) {
+      setNextPreview(getNextAdmissionNumber(settings.lastAdmissionNumber));
+    } else {
+      setNextPreview('ADM001');
+    }
+  }, [settings.lastAdmissionNumber, settings.admissionNumberAutoIncrement]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSettings({ lastAdmissionNumber: e.target.value });
+    const { name, value, type, checked } = e.target;
+    setSettings(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -68,8 +84,22 @@ export default function AdmissionNumberSettings({ schoolCode }: { schoolCode: st
   return (
     <div className="max-w-xl mx-auto p-8 bg-white rounded-xl shadow-sm border border-gray-200">
       <h2 className="text-2xl font-semibold mb-1 text-gray-900 tracking-tight">Admission Number Settings</h2>
-      <p className="mb-7 text-gray-500 text-sm leading-relaxed">Set your school's last used or first admission number. The system will automatically increment for each new student.</p>
+      <p className="mb-7 text-gray-500 text-sm leading-relaxed">Set your school's last used admission number. The system will automatically increment the number for each new student. You can use any format like ADM101, TZ001, etc.</p>
       <form onSubmit={handleSubmit} className="space-y-7">
+        <div>
+          <label className="block font-medium mb-1 text-gray-800 text-sm">Enable Auto-Increment</label>
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              name="admissionNumberAutoIncrement"
+              checked={settings.admissionNumberAutoIncrement}
+              onChange={handleChange}
+              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span className="text-sm text-gray-600">Automatically increment admission numbers</span>
+          </div>
+        </div>
+        
         <div>
           <label className="block font-medium mb-1 text-gray-800 text-sm">Last Used Admission Number</label>
           <input
@@ -81,9 +111,8 @@ export default function AdmissionNumberSettings({ schoolCode }: { schoolCode: st
             placeholder="e.g. T001, ADM104, 9787"
           />
           <p className="text-xs text-gray-400 mt-2 leading-relaxed">
-            Enter the <span className="font-semibold text-gray-700">last admission number</span> used in your school. For new schools, enter the <span className="font-semibold text-gray-700">first admission number</span> you want to use.<br />
-            The system will automatically increment the number for each new student, regardless of format.<br />
-            <span className="block mt-1"><b>Examples:</b> <span className="font-mono text-blue-700">T001</span> → <span className="font-mono text-blue-700">T002</span>, <span className="font-mono text-blue-700">ADM104</span> → <span className="font-mono text-blue-700">ADM105</span>, <span className="font-mono text-blue-700">9787</span> → <span className="font-mono text-blue-700">9788</span></span>
+            Enter the <span className="font-semibold text-gray-700">last admission number</span> used in your school. The system will automatically increment the number for each new student.<br />
+            <span className="block mt-1"><b>Examples:</b> <span className="font-mono text-blue-700">ADM101</span> → <span className="font-mono text-blue-700">ADM102</span>, <span className="font-mono text-blue-700">TZ001</span> → <span className="font-mono text-blue-700">TZ002</span>, <span className="font-mono text-blue-700">2024001</span> → <span className="font-mono text-blue-700">2024002</span></span>
           </p>
         </div>
         <div>

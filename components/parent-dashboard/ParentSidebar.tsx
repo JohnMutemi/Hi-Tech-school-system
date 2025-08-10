@@ -3,7 +3,7 @@ import {
   Sparkles, 
   Users, 
   DollarSign, 
-  Receipt, 
+  // Receipt, 
   BarChart2, 
   Settings, 
   LogOut,
@@ -30,7 +30,7 @@ const NAV_ITEMS = [
   { id: "overview", label: "Overview", icon: Sparkles },
   { id: "children", label: "My Children", icon: Users },
   { id: "fees", label: "Fee Management", icon: DollarSign },
-  { id: "receipts", label: "Receipts", icon: Receipt },
+  // { id: "receipts", label: "Receipts", icon: Receipt },
   { id: "performance", label: "Academic Performance", icon: BarChart2 },
   { id: "settings", label: "Account Settings", icon: Settings },
 ];
@@ -62,9 +62,9 @@ export const ParentSidebar: React.FC<ParentSidebarProps> = ({
 
   // Use system color mode (light/dark)
   const isDark = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const sidebarBg = 'bg-gradient-to-b from-cyan-900 via-cyan-800 to-blue-900';
-  const sidebarBorder = 'border-cyan-900';
-  const sidebarShadow = 'shadow-lg shadow-cyan-200/40';
+  const sidebarBg = 'bg-gradient-to-b from-slate-900 via-slate-800 to-indigo-900';
+  const sidebarBorder = 'border-slate-800';
+  const sidebarShadow = 'shadow-lg shadow-indigo-900/40';
 
   return (
     <>
@@ -79,11 +79,11 @@ export const ParentSidebar: React.FC<ParentSidebarProps> = ({
             <img src="/hi-tech-logo.svg" alt="HT Logo" className="w-14 h-14 p-1" />
           </div>
           {/* Sidebar Header (no logo) */}
-          <div className="flex flex-col items-center justify-center h-20 mb-4 mt-2 border-b border-cyan-800 pb-4">
+          <div className="flex flex-col items-center justify-center h-20 mb-4 mt-2 border-b border-slate-700 pb-4">
             <span className="font-bold text-2xl text-white tracking-tight">Parent Portal</span>
-            <span className="text-cyan-200 text-sm mt-1">School Management</span>
+            <span className="text-slate-300 text-sm mt-1">School Management</span>
             {parent?.parentName && (
-              <span className="text-cyan-100 text-base mt-2">Welcome, {parent.parentName}!</span>
+              <span className="text-slate-200 text-base mt-2">Hello, {parent.parentName}!</span>
             )}
           </div>
 
@@ -95,7 +95,7 @@ export const ParentSidebar: React.FC<ParentSidebarProps> = ({
                 <div className="font-bold text-white text-lg">
                   {parent.parentName}
                 </div>
-                <div className="text-cyan-200 font-semibold text-sm">
+                <div className="text-slate-300 font-semibold text-sm">
                   {parent.parentPhone}
                 </div>
               </div>
@@ -111,10 +111,10 @@ export const ParentSidebar: React.FC<ParentSidebarProps> = ({
                 return (
                   <li key={item.id}>
                     <button
-                      className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg text-left transition-colors font-semibold text-emerald-100 hover:underline hover:text-white ${
-                        isActive ? 'font-bold bg-emerald-800 text-white shadow-md' : 'font-medium'
+                      className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg text-left transition-colors font-semibold text-slate-200 hover:underline hover:text-white ${
+                        isActive ? 'font-bold bg-indigo-700 text-white shadow-md' : 'font-medium'
                       }`}
-                      style={isActive ? { boxShadow: '0 0 0 2px #34d399' } : {}}
+                      style={isActive ? { boxShadow: '0 0 0 2px #6366f1' } : {}}
                       onClick={() => onTabChange(item.id)}
                       aria-current={isActive ? "page" : undefined}
                     >
@@ -159,26 +159,26 @@ export const ParentSidebar: React.FC<ParentSidebarProps> = ({
       </nav>
 
       {/* Mobile Header */}
-      <header className="lg:hidden bg-emerald-900 shadow-sm border-b border-emerald-800 sticky top-0 z-20">
+      <header className="lg:hidden bg-slate-900 shadow-sm border-b border-slate-800 sticky top-0 z-20">
         <div className="flex items-center justify-between px-4 py-4">
           <div className="flex items-center gap-3">
             <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="hover:bg-emerald-800 h-12 w-12 rounded-xl text-white">
+                <Button variant="ghost" size="icon" className="hover:bg-slate-800 h-12 w-12 rounded-xl text-white">
                   <Menu className="h-6 w-6" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-80 p-0 bg-gradient-to-b from-emerald-900 via-emerald-800 to-teal-900 text-white">
-                <SheetHeader className="p-6 border-b border-emerald-800 bg-gradient-to-r from-emerald-800 to-teal-800 text-white">
+              <SheetContent side="left" className="w-80 p-0 bg-gradient-to-b from-slate-900 via-slate-800 to-indigo-900 text-white">
+                <SheetHeader className="p-6 border-b border-slate-700 bg-gradient-to-r from-slate-800 to-indigo-800 text-white">
                   <SheetTitle className="text-left text-white font-bold text-xl">Parent Portal</SheetTitle>
-                  <p className="text-emerald-100 text-sm mt-2">Hi-Tech SMS</p>
+                  <p className="text-slate-300 text-sm mt-2">Hi-Tech SMS</p>
                 </SheetHeader>
                 {/* Mobile Profile Section */}
                 {parent && (
-                  <div className="p-6 border-b border-emerald-800 bg-emerald-900">
+                  <div className="p-6 border-b border-slate-700 bg-slate-800">
                     <div className="flex items-center gap-4">
                       <div className="relative">
-                        <Avatar className="w-16 h-16 rounded-xl border-2 shadow-lg ring-4 ring-emerald-200">
+                        <Avatar className="w-16 h-16 rounded-xl border-2 shadow-lg ring-4 ring-slate-300">
                           <img
                             src={avatarUrl || "/placeholder-user.jpg"}
                             alt={parent.parentName || "Parent Avatar"}
@@ -186,7 +186,7 @@ export const ParentSidebar: React.FC<ParentSidebarProps> = ({
                           />
                           {onAvatarChange && (
                             <label
-                              className="absolute bottom-0 right-0 bg-emerald-600 text-white rounded-full p-1 cursor-pointer shadow-md"
+                              className="absolute bottom-0 right-0 bg-indigo-600 text-white rounded-full p-1 cursor-pointer shadow-md"
                               title="Change profile picture"
                             >
                               <input
@@ -205,7 +205,7 @@ export const ParentSidebar: React.FC<ParentSidebarProps> = ({
                         <div className="font-bold text-white text-base">
                           {parent.parentName}
                         </div>
-                        <div className="text-emerald-200 font-semibold text-sm">
+                        <div className="text-slate-300 font-semibold text-sm">
                           {parent.parentPhone}
                         </div>
                       </div>
@@ -222,7 +222,7 @@ export const ParentSidebar: React.FC<ParentSidebarProps> = ({
                         <li key={item.id}>
                           <button
                             className={`w-full flex items-center gap-4 px-6 py-4 rounded-xl text-left transition-colors font-medium mx-3 ${
-                              isActive ? 'bg-emerald-800 text-white shadow-md' : 'text-emerald-100 hover:bg-emerald-800 hover:text-white'
+                              isActive ? 'bg-indigo-700 text-white shadow-md' : 'text-slate-200 hover:bg-indigo-700 hover:text-white'
                             }`}
                             onClick={() => {
                               onTabChange(item.id);
@@ -268,15 +268,15 @@ export const ParentSidebar: React.FC<ParentSidebarProps> = ({
               </SheetContent>
             </Sheet>
             <div className="flex flex-col">
-              <span className="font-bold text-xl text-emerald-200">Parent Portal</span>
-              <span className="text-xs text-emerald-100">
+              <span className="font-bold text-xl text-slate-200">Parent Portal</span>
+              <span className="text-xs text-slate-300">
                 {NAV_ITEMS.find(item => item.id === activeTab)?.label || 'Overview'}
               </span>
             </div>
           </div>
           {parent && (
             <div className="flex items-center gap-2">
-              <div className="hidden sm:flex items-center gap-2 text-sm text-emerald-100 bg-emerald-900 px-3 py-2 rounded-full">
+              <div className="hidden sm:flex items-center gap-2 text-sm text-slate-200 bg-slate-800 px-3 py-2 rounded-full">
                 <span className="font-medium">{parent.parentName}</span>
               </div>
             </div>
@@ -296,8 +296,8 @@ export const ParentSidebar: React.FC<ParentSidebarProps> = ({
                 onClick={() => onTabChange(item.id)}
                 className={`flex flex-col items-center py-3 px-2 min-w-0 flex-1 mobile-nav-transition ${
                   isActive 
-                    ? "text-emerald-600 bg-emerald-50 nav-item-active" 
-                    : "text-gray-600 hover:text-emerald-600 hover:bg-emerald-50"
+                    ? "text-indigo-600 bg-indigo-50 nav-item-active" 
+                    : "text-gray-600 hover:text-indigo-600 hover:bg-indigo-50"
                 }`}
                 aria-current={isActive ? "page" : undefined}
               >

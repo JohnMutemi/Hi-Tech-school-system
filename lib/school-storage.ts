@@ -84,6 +84,16 @@ export type SchoolClass = {
   currentStudents?: number;
   subjects?: string[];
   gradeId?: string;
+  grade?: {
+    id: string;
+    name: string;
+  };
+  teacher?: {
+    id: string;
+    name: string;
+    email: string;
+    phone: string;
+  };
   // ...other properties
 };
 
