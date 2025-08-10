@@ -8,7 +8,7 @@ export default function BursarPage() {
   const schoolCode = params.schoolCode as string;
 
   return (
-    <div className="container mx-auto py-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       <BursarDashboard schoolCode={schoolCode} />
     </div>
   );

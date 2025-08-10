@@ -175,42 +175,50 @@ export default function SuperAdminDashboard() {
   }
 
   return (
-    <div className="space-y-8 animate-fade-in relative">
-      {/* Welcome Section */}
-      <div className="bg-gradient-to-r from-cyan-500 via-teal-500 to-cyan-600 rounded-2xl p-4 lg:p-5 text-white shadow-xl backdrop-blur-sm">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 lg:gap-4">
-          <div className="space-y-2 lg:space-y-3">
-            <h1 className="text-xl lg:text-2xl font-bold tracking-tight">
-              Welcome back, {user?.name || 'Admin'}! 👋
-            </h1>
-            <p className="text-cyan-100 text-sm lg:text-base max-w-xl">
-              Here's what's happening with your platform today. All systems are operational.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="secondary" className="bg-white/20 text-white border-white/30 text-xs px-2 py-1">
-                <CheckCircle className="w-3 h-3 mr-1" />
-                System Healthy
-              </Badge>
-              <Badge variant="secondary" className="bg-white/20 text-white border-white/30 text-xs px-2 py-1">
-                <Clock className="w-3 h-3 mr-1" />
-                {stats.uptime}% Uptime
-              </Badge>
+    <div className="animate-fade-in relative">
+      {/* Sticky Welcome Section - Reduced Size */}
+      <div className="sticky top-0 z-40 bg-gradient-to-r from-cyan-500 via-teal-500 to-cyan-600 backdrop-blur-md border-b border-cyan-400/30 shadow-lg mb-8">
+        <div className="px-4 lg:px-6 py-3 lg:py-4">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2 lg:gap-4">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-lg lg:text-xl font-bold tracking-tight text-white truncate">
+                    Welcome back, Platform Super Admin! 👋
+                  </h1>
+                  <p className="text-cyan-100 text-xs lg:text-sm mt-1 line-clamp-1">
+                    Here's what's happening with your platform today. All systems are operational.
+                  </p>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <Badge variant="secondary" className="bg-white/20 text-white border-white/30 text-xs px-2 py-1 whitespace-nowrap">
+                    <CheckCircle className="w-3 h-3 mr-1" />
+                    System Healthy
+                  </Badge>
+                  <Badge variant="secondary" className="bg-white/20 text-white border-white/30 text-xs px-2 py-1 whitespace-nowrap">
+                    <Clock className="w-3 h-3 mr-1" />
+                    {stats.uptime}% Uptime
+                  </Badge>
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="bg-white/10 border-white/20 text-white hover:bg-white/20 text-xs px-3 py-1">
-              <Bell className="w-3 h-3 mr-1" />
-              Notifications
-            </Button>
-            <Button asChild size="sm" className="bg-white text-cyan-600 hover:bg-gray-100 text-xs px-3 py-1">
-              <Link href="/superadmin/schools/add">
-                <Plus className="w-3 h-3 mr-1" />
-                Add School
-              </Link>
-            </Button>
+            <div className="flex gap-2 shrink-0">
+              <Button variant="outline" size="sm" className="bg-white/10 border-white/20 text-white hover:bg-white/20 text-xs px-3 py-1.5">
+                <Bell className="w-3 h-3 mr-1" />
+                Notifications
+              </Button>
+              <Button asChild size="sm" className="bg-white text-cyan-600 hover:bg-gray-100 text-xs px-3 py-1.5">
+                <Link href="/superadmin/schools/add">
+                  <Plus className="w-3 h-3 mr-1" />
+                  Add
+                </Link>
+              </Button>
+            </div>
           </div>
         </div>
       </div>
+
+      <div className="space-y-8 px-4 lg:px-6">
 
       {/* Key Metrics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -419,6 +427,7 @@ export default function SuperAdminDashboard() {
           </div>
         </CardContent>
       </Card>
+      </div>
 
       {/* Custom CSS for animations */}
       <style jsx>{`

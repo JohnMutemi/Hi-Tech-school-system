@@ -653,66 +653,13 @@ export default function StaffSection({ schoolCode, colorTheme, toast }: any) {
             </DialogTitle>
             <DialogDescription>
               {viewingItem && (teachers.find(t => t.id === viewingItem.id) 
-                ? 'Complete information about the teacher and their login credentials.'
-                : 'Complete information about the bursar and their login credentials.')}
+                ? 'Login credentials for teacher access.'
+                : 'Login credentials for bursar access.')}
             </DialogDescription>
           </DialogHeader>
           {viewingItem && (
             <div className="space-y-6">
-              {/* Staff Information */}
-              <div className={`p-4 rounded-lg ${teachers.find(t => t.id === viewingItem.id) ? 'bg-blue-50' : 'bg-green-50'}`}>
-                <h3 className={`font-semibold text-lg mb-3 ${teachers.find(t => t.id === viewingItem.id) ? 'text-blue-800' : 'text-green-800'}`}>
-                  {teachers.find(t => t.id === viewingItem.id) ? 'Teacher Information' : 'Bursar Information'}
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <span className="font-medium text-gray-700">Full Name:</span>
-                    <p className="text-gray-900">{viewingItem.name}</p>
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-700">Email:</span>
-                    <p className="text-gray-900">{viewingItem.email}</p>
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-700">Phone:</span>
-                    <p className="text-gray-900">{viewingItem.phone || 'N/A'}</p>
-                  </div>
-                  {teachers.find(t => t.id === viewingItem.id) && (
-                    <>
-                      <div>
-                        <span className="font-medium text-gray-700">Employee ID:</span>
-                        <p className="text-gray-900">{viewingItem.employeeId || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <span className="font-medium text-gray-700">Qualification:</span>
-                        <p className="text-gray-900">{viewingItem.qualification || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <span className="font-medium text-gray-700">Date Joined:</span>
-                        <p className="text-gray-900">{viewingItem.dateJoined ? new Date(viewingItem.dateJoined).toLocaleDateString() : 'N/A'}</p>
-                      </div>
-                      <div>
-                        <span className="font-medium text-gray-700">Assigned Class:</span>
-                        <p className="text-gray-900">{viewingItem.assignedClass || 'N/A'}</p>
-                      </div>
-                    </>
-                  )}
-                  <div>
-                    <span className="font-medium text-gray-700">Status:</span>
-                    <p className="text-gray-900">{viewingItem.status || 'Active'}</p>
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-700">Role:</span>
-                    <p className="text-gray-900 capitalize">{teachers.find(t => t.id === viewingItem.id) ? 'Teacher' : 'Bursar'}</p>
-                  </div>
-                </div>
-                {viewingItem.academicYear && teachers.find(t => t.id === viewingItem.id) && (
-                  <div className="mt-4">
-                    <span className="font-medium text-gray-700">Academic Year:</span>
-                    <p className="text-gray-900">{viewingItem.academicYear}</p>
-                  </div>
-                )}
-              </div>
+              {/* Removed staff information sections for both teachers and bursars - show only login credentials */}
 
               {/* Login Credentials */}
               <div className="bg-yellow-50 p-4 rounded-lg">
@@ -773,19 +720,7 @@ export default function StaffSection({ schoolCode, colorTheme, toast }: any) {
                 </div>
               </div>
 
-              {/* Additional Info for Bursars */}
-              {!teachers.find(t => t.id === viewingItem.id) && (
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h3 className="font-semibold text-lg mb-3 text-gray-800">Bursar Responsibilities</h3>
-                  <ul className="text-sm text-gray-700 space-y-1">
-                    <li>• Manage student fee payments and collections</li>
-                    <li>• Generate and print payment receipts</li>
-                    <li>• Track outstanding balances and payment history</li>
-                    <li>• Process cash, check, and mobile money payments</li>
-                    <li>• Generate financial reports for school administration</li>
-                  </ul>
-                </div>
-              )}
+              {/* Removed additional info sections for consistency - only showing login credentials */}
             </div>
           )}
           <div className="flex justify-end mt-6">

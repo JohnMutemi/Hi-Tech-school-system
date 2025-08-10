@@ -2,6 +2,7 @@
 
 import { useParentDashboard } from "@/components/parent-dashboard/useParentDashboard";
 import { ParentSidebar } from "@/components/parent-dashboard/ParentSidebar";
+import StickyHeader from "@/components/parent-dashboard/StickyHeader";
 import OverviewSection from "@/components/parent-dashboard/OverviewSection";
 import ChildrenSection from "@/components/parent-dashboard/ChildrenSection";
 import FeesManagement from "@/components/parent-dashboard/FeesManagement";
@@ -46,11 +47,20 @@ export default function ParentDashboard({ schoolCode, parentId }: { schoolCode: 
   };
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-b from-cyan-900 via-cyan-800 to-blue-900">
+    <div className="flex min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 relative">
+      {/* Background Pattern */}
+      <div className="absolute inset-0 opacity-5">
+        <div className="absolute inset-0" style={{
+          backgroundImage: `radial-gradient(circle at 25% 25%, #6366f1 0%, transparent 50%), 
+                           radial-gradient(circle at 75% 75%, #8b5cf6 0%, transparent 50%)`,
+          backgroundSize: '400px 400px'
+        }}></div>
+      </div>
+      
       <ParentSidebar
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        colorTheme="#0891b2"
+        colorTheme="#6366f1"
         onLogout={handleLogout}
         parent={parent}
         onAvatarChange={handleAvatarChange}
@@ -58,16 +68,36 @@ export default function ParentDashboard({ schoolCode, parentId }: { schoolCode: 
         avatarError={avatarError}
         avatarUrl={avatarUrl}
       />
-      <div className="flex-1 flex flex-col min-h-screen pl-0 lg:pl-28 xl:pl-40 2xl:pl-56 bg-cyan-50/60">
-        {/* Main Header */}
-        <header className="w-full px-4 sm:px-8 pt-8 pb-4 flex flex-col sm:flex-row items-start sm:items-center gap-2">
-          <div className="flex flex-col">
-            <span className="text-cyan-600 text-xl font-semibold">{parent?.schoolName || parent?.parentName || ''}</span>
-          </div>
-        </header>
-        <div className="flex flex-1 items-center justify-center">
-          <main className="w-full max-w-7xl mx-auto bg-white rounded-3xl shadow-2xl border-8 border-white p-10 sm:p-14 lg:p-16 pt-16 flex flex-col justify-center" style={{minHeight: '75vh'}}>
-            {renderContent()}
+      
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col h-screen lg:ml-64 relative overflow-y-auto">
+        {/* Sticky Header Component */}
+        <StickyHeader parent={parent} />
+
+        {/* Main Content with Glass Effect */}
+        <div className="flex-1 p-4 lg:p-8 space-y-6">
+          <main className="w-full max-w-7xl mx-auto">
+            {/* Glass Container */}
+            <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl shadow-2xl p-6 lg:p-10 min-h-[calc(100vh-200px)] relative z-10">
+              {/* Content Header */}
+              <div className="mb-8 pb-6 border-b border-white/10">
+                <div className="flex items-center gap-3">
+                  <div className="w-1 h-8 bg-gradient-to-b from-indigo-400 to-purple-400 rounded-full"></div>
+                  <h2 className="text-white text-xl lg:text-2xl font-semibold capitalize">
+                    {activeTab === 'fees' ? 'Fee Management' : 
+                     activeTab === 'children' ? 'My Children' :
+                     activeTab === 'performance' ? 'Academic Performance' :
+                     activeTab === 'settings' ? 'Account Settings' :
+                     'Dashboard Overview'}
+                  </h2>
+                </div>
+              </div>
+              
+              {/* Content Area with Enhanced Styling */}
+              <div className="text-slate-100">
+                {renderContent()}
+              </div>
+            </div>
           </main>
         </div>
       </div>
