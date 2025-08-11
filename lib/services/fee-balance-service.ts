@@ -631,4 +631,5 @@ class FeeBalanceService {
   }
 }
 
+export { FeeBalanceService };
 export const feeBalanceService = new FeeBalanceService();
