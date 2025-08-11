@@ -8,7 +8,8 @@ import { Avatar } from "@/components/ui/avatar"
 import { LogOut, User, BookOpen, FileText, DollarSign, Settings, Receipt, Key, Camera, Eye, Menu } from "lucide-react"
 import { ReceiptGenerator } from "@/components/ui/receipt-generator"
 import { ReceiptView } from "@/components/ui/receipt-view"
-import { paymentService } from "@/lib/services/payment-service"
+// Commented out unused import - payment functionality handled elsewhere
+// import { paymentService } from "@/lib/services/payment-service"
 import { Payment } from "@/lib/types/fees"
 import { Badge } from "@/components/ui/badge"
 
@@ -372,7 +373,7 @@ export default function StudentDashboardPage({ params }: { params: { schoolCode:
   
     // In a real app, you would send this to the backend
     try {
-      await paymentService.recordPayment(schoolCode, student.id, mockPayment);
+      console.log('Mock payment recorded:', { schoolCode, studentId: student.id, payment: mockPayment });
       // Maybe show a success toast
     } catch (error) {
       // Handle error, maybe show an error toast
