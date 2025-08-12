@@ -623,29 +623,7 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
           </div>
         );
 
-      case 'history':
-        return (
-          <div className="space-y-8">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">Payment History</h2>
-                <p className="text-gray-600">Complete payment transaction records</p>
-              </div>
-            </div>
-            <Card className="bg-white shadow-sm border-gray-200">
-              <CardContent className="p-8 text-center">
-                <div className="w-16 h-16 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <History className="w-8 h-8 text-white" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Payment History</h3>
-                <p className="text-gray-600 mb-4">View detailed payment history for each student from Student Management section</p>
-                <Button onClick={() => setActiveTab('students')} variant="outline">
-                  Go to Student Management
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        );
+
 
       case 'students':
       default:
@@ -955,7 +933,6 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
                 {activeTab === 'receipts' && 'Receipts & Records'}
                 {activeTab === 'reports' && 'Financial Reports'}
                 {activeTab === 'analytics' && 'Payment Analytics'}
-                {activeTab === 'history' && 'Payment History'}
               </h1>
               <p className="text-gray-600 text-sm mt-1">
                 {schoolInfo?.name || 'Financial Management System'}

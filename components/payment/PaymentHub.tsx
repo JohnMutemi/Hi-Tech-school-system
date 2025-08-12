@@ -5,25 +5,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
   CreditCard,
   Phone,
   Receipt,
-  Download,
-  History,
   Calculator,
   CheckCircle,
-  AlertCircle,
   Loader2,
   DollarSign,
-  Calendar,
-  User,
-  School,
-  ArrowRight,
-  ArrowLeft,
 } from "lucide-react";
 import ReceiptComponent from "./ReceiptComponent";
 
@@ -87,24 +78,12 @@ interface BalanceData {
   }[];
 }
 
-interface PaymentHistoryItem {
-  id: string;
-  receiptNumber: string;
-  amount: number;
-  paymentDate: Date;
-  paymentMethod: string;
-  term: string;
-  academicYear: string;
-  status: string;
-  reference: string;
-}
+
 
 export default function PaymentHub({ studentId, schoolCode, onPaymentComplete, initialSelectedTerm, initialAmount, initialAcademicYear }: PaymentHubProps) {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("payment");
   const [isLoading, setIsLoading] = useState(false);
   const [balanceData, setBalanceData] = useState<BalanceData | null>(null);
-  const [paymentHistory, setPaymentHistory] = useState<PaymentHistoryItem[]>([]);
   const [showReceipt, setShowReceipt] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<ReceiptData | null>(null);
   const [paymentState, setPaymentState] = useState({
@@ -119,7 +98,6 @@ export default function PaymentHub({ studentId, schoolCode, onPaymentComplete, i
   // Fetch initial data
   useEffect(() => {
     fetchBalanceData();
-    fetchPaymentHistory();
   }, [studentId, schoolCode]);
 
   // Apply initial selections from parent
@@ -180,18 +158,7 @@ export default function PaymentHub({ studentId, schoolCode, onPaymentComplete, i
     }
   };
 
-  const fetchPaymentHistory = async () => {
-    try {
-      const response = await fetch(`/api/schools/${schoolCode}/students/${studentId}/payment-history`);
-      if (response.ok) {
-        const data = await response.json();
-        const items = Array.isArray(data) ? data : (data?.payments || []);
-        setPaymentHistory(items);
-      }
-    } catch (error) {
-      console.error("Error fetching payment history:", error);
-    }
-  };
+
 
   const handlePaymentMethodChange = (method: "mpesa" | "manual") => {
     setPaymentState(prev => ({ ...prev, paymentMethod: method }));
@@ -202,92 +169,7 @@ export default function PaymentHub({ studentId, schoolCode, onPaymentComplete, i
     setPaymentState(prev => ({ ...prev, paymentAmount: numAmount }));
   };
 
-  const convertPaymentToReceipt = async (payment: PaymentHistoryItem): Promise<ReceiptData> => {
-    // Fetch additional details if needed
-    let schoolName = "";
-    let parentName = "";
-    let admissionNumber = "";
-    let studentName = "";
-    let termOutstandingBefore = 0;
-    let termOutstandingAfter = 0;
-    let academicYearOutstandingBefore = 0;
-    let academicYearOutstandingAfter = 0;
-    let carryForward = 0;
-    
-    try {
-      // Get student details
-      const studentResponse = await fetch(`/api/schools/${schoolCode}/students/${studentId}`);
-      if (studentResponse.ok) {
-        const studentData = await studentResponse.json();
-        studentName = studentData.user?.name || studentData.name || "N/A";
-        admissionNumber = studentData.admissionNumber || "N/A";
-        parentName = studentData.parentName || studentData.user?.name || "Parent/Guardian";
-      }
 
-      // Get school details
-      const schoolResponse = await fetch(`/api/schools/${schoolCode}`);
-      if (schoolResponse.ok) {
-        const schoolData = await schoolResponse.json();
-        schoolName = schoolData.name || "School";
-      }
-
-      // Try to get receipt details with balance information
-      const receiptResponse = await fetch(`/api/schools/${schoolCode}/payments/${payment.id}/receipt`);
-      if (receiptResponse.ok) {
-        const receiptData = await receiptResponse.json();
-        termOutstandingBefore = receiptData.termOutstandingBefore || 0;
-        termOutstandingAfter = receiptData.termOutstandingAfter || 0;
-        academicYearOutstandingBefore = receiptData.academicYearOutstandingBefore || 0;
-        academicYearOutstandingAfter = receiptData.academicYearOutstandingAfter || 0;
-        carryForward = receiptData.carryForwardAmount || 0;
-      }
-    } catch (error) {
-      console.error("Error fetching additional details:", error);
-    }
-
-    return {
-      receiptNumber: payment.receiptNumber,
-      paymentId: payment.id,
-      studentId: studentId,
-      schoolCode: schoolCode,
-      amount: payment.amount,
-      paymentMethod: payment.paymentMethod,
-      feeType: "School Fees",
-      term: payment.term,
-      academicYear: payment.academicYear,
-      reference: payment.reference,
-      phoneNumber: (payment as any).phoneNumber,
-      transactionId: (payment as any).transactionId,
-      status: payment.status,
-      issuedAt: payment.paymentDate,
-      issuedBy: "School Portal",
-      schoolName: schoolName,
-      studentName: studentName,
-      admissionNumber: admissionNumber,
-      parentName: parentName,
-      currency: "KES",
-      termOutstandingBefore: termOutstandingBefore,
-      termOutstandingAfter: termOutstandingAfter,
-      academicYearOutstandingBefore: academicYearOutstandingBefore,
-      academicYearOutstandingAfter: academicYearOutstandingAfter,
-      carryForward: carryForward,
-    };
-  };
-
-  const handleViewReceipt = async (payment: PaymentHistoryItem) => {
-    try {
-      const receiptData = await convertPaymentToReceipt(payment);
-      setSelectedReceipt(receiptData);
-      setShowReceipt(true);
-    } catch (error) {
-      console.error("Error preparing receipt:", error);
-      toast({
-        title: "Error",
-        description: "Failed to prepare receipt for download",
-        variant: "destructive",
-      });
-    }
-  };
 
   const handlePhoneNumberChange = (phone: string) => {
     setPaymentState(prev => ({ ...prev, phoneNumber: phone }));
@@ -408,15 +290,11 @@ export default function PaymentHub({ studentId, schoolCode, onPaymentComplete, i
 
         // Refresh data
         await fetchBalanceData();
-        await fetchPaymentHistory();
 
         // Call completion callback
         if (onPaymentComplete) {
           onPaymentComplete(receipt);
         }
-
-        // Switch to history tab
-        setActiveTab("history");
       } else {
         const error = await response.json();
         throw new Error(error.message || "Payment failed");
@@ -561,63 +439,7 @@ export default function PaymentHub({ studentId, schoolCode, onPaymentComplete, i
     </div>
   );
 
-  const renderPaymentHistory = () => (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold flex items-center gap-2">
-          <History className="w-5 h-5" />
-          Payment History
-        </h3>
-        <Badge variant="secondary">
-          {paymentHistory.length} payments
-        </Badge>
-      </div>
 
-      {paymentHistory.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-8">
-            <Receipt className="w-12 h-12 text-gray-300 mb-4" />
-            <p className="text-gray-500">No payment history found</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-3">
-          {paymentHistory.map((payment) => (
-            <Card key={payment.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="font-semibold">
-                        KES {payment.amount.toLocaleString()}
-                      </span>
-                      <Badge variant={payment.status === "completed" ? "default" : "secondary"}>
-                        {payment.status}
-                      </Badge>
-                    </div>
-                    <div className="text-sm text-gray-600 space-y-1">
-                      <div>Receipt: {payment.receiptNumber}</div>
-                      <div>Term: {payment.term} • Year: {payment.academicYear}</div>
-                      <div>Method: {payment.paymentMethod}</div>
-                      <div>Date: {new Date(payment.paymentDate).toLocaleDateString()}</div>
-                    </div>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleViewReceipt(payment)}
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Receipt
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-    </div>
-  );
 
   if (isLoading) {
     return (
@@ -632,26 +454,7 @@ export default function PaymentHub({ studentId, schoolCode, onPaymentComplete, i
 
   return (
     <div className="space-y-6">
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="payment" className="flex items-center gap-2">
-            <CreditCard className="w-4 h-4" />
-            Make Payment
-          </TabsTrigger>
-          <TabsTrigger value="history" className="flex items-center gap-2">
-            <History className="w-4 h-4" />
-            Payment History
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="payment" className="space-y-6">
-          {renderPaymentForm()}
-        </TabsContent>
-
-        <TabsContent value="history" className="space-y-6">
-          {renderPaymentHistory()}
-        </TabsContent>
-      </Tabs>
+      {renderPaymentForm()}
 
       {/* Receipt Modal */}
       {showReceipt && selectedReceipt && (

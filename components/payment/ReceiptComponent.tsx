@@ -48,7 +48,7 @@ const paperSizes = {
   A5: { width: 148, height: 210 }
 };
 
-export default function ReceiptComponent({ receiptData, onClose }: ReceiptComponentProps) {
+function ReceiptComponent({ receiptData, onClose }: ReceiptComponentProps) {
   const receiptRef = useRef<HTMLDivElement>(null);
 
   const generatePDF = async (format: 'A3' | 'A4' | 'A5') => {
@@ -397,3 +397,4 @@ export default function ReceiptComponent({ receiptData, onClose }: ReceiptCompon
   );
 }
 
+export default ReceiptComponent;

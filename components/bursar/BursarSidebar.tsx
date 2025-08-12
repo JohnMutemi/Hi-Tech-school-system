@@ -10,7 +10,6 @@ import {
   CreditCard,
   Menu,
   School,
-  History,
   PieChart,
   AlertCircle,
   CheckCircle2
@@ -62,12 +61,6 @@ const NAV_ITEMS = [
     label: "Payment Analytics", 
     icon: PieChart,
     description: "Payment trends and insights"
-  },
-  { 
-    id: "history", 
-    label: "Payment History", 
-    icon: History,
-    description: "Complete payment records"
   },
 ];
 

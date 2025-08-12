@@ -45,7 +45,7 @@ export function BursarReceiptModal({ isOpen, onClose, receiptData }: BursarRecei
   if (!receiptData) return null;
 
   const formatCurrency = (amount: number) => {
-    return `${receiptData.currency} ${amount.toLocaleString()}`;
+    return `${receiptData.currency || 'KES'} ${amount ? amount.toLocaleString() : '0'}`;
   };
 
   const formatDate = (date: Date) => {
@@ -155,26 +155,26 @@ export function BursarReceiptModal({ isOpen, onClose, receiptData }: BursarRecei
 PAYMENT RECEIPT
 ===============================================
 
-Receipt Number: ${receiptData.receiptNumber}
-Payment ID: ${receiptData.paymentId}
-Date: ${formatDate(receiptData.issuedAt)}
+Receipt Number: ${receiptData.receiptNumber || 'N/A'}
+Payment ID: ${receiptData.paymentId || 'N/A'}
+Date: ${receiptData.issuedAt ? formatDate(receiptData.issuedAt) : new Date().toLocaleDateString()}
 
 SCHOOL INFORMATION:
-School: ${receiptData.schoolName}
-School Code: ${receiptData.schoolCode}
+School: ${receiptData.schoolName || 'School Name'}
+School Code: ${receiptData.schoolCode || 'N/A'}
 
 STUDENT INFORMATION:
-Student Name: ${receiptData.studentName}
-Admission Number: ${receiptData.admissionNumber}
+Student Name: ${receiptData.studentName || 'N/A'}
+Admission Number: ${receiptData.admissionNumber || 'N/A'}
 ${receiptData.parentName ? `Parent Name: ${receiptData.parentName}` : ''}
 
 PAYMENT DETAILS:
 Amount: ${formatCurrency(receiptData.amount)}
-Payment Method: ${receiptData.paymentMethod.toUpperCase()}
-Fee Type: ${receiptData.feeType}
-Term: ${receiptData.term}
-Academic Year: ${receiptData.academicYear}
-Reference: ${receiptData.reference}
+Payment Method: ${receiptData.paymentMethod ? receiptData.paymentMethod.toUpperCase() : 'N/A'}
+Fee Type: ${receiptData.feeType || 'School Fee'}
+Term: ${receiptData.term || 'N/A'}
+Academic Year: ${receiptData.academicYear || 'N/A'}
+Reference: ${receiptData.reference || 'N/A'}
 ${receiptData.phoneNumber ? `Phone Number: ${receiptData.phoneNumber}` : ''}
 ${receiptData.transactionId ? `Transaction ID: ${receiptData.transactionId}` : ''}
 
@@ -189,8 +189,8 @@ ${receiptData.academicYearOutstandingAfter !== undefined ?
   `Academic Year Outstanding (After): ${formatCurrency(receiptData.academicYearOutstandingAfter)}` : ''}
 ${receiptData.carryForward ? `Carry Forward: ${formatCurrency(receiptData.carryForward)}` : ''}
 
-Status: ${receiptData.status.toUpperCase()}
-Issued by: ${receiptData.issuedBy}
+Status: ${receiptData.status ? receiptData.status.toUpperCase() : 'PENDING'}
+Issued by: ${receiptData.issuedBy || 'Bursar Office'}
 
 ===============================================
 This is a computer-generated receipt.
@@ -270,8 +270,8 @@ Receipt processed by Bursar Portal.
             {/* Receipt Header */}
             <div className="text-center border-b-2 border-gray-200 pb-6 mb-6">
               <h1 className="text-2xl font-bold text-gray-800 mb-2">PAYMENT RECEIPT</h1>
-              <div className="text-lg font-semibold text-blue-600">{receiptData.schoolName}</div>
-              <div className="text-sm text-gray-600 mt-1">School Code: {receiptData.schoolCode}</div>
+              <div className="text-lg font-semibold text-blue-600">{receiptData.schoolName || 'School Name'}</div>
+              <div className="text-sm text-gray-600 mt-1">School Code: {receiptData.schoolCode || 'N/A'}</div>
             </div>
 
             {/* Receipt Info */}
@@ -279,16 +279,16 @@ Receipt processed by Bursar Portal.
               <div>
                 <h3 className="font-semibold text-gray-700 mb-2 border-b border-gray-200 pb-1">Receipt Information</h3>
                 <div className="space-y-1 text-sm">
-                  <div><span className="font-medium">Receipt Number:</span> {receiptData.receiptNumber}</div>
-                  <div><span className="font-medium">Payment ID:</span> {receiptData.paymentId}</div>
-                  <div><span className="font-medium">Date & Time:</span> {formatDate(receiptData.issuedAt)}</div>
+                  <div><span className="font-medium">Receipt Number:</span> {receiptData.receiptNumber || 'N/A'}</div>
+                  <div><span className="font-medium">Payment ID:</span> {receiptData.paymentId || 'N/A'}</div>
+                  <div><span className="font-medium">Date & Time:</span> {receiptData.issuedAt ? formatDate(receiptData.issuedAt) : new Date().toLocaleDateString()}</div>
                   <div><span className="font-medium">Status:</span> 
                     <span className={`ml-1 px-2 py-1 rounded text-xs font-medium ${
-                      receiptData.status.toLowerCase() === 'completed' || receiptData.status.toLowerCase() === 'successful'
+                      receiptData.status && (receiptData.status.toLowerCase() === 'completed' || receiptData.status.toLowerCase() === 'successful')
                         ? 'bg-green-100 text-green-800'
                         : 'bg-yellow-100 text-yellow-800'
                     }`}>
-                      {receiptData.status.toUpperCase()}
+                      {receiptData.status ? receiptData.status.toUpperCase() : 'PENDING'}
                     </span>
                   </div>
                 </div>
@@ -297,8 +297,8 @@ Receipt processed by Bursar Portal.
               <div>
                 <h3 className="font-semibold text-gray-700 mb-2 border-b border-gray-200 pb-1">Student Information</h3>
                 <div className="space-y-1 text-sm">
-                  <div><span className="font-medium">Student Name:</span> {receiptData.studentName}</div>
-                  <div><span className="font-medium">Admission Number:</span> {receiptData.admissionNumber}</div>
+                  <div><span className="font-medium">Student Name:</span> {receiptData.studentName || 'N/A'}</div>
+                  <div><span className="font-medium">Admission Number:</span> {receiptData.admissionNumber || 'N/A'}</div>
                   {receiptData.parentName && (
                     <div><span className="font-medium">Parent Name:</span> {receiptData.parentName}</div>
                   )}
@@ -314,13 +314,13 @@ Receipt processed by Bursar Portal.
                   <div className="mb-2"><span className="font-medium">Amount Paid:</span> 
                     <span className="text-lg font-bold text-green-600 ml-2">{formatCurrency(receiptData.amount)}</span>
                   </div>
-                  <div className="mb-2"><span className="font-medium">Payment Method:</span> {receiptData.paymentMethod.toUpperCase()}</div>
-                  <div className="mb-2"><span className="font-medium">Fee Type:</span> {receiptData.feeType}</div>
+                  <div className="mb-2"><span className="font-medium">Payment Method:</span> {receiptData.paymentMethod ? receiptData.paymentMethod.toUpperCase() : 'N/A'}</div>
+                  <div className="mb-2"><span className="font-medium">Fee Type:</span> {receiptData.feeType || 'School Fee'}</div>
                 </div>
                 <div>
-                  <div className="mb-2"><span className="font-medium">Term:</span> {receiptData.term}</div>
-                  <div className="mb-2"><span className="font-medium">Academic Year:</span> {receiptData.academicYear}</div>
-                  <div className="mb-2"><span className="font-medium">Reference:</span> {receiptData.reference}</div>
+                  <div className="mb-2"><span className="font-medium">Term:</span> {receiptData.term || 'N/A'}</div>
+                  <div className="mb-2"><span className="font-medium">Academic Year:</span> {receiptData.academicYear || 'N/A'}</div>
+                  <div className="mb-2"><span className="font-medium">Reference:</span> {receiptData.reference || 'N/A'}</div>
                 </div>
               </div>
 
@@ -381,7 +381,7 @@ Receipt processed by Bursar Portal.
             {/* Footer */}
             <div className="border-t-2 border-gray-200 pt-4 mt-6">
               <div className="text-center text-sm text-gray-600">
-                <div className="mb-1">Issued by: <span className="font-medium">{receiptData.issuedBy}</span></div>
+                <div className="mb-1">Issued by: <span className="font-medium">{receiptData.issuedBy || 'Bursar Office'}</span></div>
                 <div className="mb-1">Processed through: <span className="font-medium">Bursar Portal</span></div>
                 <div className="text-xs italic">This is a computer-generated receipt and does not require a signature.</div>
               </div>

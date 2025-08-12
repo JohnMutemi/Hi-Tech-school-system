@@ -3,7 +3,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { DollarSign, CreditCard, History, Download, Receipt, Calendar, BookOpen, AlertCircle, RefreshCw, CheckCircle } from "lucide-react";
+import { DollarSign, CreditCard, Download, Receipt, Calendar, BookOpen, AlertCircle, RefreshCw, CheckCircle } from "lucide-react";
 import PaymentHub from "@/components/payment/PaymentHub";
 
 interface FeesManagementProps {
@@ -148,7 +148,7 @@ export default function FeesManagement({ students, schoolCode, selectedId, setSe
                   {/* Fee Management Tabs */}
                   <div className="p-6">
                     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                      <TabsList className="grid w-full grid-cols-3">
+                      <TabsList className="grid w-full grid-cols-2">
                         <TabsTrigger value="fees" className="flex items-center gap-2">
                           <BookOpen className="w-4 h-4" />
                           Termly Fees
@@ -156,10 +156,6 @@ export default function FeesManagement({ students, schoolCode, selectedId, setSe
                         <TabsTrigger value="payment" className="flex items-center gap-2">
                           <CreditCard className="w-4 h-4" />
                           Make Payment
-                        </TabsTrigger>
-                        <TabsTrigger value="history" className="flex items-center gap-2">
-                          <History className="w-4 h-4" />
-                          Payment History
                         </TabsTrigger>
                       </TabsList>
 
@@ -334,7 +330,7 @@ export default function FeesManagement({ students, schoolCode, selectedId, setSe
                           />
                         ) : (
                           <div className="text-center py-8">
-                            <CreditCard className="w-16 h-16 text-slate-400 mx-auto mb-4" />
+                            < CreditCard className="w-16 h-16 text-slate-400 mx-auto mb-4" />
                             <h3 className="text-lg font-semibold text-white mb-2">Ready to Make Payment?</h3>
                             <p className="text-slate-300 mb-4">Select a term from the "Termly Fees" tab and click "Pay Now" to proceed with payment.</p>
                             <Button onClick={() => setShowPaymentHub(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg">
@@ -345,15 +341,7 @@ export default function FeesManagement({ students, schoolCode, selectedId, setSe
                         )}
                       </TabsContent>
 
-                      <TabsContent value="history" className="mt-4">
-                        <PaymentHub
-                          studentId={selectedStudent.id}
-                          schoolCode={schoolCode}
-                          onPaymentComplete={(receipt) => {
-                            console.log("Payment completed:", receipt);
-                          }}
-                        />
-                      </TabsContent>
+
                     </Tabs>
                   </div>
                 </div>

@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { History, Download, Receipt, Loader2, Calendar, DollarSign } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import ReceiptComponent from '@/components/payment/ReceiptComponent';
+import { BursarReceiptModal } from '@/components/bursar/BursarReceiptModal';
 
 interface PaymentHistoryItem {
   id: string;
@@ -300,9 +300,9 @@ export function PaymentHistoryModal({
                             variant="outline"
                             size="sm"
                             onClick={() => handleViewReceipt(payment)}
-                            className="flex items-center gap-1"
+                            className="flex items-center gap-2 min-w-[100px] bg-white hover:bg-green-50 border-green-200 text-green-700 hover:text-green-800 shadow-sm hover:shadow-md transition-all duration-200"
                           >
-                            <Download className="w-3 h-3" />
+                            <Download className="w-4 h-4" />
                             Receipt
                           </Button>
                         </TableCell>
@@ -317,15 +317,14 @@ export function PaymentHistoryModal({
       </Dialog>
 
       {/* Receipt Modal */}
-      {showReceipt && selectedReceipt && (
-        <ReceiptComponent
-          receiptData={selectedReceipt}
-          onClose={() => {
-            setShowReceipt(false);
-            setSelectedReceipt(null);
-          }}
-        />
-      )}
+      <BursarReceiptModal
+        isOpen={showReceipt}
+        onClose={() => {
+          setShowReceipt(false);
+          setSelectedReceipt(null);
+        }}
+        receiptData={selectedReceipt}
+      />
     </>
   );
 }
