@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import { feeBalanceService } from './fee-balance-service'
+import { EmailService } from './email-service'
 
 const prisma = new PrismaClient()
 
@@ -80,6 +81,19 @@ class PaymentService {
         `${feeType} payment`,
         transactionId
       )
+
+      // Send email notification if parent email exists
+      try {
+        const emailService = new EmailService();
+        await emailService.sendPaymentNotificationForPayment(
+          result.payment.id,
+          schoolCode
+        );
+        console.log('Email notification sent for payment:', result.payment.id);
+      } catch (emailError) {
+        console.error('Email notification failed:', emailError);
+        // Don't fail the payment if email fails
+      }
 
       return {
         success: true,

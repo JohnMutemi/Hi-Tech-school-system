@@ -36,6 +36,7 @@ model School {
   subjects                     Subject[]
   termlyFees                   TermlyFeeStructure[]
   users                        User[]
+  emailNotificationConfig      EmailNotificationConfig?
 }
 
 model User {
@@ -168,6 +169,7 @@ model Payment {
   student         Student      @relation(fields: [studentId], references: [id])
   term            Term         @relation(fields: [termId], references: [id])
   receipt         Receipt?
+  notificationLogs PaymentNotificationLog[]
 }
 
 model Receipt {
@@ -554,4 +556,39 @@ model Alumni {
   @@unique([studentId, graduationYear])
   @@index([schoolId, graduationYear])
   @@index([graduationYear, finalGrade])
+}
+
+model EmailNotificationConfig {
+  id                         String   @id @default(uuid())
+  schoolId                   String   @unique
+  isEnabled                  Boolean  @default(true)
+  emailProvider              String   // 'sendgrid', 'aws_ses', 'smtp', 'gmail'
+  configuration              Json     // Provider-specific configuration
+  fromEmail                  String
+  fromName                   String
+  paymentConfirmationEnabled Boolean  @default(true)
+  receiptAttachmentEnabled   Boolean  @default(true)
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+  school                     School   @relation(fields: [schoolId], references: [id])
+
+  @@index([schoolId])
+}
+
+model PaymentNotificationLog {
+  id             String    @id @default(uuid())
+  paymentId      String
+  recipientEmail String
+  emailType      String    // 'payment_confirmation', etc.
+  status         String    // 'sent', 'failed', 'pending'
+  sentAt         DateTime?
+  errorMessage   String?
+  retryCount     Int       @default(0)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  payment        Payment   @relation(fields: [paymentId], references: [id])
+
+  @@index([paymentId])
+  @@index([recipientEmail, emailType])
+  @@index([status, createdAt])
 }

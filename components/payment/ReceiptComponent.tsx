@@ -145,18 +145,28 @@ function ReceiptComponent({ receiptData, onClose }: ReceiptComponentProps) {
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return `${receiptData.currency} ${amount.toLocaleString()}`;
+  const formatCurrency = (amount: number | null | undefined) => {
+    if (amount === null || amount === undefined || isNaN(amount)) {
+      return `${receiptData.currency || 'KES'} 0`;
+    }
+    return `${receiptData.currency || 'KES'} ${amount.toLocaleString()}`;
   };
 
-  const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+  const formatDate = (date: Date | null | undefined) => {
+    if (!date) {
+      return 'N/A';
+    }
+    try {
+      return new Date(date).toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      return 'Invalid Date';
+    }
   };
 
   return (

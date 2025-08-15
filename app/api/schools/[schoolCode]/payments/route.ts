@@ -236,6 +236,20 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
       }
     });
 
+    // Send email notification if parent email exists
+    try {
+      const { EmailService } = await import('@/lib/services/email-service');
+      const emailService = new EmailService();
+      await emailService.sendPaymentNotificationForPayment(
+        payment.id,
+        schoolCode
+      );
+      console.log('Email notification sent for payment:', payment.id);
+    } catch (emailError) {
+      console.error('Email notification failed:', emailError);
+      // Don't fail the payment if email fails
+    }
+
     return NextResponse.json({
       message: 'Payment processed successfully',
       payment: {

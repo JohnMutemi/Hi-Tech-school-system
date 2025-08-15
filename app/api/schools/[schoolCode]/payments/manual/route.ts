@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { SMSService } from "@/lib/services/sms-service";
+import { EmailService } from "@/lib/services/email-service";
 
 const prisma = new PrismaClient();
 
@@ -144,6 +145,22 @@ export async function POST(
       }
     }
 
+    // Send email notification if parent email exists
+    let emailResult = null;
+    if (student.parentEmail) {
+      try {
+        const emailService = new EmailService();
+        emailResult = await emailService.sendPaymentNotificationForPayment(
+          payment.id,
+          schoolCode
+        );
+        console.log("Email notification sent:", emailResult);
+      } catch (emailError) {
+        console.error("Email sending failed:", emailError);
+        // Don't fail the payment if email fails
+      }
+    }
+
     // Return success response
     return NextResponse.json({
       success: true,
@@ -167,11 +184,13 @@ export async function POST(
         termOutstandingAfter: receipt.termOutstandingAfter,
       },
       sms: smsResult,
+      email: emailResult,
       student: {
         name: student.user.name,
         admissionNumber: student.admissionNumber,
         parentName: student.parent?.name,
         parentPhone: student.parent?.phone,
+        parentEmail: student.parentEmail,
       },
     });
 

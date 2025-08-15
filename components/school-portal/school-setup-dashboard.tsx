@@ -91,6 +91,7 @@ import { generateTempPassword } from "@/lib/utils/school-generator";
 import { FeeManagement } from "./fee-management";
 import { AcademicCalendarCrud } from "./AcademicCalendarCrud";
 import AdmissionNumberSettings from "./AdmissionNumberSettings";
+import EmailNotificationSettings from "./EmailNotificationSettings";
 import { Sidebar } from "./Sidebar";
 import SchoolProfileSection from "./SchoolProfileSection";
 import StaffSection from "./StaffSection";
@@ -704,6 +705,9 @@ export function SchoolSetupDashboard({
               <TabsContent value="settings" className="space-y-8">
                 <div className="bg-gradient-to-br from-gray-50/90 to-slate-50/90 backdrop-blur-lg rounded-3xl shadow-xl border border-white/20 p-8">
                   <AdmissionNumberSettings schoolCode={schoolData.schoolCode} />
+                </div>
+                <div className="bg-gradient-to-br from-blue-50/90 to-indigo-50/90 backdrop-blur-lg rounded-3xl shadow-xl border border-white/20 p-8">
+                  <EmailNotificationSettings schoolCode={schoolData.schoolCode} colorTheme={schoolData.colorTheme} />
                 </div>
               </TabsContent>
             </Tabs>

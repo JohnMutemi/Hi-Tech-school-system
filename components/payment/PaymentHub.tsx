@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import {
   CreditCard,
@@ -15,8 +16,10 @@ import {
   CheckCircle,
   Loader2,
   DollarSign,
+  History,
 } from "lucide-react";
 import ReceiptComponent from "./ReceiptComponent";
+import PaymentHistory from "./PaymentHistory";
 
 interface PaymentHubProps {
   studentId: string;
@@ -45,7 +48,14 @@ interface ReceiptData {
   issuedBy: string;
   schoolName: string;
   studentName: string;
+  admissionNumber: string;
+  parentName: string;
   currency: string;
+  termOutstandingBefore: number;
+  termOutstandingAfter: number;
+  academicYearOutstandingBefore: number;
+  academicYearOutstandingAfter: number;
+  carryForward?: number;
   paymentBreakdown?: {
     term: string;
     year: string;
@@ -56,10 +66,7 @@ interface ReceiptData {
     status: string;
   }[];
   currentTermBalance?: number;
-  carryForward?: number;
   balance?: number;
-  academicYearOutstandingAfter?: number;
-  termOutstandingAfter?: number;
 }
 
 interface BalanceData {
@@ -266,11 +273,15 @@ export default function PaymentHub({ studentId, schoolCode, onPaymentComplete, i
           issuedBy: "Parent Portal",
           schoolName: responseData.payment?.schoolName || "",
           studentName: responseData.payment?.studentName || "",
+          admissionNumber: responseData.payment?.admissionNumber || "",
+          parentName: responseData.payment?.parentName || "",
           currency: "KES",
-          carryForward: 0, // This would need to be calculated if overpayment logic is implemented
-          balance: responseData.payment?.academicYearOutstandingAfter || 0,
-          academicYearOutstandingAfter: responseData.payment?.academicYearOutstandingAfter || 0,
+          termOutstandingBefore: responseData.payment?.termOutstandingBefore || 0,
           termOutstandingAfter: responseData.payment?.termOutstandingAfter || 0,
+          academicYearOutstandingBefore: responseData.payment?.academicYearOutstandingBefore || 0,
+          academicYearOutstandingAfter: responseData.payment?.academicYearOutstandingAfter || 0,
+          carryForward: responseData.payment?.carryForward || 0,
+          balance: responseData.payment?.academicYearOutstandingAfter || 0,
         };
         
         toast({
@@ -290,6 +301,10 @@ export default function PaymentHub({ studentId, schoolCode, onPaymentComplete, i
 
         // Refresh data
         await fetchBalanceData();
+
+        // Set receipt data for modal display
+        setSelectedReceipt(receipt);
+        setShowReceipt(true);
 
         // Call completion callback
         if (onPaymentComplete) {
@@ -454,7 +469,30 @@ export default function PaymentHub({ studentId, schoolCode, onPaymentComplete, i
 
   return (
     <div className="space-y-6">
-      {renderPaymentForm()}
+      <Tabs defaultValue="payment" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="payment" className="flex items-center gap-2">
+            <CreditCard className="w-4 h-4" />
+            Make Payment
+          </TabsTrigger>
+          <TabsTrigger value="history" className="flex items-center gap-2">
+            <History className="w-4 h-4" />
+            Payment History
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="payment" className="mt-6">
+          {renderPaymentForm()}
+        </TabsContent>
+
+        <TabsContent value="history" className="mt-6">
+          <PaymentHistory
+            studentId={studentId}
+            schoolCode={schoolCode}
+            className=""
+          />
+        </TabsContent>
+      </Tabs>
 
       {/* Receipt Modal */}
       {showReceipt && selectedReceipt && (
