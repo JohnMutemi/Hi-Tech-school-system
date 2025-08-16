@@ -55,8 +55,8 @@ export async function GET(
       )
     }
 
-    // Generate PDF receipt
-    const pdfBuffer = await generateReceiptPDF({
+    // Prepare receipt data for PDF generation
+    const receiptData = {
       receiptNumber: receipt.receiptNumber,
       studentName: receipt.student.user.name,
       studentId: receipt.student.id,
@@ -66,10 +66,29 @@ export async function GET(
       academicYear: receipt.payment?.academicYear?.name || '',
       term: receipt.payment?.term?.name || '',
       schoolName: school.name,
+      schoolCode: school.code,
       balanceBefore: receipt.academicYearOutstandingBefore || 0,
       balanceAfter: receipt.academicYearOutstandingAfter || 0,
-      description: receipt.payment?.description || 'Fee Payment'
-    })
+      description: receipt.payment?.description || 'Fee Payment',
+      admissionNumber: receipt.student.admissionNumber,
+      parentName: receipt.student.parent?.user?.name,
+      currency: 'KES',
+      status: receipt.payment?.status || 'COMPLETED',
+      issuedBy: 'Bursar',
+      reference: receipt.payment?.referenceNumber,
+      phoneNumber: receipt.student.parent?.phone,
+      transactionId: receipt.payment?.transactionId,
+      termOutstandingBefore: receipt.termOutstandingBefore,
+      termOutstandingAfter: receipt.termOutstandingAfter,
+      academicYearOutstandingBefore: receipt.academicYearOutstandingBefore,
+      academicYearOutstandingAfter: receipt.academicYearOutstandingAfter,
+      carryForward: receipt.carryForward
+    }
+
+    console.log('Generating PDF with data:', JSON.stringify(receiptData, null, 2))
+
+    // Generate PDF receipt
+    const pdfBuffer = await generateReceiptPDF(receiptData)
 
     // Return PDF as download
     return new NextResponse(pdfBuffer, {
