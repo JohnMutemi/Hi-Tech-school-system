@@ -610,7 +610,9 @@ const fetchReceipts = async () => {
     const currentStudent =
       students.find((c) => c.id === focusedChildId) || students[0];
 
-    let url = `/api/schools/${schoolCode}/students/${currentStudent.id}/receipts`;
+    // Use base URL for API calls in deployed environment
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || '';
+    let url = `${baseUrl}/api/schools/${schoolCode}/students/${currentStudent.id}/receipts`;
     const params = [];
 
     if (selectedYearId) params.push(`academicYearId=${selectedYearId}`);
@@ -755,6 +757,9 @@ const fetchReceipts = async () => {
     });
   };
 const handleDownloadReceipt = async (receipt: any) => {
+  // Get base URL for deployed environment
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin;
+  
   let studentId = receipt.studentId || receipt.student?.id;
   let studentName = receipt.studentName || receipt.student?.name;
   let admissionNumber =
