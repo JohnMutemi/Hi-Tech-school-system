@@ -279,7 +279,50 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     // Add term closing rows after all transactions
     const allRows = [...transactions, ...termClosingRows].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    return NextResponse.json(allRows);
+    // Calculate summary
+    const totalDebit = allRows.reduce((sum, row) => sum + (parseFloat(row.debit) || 0), 0);
+    const totalCredit = allRows.reduce((sum, row) => sum + (parseFloat(row.credit) || 0), 0);
+    const finalBalance = allRows.length > 0 ? allRows[allRows.length - 1].balance : 0;
+
+    // Get academic year name
+    const academicYear = await prisma.academicYear.findUnique({
+      where: { id: targetAcademicYearId || '' },
+      select: { name: true }
+    });
+
+    // Get student details
+    const studentDetails = await prisma.student.findFirst({
+      where: { id: studentId, schoolId: school.id },
+      include: {
+        user: { select: { name: true } },
+        class: {
+          include: {
+            grade: { select: { name: true } }
+          }
+        },
+        parent: { select: { name: true } }
+      }
+    });
+
+    // Return structured data
+    return NextResponse.json({
+      student: {
+        name: studentDetails?.user?.name || 'Student',
+        admissionNumber: studentDetails?.admissionNumber || 'N/A',
+        gradeName: studentDetails?.class?.grade?.name || 'N/A',
+        className: studentDetails?.class?.name || 'N/A',
+        parentName: studentDetails?.parent?.name || undefined
+      },
+      academicYear: academicYear?.name || 'Academic Year',
+      statement: allRows,
+      summary: {
+        totalDebit,
+        totalCredit,
+        finalBalance,
+        totalPayments: totalCredit,
+        totalCharges: totalDebit
+      }
+    });
   } catch (error) {
     console.error('Error generating fee statement:', error);
     return NextResponse.json({ error: 'Failed to generate fee statement' }, { status: 500 });

@@ -67,7 +67,15 @@ export function EnhancedReceipt({
   showActions = true,
   className = ""
 }: EnhancedReceiptProps) {
+  console.log("🧾 EnhancedReceipt component called with:", { 
+    hasReceiptData: !!receiptData, 
+    showActions, 
+    receiptNumber: receiptData?.receiptNumber 
+  });
+  
   const receiptRef = useRef<HTMLDivElement>(null);
+  
+  console.log("🎨 EnhancedReceipt rendering with showActions:", showActions);
 
   const formatCurrency = (amount: number | null | undefined) => {
     if (amount === null || amount === undefined || isNaN(amount)) {
@@ -544,12 +552,32 @@ Receipt processed by Bursar Portal.
   );
 
   if (!showActions) {
+    console.log("📄 EnhancedReceipt returning ReceiptContent only (no actions)");
     return <ReceiptContent />;
   }
 
+  console.log("🎭 EnhancedReceipt returning full modal with actions");
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+    <div 
+      className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-[9999] backdrop-blur-sm"
+      style={{ pointerEvents: 'auto' }}
+      onClick={(e) => {
+        // Only close if clicking the backdrop (not the modal content)
+        if (e.target === e.currentTarget && onClose) {
+          console.log("🎯 Backdrop clicked - closing modal");
+          onClose();
+        }
+      }}
+    >
+      <div 
+        className="bg-white rounded-xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+        style={{ pointerEvents: 'auto' }}
+        onClick={(e) => {
+          // Prevent clicks inside modal from bubbling to backdrop
+          console.log("🛡️ Modal content clicked - preventing close");
+          e.stopPropagation();
+        }}
+      >
         {/* Action Buttons */}
         <div className="px-6 py-4 border-b bg-gradient-to-r from-gray-50 to-gray-100 flex justify-between items-center">
           <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
@@ -558,7 +586,11 @@ Receipt processed by Bursar Portal.
           </h2>
           <div className="flex gap-2">
             <Button
-              onClick={() => generatePDF('A3')}
+              onClick={(e) => {
+                e.stopPropagation();
+                console.log("🖨️ A3 button clicked!");
+                generatePDF('A3');
+              }}
               variant="outline"
               size="sm"
               className="flex items-center gap-1 text-xs bg-white hover:bg-blue-50 border-blue-200 text-blue-700 hover:text-blue-800"
@@ -567,7 +599,11 @@ Receipt processed by Bursar Portal.
               A3
             </Button>
             <Button
-              onClick={() => generatePDF('A4')}
+              onClick={(e) => {
+                e.stopPropagation();
+                console.log("🖨️ A4 button clicked!");
+                generatePDF('A4');
+              }}
               variant="outline"
               size="sm"
               className="flex items-center gap-1 text-xs bg-white hover:bg-green-50 border-green-200 text-green-700 hover:text-green-800"
@@ -576,7 +612,11 @@ Receipt processed by Bursar Portal.
               A4
             </Button>
             <Button
-              onClick={() => generatePDF('A5')}
+              onClick={(e) => {
+                e.stopPropagation();
+                console.log("🖨️ A5 button clicked!");
+                generatePDF('A5');
+              }}
               variant="outline"
               size="sm"
               className="flex items-center gap-1 text-xs bg-white hover:bg-purple-50 border-purple-200 text-purple-700 hover:text-purple-800"
@@ -585,7 +625,11 @@ Receipt processed by Bursar Portal.
               A5
             </Button>
             <Button
-              onClick={downloadTxtReceipt}
+              onClick={(e) => {
+                e.stopPropagation();
+                console.log("📄 TXT button clicked!");
+                downloadTxtReceipt();
+              }}
               variant="outline"
               size="sm"
               className="flex items-center gap-1 text-xs bg-white hover:bg-gray-50 border-gray-200 text-gray-700 hover:text-gray-800"
@@ -594,7 +638,11 @@ Receipt processed by Bursar Portal.
               TXT
             </Button>
             <Button
-              onClick={handlePrint}
+              onClick={(e) => {
+                e.stopPropagation();
+                console.log("🖨️ Print button clicked!");
+                handlePrint();
+              }}
               variant="outline"
               size="sm"
               className="flex items-center gap-1 text-xs bg-white hover:bg-orange-50 border-orange-200 text-orange-700 hover:text-orange-800"
@@ -604,7 +652,11 @@ Receipt processed by Bursar Portal.
             </Button>
             {onClose && (
               <Button 
-                onClick={onClose} 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  console.log("❌ Close button clicked!");
+                  onClose();
+                }} 
                 variant="ghost" 
                 size="sm" 
                 className="text-xs hover:bg-red-50 hover:text-red-700"
@@ -616,7 +668,10 @@ Receipt processed by Bursar Portal.
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div 
+          className="flex-1 overflow-y-auto p-6"
+          style={{ pointerEvents: 'auto' }}
+        >
           <ReceiptContent />
         </div>
       </div>

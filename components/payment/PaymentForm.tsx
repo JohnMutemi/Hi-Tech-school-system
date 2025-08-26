@@ -157,9 +157,12 @@ export function PaymentForm({
       try {
         setProgressStage("Fetching student information...");
 
+        // Get base URL for deployed environment
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin;
+        
         // Fetch student info
         const studentRes = await fetch(
-          `/api/schools/${schoolCode}/students/${studentId}`
+          `${baseUrl}/api/schools/${schoolCode}/students/${studentId}`
         );
         if (studentRes.ok) {
           const student = await studentRes.json();
@@ -180,7 +183,7 @@ export function PaymentForm({
         setProgressStage("Fetching school information...");
 
         // Fetch school info
-        const schoolRes = await fetch(`/api/schools/${schoolCode}`);
+        const schoolRes = await fetch(`${baseUrl}/api/schools/${schoolCode}`);
         if (schoolRes.ok) {
           const school = await schoolRes.json();
           setSchoolInfo(school);
@@ -316,9 +319,12 @@ export function PaymentForm({
           : "Sending payment to server..."
       );
 
+      // Get base URL for deployed environment
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin;
+      
       // Send payment request with proper academic year and term
       const response = await fetch(
-        `/api/schools/${schoolCode}/students/${studentId}/payments`,
+        `${baseUrl}/api/schools/${schoolCode}/students/${studentId}/payments`,
         {
           method: "POST",
           headers: {

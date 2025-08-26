@@ -17,7 +17,9 @@ export default function OverviewSection(props: any) {
       if (!selectedStudent) return;
       setLoading(true);
       try {
-        const res = await fetch(`/api/schools/${schoolCode}/students/${selectedStudent.id}/fees`);
+        // Get base URL for deployed environment
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin;
+        const res = await fetch(`${baseUrl}/api/schools/${schoolCode}/students/${selectedStudent.id}/fees`);
         const data = await res.json();
         setFeeData(data);
         console.log('OverviewSection feeData', data); // <-- Debug log

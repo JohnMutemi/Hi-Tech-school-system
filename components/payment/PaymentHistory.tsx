@@ -20,9 +20,12 @@ import {
   Eye,
   TrendingUp,
   TrendingDown,
-  DollarSign
+  DollarSign,
+  FileText
 } from "lucide-react";
 import ReceiptComponent from "./ReceiptComponent";
+import { FeesStatementDownload } from "@/components/fees-statement/FeesStatementDownload";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface PaymentRecord {
   id: string;
@@ -72,6 +75,7 @@ export default function PaymentHistory({ studentId, schoolCode, className = "" }
   const [error, setError] = useState("");
   const [selectedReceipt, setSelectedReceipt] = useState<any>(null);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [showFeesStatement, setShowFeesStatement] = useState(false);
 
   // Filter states
   const [searchTerm, setSearchTerm] = useState("");
@@ -101,7 +105,9 @@ export default function PaymentHistory({ studentId, schoolCode, className = "" }
       setLoading(true);
       setError("");
       
-      const response = await fetch(`/api/schools/${schoolCode}/payments?studentId=${studentId}`);
+      // Get base URL for deployed environment
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin;
+      const response = await fetch(`${baseUrl}/api/schools/${schoolCode}/payments?studentId=${studentId}`);
       
       if (!response.ok) {
         throw new Error("Failed to fetch payment history");
@@ -370,6 +376,15 @@ export default function PaymentHistory({ studentId, schoolCode, className = "" }
               Payment History
             </CardTitle>
             <div className="flex items-center gap-2">
+              <Button 
+                onClick={() => setShowFeesStatement(true)} 
+                variant="outline" 
+                size="sm"
+                className="bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700 hover:text-blue-800"
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                Fee Statement
+              </Button>
               <Button onClick={exportPaymentHistory} variant="outline" size="sm">
                 <Download className="w-4 h-4 mr-2" />
                 Export CSV
@@ -500,10 +515,19 @@ export default function PaymentHistory({ studentId, schoolCode, className = "" }
                           onClick={() => handleViewReceipt(payment)}
                           variant="outline"
                           size="sm"
-                          className="flex items-center gap-1"
+                          className="flex items-center gap-1 bg-white hover:bg-green-50 border-green-200 text-green-700 hover:text-green-800"
                         >
                           <Eye className="w-4 h-4" />
-                          View Receipt
+                          Receipt
+                        </Button>
+                        <Button
+                          onClick={() => setShowFeesStatement(true)}
+                          variant="outline"
+                          size="sm"
+                          className="flex items-center gap-1 bg-white hover:bg-blue-50 border-blue-200 text-blue-700 hover:text-blue-800"
+                        >
+                          <FileText className="w-4 h-4" />
+                          Statement
                         </Button>
                       </div>
                     </div>
@@ -525,6 +549,28 @@ export default function PaymentHistory({ studentId, schoolCode, className = "" }
           }}
         />
       )}
+
+      {/* Fees Statement Modal */}
+      <Dialog open={showFeesStatement} onOpenChange={setShowFeesStatement}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              <FileText className="w-6 h-6 text-blue-600" />
+              Fee Statement
+            </DialogTitle>
+          </DialogHeader>
+          <FeesStatementDownload
+            schoolCode={schoolCode}
+            studentId={studentId}
+            studentName={payments[0]?.student?.name || "Student"}
+            admissionNumber={payments[0]?.student?.admissionNumber || "N/A"}
+            gradeName="N/A"
+            className="N/A"
+            parentName={payments[0]?.student?.parentName}
+            isBursar={false}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

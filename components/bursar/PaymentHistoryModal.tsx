@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { History, Download, Receipt, Loader2, Calendar, DollarSign } from 'lucide-react';
+import { History, Download, Receipt, Loader2, Calendar, DollarSign, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { BursarReceiptModal } from '@/components/bursar/BursarReceiptModal';
+import { FeesStatementDownload } from '@/components/fees-statement/FeesStatementDownload';
 
 interface PaymentHistoryItem {
   id: string;
@@ -58,6 +59,7 @@ export function PaymentHistoryModal({
   const [loading, setLoading] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<any>(null);
+  const [showFeesStatement, setShowFeesStatement] = useState(false);
 
   useEffect(() => {
     if (isOpen && student) {
@@ -68,12 +70,22 @@ export function PaymentHistoryModal({
   const fetchPaymentHistory = async () => {
     try {
       setLoading(true);
+      console.log("🔄 Fetching payment history for student:", student.id);
       const response = await fetch(`/api/schools/${schoolCode}/students/${student.id}/payment-history`);
+      console.log("📡 Payment history response status:", response.status);
+      
       if (response.ok) {
         const data = await response.json();
+        console.log("📊 Payment history data received:", data);
+        
         const payments = Array.isArray(data) ? data : (data?.payments || []);
+        console.log("💰 Extracted payments:", payments);
+        console.log("📈 Number of payments found:", payments.length);
+        
         setPaymentHistory(payments);
       } else {
+        const errorData = await response.text();
+        console.error("❌ Payment history fetch failed:", response.status, errorData);
         throw new Error('Failed to fetch payment history');
       }
     } catch (error) {
@@ -157,12 +169,18 @@ export function PaymentHistoryModal({
   };
 
   const handleViewReceipt = async (payment: PaymentHistoryItem) => {
+    console.log("🔍 handleViewReceipt called with payment:", payment);
     try {
+      console.log("📄 Converting payment to receipt data...");
       const receiptData = await convertPaymentToReceipt(payment);
+      console.log("✅ Receipt data prepared:", receiptData);
+      
       setSelectedReceipt(receiptData);
+      console.log("📋 Setting showReceipt to true...");
       setShowReceipt(true);
+      console.log("🎯 Receipt modal should now be visible");
     } catch (error) {
-      console.error("Error preparing receipt:", error);
+      console.error("❌ Error preparing receipt:", error);
       toast({
         title: "Error",
         description: "Failed to prepare receipt for download",
@@ -181,7 +199,18 @@ export function PaymentHistoryModal({
 
   return (
     <>
-      <Dialog open={isOpen} onOpenChange={onClose}>
+      <Dialog 
+        open={isOpen} 
+        onOpenChange={(open) => {
+          // Prevent closing if receipt modal is open
+          if (!open && showReceipt) {
+            console.log("🚫 Preventing PaymentHistoryModal close - receipt is open");
+            return;
+          }
+          console.log("✅ PaymentHistoryModal closing normally");
+          onClose();
+        }}
+      >
         <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto bg-gradient-to-br from-white to-gray-50">
           <DialogHeader className="border-b border-gray-200 pb-4">
             <DialogTitle className="flex items-center gap-3 text-xl">
@@ -244,10 +273,23 @@ export function PaymentHistoryModal({
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold">Payment Records</h3>
-                  <Badge variant="secondary">
-                    {paymentHistory.length} payments
-                  </Badge>
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowFeesStatement(true)}
+                      className="flex items-center gap-2 bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700 hover:text-blue-800"
+                    >
+                      <FileText className="w-4 h-4" />
+                      Fee Statement
+                    </Button>
+                    <Badge variant="secondary">
+                      {paymentHistory.length} payments
+                    </Badge>
+                  </div>
                 </div>
+                
+                {console.log("🎯 About to render payment table with", paymentHistory.length, "payments:", paymentHistory)}
                 
                 <Table>
                   <TableHeader>
@@ -296,15 +338,26 @@ export function PaymentHistoryModal({
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleViewReceipt(payment)}
-                            className="flex items-center gap-2 min-w-[100px] bg-white hover:bg-green-50 border-green-200 text-green-700 hover:text-green-800 shadow-sm hover:shadow-md transition-all duration-200"
-                          >
-                            <Download className="w-4 h-4" />
-                            Receipt
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleViewReceipt(payment)}
+                              className="flex items-center gap-2 bg-white hover:bg-green-50 border-green-200 text-green-700 hover:text-green-800 shadow-sm hover:shadow-md transition-all duration-200"
+                            >
+                              <Download className="w-4 h-4" />
+                              Receipt
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setShowFeesStatement(true)}
+                              className="flex items-center gap-2 bg-white hover:bg-blue-50 border-blue-200 text-blue-700 hover:text-blue-800 shadow-sm hover:shadow-md transition-all duration-200"
+                            >
+                              <FileText className="w-4 h-4" />
+                              Statement
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -320,11 +373,34 @@ export function PaymentHistoryModal({
       <BursarReceiptModal
         isOpen={showReceipt}
         onClose={() => {
+          console.log("🔐 Receipt modal closing explicitly");
           setShowReceipt(false);
           setSelectedReceipt(null);
         }}
         receiptData={selectedReceipt}
       />
+
+      {/* Fees Statement Modal */}
+      <Dialog open={showFeesStatement} onOpenChange={setShowFeesStatement}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              <FileText className="w-6 h-6 text-blue-600" />
+              Fee Statement - {student.name}
+            </DialogTitle>
+          </DialogHeader>
+          <FeesStatementDownload
+            schoolCode={schoolCode}
+            studentId={student.id}
+            studentName={student.name}
+            admissionNumber={student.admissionNumber}
+            gradeName={student.gradeName}
+            className={student.className}
+            parentName={student.parent?.name}
+            isBursar={true}
+          />
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

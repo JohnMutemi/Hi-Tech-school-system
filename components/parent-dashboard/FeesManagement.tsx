@@ -341,7 +341,6 @@ export default function FeesManagement({ students, schoolCode, selectedId, setSe
                         )}
                       </TabsContent>
 
-
                     </Tabs>
                   </div>
                 </div>

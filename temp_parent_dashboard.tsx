@@ -60,7 +60,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { PaymentModal } from "@/components/payment/payment-modal";
-import FeesSection from "@/components/parent-dashboard/FeesSection";
+import FeesManagement from "@/components/parent-dashboard/FeesManagement";
 import {
   Accordion,
   AccordionContent,
@@ -1432,7 +1432,7 @@ const outstandingFees = currentTermSummary ? currentTermSummary.balance : 0;
                   <CardContent>No children found.</CardContent>
                 </Card>
               ) : (
-                <FeesSection
+                <FeesManagement
                   schoolCode={schoolCode}
                   students={students}
                   selectedId={focusedChildId || students[0]?.id || ""}

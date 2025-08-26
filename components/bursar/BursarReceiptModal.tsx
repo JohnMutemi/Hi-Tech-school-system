@@ -36,14 +36,22 @@ interface BursarReceiptModalProps {
 }
 
 export function BursarReceiptModal({ isOpen, onClose, receiptData }: BursarReceiptModalProps) {
-  if (!receiptData) return null;
+  console.log("🎭 BursarReceiptModal called with:", { isOpen, receiptData: !!receiptData });
+  
+  if (!receiptData || !isOpen) {
+    console.log("❌ BursarReceiptModal not rendering:", { hasReceiptData: !!receiptData, isOpen });
+    return null;
+  }
 
+  console.log("✅ BursarReceiptModal rendering EnhancedReceipt");
   return (
-    <EnhancedReceipt
-      receiptData={receiptData}
-      onClose={onClose}
-      showActions={isOpen}
-    />
+    <>
+      <EnhancedReceipt
+        receiptData={receiptData}
+        onClose={onClose}
+        showActions={true}
+      />
+    </>
   );
 }
 

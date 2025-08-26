@@ -49,7 +49,9 @@ export function useParentDashboard(schoolCode: string, parentId?: string) {
     async function fetchParentAndChildren() {
       if (!schoolCode || !parentId) return;
       try {
-        const res = await fetch(`/api/schools/${schoolCode}/parents/${parentId}`);
+        // Get base URL for deployed environment
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin;
+        const res = await fetch(`${baseUrl}/api/schools/${schoolCode}/parents/${parentId}`);
         if (res.ok) {
           const data = await res.json();
           setParent(data.parent);
@@ -73,8 +75,11 @@ export function useParentDashboard(schoolCode: string, parentId?: string) {
       setReceiptsError("");
       try {
         const allReceipts: any[] = [];
+        // Get base URL for deployed environment
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin;
+        
         for (const student of students) {
-          const res = await fetch(`/api/schools/${schoolCode}/students/${student.id}/receipts`);
+          const res = await fetch(`${baseUrl}/api/schools/${schoolCode}/students/${student.id}/receipts`);
           if (res.ok) {
             const data = await res.json();
             if (Array.isArray(data)) {
@@ -101,7 +106,9 @@ export function useParentDashboard(schoolCode: string, parentId?: string) {
     setLoadingPayments(true);
     setPaymentsError("");
     try {
-      const res = await fetch(`/api/schools/${schoolCode}/students/${studentId}/payments`);
+      // Get base URL for deployed environment
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin;
+      const res = await fetch(`${baseUrl}/api/schools/${schoolCode}/students/${studentId}/payments`);
       if (!res.ok) throw new Error("Failed to fetch payments");
       const data = await res.json();
       setPayments(Array.isArray(data.payments) ? data.payments : data);
@@ -141,7 +148,9 @@ export function useParentDashboard(schoolCode: string, parentId?: string) {
   // Logout handler
   const handleLogout = async () => {
     try {
-      await fetch(`/api/schools/${schoolCode}/parents/logout`, { method: "POST" });
+      // Get base URL for deployed environment
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin;
+      await fetch(`${baseUrl}/api/schools/${schoolCode}/parents/logout`, { method: "POST" });
       router.push(`/schools/${schoolCode}/parent/login`);
     } catch (error) {
       router.push(`/schools/${schoolCode}/parent/login`);

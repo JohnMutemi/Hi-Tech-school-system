@@ -1,88 +1,52 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { NextRequest, NextResponse } from 'next/server';
 
 const prisma = new PrismaClient();
 
+// GET: Fetch all academic years for a school
 export async function GET(
   request: NextRequest,
   { params }: { params: { schoolCode: string } }
 ) {
   try {
-    console.log('🔍 GET /api/schools/[schoolCode]/academic-years called');
-    console.log('📋 Params:', params);
+    const { schoolCode } = params;
+    const decodedSchoolCode = decodeURIComponent(schoolCode);
 
-    const school = await prisma.school.findUnique({
-      where: { code: params.schoolCode }
+    // Find the school
+    const school = await prisma.school.findUnique({ 
+      where: { code: decodedSchoolCode } 
     });
-
+    
     if (!school) {
       return NextResponse.json(
-        { success: false, error: 'School not found' },
+        { error: 'School not found' }, 
         { status: 404 }
       );
     }
 
+    // Get all academic years for this school
     const academicYears = await prisma.academicYear.findMany({
       where: { schoolId: school.id },
-      orderBy: { name: 'desc' }
-    });
-
-    console.log(`✅ Found ${academicYears.length} academic years for school ${school.name}`);
-
-    // Determine which year should be current based on current date
-    const currentDate = new Date();
-    const currentYear = currentDate.getFullYear();
-    
-    // Find the academic year that should be current based on dates
-    let shouldBeCurrentYear = null;
-    for (const year of academicYears) {
-      const startDate = new Date(year.startDate);
-      const endDate = new Date(year.endDate);
-      
-      if (currentDate >= startDate && currentDate <= endDate) {
-        shouldBeCurrentYear = year.id;
-        break;
+      orderBy: [
+        { isCurrent: 'desc' }, // Current year first
+        { name: 'desc' } // Then by name descending
+      ],
+      select: {
+        id: true,
+        name: true,
+        isCurrent: true,
+        startDate: true,
+        endDate: true,
+        createdAt: true
       }
-    }
-    
-    // If no year is found based on dates, use the year that matches current year
-    if (!shouldBeCurrentYear) {
-      const matchingYear = academicYears.find(year => year.name === currentYear.toString());
-      if (matchingYear) {
-        shouldBeCurrentYear = matchingYear.id;
-      }
-    }
-
-    // Update the isCurrent field for all years
-    if (shouldBeCurrentYear) {
-      await prisma.academicYear.updateMany({
-        where: { schoolId: school.id },
-        data: { isCurrent: false }
-      });
-      
-      await prisma.academicYear.update({
-        where: { id: shouldBeCurrentYear },
-        data: { isCurrent: true }
-      });
-      
-      console.log(`✅ Updated current academic year to: ${shouldBeCurrentYear}`);
-    }
-
-    // Fetch the updated data
-    const updatedAcademicYears = await prisma.academicYear.findMany({
-      where: { schoolId: school.id },
-      orderBy: { name: 'desc' }
     });
 
-    return NextResponse.json({
-      success: true,
-      data: updatedAcademicYears
-    });
+    return NextResponse.json(academicYears);
 
   } catch (error) {
-    console.error('❌ Error fetching academic years:', error);
+    console.error('Error fetching academic years:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch academic years' },
+      { error: 'Internal server error' }, 
       { status: 500 }
     );
   }

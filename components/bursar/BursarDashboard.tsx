@@ -533,13 +533,16 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-2xl font-bold text-gray-900">Financial Reports</h2>
-                <p className="text-gray-600">Generate comprehensive fee reports</p>
+                <p className="text-gray-600">Generate comprehensive fee reports and statements</p>
               </div>
               <Button onClick={exportToExcel} className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700">
                 <Download className="w-4 h-4 mr-2" />
                 Export Current Data
               </Button>
             </div>
+            
+
+            
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:shadow-lg transition-all duration-300 cursor-pointer" onClick={exportToExcel}>
                 <CardHeader>
