@@ -23,6 +23,8 @@ interface PaymentNotificationData {
   balanceAfter?: number
   balanceBefore?: number
   receiptDownloadUrl?: string
+  feesStatementUrl?: string
+  academicYearId?: string
   admissionNumber?: string
   parentName?: string
   currency?: string
@@ -47,6 +49,13 @@ export class EmailService {
     // Create a secure URL that leads to the receipt view endpoint
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
     return `${baseUrl}/api/schools/${schoolCode}/receipts/${receiptNumber}/view`
+  }
+
+  // Helper function to generate fees statement PDF URL
+  private generateFeesStatementUrl(schoolCode: string, studentId: string, academicYearId?: string): string {
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+    const yearParam = academicYearId ? `?academicYearId=${academicYearId}` : ''
+    return `${baseUrl}/api/schools/${schoolCode}/students/${studentId}/fee-statement/pdf${yearParam}`
   }
 
   async initializeForSchool(schoolId: string): Promise<boolean> {
@@ -90,6 +99,15 @@ export class EmailService {
         paymentData.receiptDownloadUrl = this.generateReceiptViewUrl(
           paymentData.schoolCode, 
           paymentData.receiptNumber
+        )
+      }
+
+      // Generate fees statement URL if not provided
+      if (!paymentData.feesStatementUrl && paymentData.studentId) {
+        paymentData.feesStatementUrl = this.generateFeesStatementUrl(
+          paymentData.schoolCode,
+          paymentData.studentId,
+          paymentData.academicYearId
         )
       }
 
@@ -189,6 +207,7 @@ export class EmailService {
         schoolCode: school.code,
         termName: payment.term.name,
         academicYear: payment.academicYear.name,
+        academicYearId: payment.academicYear.id,
         balanceAfter: balanceInfo.balance,
         balanceBefore: balanceInfo.balance + payment.amount, // Calculate balance before payment
         admissionNumber: payment.student.admissionNumber || undefined,
@@ -389,20 +408,28 @@ export class EmailService {
             border: 2px solid #0ea5e9;
         }
         .download-button {
-            display: inline-block;
-            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            display: inline-flex;
+            align-items: center;
             color: white;
-            padding: 16px 32px;
+            padding: 18px 28px;
             text-decoration: none;
-            border-radius: 8px;
-            font-weight: bold;
-            font-size: 16px;
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+            border-radius: 12px;
+            font-weight: 600;
+            min-width: 200px;
+            gap: 8px;
             transition: all 0.3s ease;
         }
         .download-button:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+        }
+        .receipt-button {
+            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+            box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+        }
+        .statement-button {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            box-shadow: 0 4px 16px rgba(5, 150, 105, 0.3);
         }
         .thank-you-section {
             background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
@@ -431,6 +458,8 @@ export class EmailService {
             .container { margin: 10px; padding: 15px; }
             .details-grid { grid-template-columns: 1fr; }
             .header { padding: 30px 20px; }
+            .button-container { flex-direction: column; align-items: center; }
+            .download-button { min-width: 180px; }
         }
     </style>
 </head>
@@ -576,13 +605,40 @@ export class EmailService {
             </div>
             ` : ''}
             
-            ${data.receiptDownloadUrl ? `
+            ${data.receiptDownloadUrl || data.feesStatementUrl ? `
             <div class="download-section">
-                <h3 style="margin: 0 0 15px 0; color: #0c4a6e;">View Your Receipt</h3>
-                <p style="margin: 0 0 20px 0; color: #0369a1;">Click below to view your beautiful receipt with download options</p>
-                <a href="${data.receiptDownloadUrl}" class="download-button">
-                    👁️ View Enhanced Receipt
-                </a>
+                <div class="download-title" style="margin: 0 0 15px 0; color: #0c4a6e; font-size: 18px; font-weight: 600;">📄 Your Payment Documents</div>
+                <div class="download-subtitle" style="margin: 0 0 20px 0; color: #0369a1;">Access your receipt and fee statement instantly</div>
+                
+                <div class="button-container" style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+                    ${data.receiptDownloadUrl ? `
+                    <div style="text-align: center;">
+                        <a href="${data.receiptDownloadUrl}" class="download-button receipt-button" style="background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%); box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);">
+                            <span class="button-label" style="font-size: 20px;">🧾</span>
+                            <div>
+                                <div style="font-weight: 600;">View Receipt</div>
+                                <div class="button-description" style="font-size: 12px; opacity: 0.9;">Interactive receipt with download options</div>
+                            </div>
+                        </a>
+                    </div>
+                    ` : ''}
+                    
+                    ${data.feesStatementUrl ? `
+                    <div style="text-align: center;">
+                        <a href="${data.feesStatementUrl}" class="download-button statement-button" style="background: linear-gradient(135deg, #059669 0%, #047857 100%); box-shadow: 0 4px 16px rgba(5, 150, 105, 0.3);">
+                            <span class="button-label" style="font-size: 20px;">📊</span>
+                            <div>
+                                <div style="font-weight: 600;">Fee Statement</div>
+                                <div class="button-description" style="font-size: 12px; opacity: 0.9;">Complete academic year statement (PDF)</div>
+                            </div>
+                        </a>
+                    </div>
+                    ` : ''}
+                </div>
+                
+                <div class="tip-box" style="margin-top: 20px; padding: 15px; background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); border-radius: 8px; border-left: 4px solid #3b82f6; font-size: 14px; color: #475569;">
+                    💡 Tip: The receipt shows this payment details, while the fee statement shows your complete academic year financial summary.
+                </div>
             </div>
             ` : ''}
             
@@ -630,7 +686,11 @@ ${data.termName ? `- Term: ${data.termName}` : ''}
 ${data.academicYear ? `- Academic Year: ${data.academicYear}` : ''}
 ${data.balanceAfter !== undefined ? `- Remaining Balance: KES ${data.balanceAfter.toLocaleString()}` : ''}
 
-${data.receiptDownloadUrl ? `View your receipt: ${data.receiptDownloadUrl}\n` : ''}
+${data.receiptDownloadUrl || data.feesStatementUrl ? `
+Your Payment Documents:
+${data.receiptDownloadUrl ? `📧 View Interactive Receipt: ${data.receiptDownloadUrl}` : ''}
+${data.feesStatementUrl ? `📊 Download Fee Statement (PDF): ${data.feesStatementUrl}` : ''}
+` : ''}
 Thank you for your payment!
 
 ${data.schoolName}
