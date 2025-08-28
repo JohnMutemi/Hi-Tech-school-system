@@ -1,5 +1,13 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Calendar, Plus, Edit, Trash2, CheckCircle, Clock, Settings } from "lucide-react";
 
 interface AcademicYear {
   id: string;
@@ -306,143 +314,159 @@ export function AcademicCalendarCrud({ schoolCode }: { schoolCode: string }) {
   };
 
   return (
-    <div className="container mx-auto py-8">
-      <h1 className="text-3xl font-bold mb-4">Academic Calendar Management</h1>
-      <p className="text-gray-600 mb-4">
-        Here you can manage academic years and terms for your school.
-      </p>
-      <button
-        className="mb-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-        onClick={() => setShowModal(true)}
-      >
-        + Add Academic Year
-      </button>
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4">Add Academic Year</h2>
-            <form onSubmit={handleAddYear} className="space-y-4">
-              <div>
-                <label className="block mb-1 font-medium">Year Name</label>
-                <input
-                  type="text"
-                  className="w-full border rounded px-3 py-2"
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="e.g. 2025"
-                  required
-                />
+    <div className="space-y-6">
+      {/* Header */}
+      <Card className="shadow-lg border-0 rounded-2xl bg-gradient-to-br from-white to-blue-50/30">
+        <CardHeader className="border-b border-blue-100/50 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-t-2xl">
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
+                <Calendar className="w-5 h-5 text-white" />
               </div>
               <div>
-                <label className="block mb-1 font-medium">Start Date</label>
-                <input
-                  type="date"
-                  className="w-full border rounded px-3 py-2"
-                  value={form.startDate}
-                  onChange={(e) =>
-                    setForm({ ...form, startDate: e.target.value })
-                  }
-                  required
-                />
+                <span className="text-xl font-bold text-gray-800">Academic Calendar</span>
+                <div className="text-sm text-gray-600 font-normal">
+                  {years.length} {years.length === 1 ? 'year' : 'years'} configured
+                </div>
               </div>
-              <div>
-                <label className="block mb-1 font-medium">End Date</label>
-                <input
-                  type="date"
-                  className="w-full border rounded px-3 py-2"
-                  value={form.endDate}
-                  onChange={(e) =>
-                    setForm({ ...form, endDate: e.target.value })
-                  }
-                  required
-                />
-              </div>
-              {formError && <div className="text-red-600">{formError}</div>}
-              <div className="flex gap-2 justify-end">
-                <button
-                  type="button"
-                  className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-                  onClick={() => setShowModal(false)}
-                  disabled={formLoading}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                  disabled={formLoading}
-                >
-                  {formLoading ? "Adding..." : "Add Year"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      {/* Edit Modal */}
-      {editModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4">Edit Academic Year</h2>
-            <form onSubmit={handleEditYear} className="space-y-4">
-              <div>
-                <label className="block mb-1 font-medium">Year Name</label>
-                <input
-                  type="text"
-                  className="w-full border rounded px-3 py-2"
-                  value={editForm.name}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, name: e.target.value })
-                  }
-                  required
-                />
-              </div>
-              <div>
-                <label className="block mb-1 font-medium">Start Date</label>
-                <input
-                  type="date"
-                  className="w-full border rounded px-3 py-2"
-                  value={editForm.startDate}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, startDate: e.target.value })
-                  }
-                  required
-                />
-              </div>
-              <div>
-                <label className="block mb-1 font-medium">End Date</label>
-                <input
-                  type="date"
-                  className="w-full border rounded px-3 py-2"
-                  value={editForm.endDate}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, endDate: e.target.value })
-                  }
-                  required
-                />
-              </div>
-              {editError && <div className="text-red-600">{editError}</div>}
-              <div className="flex gap-2 justify-end">
-                <button
-                  type="button"
-                  className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-                  onClick={() => setEditModal(false)}
-                  disabled={editLoading}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                  disabled={editLoading}
-                >
-                  {editLoading ? "Saving..." : "Save Changes"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+            </div>
+            <Button
+              onClick={() => setShowModal(true)}
+              className="rounded-xl shadow-md hover:shadow-lg transition-all duration-200 px-6 py-2 font-medium bg-blue-600 hover:bg-blue-700"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Academic Year
+            </Button>
+          </CardTitle>
+          <CardDescription className="text-gray-600 mt-2">
+            Manage academic years and terms for your school calendar
+          </CardDescription>
+        </CardHeader>
+      
+      {/* Add Academic Year Dialog */}
+      <Dialog open={showModal} onOpenChange={setShowModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Academic Year</DialogTitle>
+            <DialogDescription>
+              Create a new academic year for your school calendar
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleAddYear} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="year-name">Year Name</Label>
+              <Input
+                id="year-name"
+                type="text"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                placeholder="e.g. 2025"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="start-date">Start Date</Label>
+              <Input
+                id="start-date"
+                type="date"
+                value={form.startDate}
+                onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="end-date">End Date</Label>
+              <Input
+                id="end-date"
+                type="date"
+                value={form.endDate}
+                onChange={(e) => setForm({ ...form, endDate: e.target.value })}
+                required
+              />
+            </div>
+            {formError && <div className="text-red-600 text-sm">{formError}</div>}
+            <div className="flex gap-2 justify-end pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowModal(false)}
+                disabled={formLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={formLoading}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                {formLoading ? "Adding..." : "Add Year"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Edit Academic Year Dialog */}
+      <Dialog open={editModal} onOpenChange={setEditModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Academic Year</DialogTitle>
+            <DialogDescription>
+              Update the academic year information
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEditYear} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-year-name">Year Name</Label>
+              <Input
+                id="edit-year-name"
+                type="text"
+                value={editForm.name}
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-start-date">Start Date</Label>
+              <Input
+                id="edit-start-date"
+                type="date"
+                value={editForm.startDate}
+                onChange={(e) => setEditForm({ ...editForm, startDate: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-end-date">End Date</Label>
+              <Input
+                id="edit-end-date"
+                type="date"
+                value={editForm.endDate}
+                onChange={(e) => setEditForm({ ...editForm, endDate: e.target.value })}
+                required
+              />
+            </div>
+            {editError && <div className="text-red-600 text-sm">{editError}</div>}
+            <div className="flex gap-2 justify-end pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditModal(false)}
+                disabled={editLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={editLoading}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                {editLoading ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
       {/* Delete Modal */}
       {deleteModal && (
         <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
@@ -478,76 +502,141 @@ export function AcademicCalendarCrud({ schoolCode }: { schoolCode: string }) {
           </div>
         </div>
       )}
-      {loading ? (
-        <div>Loading academic years...</div>
-      ) : error ? (
-        <div className="text-red-600">{error}</div>
-      ) : (
-        <table className="min-w-full border mt-4">
-          <thead>
-            <tr className="bg-gray-100">
-              <th className="p-2 border">Year</th>
-              <th className="p-2 border">Start Date</th>
-              <th className="p-2 border">End Date</th>
-              <th className="p-2 border">Current</th>
-              <th className="p-2 border">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(years || []).map((year) => (
-              <tr key={year.id} className={year.isCurrent ? "bg-green-50" : ""}>
-                <td className="p-2 border font-semibold">{year.name}</td>
-                <td className="p-2 border">
-                  {new Date(year.startDate).toLocaleDateString()}
-                </td>
-                <td className="p-2 border">
-                  {new Date(year.endDate).toLocaleDateString()}
-                </td>
-                <td className="p-2 border text-center">
-                  {year.isCurrent ? (
-                    <span className="text-green-600 font-bold">Yes</span>
-                  ) : (
-                    "No"
-                  )}
-                </td>
-                <td className="p-2 border space-x-2">
-                  <button
-                    className="px-2 py-1 bg-gray-100 rounded hover:bg-gray-200 border"
-                    onClick={() => openEditModal(year)}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    className="px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 border"
-                    onClick={() => openDeleteModal(year.id)}
-                    disabled={year.isCurrent}
-                    title={year.isCurrent ? "Cannot delete current year" : ""}
-                  >
-                    Delete
-                  </button>
-                  {!year.isCurrent && (
-                    <button
-                      className="px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 border"
-                      onClick={() => handleSetCurrent(year.id)}
-                      disabled={setCurrentLoading === year.id}
-                    >
-                      {setCurrentLoading === year.id
-                        ? "Setting..."
-                        : "Set as Current"}
-                    </button>
-                  )}
-                  <button
-                    className="px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200 border"
-                    onClick={() => openTermsModal(year)}
-                  >
-                    Manage Terms
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="text-center py-16 px-6">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading academic years...</p>
+            </div>
+          ) : error ? (
+            <div className="text-center py-16 px-6">
+              <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+                <Trash2 className="w-8 h-8 text-red-500" />
+              </div>
+              <p className="text-red-600 font-medium">{error}</p>
+            </div>
+          ) : years.length === 0 ? (
+            <div className="text-center py-16 px-6">
+              <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-4">
+                <Calendar className="w-10 h-10 text-blue-500" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-800 mb-2">No Academic Years Yet</h3>
+              <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                Create your first academic year to start organizing your school calendar
+              </p>
+              <Button
+                onClick={() => setShowModal(true)}
+                className="rounded-xl shadow-md hover:shadow-lg transition-all duration-200 bg-blue-600 hover:bg-blue-700"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add First Academic Year
+              </Button>
+            </div>
+          ) : (
+            <div className="p-6 space-y-4">
+              {(years || []).map((year) => (
+                <div
+                  key={year.id}
+                  className={`p-6 rounded-xl border-2 transition-all duration-200 hover:shadow-md ${
+                    year.isCurrent
+                      ? "border-green-200 bg-gradient-to-r from-green-50 to-emerald-50"
+                      : "border-gray-200 bg-white hover:border-blue-200"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-md ${
+                        year.isCurrent
+                          ? "bg-gradient-to-br from-green-500 to-emerald-600"
+                          : "bg-gradient-to-br from-blue-500 to-indigo-600"
+                      }`}>
+                        <Calendar className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-3">
+                          <h3 className="text-lg font-bold text-gray-800">{year.name}</h3>
+                          {year.isCurrent && (
+                            <Badge className="bg-green-100 text-green-800 border-green-200">
+                              <CheckCircle className="w-3 h-3 mr-1" />
+                              Current Year
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-4 h-4" />
+                            {new Date(year.startDate).toLocaleDateString()} - {new Date(year.endDate).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openEditModal(year)}
+                        className="rounded-lg hover:bg-blue-50"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openTermsModal(year)}
+                        className="rounded-lg hover:bg-indigo-50"
+                      >
+                        <Settings className="w-4 h-4 mr-1" />
+                        Terms
+                      </Button>
+                      {!year.isCurrent && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleSetCurrent(year.id)}
+                          disabled={setCurrentLoading === year.id}
+                          className="rounded-lg border-green-200 text-green-700 hover:bg-green-50"
+                        >
+                          {setCurrentLoading === year.id ? "Setting..." : "Set Current"}
+                        </Button>
+                      )}
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={year.isCurrent}
+                            className="rounded-lg hover:bg-red-50 text-red-600 disabled:opacity-50"
+                            title={year.isCurrent ? "Cannot delete current year" : ""}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Academic Year</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete the academic year "{year.name}"? This action cannot be undone and will remove all associated terms.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDeleteYear(year.id)}
+                              className="bg-red-600 hover:bg-red-700"
+                            >
+                              Delete Year
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
       {termsModal && (
         <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-2xl">

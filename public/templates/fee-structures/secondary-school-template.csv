@@ -1,0 +1,16 @@
+Name,Description,Amount,Frequency,Due Date,Is Active
+Tuition Fee,Monthly tuition fees for secondary students,12000,monthly,2025-01-15,TRUE
+Registration Fee,One-time registration fee,3500,once,2025-01-05,TRUE
+Development Fee,Infrastructure and facility development,2500,termly,2025-01-15,TRUE
+Laboratory Fee,Science lab equipment and materials,2000,termly,2025-01-15,TRUE
+Activity Fee,Sports clubs and societies,1500,termly,2025-01-15,TRUE
+Library Fee,Advanced library resources,800,termly,2025-01-15,TRUE
+Computer Fee,ICT lab and digital learning,1200,termly,2025-01-15,TRUE
+Examination Fee,Internal and external examinations,1800,termly,2025-01-15,TRUE
+Medical Fee,Health services and insurance,500,termly,2025-01-15,TRUE
+Uniform Fee,School uniform (optional),1800,annually,2025-01-10,FALSE
+Transport Fee,School bus service (optional),4000,monthly,2025-01-05,FALSE
+Boarding Fee,Hostel accommodation (optional),15000,termly,2025-01-05,FALSE
+
+
+

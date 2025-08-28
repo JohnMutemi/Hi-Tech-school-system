@@ -678,14 +678,6 @@ export const MobileResponsiveDashboard: React.FC<DashboardProps> = ({
               <ResponsiveFormGroup label="Academic Year">
                 <ResponsiveInput placeholder="e.g., 2024" />
               </ResponsiveFormGroup>
-              <ResponsiveFormGroup label="Class Teacher">
-                <ResponsiveSelect>
-                  <option value="">Select teacher</option>
-                  <option value="teacher1">Sarah Wilson</option>
-                  <option value="teacher2">David Brown</option>
-                  <option value="teacher3">Lisa Davis</option>
-                </ResponsiveSelect>
-              </ResponsiveFormGroup>
             </ResponsiveFormRow>
             
             <ResponsiveFormRow>

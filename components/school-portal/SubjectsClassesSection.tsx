@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
-import { Plus, Edit, Trash2, BookOpen, Users } from "lucide-react";
+import { Plus, Edit, Trash2, BookOpen, Users, Pencil } from "lucide-react";
 import type { Subject, SchoolClass, Grade } from "@/lib/school-storage";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CheckCircle, XCircle } from "lucide-react";
@@ -119,6 +119,7 @@ interface SubjectsClassesSectionProps {
   schoolCode: string;
   colorTheme: string;
   toast: any;
+  isSetupMode?: boolean;
 }
 
 const defaultSubject: Subject = {
@@ -136,11 +137,10 @@ const defaultClass: SchoolClass = {
   level: "",
   
   currentStudents: 0,
-  classTeacherId: "",
   subjects: [],
 };
 
-export default function SubjectsClassesSection({ schoolCode, colorTheme, toast }: SubjectsClassesSectionProps) {
+export default function SubjectsClassesSection({ schoolCode, colorTheme, toast, isSetupMode = false }: SubjectsClassesSectionProps) {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [grades, setGrades] = useState<Grade[]>([]);
@@ -318,7 +318,6 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast }
       const apiData = {
         name: newClass.name,
         gradeId: newClass.gradeId,
-        teacherId: newClass.classTeacherId,
       };
       const res = await fetch(`/api/schools/${schoolCode}/classes`, {
         method: "POST",
@@ -633,6 +632,14 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast }
                   className="rounded-xl border-indigo-200 hover:bg-indigo-50 transition-colors"
                 />
                 <Button 
+                  onClick={() => setShowGradeModal(true)} 
+                  variant="outline"
+                  className="rounded-xl border-purple-200 hover:bg-purple-50 transition-colors px-6 py-2 font-medium"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Grade
+                </Button>
+                <Button 
                   onClick={handleAddClass} 
                   style={{ backgroundColor: colorTheme }}
                   className="rounded-xl shadow-md hover:shadow-lg transition-all duration-200 px-6 py-2 font-medium"
@@ -647,6 +654,50 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast }
             </CardDescription>
           </CardHeader>
           <CardContent className="p-0">
+            {/* Grades Overview Section */}
+            {grades.length > 0 && (
+              <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-purple-50 to-indigo-50">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                    <BookOpen className="w-5 h-5 text-purple-600" />
+                    Available Grades
+                  </h3>
+                  <span className="text-sm text-gray-600">
+                    {grades.length} {grades.length === 1 ? 'grade' : 'grades'} configured
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                  {grades.map((grade) => (
+                    <div
+                      key={grade.id}
+                      className="flex items-center justify-between p-3 bg-white rounded-lg border border-purple-200 hover:border-purple-300 transition-colors group"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold">
+                          {grade.name.charAt(grade.name.length - 1) || 'G'}
+                        </div>
+                        <span className="text-sm font-medium text-gray-700">{grade.name}</span>
+                      </div>
+                      {!isSetupMode && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 h-6 w-6"
+                          onClick={() => {
+                            setEditingGrade(grade);
+                            setNewGrade({ name: grade.name });
+                            setShowGradeModal(true);
+                          }}
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {classes.length === 0 ? (
               <div className="text-center py-16 px-6">
                 <div className="w-20 h-20 rounded-full bg-indigo-100 flex items-center justify-center mx-auto mb-4">
@@ -685,8 +736,6 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast }
                         </div>
                       </TableHead>
                       <TableHead className="font-semibold text-gray-700 py-4">Grade</TableHead>
-                      <TableHead className="font-semibold text-gray-700 py-4">Level</TableHead>
-                      <TableHead className="font-semibold text-gray-700 py-4">Capacity</TableHead>
                       <TableHead className="font-semibold text-gray-700 py-4">Enrolled</TableHead>
                       <TableHead className="font-semibold text-gray-700 py-4 px-6">Actions</TableHead>
                     </TableRow>
@@ -704,7 +753,7 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast }
                             </div>
                             <div>
                               <div className="font-semibold text-gray-800">{cls.name}</div>
-                              <div className="text-sm text-gray-500">Class ID: {cls.id?.slice(-6) || 'N/A'}</div>
+                              {cls.id && <div className="text-sm text-gray-500">Class ID: {cls.id.slice(-6)}</div>}
                             </div>
                           </div>
                         </TableCell>
@@ -714,23 +763,7 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast }
                           </span>
                         </TableCell>
                         <TableCell className="py-4">
-                          <div className="text-gray-700">{cls.level || 'N/A'}</div>
-                        </TableCell>
-                        <TableCell className="py-4">
-                          <div className="text-gray-700">{cls.capacity || 'N/A'}</div>
-                        </TableCell>
-                        <TableCell className="py-4">
-                          <div className="flex items-center gap-2">
-                            <span className="text-gray-700">{cls.currentStudents || 0}</span>
-                            <div className="w-16 bg-gray-200 rounded-full h-2">
-                              <div 
-                                className="bg-indigo-500 h-2 rounded-full" 
-                                style={{ 
-                                  width: cls.capacity > 0 ? `${Math.min((cls.currentStudents || 0) / cls.capacity * 100, 100)}%` : '0%' 
-                                }}
-                              ></div>
-                            </div>
-                          </div>
+                          <span className="text-gray-700">{cls.currentStudents || 0}</span>
                         </TableCell>
                         <TableCell className="py-4 px-6">
                           <div className="flex space-x-2">
@@ -810,36 +843,21 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast }
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label>Level *</Label>
-                <Select value={newClass.level || ""} onValueChange={value => setNewClass({ ...newClass, level: value })} required>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select level" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Primary">Primary</SelectItem>
-                    <SelectItem value="Secondary">Secondary</SelectItem>
-                    <SelectItem value="College">College</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Class Teacher</Label>
-                <Select value={newClass.classTeacherId || ""} onValueChange={value => setNewClass({ ...newClass, classTeacherId: value })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select class teacher" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {teachers.length === 0 ? (
-                      <SelectItem value="no-teachers" disabled>No teachers found</SelectItem>
-                    ) : (
-                                              teachers.filter(teacher => teacher && teacher.id && teacher.name && teacher.id.trim() !== '').map(teacher => (
-                          <SelectItem key={teacher.id} value={teacher.id}>{teacher.name}</SelectItem>
-                        ))
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
+              {!isSetupMode && (
+                <div className="space-y-2">
+                  <Label>Level *</Label>
+                  <Select value={newClass.level || ""} onValueChange={value => setNewClass({ ...newClass, level: value })} required>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select level" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Primary">Primary</SelectItem>
+                      <SelectItem value="Secondary">Secondary</SelectItem>
+                      <SelectItem value="College">College</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               
 
 

@@ -32,10 +32,28 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
             id: true,
             name: true,
           }
+        },
+        students: {
+          where: {
+            isActive: true,
+            status: {
+              not: 'graduated'
+            }
+          },
+          select: {
+            id: true
+          }
         }
       }
     });
-    return NextResponse.json(classes);
+
+    // Add student count to each class
+    const classesWithCount = classes.map(cls => ({
+      ...cls,
+      currentStudents: cls.students.length,
+      students: undefined // Remove the actual students array for cleaner response
+    }));
+    return NextResponse.json(classesWithCount);
   } catch (error) {
     return NextResponse.json({ error: "Failed to fetch classes" }, { status: 500 });
   }
@@ -90,10 +108,29 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
             id: true,
             name: true,
           }
+        },
+        students: {
+          where: {
+            isActive: true,
+            status: {
+              not: 'graduated'
+            }
+          },
+          select: {
+            id: true
+          }
         }
       }
     });
-    return NextResponse.json(newClass, { status: 201 });
+    
+    // Add student count and clean up response
+    const classWithCount = {
+      ...newClass,
+      currentStudents: newClass.students.length,
+      students: undefined
+    };
+    
+    return NextResponse.json(classWithCount, { status: 201 });
   } catch (error) {
     console.error("Error creating class:", error);
     return NextResponse.json({ error: "Failed to create class" }, { status: 500 });

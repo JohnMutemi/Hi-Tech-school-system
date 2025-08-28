@@ -196,111 +196,129 @@ export default function AlumniSection({ schoolCode }: AlumniSectionProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h2 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-            <Crown className="h-8 w-8" style={{ color: colorTheme }} />
-            Alumni Hall of Fame
-          </h2>
-          <p className="text-gray-600 mt-2">
-            Celebrating our distinguished graduates and their achievements
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            onClick={promoteGrade6Students}
-            disabled={loading}
-            className="flex items-center gap-2"
-            style={{ backgroundColor: colorTheme }}
-          >
-            <GraduationCap className="h-4 w-4" />
-            Promote Grade 6
-          </Button>
-          <Button
-            onClick={cleanupAlumniStudents}
-            disabled={cleaningUp}
-            variant="outline"
-            className="flex items-center gap-2 border-orange-300 text-orange-700 hover:bg-orange-50"
-          >
-            {cleaningUp ? (
-              <RefreshCw className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4" />
-            )}
-            {cleaningUp ? 'Cleaning...' : 'Cleanup Alumni'}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={loadAlumni}
-            disabled={loading}
-            className="flex items-center gap-2"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Refresh
-          </Button>
-        </div>
-      </div>
+      {/* Enhanced Header */}
+      <Card className="shadow-lg border-0 rounded-2xl bg-gradient-to-br from-white to-purple-50/30">
+        <CardHeader className="border-b border-purple-100/50 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-t-2xl">
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-lg">
+                <Crown className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <span className="text-xl font-bold text-gray-800">Alumni Hall of Fame</span>
+                <div className="text-sm text-gray-600 font-normal mt-1">
+                  {stats.totalAlumni} distinguished graduates across {stats.totalYears} years
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={promoteGrade6Students}
+                disabled={loading}
+                className="rounded-xl shadow-md hover:shadow-lg transition-all duration-200 px-4 py-2 font-medium bg-purple-600 hover:bg-purple-700"
+              >
+                <GraduationCap className="w-4 h-4 mr-2" />
+                Promote Grade 6
+              </Button>
+              <Button
+                onClick={cleanupAlumniStudents}
+                disabled={cleaningUp}
+                variant="outline"
+                className="rounded-xl border-orange-200 text-orange-700 hover:bg-orange-50 shadow-md hover:shadow-lg transition-all duration-200"
+              >
+                {cleaningUp ? (
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                )}
+                {cleaningUp ? 'Cleaning...' : 'Cleanup Alumni'}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={loadAlumni}
+                disabled={loading}
+                className="rounded-xl shadow-md hover:shadow-lg transition-all duration-200"
+              >
+                <RefreshCw className="w-4 w-4 mr-2" />
+                Refresh
+              </Button>
+            </div>
+          </CardTitle>
+          <CardDescription className="text-gray-600 mt-2">
+            Celebrating our distinguished graduates and their remarkable achievements
+          </CardDescription>
+        </CardHeader>
+      </Card>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-0 shadow-lg">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-0 shadow-xl rounded-2xl hover:shadow-2xl transition-all duration-300 group">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-blue-600">Total Alumni</p>
-                <p className="text-2xl font-bold text-blue-900">{stats.totalAlumni}</p>
+                <p className="text-sm font-medium text-blue-600 mb-2">Total Alumni</p>
+                <p className="text-3xl font-bold text-blue-900 group-hover:scale-105 transition-transform duration-200">{stats.totalAlumni}</p>
               </div>
-              <Users className="h-8 w-8 text-blue-600" />
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-200">
+                <Users className="w-6 h-6 text-white" />
+              </div>
             </div>
           </CardContent>
         </Card>
         
-        <Card className="bg-gradient-to-br from-green-50 to-green-100 border-0 shadow-lg">
+        <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border-0 shadow-xl rounded-2xl hover:shadow-2xl transition-all duration-300 group">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-green-600">Graduation Years</p>
-                <p className="text-2xl font-bold text-green-900">{stats.totalYears}</p>
+                <p className="text-sm font-medium text-emerald-600 mb-2">Graduation Years</p>
+                <p className="text-3xl font-bold text-emerald-900 group-hover:scale-105 transition-transform duration-200">{stats.totalYears}</p>
               </div>
-              <Calendar className="h-8 w-8 text-green-600" />
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-200">
+                <Calendar className="w-6 h-6 text-white" />
+              </div>
             </div>
           </CardContent>
         </Card>
         
-        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-0 shadow-lg">
+        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-0 shadow-xl rounded-2xl hover:shadow-2xl transition-all duration-300 group">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-purple-600">{currentYear} Graduates</p>
-                <p className="text-2xl font-bold text-purple-900">{stats.thisYearGraduates}</p>
+                <p className="text-sm font-medium text-purple-600 mb-2">{currentYear} Graduates</p>
+                <p className="text-3xl font-bold text-purple-900 group-hover:scale-105 transition-transform duration-200">{stats.thisYearGraduates}</p>
               </div>
-              <GraduationCap className="h-8 w-8 text-purple-600" />
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-200">
+                <GraduationCap className="w-6 h-6 text-white" />
+              </div>
             </div>
           </CardContent>
         </Card>
         
-        <Card className="bg-gradient-to-br from-amber-50 to-amber-100 border-0 shadow-lg">
+        <Card className="bg-gradient-to-br from-amber-50 to-amber-100 border-0 shadow-xl rounded-2xl hover:shadow-2xl transition-all duration-300 group">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-amber-600">Top Performers</p>
-                <p className="text-2xl font-bold text-amber-900">{stats.topPerformers}</p>
+                <p className="text-sm font-medium text-amber-600 mb-2">Top Performers</p>
+                <p className="text-3xl font-bold text-amber-900 group-hover:scale-105 transition-transform duration-200">{stats.topPerformers}</p>
               </div>
-              <Trophy className="h-8 w-8 text-amber-600" />
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-200">
+                <Trophy className="w-6 h-6 text-white" />
+              </div>
             </div>
           </CardContent>
         </Card>
         
-        <Card className="bg-gradient-to-br from-red-50 to-red-100 border-0 shadow-lg">
+        <Card className="bg-gradient-to-br from-rose-50 to-rose-100 border-0 shadow-xl rounded-2xl hover:shadow-2xl transition-all duration-300 group">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-red-600">Outstanding Fees</p>
-                <p className="text-2xl font-bold text-red-900">{stats.alumniWithOutstandingFees}</p>
-                <p className="text-xs text-red-700">${stats.totalOutstandingFees.toLocaleString()}</p>
+                <p className="text-sm font-medium text-rose-600 mb-2">Outstanding Fees</p>
+                <p className="text-3xl font-bold text-rose-900 group-hover:scale-105 transition-transform duration-200">{stats.alumniWithOutstandingFees}</p>
+                <p className="text-xs text-rose-700 mt-1">${stats.totalOutstandingFees.toLocaleString()}</p>
               </div>
-              <BookOpen className="h-8 w-8 text-red-600" />
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-rose-500 to-rose-600 flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-200">
+                <DollarSign className="w-6 h-6 text-white" />
+              </div>
             </div>
           </CardContent>
         </Card>

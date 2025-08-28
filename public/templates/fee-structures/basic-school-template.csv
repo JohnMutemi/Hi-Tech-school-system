@@ -1,0 +1,12 @@
+Name,Description,Amount,Frequency,Due Date,Is Active
+Tuition Fee,Basic education fees,5000,monthly,2025-01-15,TRUE
+Registration Fee,Student registration fee,1500,once,2025-01-05,TRUE
+Development Fee,Basic infrastructure maintenance,800,termly,2025-01-15,TRUE
+Activity Fee,Basic sports and activities,500,termly,2025-01-15,TRUE
+Library Fee,Basic library maintenance,300,termly,2025-01-15,TRUE
+Medical Fee,Basic health services,200,termly,2025-01-15,TRUE
+Uniform Fee,School uniform (optional),800,annually,2025-01-10,FALSE
+Transport Fee,Basic transport service (optional),2000,monthly,2025-01-05,FALSE
+
+
+

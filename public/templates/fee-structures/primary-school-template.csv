@@ -1,0 +1,14 @@
+Name,Description,Amount,Frequency,Due Date,Is Active
+Tuition Fee,Monthly tuition fees for Grade 1-6,8000,monthly,2025-01-15,TRUE
+Registration Fee,One-time registration fee,2500,once,2025-01-05,TRUE
+Development Fee,Infrastructure development fund,1500,termly,2025-01-15,TRUE
+Activity Fee,Sports and co-curricular activities,1000,termly,2025-01-15,TRUE
+Library Fee,Library maintenance and books,500,termly,2025-01-15,TRUE
+Computer Fee,ICT lab and computer training,800,termly,2025-01-15,TRUE
+Medical Fee,Basic first aid and health services,300,termly,2025-01-15,TRUE
+Uniform Fee,School uniform (optional),1200,annually,2025-01-10,FALSE
+Transport Fee,School bus service (optional),3000,monthly,2025-01-05,FALSE
+Lunch Fee,School meals program (optional),2500,monthly,2025-01-05,FALSE
+
+
+

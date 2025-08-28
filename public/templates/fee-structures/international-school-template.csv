@@ -1,0 +1,18 @@
+Name,Description,Amount,Frequency,Due Date,Is Active
+Tuition Fee,International curriculum tuition,25000,monthly,2025-01-15,TRUE
+Registration Fee,Application and registration fee,8000,once,2025-01-05,TRUE
+Development Fee,Facility and infrastructure development,5000,termly,2025-01-15,TRUE
+Technology Fee,Digital learning and devices,3000,termly,2025-01-15,TRUE
+Laboratory Fee,Science and research facilities,2500,termly,2025-01-15,TRUE
+Activity Fee,International sports and clubs,2000,termly,2025-01-15,TRUE
+Library Fee,International digital library,1200,termly,2025-01-15,TRUE
+Assessment Fee,International assessments and testing,3500,termly,2025-01-15,TRUE
+Medical Fee,Comprehensive health services,800,termly,2025-01-15,TRUE
+Language Fee,Additional language programs,1500,termly,2025-01-15,TRUE
+Uniform Fee,International school uniform,2500,annually,2025-01-10,FALSE
+Transport Fee,Premium transport service,6000,monthly,2025-01-05,FALSE
+Boarding Fee,International boarding facilities,35000,termly,2025-01-05,FALSE
+Field Trip Fee,Educational excursions,4000,termly,2025-01-15,FALSE
+
+
+

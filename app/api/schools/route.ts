@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
+import { SchoolSeedingService } from '@/lib/services/school-seeding-service';
 
 const prisma = new PrismaClient();
 
@@ -167,6 +168,17 @@ export async function POST(request: NextRequest) {
         isActive: true
       }
     });
+
+    // Automatically seed initial school data
+    try {
+      console.log(`🌱 Auto-seeding data for new school: ${schoolCode}`);
+      const seedingService = new SchoolSeedingService(school.id, schoolCode);
+      const seedingResults = await seedingService.seedSchoolData();
+      console.log(`✅ Auto-seeding completed for school: ${schoolCode}`, seedingResults);
+    } catch (seedingError) {
+      console.error(`⚠️ Warning: Auto-seeding failed for school: ${schoolCode}`, seedingError);
+      // Don't fail school creation if seeding fails - it can be done manually later
+    }
 
     // Return the created school with admin info
     const createdSchool = {
