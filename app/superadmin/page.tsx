@@ -165,9 +165,9 @@ export default function SuperAdminDashboard() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-cyan-50 to-teal-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-red-50 via-slate-50 to-red-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-cyan-600 mx-auto mb-6"></div>
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-red-600 mx-auto mb-6"></div>
           <p className="text-gray-600 text-lg">Loading dashboard...</p>
         </div>
       </div>
@@ -177,7 +177,7 @@ export default function SuperAdminDashboard() {
   return (
     <div className="animate-fade-in relative">
       {/* Sticky Welcome Section - Reduced Size */}
-      <div className="sticky top-0 z-40 bg-gradient-to-r from-cyan-500 via-teal-500 to-cyan-600 backdrop-blur-md border-b border-cyan-400/30 shadow-lg mb-8">
+      <div className="sticky top-0 z-40 bg-gradient-to-r from-red-600 via-red-700 to-red-800 backdrop-blur-md border-b border-red-500/30 shadow-lg mb-8">
         <div className="px-4 lg:px-6 py-3 lg:py-4">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2 lg:gap-4">
             <div className="flex-1 min-w-0">
@@ -186,7 +186,7 @@ export default function SuperAdminDashboard() {
                   <h1 className="text-lg lg:text-xl font-bold tracking-tight text-white truncate">
                     Welcome back, Platform Super Admin! 👋
                   </h1>
-                  <p className="text-cyan-100 text-xs lg:text-sm mt-1 line-clamp-1">
+                  <p className="text-red-100 text-xs lg:text-sm mt-1 line-clamp-1">
                     Here's what's happening with your platform today. All systems are operational.
                   </p>
                 </div>
@@ -207,7 +207,7 @@ export default function SuperAdminDashboard() {
                 <Bell className="w-3 h-3 mr-1" />
                 Notifications
               </Button>
-              <Button asChild size="sm" className="bg-white text-cyan-600 hover:bg-gray-100 text-xs px-3 py-1.5">
+              <Button asChild size="sm" className="bg-white text-red-600 hover:bg-gray-100 text-xs px-3 py-1.5">
                 <Link href="/superadmin/schools/add">
                   <Plus className="w-3 h-3 mr-1" />
                   Add
@@ -233,7 +233,7 @@ export default function SuperAdminDashboard() {
                   <span className="text-base text-green-600">+{stats.recentGrowth}%</span>
                 </div>
               </div>
-              <div className="w-16 h-16 bg-gradient-to-br from-cyan-500 to-teal-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+              <div className="w-16 h-16 bg-gradient-to-br from-red-600 to-red-700 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg border border-red-500/20">
                 <School className="w-8 h-8 text-white" />
               </div>
             </div>
@@ -251,7 +251,7 @@ export default function SuperAdminDashboard() {
                   <span className="text-base text-green-600">Active</span>
                 </div>
               </div>
-              <div className="w-16 h-16 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+              <div className="w-16 h-16 bg-gradient-to-br from-slate-600 to-slate-700 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg border border-slate-500/20">
                 <Activity className="w-8 h-8 text-white" />
               </div>
             </div>
@@ -269,7 +269,7 @@ export default function SuperAdminDashboard() {
                   <span className="text-base text-blue-600">Enrolled</span>
                 </div>
               </div>
-              <div className="w-16 h-16 bg-gradient-to-br from-cyan-400 to-teal-500 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+              <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg border border-blue-500/20">
                 <Users className="w-8 h-8 text-white" />
               </div>
             </div>
@@ -287,7 +287,7 @@ export default function SuperAdminDashboard() {
                   <span className="text-base text-orange-600">Staff</span>
                 </div>
               </div>
-              <div className="w-16 h-16 bg-gradient-to-br from-teal-400 to-cyan-500 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+              <div className="w-16 h-16 bg-gradient-to-br from-orange-600 to-orange-700 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg border border-orange-500/20">
                 <GraduationCap className="w-8 h-8 text-white" />
               </div>
             </div>
@@ -397,7 +397,7 @@ export default function SuperAdminDashboard() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Button asChild className="h-24 flex-col gap-3 bg-gradient-to-br from-cyan-500 to-teal-600 hover:from-cyan-600 hover:to-teal-700 text-white text-base">
+            <Button asChild className="h-24 flex-col gap-3 bg-gradient-to-br from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white text-base shadow-lg border border-red-500/20">
               <Link href="/superadmin/schools/add">
                 <Plus className="w-8 h-8" />
                 Add School

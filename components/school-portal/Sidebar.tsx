@@ -41,10 +41,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, colorT
   // Use system color mode (light/dark)
   const isDark = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
   const sidebarBg = isDark
-    ? 'bg-gradient-to-b from-blue-950 via-blue-900 to-neutral-900'
-    : 'bg-gradient-to-b from-blue-100 via-white to-blue-200';
-  const sidebarBorder = isDark ? 'border-neutral-800' : 'border-neutral-200';
-  const sidebarShadow = isDark ? 'shadow-lg shadow-black/20' : 'shadow-lg shadow-blue-200/40';
+    ? 'bg-gradient-to-b from-cyan-950 via-cyan-900 to-slate-900'
+    : 'bg-gradient-to-b from-cyan-100 via-white to-cyan-200';
+  const sidebarBorder = isDark ? 'border-cyan-800' : 'border-cyan-200';
+  const sidebarShadow = isDark ? 'shadow-lg shadow-black/20' : 'shadow-lg shadow-cyan-200/40';
 
   return (
     <>
@@ -140,14 +140,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, colorT
           <div className="flex items-center gap-3">
             <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="hover:bg-blue-50 h-10 w-10">
+                <Button variant="ghost" size="icon" className="hover:bg-cyan-50 h-10 w-10">
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="w-80 p-0">
-                <SheetHeader className="p-6 border-b bg-gradient-to-r from-blue-600 to-blue-700 text-white">
+                <SheetHeader className="p-6 border-b bg-gradient-to-r from-cyan-600 to-cyan-700 text-white">
                   <SheetTitle className="text-left text-white font-bold text-lg">School Portal</SheetTitle>
-                  <p className="text-blue-100 text-sm mt-1">Hi-Tech SMS</p>
+                  <p className="text-cyan-100 text-sm mt-1">Hi-Tech SMS</p>
                 </SheetHeader>
                 
                 {/* Mobile School Info */}

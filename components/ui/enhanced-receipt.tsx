@@ -31,7 +31,6 @@ interface ReceiptData {
   term: string;
   academicYear: string;
   reference: string;
-  phoneNumber?: string;
   transactionId?: string;
   status: string;
   issuedAt: Date;
@@ -99,6 +98,51 @@ export function EnhancedReceipt({
     } catch (error) {
       return 'Invalid Date';
     }
+  };
+
+  const convertToWords = (amount: number): string => {
+    if (amount === 0) return 'Zero';
+    
+    const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+    const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+    const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+    const thousands = ['', 'Thousand', 'Million', 'Billion'];
+
+    function convertHundreds(num: number): string {
+      let result = '';
+      
+      if (num >= 100) {
+        result += ones[Math.floor(num / 100)] + ' Hundred ';
+        num %= 100;
+      }
+      
+      if (num >= 20) {
+        result += tens[Math.floor(num / 10)] + ' ';
+        num %= 10;
+      } else if (num >= 10) {
+        result += teens[num - 10] + ' ';
+        return result;
+      }
+      
+      if (num > 0) {
+        result += ones[num] + ' ';
+      }
+      
+      return result;
+    }
+
+    let result = '';
+    let thousandCounter = 0;
+    
+    while (amount > 0) {
+      if (amount % 1000 !== 0) {
+        result = convertHundreds(amount % 1000) + thousands[thousandCounter] + ' ' + result;
+      }
+      amount = Math.floor(amount / 1000);
+      thousandCounter++;
+    }
+    
+    return result.trim();
   };
 
   const generatePDF = async (format: 'A3' | 'A4' | 'A5' = 'A4') => {
@@ -254,49 +298,38 @@ export function EnhancedReceipt({
 
   const downloadTxtReceipt = () => {
     const receiptContent = `
+${receiptData.schoolName}
+School Code: ${receiptData.schoolCode}
+Email: ${receiptData.schoolCode.toLowerCase()}@school.ac.ke
+
 PAYMENT RECEIPT
 ===============================================
 
-Receipt Number: ${receiptData.receiptNumber || 'N/A'}
-Payment ID: ${receiptData.paymentId || 'N/A'}
+Receipt No: ${receiptData.receiptNumber || 'N/A'}
 Date: ${receiptData.issuedAt ? formatDate(receiptData.issuedAt) : new Date().toLocaleDateString()}
 
-SCHOOL INFORMATION:
-School: ${receiptData.schoolName || 'School Name'}
-School Code: ${receiptData.schoolCode || 'N/A'}
+Received from:
+${receiptData.studentName || 'N/A'}
+Admission No: ${receiptData.admissionNumber || 'N/A'}
+${receiptData.parentName ? `Parent/Guardian: ${receiptData.parentName}` : ''}
 
-STUDENT INFORMATION:
-Student Name: ${receiptData.studentName || 'N/A'}
-Admission Number: ${receiptData.admissionNumber || 'N/A'}
-${receiptData.parentName ? `Parent Name: ${receiptData.parentName}` : ''}
-
-PAYMENT DETAILS:
-Amount: ${formatCurrency(receiptData.amount)}
-Payment Method: ${receiptData.paymentMethod ? receiptData.paymentMethod.toUpperCase() : 'N/A'}
-Fee Type: ${receiptData.feeType || 'School Fee'}
-Term: ${receiptData.term || 'N/A'}
+Payment for: ${receiptData.feeType || 'School Fee'}
 Academic Year: ${receiptData.academicYear || 'N/A'}
-Reference: ${receiptData.reference || 'N/A'}
-${receiptData.phoneNumber ? `Phone Number: ${receiptData.phoneNumber}` : ''}
+Term: ${receiptData.term || 'N/A'}
+Payment Method: ${receiptData.paymentMethod ? receiptData.paymentMethod.replace('_', ' ') : 'N/A'}
+
+Amount: ${formatCurrency(receiptData.amount)}
+In words: ${convertToWords(receiptData.amount)} ${receiptData.currency || 'Kenyan Shillings'} Only
+
+${receiptData.reference ? `Reference: ${receiptData.reference}` : ''}
+Payment ID: ${receiptData.paymentId || 'N/A'}
 ${receiptData.transactionId ? `Transaction ID: ${receiptData.transactionId}` : ''}
 
-BALANCE INFORMATION:
-${receiptData.termOutstandingBefore !== undefined ? 
-  `Term Outstanding (Before): ${formatCurrency(receiptData.termOutstandingBefore)}` : ''}
-${receiptData.termOutstandingAfter !== undefined ? 
-  `Term Outstanding (After): ${formatCurrency(receiptData.termOutstandingAfter)}` : ''}
-${receiptData.academicYearOutstandingBefore !== undefined ? 
-  `Academic Year Outstanding (Before): ${formatCurrency(receiptData.academicYearOutstandingBefore)}` : ''}
-${receiptData.academicYearOutstandingAfter !== undefined ? 
-  `Academic Year Outstanding (After): ${formatCurrency(receiptData.academicYearOutstandingAfter)}` : ''}
-${receiptData.carryForward ? `Carry Forward: ${formatCurrency(receiptData.carryForward)}` : ''}
-
-Status: ${receiptData.status ? receiptData.status.toUpperCase() : 'PENDING'}
 Issued by: ${receiptData.issuedBy || 'Bursar Office'}
+Generated: ${new Date().toLocaleDateString()}
 
+Thank you for your payment!
 ===============================================
-This is a computer-generated receipt.
-Receipt processed by Bursar Portal.
     `.trim();
 
     const blob = new Blob([receiptContent], { type: 'text/plain' });
@@ -313,241 +346,141 @@ Receipt processed by Bursar Portal.
   const ReceiptContent = () => (
     <div 
       ref={receiptRef} 
-      className={`bg-white p-8 rounded-2xl shadow-lg border-2 border-gray-100 ${className}`}
+      className={`bg-white mx-auto max-w-2xl shadow-lg border border-gray-200 ${className}`}
       style={{
-        background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-        position: 'relative',
-        overflow: 'hidden'
+        background: 'white',
+        fontFamily: 'Arial, sans-serif',
+        minHeight: 'auto'
       }}
     >
-      {/* Curled corner effect */}
-      <div className="absolute top-0 right-0 w-16 h-16 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 right-0 w-8 h-8 bg-gray-200 transform rotate-45 origin-bottom-left shadow-lg"></div>
+      {/* Clean Simple Header */}
+      <div className="bg-white border-b-2 border-gray-200 p-6">
+        <div className="flex justify-between items-start">
+          <div className="flex-1">
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">
+              {receiptData.schoolName}
+            </h1>
+            <p className="text-gray-600 text-sm mb-3">School Code: {receiptData.schoolCode}</p>
+            <p className="text-gray-500 text-sm">{receiptData.schoolCode.toLowerCase()}@school.ac.ke</p>
+          </div>
+          
+          <div className="text-right">
+            <div className="mb-3">
+              <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Date</p>
+              <p className="text-sm font-semibold text-gray-900">{formatDate(receiptData.issuedAt).split(',')[0]}</p>
+            </div>
+            <div className="bg-orange-100 px-3 py-2 rounded-lg">
+              <p className="text-xs text-orange-800 uppercase tracking-wide mb-1">Receipt No</p>
+              <p className="text-sm font-bold text-orange-900">{receiptData.receiptNumber}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+          
+      {/* Simple Title */}
+      <div className="bg-gray-900 text-white text-center py-3">
+        <h2 className="text-xl font-bold">PAYMENT RECEIPT</h2>
       </div>
 
-      {/* Header with gradient background */}
-      <div className="text-center mb-8 relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 rounded-t-2xl -mx-8 -mt-8 h-32 opacity-10"></div>
-        <div className="relative z-10">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="p-3 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full shadow-lg">
-              <School className="w-8 h-8 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-800">{receiptData.schoolName}</h1>
-              <p className="text-sm text-gray-600">School Code: {receiptData.schoolCode}</p>
-            </div>
+      {/* Simple Customer Info */}
+      <div className="p-6 bg-gray-50 border-b">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-2">Received From:</h3>
+            <p className="text-lg font-bold text-gray-900">{receiptData.studentName}</p>
+            <p className="text-sm text-gray-600">Admission No: {receiptData.admissionNumber}</p>
+            {receiptData.parentName && (
+              <p className="text-sm text-gray-600">Parent/Guardian: {receiptData.parentName}</p>
+            )}
           </div>
-          
-          <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl p-4 mb-4 shadow-sm">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <CheckCircle className="w-5 h-5 text-green-600" />
-              <span className="text-green-700 font-semibold">Payment Successful</span>
-            </div>
-            <h2 className="text-xl font-bold text-green-800">OFFICIAL RECEIPT</h2>
-          </div>
-          
-          <div className="flex justify-between items-center text-sm text-gray-600 bg-gray-50 rounded-lg p-3">
-            <span>Receipt No: <strong className="text-blue-600">{receiptData.receiptNumber}</strong></span>
-            <span>Date: <strong>{formatDate(receiptData.issuedAt)}</strong></span>
+          <div>
+            <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-2">Payment For:</h3>
+            <p className="text-lg font-bold text-gray-900">{receiptData.feeType}</p>
+            <p className="text-sm text-gray-600">{receiptData.academicYear} - {receiptData.term}</p>
           </div>
         </div>
       </div>
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Student Information */}
-        <Card className="border-2 border-blue-200 shadow-md hover:shadow-lg transition-shadow">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="p-2 bg-blue-100 rounded-full">
-                <User className="w-4 h-4 text-blue-600" />
-              </div>
-              <h3 className="font-semibold text-blue-800">Student Details</h3>
-            </div>
-            <div className="space-y-2">
-              <div>
-                <span className="text-xs text-gray-600">Student Name:</span>
-                <p className="font-semibold text-sm text-gray-800">{receiptData.studentName}</p>
-              </div>
-              <div>
-                <span className="text-xs text-gray-600">Admission Number:</span>
-                <p className="font-semibold text-sm text-gray-800">{receiptData.admissionNumber}</p>
-              </div>
-              {receiptData.parentName && (
-                <div>
-                  <span className="text-xs text-gray-600">Parent/Guardian:</span>
-                  <p className="font-semibold text-sm text-gray-800">{receiptData.parentName}</p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Payment Information */}
-        <Card className="border-2 border-green-200 shadow-md hover:shadow-lg transition-shadow">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="p-2 bg-green-100 rounded-full">
-                <CreditCard className="w-4 h-4 text-green-600" />
-              </div>
-              <h3 className="font-semibold text-green-800">Payment Details</h3>
-            </div>
-            <div className="space-y-2">
-              <div>
-                <span className="text-xs text-gray-600">Amount Paid:</span>
-                <p className="font-bold text-lg text-green-600">{formatCurrency(receiptData.amount)}</p>
-              </div>
-              <div>
-                <span className="text-xs text-gray-600">Payment Method:</span>
-                <p className="font-semibold text-sm capitalize">{receiptData.paymentMethod.replace('_', ' ')}</p>
-              </div>
-              {receiptData.phoneNumber && (
-                <div>
-                  <span className="text-xs text-gray-600">Phone Number:</span>
-                  <p className="font-semibold text-sm">{receiptData.phoneNumber}</p>
-                </div>
-              )}
-              <div>
-                <span className="text-xs text-gray-600">Reference:</span>
-                <p className="font-semibold text-xs break-all text-gray-700">{receiptData.reference}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Simple Payment Details */}
+      <div className="p-6">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="border-b-2 border-gray-200">
+              <th className="text-left py-2 text-sm font-semibold text-gray-700">Description</th>
+              <th className="text-center py-2 text-sm font-semibold text-gray-700">Quantity</th>
+              <th className="text-right py-2 text-sm font-semibold text-gray-700">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="border-b border-gray-100">
+              <td className="py-3">
+                <div className="font-medium text-gray-900">{receiptData.feeType}</div>
+                <div className="text-sm text-gray-600">{receiptData.academicYear} - {receiptData.term}</div>
+                <div className="text-xs text-gray-500">Payment Method: {receiptData.paymentMethod.replace('_', ' ')}</div>
+              </td>
+              <td className="text-center py-3 text-gray-700">1</td>
+              <td className="text-right py-3 font-semibold text-gray-900">{formatCurrency(receiptData.amount)}</td>
+            </tr>
+            {/* Balance Information - Only if exists */}
+            {(receiptData.termOutstandingBefore !== undefined || receiptData.academicYearOutstandingBefore !== undefined) && (
+              <tr className="border-b border-gray-100 bg-gray-50">
+                <td className="py-3">
+                  <div className="font-medium text-gray-900">Account Balance Summary</div>
+                  <div className="text-sm text-gray-600">
+                    {receiptData.termOutstandingBefore !== undefined && (
+                      <div>Term Balance: {formatCurrency(receiptData.termOutstandingBefore)} → {formatCurrency(receiptData.termOutstandingAfter)}</div>
+                    )}
+                    {receiptData.academicYearOutstandingBefore !== undefined && (
+                      <div>Year Balance: {formatCurrency(receiptData.academicYearOutstandingBefore)} → {formatCurrency(receiptData.academicYearOutstandingAfter)}</div>
+                    )}
+                  </div>
+                </td>
+                <td className="text-center py-3 text-gray-500">-</td>
+                <td className="text-right py-3 text-gray-500">-</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
 
-      {/* Academic Information */}
-      <Card className="border-2 border-purple-200 shadow-md hover:shadow-lg transition-shadow mb-6">
-        <CardContent className="p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="p-2 bg-purple-100 rounded-full">
-              <Calendar className="w-4 h-4 text-purple-600" />
-            </div>
-            <h3 className="font-semibold text-purple-800">Academic Period</h3>
+      {/* Simple Total Section */}
+      <div className="border-t bg-orange-500 text-white p-4">
+        <div className="text-center">
+          <p className="text-sm uppercase tracking-wide mb-1">Total Amount Paid</p>
+          <p className="text-2xl font-bold">{receiptData.currency} {receiptData.amount.toLocaleString()}</p>
+        </div>
+      </div>
+
+      {/* Amount in Words */}
+      <div className="border-t p-4 bg-gray-50">
+        <p className="text-xs text-gray-600 uppercase tracking-wide mb-2">Amount in words:</p>
+        <p className="text-sm font-semibold text-gray-800 italic">
+          {convertToWords(receiptData.amount)} {receiptData.currency || 'Kenyan Shillings'} Only
+        </p>
+      </div>
+
+      {/* Simple Footer */}
+      <div className="border-t p-4 text-center bg-gray-100">
+        <p className="text-sm font-semibold text-gray-800 mb-2">Thank you for your payment!</p>
+        <p className="text-xs text-gray-600">Issued by: {receiptData.issuedBy} | Generated: {formatDate(new Date())}</p>
+      </div>
+
+      {/* Reference IDs - Only if needed */}
+      {(receiptData.reference || receiptData.transactionId || receiptData.paymentId) && (
+        <div className="border-t p-3 bg-gray-50">
+          <div className="text-xs text-gray-600 space-y-1">
+            {receiptData.paymentId && (
+              <p><span className="font-semibold">Payment ID:</span> {receiptData.paymentId}</p>
+            )}
+            {receiptData.transactionId && (
+              <p><span className="font-semibold">Transaction ID:</span> {receiptData.transactionId}</p>
+            )}
+            {receiptData.reference && (
+              <p><span className="font-semibold">Reference:</span> {receiptData.reference}</p>
+            )}
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <span className="text-xs text-gray-600">Academic Year:</span>
-              <p className="font-semibold text-sm">{receiptData.academicYear}</p>
-            </div>
-            <div>
-              <span className="text-xs text-gray-600">Term:</span>
-              <p className="font-semibold text-sm">{receiptData.term}</p>
-            </div>
-            <div>
-              <span className="text-xs text-gray-600">Fee Type:</span>
-              <p className="font-semibold text-sm">{receiptData.feeType}</p>
-            </div>
-            <div>
-              <span className="text-xs text-gray-600">Status:</span>
-              <Badge className={`text-xs ${
-                receiptData.status?.toLowerCase() === 'completed' || receiptData.status?.toLowerCase() === 'successful'
-                  ? 'bg-green-100 text-green-800'
-                  : 'bg-yellow-100 text-yellow-800'
-              }`}>
-                {receiptData.status?.toUpperCase() || 'PENDING'}
-              </Badge>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Balance Summary */}
-      {(receiptData.termOutstandingBefore !== undefined || receiptData.academicYearOutstandingBefore !== undefined) && (
-        <Card className="border-2 border-orange-200 shadow-md hover:shadow-lg transition-shadow mb-6">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="p-2 bg-orange-100 rounded-full">
-                <Receipt className="w-4 h-4 text-orange-600" />
-              </div>
-              <h3 className="font-semibold text-orange-800">Balance Summary</h3>
-            </div>
-            <div className="space-y-4">
-              {/* Term Balance */}
-              {receiptData.termOutstandingBefore !== undefined && (
-                <div className="bg-gradient-to-r from-gray-50 to-gray-100 p-4 rounded-lg border border-gray-200">
-                  <h4 className="font-semibold text-gray-800 mb-3 text-sm">{receiptData.term} Balance</h4>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-600">Balance Before:</span>
-                      <p className="font-semibold text-sm">{formatCurrency(receiptData.termOutstandingBefore)}</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Balance After:</span>
-                      <p className={`font-semibold text-sm ${
-                        receiptData.termOutstandingAfter && receiptData.termOutstandingAfter <= 0 
-                          ? 'text-green-600' 
-                          : 'text-orange-600'
-                      }`}>
-                        {formatCurrency(receiptData.termOutstandingAfter)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Academic Year Balance */}
-              {receiptData.academicYearOutstandingBefore !== undefined && (
-                <div className="bg-gradient-to-r from-gray-50 to-gray-100 p-4 rounded-lg border border-gray-200">
-                  <h4 className="font-semibold text-gray-800 mb-3 text-sm">Academic Year Balance</h4>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-600">Balance Before:</span>
-                      <p className="font-semibold text-sm">{formatCurrency(receiptData.academicYearOutstandingBefore)}</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Balance After:</span>
-                      <p className={`font-semibold text-sm ${
-                        receiptData.academicYearOutstandingAfter && receiptData.academicYearOutstandingAfter <= 0 
-                          ? 'text-green-600' 
-                          : 'text-orange-600'
-                      }`}>
-                        {formatCurrency(receiptData.academicYearOutstandingAfter)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Carry Forward */}
-              {receiptData.carryForward && receiptData.carryForward > 0 && (
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 p-4 rounded-lg">
-                  <h4 className="font-semibold text-blue-800 mb-2 text-sm">Overpayment Carried Forward</h4>
-                  <p className="text-blue-700 font-semibold text-sm">{formatCurrency(receiptData.carryForward)}</p>
-                  <p className="text-xs text-blue-600 mt-1">This amount will be applied to your next term fees.</p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+        </div>
       )}
-
-      {/* Footer */}
-      <Separator className="my-6" />
-      
-      <div className="text-center space-y-4">
-        <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl p-4">
-          <h3 className="text-lg font-bold text-green-800 mb-2">Thank You for Your Payment!</h3>
-          <p className="text-green-700 text-sm">
-            We appreciate your prompt payment. This receipt serves as proof of payment for the above mentioned fees.
-          </p>
-        </div>
-        
-        <div className="text-xs text-gray-600 space-y-1 bg-gray-50 rounded-lg p-3">
-          <p><strong>Received By:</strong> {receiptData.issuedBy}</p>
-          <p><strong>Payment ID:</strong> {receiptData.paymentId}</p>
-          {receiptData.transactionId && (
-            <p><strong>Transaction ID:</strong> {receiptData.transactionId}</p>
-          )}
-        </div>
-        
-        <div className="text-xs text-gray-500 mt-4 pt-4 border-t border-gray-200">
-          <p>This is a computer-generated receipt and does not require a signature.</p>
-          <p>For any queries, please contact the school administration.</p>
-          <p>Generated on {formatDate(new Date())}</p>
-        </div>
-      </div>
     </div>
   );
 

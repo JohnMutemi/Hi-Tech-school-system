@@ -76,7 +76,7 @@ export async function GET(
       status: receipt.payment?.status || 'COMPLETED',
       issuedBy: 'Bursar',
       reference: receipt.payment?.referenceNumber,
-      phoneNumber: receipt.student.parent?.phone,
+
       transactionId: receipt.payment?.transactionId,
       termOutstandingBefore: receipt.termOutstandingBefore,
       termOutstandingAfter: receipt.termOutstandingAfter,

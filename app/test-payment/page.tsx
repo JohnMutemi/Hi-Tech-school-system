@@ -99,7 +99,7 @@ Payment Details:
 - Term: ${receiptData.term}
 - Academic Year: ${receiptData.academicYear}
 - Payment Method: ${receiptData.paymentMethod.toUpperCase()}
-${receiptData.phoneNumber ? `- Phone Number: ${receiptData.phoneNumber}` : ''}
+
 ${receiptData.transactionId ? `- Transaction ID: ${receiptData.transactionId}` : ''}
 - Reference: ${receiptData.reference}
 - Status: ${receiptData.status.toUpperCase()}
@@ -161,12 +161,7 @@ Thank you for your payment!
                 <span className="font-medium">Payment Method:</span>
                 <p className="uppercase">{receiptData.paymentMethod}</p>
               </div>
-              {receiptData.phoneNumber && (
-                <div>
-                  <span className="font-medium">Phone Number:</span>
-                  <p>{receiptData.phoneNumber}</p>
-                </div>
-              )}
+
               {receiptData.transactionId && (
                 <div>
                   <span className="font-medium">Transaction ID:</span>

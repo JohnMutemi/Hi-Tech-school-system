@@ -47,15 +47,31 @@ export class EmailService {
   // Helper function to generate receipt view URL
   private generateReceiptViewUrl(schoolCode: string, receiptNumber: string): string {
     // Create a secure URL that leads to the receipt view endpoint
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-    return `${baseUrl}/api/schools/${schoolCode}/receipts/${receiptNumber}/view`
+    let baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+    // Remove trailing slash to avoid double slashes
+    baseUrl = baseUrl.replace(/\/$/, '')
+    const url = `${baseUrl}/api/schools/${schoolCode}/receipts/${receiptNumber}/view`
+    console.log('🔍 Receipt URL Debug:', {
+      NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL,
+      baseUrl,
+      generatedUrl: url
+    })
+    return url
   }
 
   // Helper function to generate fees statement PDF URL
   private generateFeesStatementUrl(schoolCode: string, studentId: string, academicYearId?: string): string {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+    let baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+    // Remove trailing slash to avoid double slashes
+    baseUrl = baseUrl.replace(/\/$/, '')
     const yearParam = academicYearId ? `?academicYearId=${academicYearId}` : ''
-    return `${baseUrl}/api/schools/${schoolCode}/students/${studentId}/fee-statement/pdf${yearParam}`
+    const url = `${baseUrl}/api/schools/${schoolCode}/students/${studentId}/fee-statement/pdf${yearParam}`
+    console.log('🔍 Fees Statement URL Debug:', {
+      NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL,
+      baseUrl,
+      generatedUrl: url
+    })
+    return url
   }
 
   async initializeForSchool(schoolId: string): Promise<boolean> {
@@ -239,6 +255,52 @@ export class EmailService {
     }
   }
 
+  // Helper function to convert numbers to words for email
+  private convertNumberToWords(amount: number): string {
+    if (amount === 0) return 'Zero';
+    
+    const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+    const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+    const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+    const thousands = ['', 'Thousand', 'Million', 'Billion'];
+
+    function convertHundreds(num: number): string {
+      let result = '';
+      
+      if (num >= 100) {
+        result += ones[Math.floor(num / 100)] + ' Hundred ';
+        num %= 100;
+      }
+      
+      if (num >= 20) {
+        result += tens[Math.floor(num / 10)] + ' ';
+        num %= 10;
+      } else if (num >= 10) {
+        result += teens[num - 10] + ' ';
+        return result;
+      }
+      
+      if (num > 0) {
+        result += ones[num] + ' ';
+      }
+      
+      return result;
+    }
+
+    let result = '';
+    let thousandCounter = 0;
+    
+    while (amount > 0) {
+      if (amount % 1000 !== 0) {
+        result = convertHundreds(amount % 1000) + thousands[thousandCounter] + ' ' + result;
+      }
+      amount = Math.floor(amount / 1000);
+      thousandCounter++;
+    }
+    
+    return result.trim();
+  }
+
   private generatePaymentConfirmationEmail(data: PaymentNotificationData) {
     const subject = `Payment Confirmation - ${data.schoolName}`
     
@@ -251,373 +313,429 @@ export class EmailService {
     <title>Payment Confirmation - ${data.schoolName}</title>
     <style>
         body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
+            font-family: Inter, system-ui, sans-serif; 
             line-height: 1.6; 
             color: #333; 
             margin: 0; 
             padding: 0; 
             background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
         }
-        .container { 
-            max-width: 800px; 
-            margin: 0 auto; 
-            padding: 20px; 
+        .email-container { 
+            max-width: 700px; 
+            margin: 20px auto; 
+            padding: 0;
             background: white;
-            border-radius: 16px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-            border: 2px solid #f1f5f9;
-            position: relative;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
             overflow: hidden;
-        }
-        .curled-corner {
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 64px;
-            height: 64px;
-            overflow: hidden;
-            pointer-events: none;
-        }
-        .curled-corner::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 32px;
-            height: 32px;
-            background: #e2e8f0;
-            transform: rotate(45deg);
-            transform-origin: bottom left;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         .header { 
-            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); 
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); 
             color: white; 
-            padding: 40px 30px; 
+            padding: 30px; 
             text-align: center; 
-            border-radius: 12px 12px 0 0; 
-            margin: -20px -20px 30px -20px;
-            position: relative;
         }
-        .header::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-            opacity: 0.1;
-            border-radius: 12px 12px 0 0;
+        .header h1 {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 0 0 5px 0;
         }
-        .school-logo {
-            display: inline-block;
-            background: rgba(255,255,255,0.2);
-            padding: 12px;
-            border-radius: 50%;
-            margin-bottom: 15px;
+        .header p {
+            font-size: 12px;
+            color: #dbeafe;
+            margin: 2px 0;
         }
-        .success-badge {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            border: 2px solid #34d399;
-            border-radius: 12px;
-            padding: 20px;
-            margin: 20px 0;
+        .email-intro {
+            padding: 30px;
+            background: #f0fdf4;
+            border-bottom: 1px solid #bbf7d0;
             text-align: center;
         }
-        .receipt-info {
-            background: #f8fafc;
+        .email-intro h2 {
+            color: #166534;
+            margin: 0 0 10px 0;
+            font-size: 20px;
+        }
+        .email-intro p {
+            color: #15803d;
+            margin: 0;
+            font-size: 16px;
+        }
+        .receipt-preview {
+            margin: 30px;
+            background: white;
+            border: 2px solid #e5e7eb;
             border-radius: 8px;
-            padding: 15px;
-            margin: 20px 0;
+            overflow: hidden;
+        }
+        .receipt-header {
+            padding: 20px;
+            border-bottom: 1px solid #e5e7eb;
+            background: #f9fafb;
+        }
+        .receipt-header h3 {
+            margin: 0 0 10px 0;
+            color: #374151;
+            font-size: 18px;
+        }
+        .receipt-info {
             display: flex;
             justify-content: space-between;
             align-items: center;
             font-size: 14px;
-            color: #64748b;
+            color: #6b7280;
+            margin-top: 10px;
         }
-        .content { 
-            padding: 0 20px 30px 20px; 
+        .status-badge {
+            background: #dcfce7;
+            color: #166534;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .receipt-content { 
+            padding: 25px; 
         }
         .section {
-            background: white;
-            border: 2px solid #e2e8f0;
-            border-radius: 12px;
-            margin: 20px 0;
-            overflow: hidden;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            margin-bottom: 25px;
         }
-        .section-header {
-            padding: 15px 20px;
+        .section h4 {
+            font-size: 14px;
             font-weight: 600;
-            font-size: 16px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
+            color: #374151;
+            margin: 0 0 10px 0;
         }
-        .section-content {
+        .section-box {
+            background: #f9fafb;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #e5e7eb;
+        }
+        .amount-box {
+            background: #f0fdf4;
+            border: 2px solid #bbf7d0;
             padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            margin: 20px 0;
         }
-        .student-section { border-left: 4px solid #3b82f6; }
-        .student-section .section-header { background: #eff6ff; color: #1e40af; }
-        .payment-section { border-left: 4px solid #10b981; }
-        .payment-section .section-header { background: #ecfdf5; color: #047857; }
-        .academic-section { border-left: 4px solid #8b5cf6; }
-        .academic-section .section-header { background: #f3f4f6; color: #6d28d9; }
-        .balance-section { border-left: 4px solid #f59e0b; }
-        .balance-section .section-header { background: #fffbeb; color: #d97706; }
+        .amount-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #166534;
+            margin: 0;
+        }
+        .amount-words {
+            font-style: italic;
+            color: #374151;
+            margin: 5px 0 0 0;
+            font-size: 14px;
+        }
         .details-grid { 
             display: grid; 
             grid-template-columns: 1fr 1fr; 
             gap: 15px; 
-            margin: 15px 0; 
-        }
-        .detail-item { 
-            padding: 12px; 
-            background: #f8fafc; 
-            border-radius: 8px; 
-            border: 1px solid #e2e8f0;
-        }
-        .detail-label { 
-            font-weight: 600; 
-            color: #64748b; 
-            font-size: 12px; 
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .detail-value { 
-            color: #1e293b; 
-            margin-top: 4px; 
-            font-weight: 600;
             font-size: 14px;
         }
-        .amount-highlight {
-            font-size: 24px;
-            font-weight: bold;
-            color: #10b981;
-            text-align: center;
-            padding: 20px;
-            background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
-            border-radius: 12px;
-            margin: 20px 0;
-            border: 2px solid #34d399;
+        .detail-item span {
+            color: #6b7280;
+            font-size: 12px; 
+            font-weight: 500;
+        }
+        .detail-item p {
+            color: #374151;
+            font-weight: 600;
+            margin: 2px 0 0 0;
         }
         .download-section {
-            text-align: center;
-            margin: 30px 0;
-            padding: 30px;
-            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-            border-radius: 12px;
+            background: #f0f9ff;
             border: 2px solid #0ea5e9;
+            border-radius: 12px;
+            padding: 30px;
+            margin: 30px;
+            text-align: center;
+        }
+        .download-title {
+            color: #0c4a6e;
+            font-size: 20px;
+            font-weight: 600;
+            margin: 0 0 10px 0;
+        }
+        .download-subtitle {
+            color: #0369a1;
+            margin: 0 0 25px 0;
+            font-size: 14px;
+        }
+        .button-container {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
         }
         .download-button {
             display: inline-flex;
             align-items: center;
             color: white;
-            padding: 18px 28px;
+            padding: 15px 25px;
             text-decoration: none;
-            border-radius: 12px;
+            border-radius: 8px;
             font-weight: 600;
-            min-width: 200px;
-            gap: 8px;
+            min-width: 180px;
+            gap: 10px;
             transition: all 0.3s ease;
-        }
-        .download-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+            font-size: 14px;
         }
         .receipt-button {
             background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
-            box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
         }
         .statement-button {
             background: linear-gradient(135deg, #059669 0%, #047857 100%);
-            box-shadow: 0 4px 16px rgba(5, 150, 105, 0.3);
+            box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
         }
-        .thank-you-section {
-            background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
-            border: 2px solid #10b981;
-            border-radius: 12px;
-            padding: 25px;
-            margin: 20px 0;
-            text-align: center;
+        .download-note {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(59, 130, 246, 0.1);
+            border-radius: 6px;
+            font-size: 13px;
+            color: #475569;
+            border-left: 4px solid #3b82f6;
         }
         .footer { 
+            background: #f9fafb;
+            border-top: 1px solid #e5e7eb;
+            padding: 25px;
             text-align: center; 
-            margin-top: 30px; 
-            color: #64748b; 
+            color: #6b7280; 
             font-size: 12px;
-            padding: 20px;
-            border-top: 1px solid #e2e8f0;
         }
-        .icon {
-            width: 20px;
-            height: 20px;
-            display: inline-block;
-            vertical-align: middle;
-            margin-right: 8px;
+        .footer p {
+            margin: 5px 0;
         }
         @media (max-width: 600px) {
-            .container { margin: 10px; padding: 15px; }
+            .email-container { margin: 10px; }
             .details-grid { grid-template-columns: 1fr; }
-            .header { padding: 30px 20px; }
+            .receipt-info { flex-direction: column; gap: 10px; text-align: center; }
             .button-container { flex-direction: column; align-items: center; }
-            .download-button { min-width: 180px; }
+            .download-button { min-width: 200px; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="curled-corner"></div>
-        
+    <div class="email-container">
         <div class="header">
-            <div class="school-logo">🏫</div>
-            <h1 style="margin: 0; font-size: 28px; font-weight: bold;">${data.schoolName}</h1>
-            <p style="margin: 5px 0 0; opacity: 0.9;">School Code: ${data.schoolCode || 'N/A'}</p>
+            <h1>${data.schoolName}</h1>
+            <p>School Code: ${data.schoolCode || 'N/A'}</p>
+            <p>📧 ${(data.schoolCode || 'school').toLowerCase()}@school.ac.ke | 📞 +254-XXX-XXXXXX</p>
         </div>
         
-        <div class="success-badge">
-            <div style="font-size: 24px; margin-bottom: 10px;">✅</div>
-            <div style="font-weight: bold; font-size: 18px; color: #047857;">Payment Successful</div>
-            <div style="font-size: 20px; font-weight: bold; color: #065f46;">OFFICIAL RECEIPT</div>
+        <div class="email-intro">
+            <h2>✅ Payment Successfully Received!</h2>
+            <p>Your payment has been processed and a receipt has been generated.</p>
         </div>
         
-        <div class="receipt-info">
-            <span>Receipt No: <strong style="color: #3b82f6;">${data.receiptNumber}</strong></span>
-            <span>Date: <strong>${new Date(data.paymentDate).toLocaleDateString('en-GB', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            })}</strong></span>
-        </div>
-        
-        <div class="content">
-            <div class="amount-highlight">
-                KES ${data.amount.toLocaleString()}
+        <div class="receipt-preview">
+            <!-- Premium Receipt Header -->
+            <div style="background: linear-gradient(135deg, #1d4ed8 0%, #3730a3 100%); color: white; padding: 20px; position: relative; overflow: hidden;">
+                <!-- Decorative elements -->
+                <div style="position: absolute; top: -20px; right: -20px; width: 80px; height: 80px; background: rgba(255,255,255,0.1); border-radius: 50%;"></div>
+                <div style="position: absolute; bottom: -15px; left: -15px; width: 60px; height: 60px; background: rgba(255,255,255,0.05); border-radius: 50%;"></div>
+                
+                <div style="display: flex; justify-content: space-between; align-items: start; position: relative;">
+                    <div style="flex: 1;">
+                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                            <div style="width: 40px; height: 40px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.3);">
+                                <span style="font-size: 16px;">🏫</span>
+            </div>
+                            <div>
+                                <h3 style="margin: 0; font-size: 20px; font-weight: bold; letter-spacing: 0.5px;">${data.schoolName}</h3>
+                                <p style="margin: 0; font-size: 12px; color: #dbeafe; font-weight: 500;">Excellence in Education</p>
+                </div>
+                        </div>
+                        <div style="font-size: 10px; color: #dbeafe; line-height: 1.5;">
+                            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
+                                <span style="width: 14px; height: 14px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 8px;">🏢</span>
+                                School Code: <span style="color: white; font-weight: 600;">${data.schoolCode || 'N/A'}</span>
+                        </div>
+                            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
+                                <span style="width: 14px; height: 14px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 8px;">📧</span>
+                                ${(data.schoolCode || 'school').toLowerCase()}@school.ac.ke
+                        </div>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="width: 14px; height: 14px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 8px;">📞</span>
+                                +254-XXX-XXXXXX
+                    </div>
+                </div>
             </div>
             
-            <div class="section student-section">
-                <div class="section-header">
-                    <span class="icon">👤</span>
-                    Student Details
+                    <div style="text-align: right; margin-left: 20px;">
+                        <div style="background: rgba(255,255,255,0.95); color: #1d4ed8; padding: 8px 12px; border-radius: 8px; margin-bottom: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border: 1px solid rgba(255,255,255,0.5);">
+                            <p style="margin: 0; font-size: 10px; font-weight: 600; color: #3730a3;">DATE</p>
+                            <p style="margin: 0; font-size: 12px; font-weight: bold; color: #000;">${new Date(data.paymentDate).toLocaleDateString()}</p>
                 </div>
-                <div class="section-content">
-                    <div class="details-grid">
-                        <div class="detail-item">
-                            <div class="detail-label">Student Name</div>
-                            <div class="detail-value">${data.studentName}</div>
+                        <div style="background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); color: #000; padding: 8px 12px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border: 1px solid #d97706;">
+                            <p style="margin: 0; font-size: 10px; font-weight: 600; color: #92400e;">RECEIPT NO</p>
+                            <p style="margin: 0; font-size: 12px; font-weight: bold;">${data.receiptNumber}</p>
                         </div>
-                        <div class="detail-item">
-                            <div class="detail-label">Admission Number</div>
-                            <div class="detail-value">${data.admissionNumber || 'N/A'}</div>
                         </div>
-                        ${data.parentName ? `
-                        <div class="detail-item">
-                            <div class="detail-label">Parent/Guardian</div>
-                            <div class="detail-value">${data.parentName}</div>
+                        </div>
+            </div>
+
+            <!-- Invoice/Receipt Label -->
+            <div style="background: #2563eb; color: white; text-align: center; padding: 8px;">
+                <h4 style="margin: 0; font-size: 14px; font-weight: bold;">MONEY RECEIPT</h4>
+            </div>
+
+            <div class="receipt-content" style="padding: 20px;">
+                <!-- Enhanced Customer Information Section -->
+                <div style="background: linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%); border: 2px solid #2563eb; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+                    <div style="margin-bottom: 15px;">
+                        <div style="background: white; border: 2px solid #bfdbfe; padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
+                                <span style="width: 20px; height: 20px; background: #eff6ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px;">👤</span>
+                                <h5 style="color: #2563eb; font-size: 12px; font-weight: bold; margin: 0;">STUDENT NAME:</h5>
+                            </div>
+                            <p style="margin: 0; font-weight: bold; font-size: 16px; color: #374151;">${data.studentName}</p>
+                        </div>
+                    </div>
+                    <div>
+                        <div style="background: white; border: 2px solid #bfdbfe; padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
+                                <span style="width: 20px; height: 20px; background: #eff6ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px;">🆔</span>
+                                <h5 style="color: #2563eb; font-size: 12px; font-weight: bold; margin: 0;">ADMISSION NO:</h5>
+                            </div>
+                            <p style="margin: 0; font-weight: bold; font-size: 16px; color: #374151;">${data.admissionNumber || 'N/A'}</p>
+                            ${data.parentName ? `
+                            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #eff6ff;">
+                                <p style="margin: 0; font-size: 12px; color: #2563eb; font-weight: 500;">Parent/Guardian: ${data.parentName}</p>
                         </div>
                         ` : ''}
                     </div>
                 </div>
             </div>
             
-            <div class="section payment-section">
-                <div class="section-header">
-                    <span class="icon">💳</span>
-                    Payment Details
+                <!-- Items Table -->
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                    <thead>
+                        <tr style="background: #2563eb; color: white;">
+                            <th style="border: 1px solid #1d4ed8; padding: 8px; text-align: center; font-size: 11px;">NO.</th>
+                            <th style="border: 1px solid #1d4ed8; padding: 8px; text-align: left; font-size: 11px;">DESCRIPTION</th>
+                            <th style="border: 1px solid #1d4ed8; padding: 8px; text-align: center; font-size: 11px;">QTY</th>
+                            <th style="border: 1px solid #1d4ed8; padding: 8px; text-align: center; font-size: 11px;">UNIT PRICE</th>
+                            <th style="border: 1px solid #1d4ed8; padding: 8px; text-align: center; font-size: 11px;">AMOUNT</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="border: 1px solid #d1d5db; padding: 8px; text-align: center; font-weight: 600;">1</td>
+                            <td style="border: 1px solid #d1d5db; padding: 8px;">
+                                <div style="font-weight: 600; color: #374151;">${data.feeType || 'School Fees'}</div>
+                                <div style="font-size: 11px; color: #6b7280;">${data.academicYear || 'N/A'} - ${data.termName || 'N/A'}</div>
+                                <div style="font-size: 10px; color: #9ca3af;">Payment: ${data.paymentMethod ? data.paymentMethod.replace('_', ' ') : 'N/A'}</div>
+                            </td>
+                            <td style="border: 1px solid #d1d5db; padding: 8px; text-align: center;">1</td>
+                            <td style="border: 1px solid #d1d5db; padding: 8px; text-align: right;">KES ${data.amount.toLocaleString()}</td>
+                            <td style="border: 1px solid #d1d5db; padding: 8px; text-align: right; font-weight: bold;">KES ${data.amount.toLocaleString()}</td>
+                        </tr>
+                        ${(data.academicYearOutstandingBefore !== undefined || data.academicYearOutstandingAfter !== undefined || data.balanceBefore !== undefined || data.balanceAfter !== undefined) ? `
+                        <tr style="background: #f9fafb;">
+                            <td style="border: 1px solid #d1d5db; padding: 8px; text-align: center; font-weight: 600;">2</td>
+                            <td style="border: 1px solid #d1d5db; padding: 8px;">
+                                <div style="font-weight: 600; color: #374151;">Account Balance Summary</div>
+                                <div style="font-size: 11px; color: #6b7280;">
+                                    Balance Before: KES ${(data.academicYearOutstandingBefore || data.balanceBefore || 0).toLocaleString()}<br>
+                                    Balance After: KES ${(data.academicYearOutstandingAfter || data.balanceAfter || 0).toLocaleString()}
                 </div>
-                <div class="section-content">
-                    <div class="details-grid">
-                        <div class="detail-item">
-                            <div class="detail-label">Payment Method</div>
-                            <div class="detail-value">${data.paymentMethod}</div>
-                        </div>
-                        <div class="detail-item">
-                            <div class="detail-label">Reference</div>
-                            <div class="detail-value">${data.reference || 'N/A'}</div>
-                        </div>
-                        ${data.phoneNumber ? `
-                        <div class="detail-item">
-                            <div class="detail-label">Phone Number</div>
-                            <div class="detail-value">${data.phoneNumber}</div>
-                        </div>
+                            </td>
+                            <td style="border: 1px solid #d1d5db; padding: 8px; text-align: center;">-</td>
+                            <td style="border: 1px solid #d1d5db; padding: 8px; text-align: center;">-</td>
+                            <td style="border: 1px solid #d1d5db; padding: 8px; text-align: center;">-</td>
+                        </tr>
                         ` : ''}
-                        ${data.transactionId ? `
-                        <div class="detail-item">
-                            <div class="detail-label">Transaction ID</div>
-                            <div class="detail-value">${data.transactionId}</div>
-                        </div>
+                        ${data.carryForward && data.carryForward > 0 ? `
+                        <tr style="background: #eff6ff;">
+                            <td style="border: 1px solid #d1d5db; padding: 8px; text-align: center; font-weight: 600; color: #2563eb;">3</td>
+                            <td style="border: 1px solid #d1d5db; padding: 8px;">
+                                <div style="font-weight: 600; color: #2563eb;">Overpayment Carried Forward</div>
+                                <div style="font-size: 11px; color: #3b82f6;">Applied to next term fees</div>
+                            </td>
+                            <td style="border: 1px solid #d1d5db; padding: 8px; text-align: center; color: #2563eb;">1</td>
+                            <td style="border: 1px solid #d1d5db; padding: 8px; text-align: right; color: #2563eb;">KES ${data.carryForward.toLocaleString()}</td>
+                            <td style="border: 1px solid #d1d5db; padding: 8px; text-align: right; font-weight: bold; color: #2563eb;">KES ${data.carryForward.toLocaleString()}</td>
+                        </tr>
                         ` : ''}
+                    </tbody>
+                </table>
+
+                <!-- Terms and Total Section -->
+                <div style="border-top: 2px solid #2563eb; display: grid; grid-template-columns: 1fr 1fr;">
+                    <div style="padding: 15px; border-right: 1px solid #d1d5db;">
+                        <div style="font-size: 11px; color: #6b7280;">
+                            <p style="font-weight: bold; margin: 0 0 5px 0;">TERMS & CONDITIONS:</p>
+                            <p style="margin: 2px 0;">Payment received in good condition</p>
+                            <p style="margin: 2px 0;">No refund of money after payment</p>
+                            <p style="margin: 8px 0 0 0; font-weight: 600;">Thanks for your patronage.</p>
+                        </div>
+                        </div>
+                    <div style="background: #fecaca; padding: 15px; text-align: right;">
+                        <div style="background: #dc2626; color: white; padding: 8px 15px; font-weight: bold; font-size: 14px; border-radius: 4px; display: inline-block;">
+                            TOTAL KES ${data.amount.toLocaleString()}
+                        </div>
+                        </div>
                     </div>
-                </div>
+
+                <!-- Amount in Words -->
+                <div style="border-top: 1px solid #d1d5db; padding: 15px; background: #f9fafb;">
+                    <h5 style="font-size: 12px; font-weight: bold; color: #374151; margin: 0 0 5px 0;">Amount in words:</h5>
+                    <p style="margin: 0; font-weight: 600; color: #374151;">${this.convertNumberToWords(data.amount)} Kenyan Shillings Only</p>
             </div>
             
-            <div class="section academic-section">
-                <div class="section-header">
-                    <span class="icon">📅</span>
-                    Academic Period
+                <!-- Signatures -->
+                <div style="border-top: 1px solid #d1d5db; padding: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
+                    <div style="text-align: center;">
+                        <div style="border-top: 1px solid #6b7280; width: 80%; margin: 20px auto 8px auto;"></div>
+                        <p style="margin: 0; font-size: 12px; font-weight: bold; color: #374151;">Soft's signature</p>
                 </div>
-                <div class="section-content">
-                    <div class="details-grid">
-                        <div class="detail-item">
-                            <div class="detail-label">Academic Year</div>
-                            <div class="detail-value">${data.academicYear || 'N/A'}</div>
+                    <div style="text-align: center;">
+                        <div style="background: #2563eb; color: white; padding: 6px 12px; border-radius: 4px; font-weight: bold; font-size: 11px; margin-bottom: 15px; display: inline-block;">
+                            Thanks For Your Patronage!
                         </div>
-                        <div class="detail-item">
-                            <div class="detail-label">Term</div>
-                            <div class="detail-value">${data.termName || 'N/A'}</div>
-                        </div>
-                        <div class="detail-item">
-                            <div class="detail-label">Fee Type</div>
-                            <div class="detail-value">${data.feeType || 'School Fees'}</div>
-                        </div>
-                        <div class="detail-item">
-                            <div class="detail-label">Status</div>
-                            <div class="detail-value" style="color: #10b981; font-weight: bold;">${data.status || 'COMPLETED'}</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            ${data.balanceAfter !== undefined || data.balanceBefore !== undefined ? `
-            <div class="section balance-section">
-                <div class="section-header">
-                    <span class="icon">📊</span>
-                    Balance Summary
-                </div>
-                <div class="section-content">
-                    <div class="details-grid">
-                        ${data.balanceBefore !== undefined ? `
-                        <div class="detail-item">
-                            <div class="detail-label">Balance Before</div>
-                            <div class="detail-value">KES ${data.balanceBefore.toLocaleString()}</div>
-                        </div>
-                        ` : ''}
-                        ${data.balanceAfter !== undefined ? `
-                        <div class="detail-item">
-                            <div class="detail-label">Balance After</div>
-                            <div class="detail-value" style="color: ${data.balanceAfter <= 0 ? '#10b981' : '#f59e0b'};">
-                                KES ${data.balanceAfter.toLocaleString()}
+                        <div style="border-top: 1px solid #6b7280; width: 80%; margin: 0 auto 8px auto;"></div>
+                        <p style="margin: 0; font-size: 12px; font-weight: bold; color: #374151;">Customer's signature</p>
                             </div>
                         </div>
-                        ` : ''}
-                    </div>
+
+                <!-- Reference Information -->
+                ${(data.reference || data.transactionId || data.paymentId) ? `
+                <div style="border-top: 1px solid #d1d5db; padding: 15px; background: #f9fafb;">
+                    <div style="font-size: 11px; color: #6b7280;">
+                        ${data.paymentId ? `<p style="margin: 2px 0;"><span style="font-weight: 600;">Payment ID:</span> ${data.paymentId}</p>` : ''}
+                        ${data.transactionId ? `<p style="margin: 2px 0;"><span style="font-weight: 600;">Transaction ID:</span> ${data.transactionId}</p>` : ''}
+                        ${data.reference ? `<p style="margin: 2px 0;"><span style="font-weight: 600;">Reference:</span> ${data.reference}</p>` : ''}
+                        <p style="margin: 8px 0 0 0; text-align: center;"><span style="font-weight: 600;">Issued by:</span> ${data.issuedBy || 'Bursar'} | <span style="font-weight: 600;">Generated:</span> ${new Date().toLocaleDateString()}</p>
                 </div>
             </div>
             ` : ''}
+            </div>
+        </div>
             
+        <!-- Download Section with Clear Call-to-Action -->
             ${data.receiptDownloadUrl || data.feesStatementUrl ? `
             <div class="download-section">
-                <div class="download-title" style="margin: 0 0 15px 0; color: #0c4a6e; font-size: 18px; font-weight: 600;">📄 Your Payment Documents</div>
-                <div class="download-subtitle" style="margin: 0 0 20px 0; color: #0369a1;">Access your receipt and fee statement instantly</div>
+            <div class="download-title">📄 Your Payment Documents</div>
+            <div class="download-subtitle">Access your receipt and fee statement instantly - they'll open in your browser with full download options.</div>
                 
-                <div class="button-container" style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+            <div class="button-container">
                     ${data.receiptDownloadUrl ? `
                     <div style="text-align: center;">
-                        <a href="${data.receiptDownloadUrl}" class="download-button receipt-button" style="background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%); box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);">
-                            <span class="button-label" style="font-size: 20px;">🧾</span>
+                    <a href="${data.receiptDownloadUrl}" class="download-button receipt-button">
+                        <span style="font-size: 18px;">🧾</span>
                             <div>
-                                <div style="font-weight: 600;">View Receipt</div>
-                                <div class="button-description" style="font-size: 12px; opacity: 0.9;">Interactive receipt with download options</div>
+                            <div style="font-weight: 600;">View Interactive Receipt</div>
+                            <div style="font-size: 12px; opacity: 0.9;">View online • Download PDF • Print</div>
                             </div>
                         </a>
                     </div>
@@ -625,29 +743,31 @@ export class EmailService {
                     
                     ${data.feesStatementUrl ? `
                     <div style="text-align: center;">
-                        <a href="${data.feesStatementUrl}" class="download-button statement-button" style="background: linear-gradient(135deg, #059669 0%, #047857 100%); box-shadow: 0 4px 16px rgba(5, 150, 105, 0.3);">
-                            <span class="button-label" style="font-size: 20px;">📊</span>
+                    <a href="${data.feesStatementUrl}" class="download-button statement-button">
+                        <span style="font-size: 18px;">📊</span>
                             <div>
-                                <div style="font-weight: 600;">Fee Statement</div>
-                                <div class="button-description" style="font-size: 12px; opacity: 0.9;">Complete academic year statement (PDF)</div>
+                            <div style="font-weight: 600;">Complete Fee Statement</div>
+                            <div style="font-size: 12px; opacity: 0.9;">Full academic year summary (PDF)</div>
                             </div>
                         </a>
                     </div>
                     ` : ''}
                 </div>
                 
-                <div class="tip-box" style="margin-top: 20px; padding: 15px; background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); border-radius: 8px; border-left: 4px solid #3b82f6; font-size: 14px; color: #475569;">
-                    💡 Tip: The receipt shows this payment details, while the fee statement shows your complete academic year financial summary.
+            <div class="download-note">
+                <strong>💡 What's Available:</strong><br>
+                • <strong>Interactive Receipt:</strong> View this payment with unified layout, download as PDF (A3/A4/A5), print, or save as text<br>
+                • <strong>Fee Statement:</strong> Complete overview of all fees and payments for the academic year
                 </div>
             </div>
             ` : ''}
             
-            <div class="thank-you-section">
-                <h3 style="margin: 0 0 10px 0; color: #047857;">Thank You for Your Payment!</h3>
-                <p style="margin: 0; color: #065f46;">
-                    We appreciate your prompt payment. This receipt serves as proof of payment for the above mentioned fees.
-                </p>
-            </div>
+        <!-- Thank You Section -->
+        <div style="background: #f0fdf4; border: 2px solid #bbf7d0; border-radius: 12px; padding: 25px; margin: 30px; text-align: center;">
+            <h3 style="margin: 0 0 10px 0; color: #166534; font-size: 18px;">🙏 Thank You for Your Payment!</h3>
+            <p style="margin: 0; color: #15803d; font-size: 14px;">
+                We appreciate your prompt payment. This receipt serves as official proof of payment for the fees mentioned above.
+            </p>
         </div>
         
         <div class="footer">
@@ -672,26 +792,75 @@ export class EmailService {
     `
 
     const text = `
-Payment Confirmation - ${data.schoolName}
+${data.schoolName}
+School Code: ${data.schoolCode || 'N/A'}
+📧 ${(data.schoolCode || 'school').toLowerCase()}@school.ac.ke | 📞 +254-XXX-XXXXXX
 
-Your payment has been successfully processed!
+✅ PAYMENT SUCCESSFULLY RECEIVED!
 
-Payment Details:
-- Amount: KES ${data.amount.toLocaleString()}
-- Student: ${data.studentName}
-- Receipt Number: ${data.receiptNumber}
-- Payment Method: ${data.paymentMethod}
-- Payment Date: ${new Date(data.paymentDate).toLocaleDateString()}
-${data.termName ? `- Term: ${data.termName}` : ''}
-${data.academicYear ? `- Academic Year: ${data.academicYear}` : ''}
-${data.balanceAfter !== undefined ? `- Remaining Balance: KES ${data.balanceAfter.toLocaleString()}` : ''}
+MONEY RECEIPT
+===============================================
+
+Receipt No: ${data.receiptNumber}
+Date: ${new Date(data.paymentDate).toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    })}
+Status: ✓ PAID
+
+Received with thanks from:
+${data.studentName}
+Admission No: ${data.admissionNumber || 'N/A'}
+${data.parentName ? `Parent/Guardian: ${data.parentName}` : ''}
+${data.phoneNumber ? `Phone: ${data.phoneNumber}` : ''}
+
+Amount:
+KES ${data.amount.toLocaleString()}
+In words: ${this.convertNumberToWords(data.amount)} Kenyan Shillings Only
+
+For:
+Fee Type: ${data.feeType || 'School Fees'}
+Academic Year: ${data.academicYear || 'N/A'}
+Term: ${data.termName || 'N/A'}
+Payment Method: ${data.paymentMethod ? data.paymentMethod.replace('_', ' ') : 'N/A'}
+${data.reference ? `Reference: ${data.reference}` : ''}
+
+${(data.academicYearOutstandingBefore !== undefined || data.academicYearOutstandingAfter !== undefined || data.balanceBefore !== undefined || data.balanceAfter !== undefined) ? `
+Account Balance:
+Balance Before: KES ${(data.academicYearOutstandingBefore || data.balanceBefore || 0).toLocaleString()}
+Balance After: KES ${(data.academicYearOutstandingAfter || data.balanceAfter || 0).toLocaleString()}
+${data.carryForward && data.carryForward > 0 ? `
+Overpayment Carried Forward: KES ${data.carryForward.toLocaleString()}
+Applied to next term fees` : ''}
+` : ''}
+
+                   _________________________
+                      Money Receiver Sign
+                        ${data.issuedBy || 'Bursar'}
 
 ${data.receiptDownloadUrl || data.feesStatementUrl ? `
-Your Payment Documents:
-${data.receiptDownloadUrl ? `📧 View Interactive Receipt: ${data.receiptDownloadUrl}` : ''}
-${data.feesStatementUrl ? `📊 Download Fee Statement (PDF): ${data.feesStatementUrl}` : ''}
+📄 YOUR PAYMENT DOCUMENTS:
+
+${data.receiptDownloadUrl ? `🧾 View Interactive Receipt: ${data.receiptDownloadUrl}
+   • View online with unified layout
+   • Download as PDF (A3/A4/A5 formats)
+   • Print directly from browser
+   • Save as text file` : ''}
+
+${data.feesStatementUrl ? `📊 Complete Fee Statement: ${data.feesStatementUrl}
+   • Full academic year summary
+   • PDF format ready for download` : ''}
 ` : ''}
-Thank you for your payment!
+
+===============================================
+🙏 Thank you for your payment!
+This receipt serves as official proof of payment.
+
+For queries, contact the school administration.
+Processed through: Bursar Portal
 
 ${data.schoolName}
     `

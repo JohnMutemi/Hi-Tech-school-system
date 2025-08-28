@@ -12,7 +12,8 @@ import {
   School,
   PieChart,
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
+  LogOut
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -33,22 +34,10 @@ const NAV_ITEMS = [
     description: "Manage student fee records"
   },
   { 
-    id: "payments", 
-    label: "Payment Processing", 
-    icon: CreditCard,
-    description: "Record and process payments"
-  },
-  { 
     id: "outstanding", 
     label: "Outstanding Fees", 
     icon: AlertCircle,
     description: "Track unpaid balances"
-  },
-  { 
-    id: "receipts", 
-    label: "Receipts & Records", 
-    icon: Receipt,
-    description: "View payment receipts"
   },
   { 
     id: "reports", 
@@ -69,6 +58,7 @@ const NAV_ITEMS = [
 interface BursarSidebarProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
+  onLogout?: () => void;
   bursar?: any;
   schoolName?: string;
   schoolCode?: string;
@@ -83,6 +73,7 @@ interface BursarSidebarProps {
 export const BursarSidebar: React.FC<BursarSidebarProps> = ({ 
   activeTab, 
   onTabChange, 
+  onLogout,
   bursar,
   schoolName,
   schoolCode,
@@ -101,31 +92,31 @@ export const BursarSidebar: React.FC<BursarSidebarProps> = ({
   const SidebarContent = () => (
     <>
       {/* Sidebar Header */}
-      <div className="flex flex-col items-center p-6 border-b border-slate-700 bg-gradient-to-r from-slate-800 to-indigo-800">
-        <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
+      <div className="flex flex-col items-center p-6 border-b border-blue-800 bg-gradient-to-r from-slate-900 to-blue-900">
+        <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl flex items-center justify-center mb-4 shadow-xl border border-blue-500/20">
           <School className="w-8 h-8 text-white" />
         </div>
         <h2 className="text-xl font-bold text-white text-center mb-1">Bursar Portal</h2>
-        <p className="text-slate-300 text-sm text-center">Financial Management</p>
+        <p className="text-blue-200 text-sm text-center font-medium">Financial Management</p>
         {schoolName && (
-          <div className="mt-3 px-3 py-1 bg-slate-700 rounded-full">
-            <span className="text-xs text-slate-200">{schoolName}</span>
+          <div className="mt-3 px-4 py-2 bg-blue-800/50 backdrop-blur-sm rounded-full border border-blue-600/30">
+            <span className="text-xs text-blue-100 font-medium">{schoolName}</span>
           </div>
         )}
       </div>
 
       {/* Bursar Profile */}
       {bursar && (
-        <div className="p-4 border-b border-slate-700">
+        <div className="p-4 border-b border-blue-800">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+            <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-semibold text-sm shadow-lg border border-blue-400/30">
               {bursar.name?.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() || 'B'}
             </div>
             <div>
               <div className="font-semibold text-white text-sm">
                 {bursar.name || 'Bursar'}
               </div>
-              <div className="text-slate-300 text-xs">
+              <div className="text-blue-200 text-xs font-medium">
                 {bursar.email || 'Financial Officer'}
               </div>
             </div>
@@ -138,7 +129,7 @@ export const BursarSidebar: React.FC<BursarSidebarProps> = ({
       {/* Navigation Links */}
       <div className="flex-1 flex flex-col">
         <nav className="p-4">
-          <h3 className="text-sm font-semibold text-slate-300 mb-4 uppercase tracking-wide">Navigation</h3>
+          <h3 className="text-sm font-semibold text-blue-200 mb-4 uppercase tracking-wide">Navigation</h3>
           <ul className="space-y-2">
             {NAV_ITEMS.map((item) => {
               const Icon = item.icon;
@@ -148,8 +139,8 @@ export const BursarSidebar: React.FC<BursarSidebarProps> = ({
                   <button
                     className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg text-left transition-all duration-200 group ${
                       isActive 
-                        ? 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow-lg' 
-                        : 'text-slate-300 hover:bg-slate-700 hover:text-white'
+                        ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg border border-blue-500/30' 
+                        : 'text-blue-200 hover:bg-blue-800/50 hover:text-white'
                     }`}
                     onClick={() => {
                       onTabChange(item.id);
@@ -159,19 +150,19 @@ export const BursarSidebar: React.FC<BursarSidebarProps> = ({
                   >
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200 ${
                       isActive 
-                        ? 'bg-white/20' 
-                        : 'bg-slate-600 group-hover:bg-slate-500'
+                        ? 'bg-white/20 border border-white/30' 
+                        : 'bg-blue-700/50 group-hover:bg-blue-600/50'
                     }`}>
                       <Icon className="w-4 h-4" />
                     </div>
                     <div className="flex-1">
                       <div className="font-medium text-sm">{item.label}</div>
-                      <div className={`text-xs ${isActive ? 'text-blue-100' : 'text-slate-400'}`}>
+                      <div className={`text-xs ${isActive ? 'text-blue-100' : 'text-blue-300'}`}>
                         {item.description}
                       </div>
                     </div>
                     {isActive && (
-                      <div className="w-2 h-2 bg-white rounded-full"></div>
+                      <div className="w-2 h-2 bg-white rounded-full shadow-sm"></div>
                     )}
                   </button>
                 </li>
@@ -180,7 +171,26 @@ export const BursarSidebar: React.FC<BursarSidebarProps> = ({
           </ul>
         </nav>
 
-
+        {/* Logout Button at Bottom */}
+        <div className="mt-auto p-4 border-t border-blue-800">
+          {onLogout && (
+            <Button
+              onClick={onLogout}
+              variant="ghost"
+              className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-left transition-all duration-200 text-blue-200 hover:bg-red-800/50 hover:text-white group"
+            >
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200 bg-red-700/50 group-hover:bg-red-600/50">
+                <LogOut className="w-4 h-4" />
+              </div>
+              <div className="flex-1">
+                <div className="font-medium text-sm">Sign Out</div>
+                <div className="text-xs text-blue-300 group-hover:text-red-200">
+                  Leave portal safely
+                </div>
+              </div>
+            </Button>
+          )}
+        </div>
       </div>
     </>
   );
@@ -188,33 +198,33 @@ export const BursarSidebar: React.FC<BursarSidebarProps> = ({
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex fixed left-0 top-0 h-full w-80 z-30 bg-gradient-to-b from-slate-900 via-slate-800 to-indigo-900 border-r border-slate-700 shadow-2xl flex-col">
+      <aside className="hidden lg:flex fixed left-0 top-0 h-full w-80 z-50 bg-gradient-to-b from-slate-900 via-blue-900 to-blue-800 border-r border-blue-800/50 shadow-2xl flex-col backdrop-blur-xl">
         <SidebarContent />
       </aside>
 
       {/* Mobile Header */}
-      <header className="lg:hidden bg-gradient-to-r from-slate-900 to-indigo-900 shadow-lg border-b border-slate-700 sticky top-0 z-20">
+      <header className="lg:hidden bg-gradient-to-r from-slate-900 to-blue-900 shadow-lg border-b border-blue-800 sticky top-0 z-40">
         <div className="flex items-center justify-between px-4 py-4">
           <div className="flex items-center gap-3">
             <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="hover:bg-slate-800 h-10 w-10 rounded-xl text-white">
+                <Button variant="ghost" size="icon" className="hover:bg-blue-800/50 h-10 w-10 rounded-xl text-white border border-blue-700/30">
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-80 p-0 bg-gradient-to-b from-slate-900 via-slate-800 to-indigo-900 text-white border-slate-700">
+              <SheetContent side="left" className="w-80 p-0 bg-gradient-to-b from-slate-900 via-blue-900 to-blue-800 text-white border-blue-800">
                 <div className="h-full flex flex-col">
                   <SidebarContent />
                 </div>
               </SheetContent>
             </Sheet>
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg flex items-center justify-center border border-blue-500/30 shadow-lg">
                 <School className="w-4 h-4 text-white" />
               </div>
               <div>
                 <span className="font-bold text-lg text-white">Bursar Portal</span>
-                <div className="text-xs text-slate-300">
+                <div className="text-xs text-blue-200 font-medium">
                   {NAV_ITEMS.find(item => item.id === activeTab)?.label || 'Dashboard'}
                 </div>
               </div>
@@ -222,7 +232,7 @@ export const BursarSidebar: React.FC<BursarSidebarProps> = ({
           </div>
           {summary && (
             <div className="hidden sm:flex items-center gap-2">
-              <Badge variant="secondary" className="bg-slate-700 text-slate-200 border-slate-600">
+              <Badge variant="secondary" className="bg-blue-800/50 text-blue-100 border-blue-600/50 backdrop-blur-sm">
                 {summary.totalStudents} Students
               </Badge>
               <Badge variant="destructive" className="bg-red-900 text-red-200 border-red-700">

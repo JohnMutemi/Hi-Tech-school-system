@@ -335,11 +335,11 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
         return (
           <div className="space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:shadow-lg transition-all duration-300">
+              <Card className="bg-gradient-to-br from-blue-50 to-white border-blue-200/50 hover:shadow-xl hover:shadow-blue-100/50 transition-all duration-300 backdrop-blur-sm">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                  <CardTitle className="text-sm font-semibold text-blue-700">Total Students</CardTitle>
-                  <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center shadow-sm">
-                    <Users className="h-5 w-5 text-white" />
+                  <CardTitle className="text-sm font-semibold text-blue-800">Total Students</CardTitle>
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg border border-blue-500/20">
+                    <Users className="h-6 w-6 text-white" />
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -348,11 +348,11 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
                 </CardContent>
               </Card>
               
-              <Card className="bg-gradient-to-br from-red-50 to-red-100 border-red-200 hover:shadow-lg transition-all duration-300">
+              <Card className="bg-gradient-to-br from-red-50 to-white border-red-200/50 hover:shadow-xl hover:shadow-red-100/50 transition-all duration-300 backdrop-blur-sm">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                  <CardTitle className="text-sm font-semibold text-red-700">Total Outstanding</CardTitle>
-                  <div className="w-10 h-10 bg-red-500 rounded-xl flex items-center justify-center shadow-sm">
-                    <AlertCircle className="h-5 w-5 text-white" />
+                  <CardTitle className="text-sm font-semibold text-red-800">Total Outstanding</CardTitle>
+                  <div className="w-12 h-12 bg-gradient-to-br from-red-600 to-red-700 rounded-xl flex items-center justify-center shadow-lg border border-red-500/20">
+                    <AlertCircle className="h-6 w-6 text-white" />
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -363,11 +363,11 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
                 </CardContent>
               </Card>
               
-              <Card className="bg-gradient-to-br from-amber-50 to-amber-100 border-amber-200 hover:shadow-lg transition-all duration-300">
+              <Card className="bg-gradient-to-br from-amber-50 to-white border-amber-200/50 hover:shadow-xl hover:shadow-amber-100/50 transition-all duration-300 backdrop-blur-sm">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                  <CardTitle className="text-sm font-semibold text-amber-700">With Balance</CardTitle>
-                  <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center shadow-sm">
-                    <Clock className="h-5 w-5 text-white" />
+                  <CardTitle className="text-sm font-semibold text-amber-800">With Balance</CardTitle>
+                  <div className="w-12 h-12 bg-gradient-to-br from-amber-600 to-amber-700 rounded-xl flex items-center justify-center shadow-lg border border-amber-500/20">
+                    <Clock className="h-6 w-6 text-white" />
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -376,11 +376,11 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
                 </CardContent>
               </Card>
               
-              <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200 hover:shadow-lg transition-all duration-300">
+              <Card className="bg-gradient-to-br from-emerald-50 to-white border-emerald-200/50 hover:shadow-xl hover:shadow-emerald-100/50 transition-all duration-300 backdrop-blur-sm">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                  <CardTitle className="text-sm font-semibold text-emerald-700">Fully Paid</CardTitle>
-                  <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center shadow-sm">
-                    <CheckCircle2 className="h-5 w-5 text-white" />
+                  <CardTitle className="text-sm font-semibold text-emerald-800">Fully Paid</CardTitle>
+                  <div className="w-12 h-12 bg-gradient-to-br from-emerald-600 to-emerald-700 rounded-xl flex items-center justify-center shadow-lg border border-emerald-500/20">
+                    <CheckCircle2 className="h-6 w-6 text-white" />
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -392,29 +392,7 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
           </div>
         );
 
-      case 'payments':
-        return (
-          <div className="space-y-8">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">Payment Processing</h2>
-                <p className="text-gray-600">Record and process student fee payments</p>
-              </div>
-            </div>
-            <Card className="bg-white shadow-sm border-gray-200">
-              <CardContent className="p-8 text-center">
-                <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <CreditCard className="w-8 h-8 text-white" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Process Payments</h3>
-                <p className="text-gray-600 mb-4">Go to Student Management to record payments for individual students</p>
-                <Button onClick={() => setActiveTab('students')} className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700">
-                  Go to Student Management
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        );
+
 
       case 'outstanding':
         return (
@@ -503,29 +481,7 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
           </div>
         );
 
-      case 'receipts':
-        return (
-          <div className="space-y-8">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">Receipts & Records</h2>
-                <p className="text-gray-600">View and manage payment receipts</p>
-              </div>
-            </div>
-            <Card className="bg-white shadow-sm border-gray-200">
-              <CardContent className="p-8 text-center">
-                <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <FileText className="w-8 h-8 text-white" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Payment Receipts</h3>
-                <p className="text-gray-600 mb-4">View receipts in student payment history from Student Management section</p>
-                <Button onClick={() => setActiveTab('students')} variant="outline">
-                  Go to Student Management
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        );
+
 
       case 'reports':
         return (
@@ -634,13 +590,13 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
           <div className="space-y-8">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">Student Fee Management</h2>
-                <p className="text-gray-600">Manage student fee payments and balances</p>
+                <h2 className="text-2xl font-bold text-blue-900">Student Fee Management</h2>
+                <p className="text-blue-700/70">Manage student fee payments and balances</p>
               </div>
               <div className="flex items-center space-x-3">
                 <Button 
                   onClick={exportToExcel} 
-                  className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+                  className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transition-all duration-200 border border-blue-500/20"
                 >
                   <Download className="w-4 h-4 mr-2" />
                   Export Report
@@ -648,7 +604,7 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
                 <Button 
                   onClick={fetchStudents}
                   variant="outline"
-                  className="border-gray-300 hover:bg-gray-50 shadow-sm"
+                  className="border-blue-200 hover:bg-blue-50 hover:border-blue-300 text-blue-700 shadow-sm"
                 >
                   <RefreshCw className="w-4 h-4 mr-2" />
                   Refresh
@@ -657,10 +613,10 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
             </div>
 
             {/* Enhanced Filters Section */}
-            <Card className="bg-white shadow-sm border-gray-200 hover:shadow-md transition-shadow duration-300">
+            <Card className="bg-gradient-to-r from-white to-blue-50/30 shadow-sm border-blue-100 hover:shadow-lg hover:shadow-blue-100/50 transition-all duration-300 backdrop-blur-sm">
               <CardHeader className="border-b border-gray-100 pb-4">
-                <CardTitle className="flex items-center gap-3 text-gray-800">
-                  <div className="w-8 h-8 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center">
+                <CardTitle className="flex items-center gap-3 text-blue-900">
+                  <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg flex items-center justify-center border border-blue-500/20 shadow-sm">
                     <Filter className="w-4 h-4 text-white" />
                   </div>
                   Advanced Filters
@@ -768,14 +724,14 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
                           setSelectedClass('all');
                         }}
                         variant="outline"
-                        className="w-full border-gray-300 hover:bg-gray-50"
+                        className="w-full border-blue-200 hover:bg-blue-50 hover:border-blue-300 text-blue-700"
                       >
                         Clear Filters
                       </Button>
                     </div>
                     <div className="flex items-end">
-                      <div className="text-sm text-gray-600 bg-gray-50 px-3 py-2 rounded-lg w-full">
-                        Showing <span className="font-semibold text-gray-900">{filteredStudents.length}</span> of {students.length} students
+                      <div className="text-sm text-blue-600 bg-blue-50/50 px-3 py-2 rounded-lg w-full border border-blue-100">
+                        Showing <span className="font-semibold text-blue-900">{filteredStudents.length}</span> of {students.length} students
                       </div>
                     </div>
                   </div>
@@ -784,14 +740,14 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
             </Card>
 
             {/* Students Table */}
-            <Card className="bg-white shadow-sm border-gray-200 overflow-hidden">
-              <CardHeader className="border-b border-gray-100 bg-gray-50">
+            <Card className="bg-gradient-to-br from-white to-blue-50/30 shadow-lg border-blue-100/50 overflow-hidden backdrop-blur-sm">
+              <CardHeader className="border-b border-blue-100/50 bg-gradient-to-r from-blue-50/50 to-blue-100/30">
                 <CardTitle className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center">
+                    <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg flex items-center justify-center border border-blue-500/20 shadow-sm">
                       <Users className="w-4 h-4 text-white" />
                     </div>
-                    <span className="text-gray-800">Student Fee Management</span>
+                    <span className="text-blue-900 font-semibold">Student Fee Management</span>
                     <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200">
                       {filteredStudents.length} students
                     </Badge>
@@ -802,23 +758,23 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
-                      <TableRow className="bg-gray-50 border-b border-gray-200">
-                        <TableHead className="font-semibold text-gray-700 py-4">Student Information</TableHead>
-                        <TableHead className="font-semibold text-gray-700">Grade & Class</TableHead>
-                        <TableHead className="font-semibold text-gray-700">Parent Contact</TableHead>
-                        <TableHead className="font-semibold text-gray-700 text-right">Fee Required</TableHead>
-                        <TableHead className="font-semibold text-gray-700 text-right">Amount Paid</TableHead>
-                        <TableHead className="font-semibold text-gray-700 text-right">Outstanding</TableHead>
-                        <TableHead className="font-semibold text-gray-700 text-center">Status</TableHead>
-                        <TableHead className="font-semibold text-gray-700 text-center">Actions</TableHead>
+                      <TableRow className="bg-gradient-to-r from-blue-50 to-blue-100/50 border-b border-blue-200">
+                        <TableHead className="font-semibold text-blue-800 py-4">Student Information</TableHead>
+                        <TableHead className="font-semibold text-blue-800">Grade & Class</TableHead>
+                        <TableHead className="font-semibold text-blue-800">Parent Contact</TableHead>
+                        <TableHead className="font-semibold text-blue-800 text-right">Fee Required</TableHead>
+                        <TableHead className="font-semibold text-blue-800 text-right">Amount Paid</TableHead>
+                        <TableHead className="font-semibold text-blue-800 text-right">Outstanding</TableHead>
+                        <TableHead className="font-semibold text-blue-800 text-center">Status</TableHead>
+                        <TableHead className="font-semibold text-blue-800 text-center">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredStudents.map((student) => (
-                        <TableRow key={student.id} className="hover:bg-gray-50 transition-colors duration-200 border-b border-gray-100">
+                        <TableRow key={student.id} className="hover:bg-blue-50/30 transition-colors duration-200 border-b border-blue-100/50">
                           <TableCell className="py-4">
                             <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                              <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-blue-700 rounded-full flex items-center justify-center text-white font-semibold text-sm shadow-sm border border-blue-500/20">
                                 {student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                               </div>
                               <div>
@@ -882,7 +838,7 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
                                   setHistoryStudent(student);
                                   setShowPaymentHistory(true);
                                 }}
-                                className="border-gray-300 hover:bg-gray-50 shadow-sm"
+                                className="border-blue-200 hover:bg-blue-50 hover:border-blue-300 text-blue-600 shadow-sm"
                               >
                                 <History className="w-3 h-3" />
                               </Button>
@@ -913,9 +869,10 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       {/* Sidebar Navigation */}
-      <BursarSidebar 
+            <BursarSidebar
         activeTab={activeTab}
         onTabChange={setActiveTab}
+        onLogout={handleLogout}
         bursar={bursarInfo}
         schoolName={schoolInfo?.name}
         schoolCode={schoolCode}
@@ -924,70 +881,43 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
 
       {/* Main Content */}
       <div className="lg:ml-80">
-        {/* Top Header with Profile Dropdown */}
-        <div className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
+        {/* Enhanced Top Header - Sticky */}
+        <div className="sticky-header bg-gradient-to-r from-white/95 to-blue-50/80 border-b border-blue-100/50 px-6 py-6 shadow-lg backdrop-blur-md supports-[backdrop-filter]:bg-white/80">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                {activeTab === 'dashboard' && 'Dashboard'}
-                {activeTab === 'students' && 'Student Management'}
-                {activeTab === 'payments' && 'Payment Processing'}
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-900 to-blue-700 bg-clip-text text-transparent">
+                {activeTab === 'dashboard' && 'Financial Dashboard'}
+                {activeTab === 'students' && 'Student Fee Management'}
                 {activeTab === 'outstanding' && 'Outstanding Fees'}
-                {activeTab === 'receipts' && 'Receipts & Records'}
                 {activeTab === 'reports' && 'Financial Reports'}
                 {activeTab === 'analytics' && 'Payment Analytics'}
               </h1>
-              <p className="text-gray-600 text-sm mt-1">
+              <p className="text-blue-600/80 text-sm mt-2 font-medium">
                 {schoolInfo?.name || 'Financial Management System'}
               </p>
             </div>
             
-            {/* Profile Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-                  <Avatar className="h-10 w-10 border-2 border-gray-200">
-                    <AvatarImage src="/placeholder-avatar.jpg" alt="Bursar" />
-                    <AvatarFallback className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold">
-                      {bursarInfo?.name?.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() || 'B'}
-                    </AvatarFallback>
-                  </Avatar>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end" forceMount>
-                <DropdownMenuLabel className="font-normal">
-                  <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">
-                      {bursarInfo?.name || 'Bursar'}
-                    </p>
-                    <p className="text-xs leading-none text-muted-foreground">
-                      {bursarInfo?.email || 'Financial Officer'}
-                    </p>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="cursor-pointer">
-                  <User className="mr-2 h-4 w-4" />
-                  <span>Profile</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem className="cursor-pointer">
-                  <Settings className="mr-2 h-4 w-4" />
-                  <span>Settings</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem 
-                  className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50"
-                  onClick={handleLogout}
-                >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Sign out</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {/* Current Tab Indicator */}
+            <div className="hidden md:flex items-center space-x-4">
+              <div className="text-right">
+                <p className="text-sm font-medium text-blue-700">Current Session</p>
+                <p className="text-xs text-blue-500">
+                  {new Date().toLocaleDateString('en-US', { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'short', 
+                    day: 'numeric' 
+                  })}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg border border-blue-500/20">
+                <School className="w-6 h-6 text-white" />
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="p-6 pb-20 lg:pb-6">
+        <div className="p-6 pb-20 lg:pb-6 bg-gradient-to-br from-slate-50/50 via-blue-50/20 to-slate-50/50 min-h-[calc(100vh-8rem)]">
           {renderTabContent()}
         </div>
       </div>

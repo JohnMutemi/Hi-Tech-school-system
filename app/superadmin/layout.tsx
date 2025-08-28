@@ -64,20 +64,20 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
   }
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-slate-50 via-cyan-50 to-teal-100 relative overflow-hidden">
+    <div className="flex min-h-screen bg-gradient-to-br from-red-50 via-slate-50 to-red-100 relative overflow-hidden">
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-cyan-400/20 to-teal-400/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-aqua-400/20 to-cyan-400/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-r from-cyan-300/10 to-teal-300/10 rounded-full blur-3xl animate-pulse delay-500"></div>
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-red-400/20 to-red-600/20 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-slate-400/20 to-red-400/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-r from-red-300/10 to-slate-300/10 rounded-full blur-3xl animate-pulse delay-500"></div>
       </div>
 
               {/* Desktop Sidebar */}
         <aside className="w-72 bg-white/80 backdrop-blur-xl shadow-2xl hidden lg:flex flex-col h-screen fixed left-0 top-0 z-30 border-r border-white/20">
-        <div className="h-24 flex items-center justify-center border-b border-white/20 bg-gradient-to-r from-cyan-500 to-teal-500">
+        <div className="h-24 flex items-center justify-center border-b border-red-200/20 bg-gradient-to-r from-red-600 to-red-700 shadow-lg">
           <div className="text-center">
             <span className="font-bold text-2xl text-white tracking-tight">Hi-Tech SMS</span>
-            <p className="text-cyan-100 text-sm mt-1">Super Admin Portal</p>
+            <p className="text-red-100 text-sm mt-1">Super Admin Portal</p>
           </div>
         </div>
         
@@ -89,10 +89,10 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
               <Link 
                 key={item.href}
                 href={item.href} 
-                className={`group flex items-center gap-4 px-6 py-4 rounded-2xl font-medium transition-all duration-300 transform hover:scale-105 ${
-                  isActive 
-                    ? "bg-gradient-to-r from-cyan-500 to-teal-500 text-white shadow-lg shadow-cyan-500/25" 
-                    : "text-gray-700 hover:bg-white/60 hover:text-cyan-700 hover:shadow-md"
+                                className={`group flex items-center gap-4 px-6 py-4 rounded-2xl font-medium transition-all duration-300 transform hover:scale-105 ${
+                  isActive
+                    ? "bg-gradient-to-r from-red-600 to-red-700 text-white shadow-lg shadow-red-500/25 border border-red-500/20"
+                    : "text-gray-700 hover:bg-red-50/60 hover:text-red-700 hover:shadow-md"
                 }`} 
                 aria-current={isActive ? "page" : undefined}
               >
@@ -109,9 +109,9 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
         </nav>
         
         <div className="mt-auto mb-8 px-4">
-          <div className="mb-4 p-4 bg-gradient-to-r from-gray-50 to-cyan-50 rounded-2xl border border-white/50">
+          <div className="mb-4 p-4 bg-gradient-to-r from-red-50 to-slate-50 rounded-2xl border border-red-200/50">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-teal-600 rounded-full flex items-center justify-center">
+              <div className="w-10 h-10 bg-gradient-to-br from-red-600 to-red-700 rounded-full flex items-center justify-center shadow-sm border border-red-500/20">
                 <User className="w-5 h-5 text-white" />
               </div>
               <div className="flex-1 min-w-0">
@@ -139,14 +139,14 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
             <div className="flex items-center gap-3">
               <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                 <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" className="lg:hidden hover:bg-cyan-50 h-12 w-12 rounded-2xl transition-all duration-300 hover:scale-105">
+                  <Button variant="ghost" size="icon" className="lg:hidden hover:bg-red-50 h-12 w-12 rounded-2xl transition-all duration-300 hover:scale-105">
                     <Menu className="h-6 w-6" />
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="left" className="w-80 p-0 bg-white/95 backdrop-blur-xl">
-                  <SheetHeader className="p-6 border-b bg-gradient-to-r from-cyan-500 to-teal-500 text-white">
+                  <SheetHeader className="p-6 border-b bg-gradient-to-r from-red-600 to-red-700 text-white">
                     <SheetTitle className="text-left text-white font-bold text-xl">Hi-Tech SMS</SheetTitle>
-                    <p className="text-cyan-100 text-sm mt-2">Super Admin Portal</p>
+                    <p className="text-red-100 text-sm mt-2">Super Admin Portal</p>
                   </SheetHeader>
                   <nav className="flex-1 py-6 space-y-3 px-4">
                     {navigationItems.map((item) => {
@@ -157,10 +157,10 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
                           key={item.href}
                           href={item.href} 
                           onClick={() => setIsMobileMenuOpen(false)}
-                          className={`flex items-center gap-4 px-6 py-4 rounded-2xl font-medium transition-all duration-300 transform hover:scale-105 ${
-                            isActive 
-                              ? "bg-gradient-to-r from-cyan-500 to-teal-500 text-white shadow-lg" 
-                              : "text-gray-700 hover:bg-cyan-50 hover:text-cyan-700 hover:shadow-md"
+                                                    className={`flex items-center gap-4 px-6 py-4 rounded-2xl font-medium transition-all duration-300 transform hover:scale-105 ${
+                            isActive
+                              ? "bg-gradient-to-r from-red-600 to-red-700 text-white shadow-lg"
+                              : "text-gray-700 hover:bg-red-50 hover:text-red-700 hover:shadow-md"
                           }`} 
                           aria-current={isActive ? "page" : undefined}
                         >
@@ -176,9 +176,9 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
                     })}
                   </nav>
                   <div className="mt-auto p-6 border-t border-white/20">
-                                         <div className="mb-4 p-4 bg-gradient-to-r from-gray-50 to-cyan-50 rounded-2xl">
-                       <div className="flex items-center gap-3">
-                         <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-teal-600 rounded-full flex items-center justify-center">
+                                                             <div className="mb-4 p-4 bg-gradient-to-r from-red-50 to-slate-50 rounded-2xl">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gradient-to-br from-red-600 to-red-700 rounded-full flex items-center justify-center">
                            <User className="w-5 h-5 text-white" />
                          </div>
                         <div className="flex-1 min-w-0">
@@ -221,7 +221,7 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
               </div>
               
               {/* Notifications */}
-              <Button variant="ghost" size="icon" className="relative h-10 w-10 rounded-2xl hover:bg-cyan-50 transition-all duration-300 hover:scale-105">
+              <Button variant="ghost" size="icon" className="relative h-10 w-10 rounded-2xl hover:bg-red-50 transition-all duration-300 hover:scale-105">
                 <Bell className="w-5 h-5" />
                 <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
                   3
@@ -230,7 +230,7 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
               
               {/* User Avatar */}
               <div className="hidden sm:flex items-center gap-2 text-sm text-gray-600 bg-white/60 backdrop-blur-sm px-4 py-2 rounded-2xl border border-white/20">
-                <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 to-teal-600 rounded-full flex items-center justify-center">
+                <div className="w-8 h-8 bg-gradient-to-br from-red-600 to-red-700 rounded-full flex items-center justify-center">
                   <User className="w-4 h-4 text-white" />
                 </div>
                 <span className="font-medium">{user?.name || 'Admin'}</span>
@@ -256,10 +256,10 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex flex-col items-center py-3 px-2 min-w-0 flex-1 transition-all duration-300 transform hover:scale-110 ${
-                    isActive 
-                      ? "text-cyan-600 bg-gradient-to-r from-cyan-50 to-teal-50 rounded-2xl shadow-md" 
-                      : "text-gray-600 hover:text-cyan-600 hover:bg-cyan-50/50 rounded-2xl"
+                                    className={`flex flex-col items-center py-3 px-2 min-w-0 flex-1 transition-all duration-300 transform hover:scale-110 ${
+                    isActive
+                      ? "text-red-600 bg-gradient-to-r from-red-50 to-red-100/50 rounded-2xl shadow-md"
+                      : "text-gray-600 hover:text-red-600 hover:bg-red-50/50 rounded-2xl"
                   }`}
                   aria-current={isActive ? "page" : undefined}
                 >
@@ -291,13 +291,13 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
           background: transparent;
         }
         
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: linear-gradient(to bottom, #06b6d4, #0d9488);
+                .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: linear-gradient(to bottom, #dc2626, #b91c1c);
           border-radius: 3px;
         }
-        
+
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: linear-gradient(to bottom, #0891b2, #0f766e);
+          background: linear-gradient(to bottom, #b91c1c, #991b1b);
         }
         
         @keyframes float {

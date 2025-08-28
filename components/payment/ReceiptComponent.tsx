@@ -14,7 +14,6 @@ interface ReceiptData {
   term: string;
   academicYear: string;
   reference: string;
-  phoneNumber?: string;
   transactionId?: string;
   status: string;
   issuedAt: Date;

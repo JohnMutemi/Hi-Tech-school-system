@@ -155,8 +155,8 @@ export function SchoolSetupDashboard({
       description: "Complete your school information and settings",
       completed: !!schoolData.profile,
       icon: School,
-      color: "text-blue-600",
-      gradient: "from-blue-500 to-cyan-500",
+      color: "text-cyan-600",
+      gradient: "from-cyan-500 to-cyan-600",
     },
     {
       id: "staff",
@@ -164,8 +164,8 @@ export function SchoolSetupDashboard({
       description: "Add teachers and administrative staff",
       completed: (schoolData.teachers?.length || 0) > 0,
       icon: Users,
-      color: "text-emerald-600",
-      gradient: "from-emerald-500 to-teal-500",
+      color: "text-teal-600",
+      gradient: "from-teal-500 to-cyan-500",
     },
     {
       id: "students",
@@ -173,8 +173,8 @@ export function SchoolSetupDashboard({
       description: "Import or manually add student records",
       completed: (schoolData.students?.length || 0) > 0,
       icon: GraduationCap,
-      color: "text-purple-600",
-      gradient: "from-purple-500 to-indigo-500",
+      color: "text-slate-600",
+      gradient: "from-slate-500 to-cyan-500",
     },
     {
       id: "subjects",
@@ -185,7 +185,7 @@ export function SchoolSetupDashboard({
         (schoolData.classes?.length || 0) > 0,
       icon: BookOpen,
       color: "text-orange-600",
-      gradient: "from-orange-500 to-red-500",
+      gradient: "from-cyan-600 to-teal-600",
     },
     {
       id: "fees",
@@ -194,7 +194,7 @@ export function SchoolSetupDashboard({
       completed: false, // Will be updated based on fee structures
       icon: DollarSign,
       color: "text-green-600",
-      gradient: "from-green-500 to-emerald-500",
+      gradient: "from-teal-600 to-cyan-600",
     },
   ]);
 
@@ -350,7 +350,7 @@ export function SchoolSetupDashboard({
 
   // The return statement must be inside the function
   return (
-    <div className="min-h-screen flex bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen flex bg-gradient-to-br from-cyan-50 via-slate-50 to-cyan-100">
       {/* Enhanced Sidebar with modern look */}
       <Sidebar activeTab={activeTab} onTabChange={setActiveTab} colorTheme={schoolData.colorTheme} onLogout={onLogout} />
       
@@ -358,8 +358,8 @@ export function SchoolSetupDashboard({
       <div className="flex-1 flex justify-center items-start relative">
         {/* Animated background elements */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-blue-400/20 to-purple-400/20 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-cyan-400/20 to-blue-400/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-cyan-400/20 to-teal-400/20 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-slate-400/20 to-cyan-400/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
         </div>
         
         <main className="flex-1 flex justify-center items-start p-4 md:p-8 transition-all duration-300">
@@ -399,10 +399,10 @@ export function SchoolSetupDashboard({
                   </div>
                 )}
                 <div className="space-y-2">
-                  <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+                  <h1 className="text-4xl font-bold bg-gradient-to-r from-cyan-900 to-cyan-700 bg-clip-text text-transparent">
                     Welcome, {schoolData.adminFirstName} {schoolData.adminLastName}!
                   </h1>
-                  <p className="text-gray-600 font-medium">School Management Dashboard</p>
+                  <p className="text-cyan-600/80 font-medium">School Management Dashboard</p>
                 </div>
               </div>
               <div className="flex items-center space-x-4">
@@ -421,53 +421,53 @@ export function SchoolSetupDashboard({
               <TabsContent value="overview" className="space-y-8">
                 {/* Enhanced Summary Stats Section */}
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-6 mb-8">
-                  <Card className="group bg-gradient-to-br from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 shadow-lg border-0 rounded-2xl flex flex-col items-center py-6 px-6 transition-all duration-300 hover:scale-105">
-                    <CardContent className="flex flex-col items-center p-0">
-                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-300">
-                        <Users className="w-6 h-6 text-white" />
-                      </div>
-                      <div className="text-3xl font-bold text-blue-700">{schoolData.teachers?.length || 0}</div>
-                      <div className="text-blue-600 text-sm font-medium">Teachers</div>
-                    </CardContent>
-                  </Card>
+                                      <Card className="group bg-gradient-to-br from-cyan-50 to-cyan-100 hover:from-cyan-100 hover:to-cyan-200 shadow-lg border-0 rounded-2xl flex flex-col items-center py-6 px-6 transition-all duration-300 hover:scale-105">
+                      <CardContent className="flex flex-col items-center p-0">
+                        <div className="w-12 h-12 bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-300 shadow-lg border border-cyan-400/20">
+                          <Users className="w-6 h-6 text-white" />
+                        </div>
+                        <div className="text-3xl font-bold text-cyan-700">{schoolData.teachers?.length || 0}</div>
+                        <div className="text-cyan-600 text-sm font-medium">Teachers</div>
+                      </CardContent>
+                    </Card>
                   
-                  <Card className="group bg-gradient-to-br from-emerald-50 to-emerald-100 hover:from-emerald-100 hover:to-emerald-200 shadow-lg border-0 rounded-2xl flex flex-col items-center py-6 px-6 transition-all duration-300 hover:scale-105">
+                  <Card className="group bg-gradient-to-br from-teal-50 to-teal-100 hover:from-teal-100 hover:to-teal-200 shadow-lg border-0 rounded-2xl flex flex-col items-center py-6 px-6 transition-all duration-300 hover:scale-105">
                     <CardContent className="flex flex-col items-center p-0">
-                      <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-300">
+                      <div className="w-12 h-12 bg-gradient-to-br from-teal-500 to-teal-600 rounded-xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-300 shadow-lg border border-teal-400/20">
                         <GraduationCap className="w-6 h-6 text-white" />
                       </div>
-                      <div className="text-3xl font-bold text-emerald-700">{schoolData.students?.length || 0}</div>
-                      <div className="text-emerald-600 text-sm font-medium">Students</div>
+                      <div className="text-3xl font-bold text-teal-700">{schoolData.students?.length || 0}</div>
+                      <div className="text-teal-600 text-sm font-medium">Students</div>
                     </CardContent>
                   </Card>
                   
-                  <Card className="group bg-gradient-to-br from-purple-50 to-purple-100 hover:from-purple-100 hover:to-purple-200 shadow-lg border-0 rounded-2xl flex flex-col items-center py-6 px-6 transition-all duration-300 hover:scale-105">
+                  <Card className="group bg-gradient-to-br from-slate-50 to-slate-100 hover:from-slate-100 hover:to-slate-200 shadow-lg border-0 rounded-2xl flex flex-col items-center py-6 px-6 transition-all duration-300 hover:scale-105">
                     <CardContent className="flex flex-col items-center p-0">
-                      <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-300">
+                      <div className="w-12 h-12 bg-gradient-to-br from-slate-500 to-slate-600 rounded-xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-300 shadow-lg border border-slate-400/20">
                         <BookOpen className="w-6 h-6 text-white" />
                       </div>
-                      <div className="text-3xl font-bold text-purple-700">{schoolData.subjects?.length || 0}</div>
-                      <div className="text-purple-600 text-sm font-medium">Subjects</div>
+                      <div className="text-3xl font-bold text-slate-700">{schoolData.subjects?.length || 0}</div>
+                      <div className="text-slate-600 text-sm font-medium">Subjects</div>
                     </CardContent>
                   </Card>
                   
-                  <Card className="group bg-gradient-to-br from-orange-50 to-orange-100 hover:from-orange-100 hover:to-orange-200 shadow-lg border-0 rounded-2xl flex flex-col items-center py-6 px-6 transition-all duration-300 hover:scale-105">
+                  <Card className="group bg-gradient-to-br from-cyan-100 to-cyan-200 hover:from-cyan-200 hover:to-cyan-300 shadow-lg border-0 rounded-2xl flex flex-col items-center py-6 px-6 transition-all duration-300 hover:scale-105">
                     <CardContent className="flex flex-col items-center p-0">
-                      <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-300">
+                      <div className="w-12 h-12 bg-gradient-to-br from-cyan-600 to-cyan-700 rounded-xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-300 shadow-lg border border-cyan-500/20">
                         <School className="w-6 h-6 text-white" />
                       </div>
-                      <div className="text-3xl font-bold text-orange-700">{schoolData.classes?.length || 0}</div>
-                      <div className="text-orange-600 text-sm font-medium">Classes</div>
+                      <div className="text-3xl font-bold text-cyan-800">{schoolData.classes?.length || 0}</div>
+                      <div className="text-cyan-700 text-sm font-medium">Classes</div>
                     </CardContent>
                   </Card>
                   
-                  <Card className="group bg-gradient-to-br from-green-50 to-green-100 hover:from-green-100 hover:to-green-200 shadow-lg border-0 rounded-2xl flex flex-col items-center py-6 px-6 transition-all duration-300 hover:scale-105">
+                  <Card className="group bg-gradient-to-br from-teal-100 to-teal-200 hover:from-teal-200 hover:to-teal-300 shadow-lg border-0 rounded-2xl flex flex-col items-center py-6 px-6 transition-all duration-300 hover:scale-105">
                     <CardContent className="flex flex-col items-center p-0">
-                      <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-300">
+                      <div className="w-12 h-12 bg-gradient-to-br from-teal-600 to-teal-700 rounded-xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-300 shadow-lg border border-teal-500/20">
                         <DollarSign className="w-6 h-6 text-white" />
                       </div>
-                      <div className="text-3xl font-bold text-green-700">{feeStructureCount}</div>
-                      <div className="text-green-600 text-sm font-medium">Fee Structures</div>
+                      <div className="text-3xl font-bold text-teal-800">{feeStructureCount}</div>
+                      <div className="text-teal-700 text-sm font-medium">Fee Structures</div>
                     </CardContent>
                   </Card>
                 </div>
@@ -588,13 +588,13 @@ export function SchoolSetupDashboard({
                 </div>
 
                 {/* Quick Actions Section */}
-                <Card className="bg-gradient-to-br from-indigo-50/90 to-purple-50/90 backdrop-blur-lg rounded-3xl shadow-xl border border-white/20">
+                <Card className="bg-gradient-to-br from-cyan-50/90 to-teal-50/90 backdrop-blur-lg rounded-3xl shadow-xl border border-white/20">
                   <CardHeader className="px-8 py-8">
                     <CardTitle className="flex items-center space-x-3 text-2xl font-bold">
-                      <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-xl flex items-center justify-center">
+                      <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-teal-500 rounded-xl flex items-center justify-center">
                         <Activity className="w-6 h-6 text-white" />
                       </div>
-                      <span className="bg-gradient-to-r from-indigo-900 to-purple-900 bg-clip-text text-transparent">
+                      <span className="bg-gradient-to-r from-cyan-900 to-teal-900 bg-clip-text text-transparent">
                         Quick Actions
                       </span>
                     </CardTitle>
