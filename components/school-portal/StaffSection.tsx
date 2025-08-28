@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Edit, Trash2, Eye, ArrowLeft } from "lucide-react";
+import { Plus, Edit, Trash2, Eye, ArrowLeft, DollarSign, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useRef, useState ,useEffect} from "react";
 import { CheckCircle, XCircle } from "lucide-react";
@@ -462,97 +462,273 @@ export default function StaffSection({ schoolCode, colorTheme, toast }: any) {
   // Main staff section UI
   return (
     <div className="space-y-8">
-      <Card>
-        <CardHeader>
+      {/* Enhanced Teachers Section */}
+      <Card className="shadow-lg border-0 rounded-2xl bg-gradient-to-br from-white to-blue-50/30">
+        <CardHeader className="border-b border-blue-100/50 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-t-2xl">
           <CardTitle className="flex items-center justify-between">
-            <span>Teachers</span>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
+                <Users className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <span className="text-xl font-bold text-gray-800">Teachers</span>
+                <div className="text-sm text-gray-600 font-normal">
+                  {allTeachers.length} {allTeachers.length === 1 ? 'teacher' : 'teachers'} registered
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3">
               <BulkImport 
-              entityType="teachers" 
-              schoolCode={schoolCode} 
-              onSuccess={handleImportResult}
-              variant="outline"
-              size="sm"
-            />
-              <Button onClick={handleAddTeacher} style={{ backgroundColor: colorTheme }}>+ Add Teacher</Button>
+                entityType="teachers" 
+                schoolCode={schoolCode} 
+                onSuccess={handleImportResult}
+                variant="outline"
+                size="sm"
+                className="rounded-xl border-blue-200 hover:bg-blue-50 transition-colors"
+              />
+              <Button 
+                onClick={handleAddTeacher} 
+                style={{ backgroundColor: colorTheme }}
+                className="rounded-xl shadow-md hover:shadow-lg transition-all duration-200 px-6 py-2 font-medium"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Teacher
+              </Button>
             </div>
           </CardTitle>
-          <CardDescription>Manage your school's teaching staff</CardDescription>
+          <CardDescription className="text-gray-600 mt-2">
+            Manage your school's teaching staff and their information
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Qualification</TableHead>
-                <TableHead>Date Joined</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {allTeachers.map((teacher, idx) => (
-                <TableRow key={teacher.id || teacher.email || idx}>
-                  <TableCell>{teacher.name}</TableCell>
-                  <TableCell>{teacher.email}</TableCell>
-                  <TableCell>{teacher.phone}</TableCell>
-                  <TableCell>{teacher.qualification}</TableCell>
-                  <TableCell>{teacher.dateJoined ? new Date(teacher.dateJoined).toLocaleDateString() : ''}</TableCell>
-                  <TableCell>{teacher.status || 'Active'}</TableCell>
-                  <TableCell>
-                    <Button size="sm" onClick={() => setViewingItem(teacher)}>View</Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <CardContent className="p-0">
+          {allTeachers.length === 0 ? (
+            <div className="text-center py-16 px-6">
+              <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-4">
+                <Users className="w-10 h-10 text-blue-500" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-800 mb-2">No Teachers Yet</h3>
+              <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                Get started by adding your first teacher or importing multiple teachers at once
+              </p>
+              <div className="flex gap-3 justify-center">
+                <Button 
+                  onClick={handleAddTeacher} 
+                  style={{ backgroundColor: colorTheme }}
+                  className="rounded-xl shadow-md hover:shadow-lg transition-all duration-200"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add First Teacher
+                </Button>
+                <BulkImport 
+                  entityType="teachers" 
+                  schoolCode={schoolCode} 
+                  onSuccess={handleImportResult}
+                  variant="outline"
+                  className="rounded-xl border-blue-200 hover:bg-blue-50"
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-gray-50/50">
+                  <TableRow className="border-b border-gray-200/60 hover:bg-transparent">
+                    <TableHead className="font-semibold text-gray-700 py-4 px-6">
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4" />
+                        Name
+                      </div>
+                    </TableHead>
+                    <TableHead className="font-semibold text-gray-700 py-4">Email</TableHead>
+                    <TableHead className="font-semibold text-gray-700 py-4">Phone</TableHead>
+                    <TableHead className="font-semibold text-gray-700 py-4">Qualification</TableHead>
+                    <TableHead className="font-semibold text-gray-700 py-4">Date Joined</TableHead>
+                    <TableHead className="font-semibold text-gray-700 py-4">Status</TableHead>
+                    <TableHead className="font-semibold text-gray-700 py-4 px-6">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {allTeachers.map((teacher, idx) => (
+                    <TableRow 
+                      key={teacher.id || teacher.email || idx}
+                      className="border-b border-gray-100 hover:bg-blue-50/30 transition-colors group"
+                    >
+                      <TableCell className="py-4 px-6">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-semibold text-sm shadow-md">
+                            {teacher.name?.charAt(0)?.toUpperCase() || 'T'}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-gray-800">{teacher.name}</div>
+                            <div className="text-sm text-gray-500">Staff ID: {teacher.id?.slice(-6) || 'N/A'}</div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-4">
+                        <div className="text-gray-700">{teacher.email}</div>
+                      </TableCell>
+                      <TableCell className="py-4">
+                        <div className="text-gray-700">{teacher.phone || 'N/A'}</div>
+                      </TableCell>
+                      <TableCell className="py-4">
+                        <div className="text-gray-700">{teacher.qualification || 'N/A'}</div>
+                      </TableCell>
+                      <TableCell className="py-4">
+                        <div className="text-gray-700">
+                          {teacher.dateJoined ? new Date(teacher.dateJoined).toLocaleDateString() : 'N/A'}
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-4">
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                          (teacher.status || 'Active') === 'Active' 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {teacher.status || 'Active'}
+                        </span>
+                      </TableCell>
+                      <TableCell className="py-4 px-6">
+                        <Button 
+                          size="sm" 
+                          onClick={() => setViewingItem(teacher)}
+                          className="rounded-lg bg-blue-500 hover:bg-blue-600 text-white shadow-sm hover:shadow-md transition-all duration-200 opacity-75 group-hover:opacity-100"
+                        >
+                          <Eye className="w-4 h-4 mr-1" />
+                          View
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Bursars Section */}
-      <Card>
-        <CardHeader>
+      {/* Enhanced Bursars Section */}
+      <Card className="shadow-lg border-0 rounded-2xl bg-gradient-to-br from-white to-green-50/30">
+        <CardHeader className="border-b border-green-100/50 bg-gradient-to-r from-green-50 to-emerald-50 rounded-t-2xl">
           <CardTitle className="flex items-center justify-between">
-            Bursars ({bursars.length})
-            <Button onClick={handleAddBursar} style={{ backgroundColor: colorTheme }}>
-              <Plus className="w-4 h-4 mr-2" /> Add Bursar
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg">
+                <DollarSign className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <span className="text-xl font-bold text-gray-800">Bursars</span>
+                <div className="text-sm text-gray-600 font-normal">
+                  {bursars.length} {bursars.length === 1 ? 'bursar' : 'bursars'} registered
+                </div>
+              </div>
+            </div>
+            <Button 
+              onClick={handleAddBursar} 
+              style={{ backgroundColor: colorTheme }}
+              className="rounded-xl shadow-md hover:shadow-lg transition-all duration-200 px-6 py-2 font-medium"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Bursar
             </Button>
           </CardTitle>
-          <CardDescription>Manage your school's financial staff</CardDescription>
+          <CardDescription className="text-gray-600 mt-2">
+            Manage your school's financial and administrative staff
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {viewMode.staff === "bursar-form" ? (
             <BursarForm onSave={createBursar} onCancel={() => setViewMode({ staff: "list" })} />
           ) : editingItem ? (
             <BursarForm bursar={editingItem} onSave={updateBursar} onCancel={() => { setEditingItem(null); setViewMode({ staff: "list" }); }} />
+          ) : bursars.length === 0 ? (
+            <div className="text-center py-16 px-6">
+              <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+                <DollarSign className="w-10 h-10 text-green-500" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-800 mb-2">No Bursars Yet</h3>
+              <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                Add bursars to manage financial operations and student fees
+              </p>
+              <Button 
+                onClick={handleAddBursar} 
+                style={{ backgroundColor: colorTheme }}
+                className="rounded-xl shadow-md hover:shadow-lg transition-all duration-200"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add First Bursar
+              </Button>
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Phone</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
+                <TableHeader className="bg-gray-50/50">
+                  <TableRow className="border-b border-gray-200/60 hover:bg-transparent">
+                    <TableHead className="font-semibold text-gray-700 py-4 px-6">
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="w-4 h-4" />
+                        Name
+                      </div>
+                    </TableHead>
+                    <TableHead className="font-semibold text-gray-700 py-4">Email</TableHead>
+                    <TableHead className="font-semibold text-gray-700 py-4">Phone</TableHead>
+                    <TableHead className="font-semibold text-gray-700 py-4">Status</TableHead>
+                    <TableHead className="font-semibold text-gray-700 py-4 px-6">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {bursars.map((bursar) => (
-                    <TableRow key={bursar.id}>
-                      <TableCell className="font-medium">{bursar.name}</TableCell>
-                      <TableCell>{bursar.email}</TableCell>
-                      <TableCell>{bursar.phone || "-"}</TableCell>
-                      <TableCell><Badge variant="default">Active</Badge></TableCell>
-                      <TableCell>
+                    <TableRow 
+                      key={bursar.id}
+                      className="border-b border-gray-100 hover:bg-green-50/30 transition-colors group"
+                    >
+                      <TableCell className="py-4 px-6">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white font-semibold text-sm shadow-md">
+                            {bursar.name?.charAt(0)?.toUpperCase() || 'B'}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-gray-800">{bursar.name}</div>
+                            <div className="text-sm text-gray-500">Staff ID: {bursar.id?.slice(-6) || 'N/A'}</div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-4">
+                        <div className="text-gray-700">{bursar.email}</div>
+                      </TableCell>
+                      <TableCell className="py-4">
+                        <div className="text-gray-700">{bursar.phone || 'N/A'}</div>
+                      </TableCell>
+                      <TableCell className="py-4">
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                          Active
+                        </span>
+                      </TableCell>
+                      <TableCell className="py-4 px-6">
                         <div className="flex space-x-2">
-                          <Button variant="outline" size="sm" onClick={() => setViewingItem(bursar)}><Eye className="w-4 h-4" /></Button>
-                          <Button size="icon" variant="ghost" onClick={() => handleEditBursar(bursar)}><Edit className="w-4 h-4" /></Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => setViewingItem(bursar)}
+                            className="rounded-lg border-green-200 hover:bg-green-50 text-green-600 opacity-75 group-hover:opacity-100 transition-all"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="ghost" 
+                            onClick={() => handleEditBursar(bursar)}
+                            className="rounded-lg hover:bg-blue-50 text-blue-600 opacity-75 group-hover:opacity-100 transition-all"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button variant="outline" size="sm" className="text-red-600"><Trash2 className="w-4 h-4" /></Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="rounded-lg border-red-200 hover:bg-red-50 text-red-600 opacity-75 group-hover:opacity-100 transition-all"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
@@ -561,7 +737,7 @@ export default function StaffSection({ schoolCode, colorTheme, toast }: any) {
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => deleteBursar(bursar.id)}>Delete</AlertDialogAction>
+                                <AlertDialogAction onClick={() => deleteBursar(bursar.id)} className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
                           </AlertDialog>

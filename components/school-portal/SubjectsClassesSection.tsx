@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
-import { Plus, Edit, Trash2 } from "lucide-react";
+import { Plus, Edit, Trash2, BookOpen, Users } from "lucide-react";
 import type { Subject, SchoolClass, Grade } from "@/lib/school-storage";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CheckCircle, XCircle } from "lucide-react";
@@ -408,55 +408,174 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast }
 
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Subjects & Classes</CardTitle>
-        <CardDescription>Manage subjects and classes for your school.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {/* Subjects Section */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="font-bold text-lg">Subjects</h3>
-            <Button onClick={handleAddSubject} style={{ backgroundColor: colorTheme }} className="h-10">+ Subject</Button>
+    <div className="space-y-8">
+      {/* Enhanced Toggle Section */}
+      <div className="flex items-center justify-center">
+        <div className="bg-gray-100 p-1 rounded-2xl shadow-inner">
+          <div className="flex space-x-1">
+            <Button 
+              variant={viewMode === "subjects" ? "default" : "ghost"} 
+              onClick={() => setViewMode("subjects")}
+              className={`rounded-xl px-6 py-2 font-medium transition-all duration-200 ${
+                viewMode === "subjects" 
+                  ? 'shadow-md text-white' 
+                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+              }`}
+              style={viewMode === "subjects" ? { backgroundColor: colorTheme } : {}}
+            >
+              <BookOpen className="w-4 h-4 mr-2" />
+              Subjects
+            </Button>
+            <Button 
+              variant={viewMode === "classes" ? "default" : "ghost"} 
+              onClick={() => setViewMode("classes")}
+              className={`rounded-xl px-6 py-2 font-medium transition-all duration-200 ${
+                viewMode === "classes" 
+                  ? 'shadow-md text-white' 
+                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+              }`}
+              style={viewMode === "classes" ? { backgroundColor: colorTheme } : {}}
+            >
+              <Users className="w-4 h-4 mr-2" />
+              Classes & Grades
+            </Button>
           </div>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Code</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {subjects.map((subject) => (
-              <TableRow key={subject.id}>
-                <TableCell>{subject.name}</TableCell>
-                <TableCell>{subject.code}</TableCell>
-                <TableCell>{subject.description}</TableCell>
-                <TableCell>
-                  <Button size="icon" variant="ghost" onClick={() => handleEditSubject(subject)}><Edit className="w-4 h-4" /></Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button size="icon" variant="ghost"><Trash2 className="w-4 h-4 text-red-500" /></Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Subject?</AlertDialogTitle>
-                        <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => handleDeleteSubject(subject.id)}>Delete</AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        </div>
+      </div>
+
+      {/* Subjects Section */}
+      {viewMode === "subjects" && (
+        <Card className="shadow-lg border-0 rounded-2xl bg-gradient-to-br from-white to-orange-50/30">
+          <CardHeader className="border-b border-orange-100/50 bg-gradient-to-r from-orange-50 to-yellow-50 rounded-t-2xl">
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-yellow-600 flex items-center justify-center shadow-lg">
+                  <BookOpen className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <span className="text-xl font-bold text-gray-800">Subjects</span>
+                  <div className="text-sm text-gray-600 font-normal">
+                    {subjects.length} {subjects.length === 1 ? 'subject' : 'subjects'} available
+                  </div>
+                </div>
+              </div>
+              <Button 
+                onClick={handleAddSubject} 
+                style={{ backgroundColor: colorTheme }} 
+                className="rounded-xl shadow-md hover:shadow-lg transition-all duration-200 px-6 py-2 font-medium"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Subject
+              </Button>
+            </CardTitle>
+            <CardDescription className="text-gray-600 mt-2">
+              Manage academic subjects and curriculum
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            {subjects.length === 0 ? (
+              <div className="text-center py-16 px-6">
+                <div className="w-20 h-20 rounded-full bg-orange-100 flex items-center justify-center mx-auto mb-4">
+                  <BookOpen className="w-10 h-10 text-orange-500" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-800 mb-2">No Subjects Yet</h3>
+                <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                  Start by adding subjects to your curriculum
+                </p>
+                <Button 
+                  onClick={handleAddSubject} 
+                  style={{ backgroundColor: colorTheme }}
+                  className="rounded-xl shadow-md hover:shadow-lg transition-all duration-200"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add First Subject
+                </Button>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader className="bg-gray-50/50">
+                    <TableRow className="border-b border-gray-200/60 hover:bg-transparent">
+                      <TableHead className="font-semibold text-gray-700 py-4 px-6">
+                        <div className="flex items-center gap-2">
+                          <BookOpen className="w-4 h-4" />
+                          Subject
+                        </div>
+                      </TableHead>
+                      <TableHead className="font-semibold text-gray-700 py-4">Code</TableHead>
+                      <TableHead className="font-semibold text-gray-700 py-4">Description</TableHead>
+                      <TableHead className="font-semibold text-gray-700 py-4 px-6">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {subjects.map((subject) => (
+                      <TableRow 
+                        key={subject.id}
+                        className="border-b border-gray-100 hover:bg-orange-50/30 transition-colors group"
+                      >
+                        <TableCell className="py-4 px-6">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-yellow-600 flex items-center justify-center text-white font-semibold text-sm shadow-md">
+                              {subject.name?.charAt(0)?.toUpperCase() || 'S'}
+                            </div>
+                            <div>
+                              <div className="font-semibold text-gray-800">{subject.name}</div>
+                              <div className="text-sm text-gray-500">Subject ID: {subject.id?.slice(-6) || 'N/A'}</div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4">
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-mono bg-blue-100 text-blue-800">
+                            {subject.code || 'N/A'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="py-4">
+                          <div className="text-gray-700 max-w-xs truncate">
+                            {subject.description || 'No description'}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4 px-6">
+                          <div className="flex space-x-2">
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              onClick={() => handleEditSubject(subject)}
+                              className="rounded-lg hover:bg-blue-50 text-blue-600 opacity-75 group-hover:opacity-100 transition-all"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button 
+                                  size="sm" 
+                                  variant="ghost"
+                                  className="rounded-lg hover:bg-red-50 text-red-600 opacity-75 group-hover:opacity-100 transition-all"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Subject?</AlertDialogTitle>
+                                  <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDeleteSubject(subject.id)} className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
         {/* Subject Modal */}
         <Dialog open={showSubjectModal} onOpenChange={setShowSubjectModal}>
           <DialogContent>
@@ -487,173 +606,178 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast }
             </form>
           </DialogContent>
         </Dialog>
-        </div>
-        
-        {/* Grades Section */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="font-bold text-lg">Grades</h3>
-            <div className="flex gap-2">
-              <Button 
-                onClick={() => {
-                  const confirm = window.confirm("This will replace all existing grades with Grade 1-6. Continue?");
-                  if (confirm) {
-                    fetch(`/api/schools/${schoolCode}/grades/seed`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' }
-                    })
-                    .then(res => res.json())
-                    .then(data => {
-                      if (data.success && data.grades) {
-                        setGrades(data.grades);
-                        toast && toast({ 
-                          title: "Grades Created", 
-                          description: `Successfully created ${data.grades.length} grades for your school.`, 
-                          variant: "default" 
-                        });
-                      } else {
-                        toast && toast({ 
-                          title: "Error", 
-                          description: "Failed to create grades.", 
-                          variant: "destructive" 
-                        });
-                      }
-                    })
-                    .catch(error => {
-                      console.error('Error seeding grades:', error);
-                      toast && toast({ 
-                        title: "Error", 
-                        description: "Failed to create grades. Please try again.", 
-                        variant: "destructive" 
-                      });
-                    });
-                  }
-                }} 
-                disabled={loading}
-                variant="outline" 
-                size="sm"
-                className="h-10"
-              >
-                {loading ? "Creating Grades..." : "Reset to Grade 1-6"}
-              </Button>
-              <Button 
-                onClick={() => {
-                  setEditingGrade(null);
-                  setNewGrade({ name: "" });
-                  setShowGradeModal(true);
-                }} 
-                variant="outline" 
-                size="sm"
-                className="h-10"
-              >
-                + Add Custom Grade
-              </Button>
-            </div>
-          </div>
-          
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Grade Name</TableHead>
-                <TableHead>Classes Count</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {grades.map((grade) => (
-                <TableRow key={grade.id}>
-                  <TableCell className="font-medium">{grade.name}</TableCell>
-                  <TableCell>{(grade as any).classes?.length || 0}</TableCell>
-                  <TableCell>
-                    <Button size="icon" variant="ghost" onClick={() => {
-                      setEditingGrade(grade);
-                      setNewGrade({ name: grade.name });
-                      setShowGradeModal(true);
-                    }}>
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button size="icon" variant="ghost">
-                          <Trash2 className="w-4 h-4 text-red-500" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Grade?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This will delete the grade and all associated classes. This action cannot be undone.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDeleteGrade(grade.id)}>
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-        
-        {/* Classes Section */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="font-bold text-lg">Classes</h3>
-            <div className="flex gap-2">
-              <BulkImport entityType="classes" schoolCode={schoolCode} variant="outline" size="sm" />
-              <Button onClick={handleAddClass} style={{ backgroundColor: colorTheme }} className="h-10">+ Add Class</Button>
-            </div>
-          </div>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Grade</TableHead>
-              <TableHead>Level</TableHead>
-              <TableHead>Capacity</TableHead>
-              <TableHead>Current Students</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {classes.map((cls: any) => (
-              <TableRow key={cls.id}>
-                <TableCell>{cls.name}</TableCell>
-                <TableCell>{cls.grade?.name || 'N/A'}</TableCell>
-                <TableCell>{cls.level}</TableCell>
-                <TableCell>{cls.capacity}</TableCell>
-                <TableCell>{cls.currentStudents}</TableCell>
-                <TableCell>
-                    <Button size="icon" variant="ghost" onClick={() => {
-                      setNewClass(cls);
-                      setShowClassModal(true);
-                      setClassError("");
-                    }}><Edit className="w-4 h-4" /></Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button size="icon" variant="ghost"><Trash2 className="w-4 h-4 text-red-500" /></Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Class?</AlertDialogTitle>
-                        <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => handleDeleteClass(cls.id)}>Delete</AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+
+      
+      {/* Classes Section */}
+      {viewMode === "classes" && (
+        <Card className="shadow-lg border-0 rounded-2xl bg-gradient-to-br from-white to-indigo-50/30">
+          <CardHeader className="border-b border-indigo-100/50 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-t-2xl">
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
+                  <Users className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <span className="text-xl font-bold text-gray-800">Classes & Grades</span>
+                  <div className="text-sm text-gray-600 font-normal">
+                    {classes.length} {classes.length === 1 ? 'class' : 'classes'} configured
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <BulkImport 
+                  entityType="classes" 
+                  schoolCode={schoolCode} 
+                  variant="outline" 
+                  size="sm"
+                  className="rounded-xl border-indigo-200 hover:bg-indigo-50 transition-colors"
+                />
+                <Button 
+                  onClick={handleAddClass} 
+                  style={{ backgroundColor: colorTheme }}
+                  className="rounded-xl shadow-md hover:shadow-lg transition-all duration-200 px-6 py-2 font-medium"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Class
+                </Button>
+              </div>
+            </CardTitle>
+            <CardDescription className="text-gray-600 mt-2">
+              Manage class structures and grade levels
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            {classes.length === 0 ? (
+              <div className="text-center py-16 px-6">
+                <div className="w-20 h-20 rounded-full bg-indigo-100 flex items-center justify-center mx-auto mb-4">
+                  <Users className="w-10 h-10 text-indigo-500" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-800 mb-2">No Classes Yet</h3>
+                <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                  Create classes to organize students by grade level
+                </p>
+                <div className="flex gap-3 justify-center">
+                  <Button 
+                    onClick={handleAddClass} 
+                    style={{ backgroundColor: colorTheme }}
+                    className="rounded-xl shadow-md hover:shadow-lg transition-all duration-200"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add First Class
+                  </Button>
+                  <BulkImport 
+                    entityType="classes" 
+                    schoolCode={schoolCode} 
+                    variant="outline"
+                    className="rounded-xl border-indigo-200 hover:bg-indigo-50"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader className="bg-gray-50/50">
+                    <TableRow className="border-b border-gray-200/60 hover:bg-transparent">
+                      <TableHead className="font-semibold text-gray-700 py-4 px-6">
+                        <div className="flex items-center gap-2">
+                          <Users className="w-4 h-4" />
+                          Class
+                        </div>
+                      </TableHead>
+                      <TableHead className="font-semibold text-gray-700 py-4">Grade</TableHead>
+                      <TableHead className="font-semibold text-gray-700 py-4">Level</TableHead>
+                      <TableHead className="font-semibold text-gray-700 py-4">Capacity</TableHead>
+                      <TableHead className="font-semibold text-gray-700 py-4">Enrolled</TableHead>
+                      <TableHead className="font-semibold text-gray-700 py-4 px-6">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {classes.map((cls: any) => (
+                      <TableRow 
+                        key={cls.id}
+                        className="border-b border-gray-100 hover:bg-indigo-50/30 transition-colors group"
+                      >
+                        <TableCell className="py-4 px-6">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm shadow-md">
+                              {cls.name?.charAt(0)?.toUpperCase() || 'C'}
+                            </div>
+                            <div>
+                              <div className="font-semibold text-gray-800">{cls.name}</div>
+                              <div className="text-sm text-gray-500">Class ID: {cls.id?.slice(-6) || 'N/A'}</div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4">
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
+                            {cls.grade?.name || 'N/A'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="py-4">
+                          <div className="text-gray-700">{cls.level || 'N/A'}</div>
+                        </TableCell>
+                        <TableCell className="py-4">
+                          <div className="text-gray-700">{cls.capacity || 'N/A'}</div>
+                        </TableCell>
+                        <TableCell className="py-4">
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-700">{cls.currentStudents || 0}</span>
+                            <div className="w-16 bg-gray-200 rounded-full h-2">
+                              <div 
+                                className="bg-indigo-500 h-2 rounded-full" 
+                                style={{ 
+                                  width: cls.capacity > 0 ? `${Math.min((cls.currentStudents || 0) / cls.capacity * 100, 100)}%` : '0%' 
+                                }}
+                              ></div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4 px-6">
+                          <div className="flex space-x-2">
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              onClick={() => {
+                                setNewClass(cls);
+                                setShowClassModal(true);
+                                setClassError("");
+                              }}
+                              className="rounded-lg hover:bg-blue-50 text-blue-600 opacity-75 group-hover:opacity-100 transition-all"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button 
+                                  size="sm" 
+                                  variant="ghost"
+                                  className="rounded-lg hover:bg-red-50 text-red-600 opacity-75 group-hover:opacity-100 transition-all"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Class?</AlertDialogTitle>
+                                  <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDeleteClass(cls.id)} className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
         {/* Class Modal */}
         <Dialog open={showClassModal} onOpenChange={setShowClassModal}>
           <DialogContent>
@@ -759,8 +883,6 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast }
             </form>
           </DialogContent>
         </Dialog>
-        </div>
-      </CardContent>
-    </Card>
+    </div>
   );
 } 

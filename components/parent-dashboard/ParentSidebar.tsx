@@ -60,11 +60,11 @@ export const ParentSidebar: React.FC<ParentSidebarProps> = ({
 }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Use system color mode (light/dark)
+  // Enhanced green theme for parent dashboard
   const isDark = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const sidebarBg = 'bg-gradient-to-b from-slate-900 via-slate-800 to-indigo-900';
-  const sidebarBorder = 'border-slate-800';
-  const sidebarShadow = 'shadow-lg shadow-indigo-900/40';
+  const sidebarBg = 'bg-gradient-to-b from-emerald-900 via-slate-800 to-emerald-800';
+  const sidebarBorder = 'border-emerald-700';
+  const sidebarShadow = 'shadow-lg shadow-emerald-900/50';
 
   return (
     <>
@@ -164,12 +164,12 @@ export const ParentSidebar: React.FC<ParentSidebarProps> = ({
           <div className="flex items-center gap-3">
             <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="hover:bg-slate-800 h-12 w-12 rounded-xl text-white">
+                <Button variant="ghost" size="icon" className="hover:bg-emerald-800 h-12 w-12 rounded-xl text-white">
                   <Menu className="h-6 w-6" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-80 p-0 bg-gradient-to-b from-slate-900 via-slate-800 to-indigo-900 text-white">
-                <SheetHeader className="p-6 border-b border-slate-700 bg-gradient-to-r from-slate-800 to-indigo-800 text-white">
+              <SheetContent side="left" className="w-80 p-0 bg-gradient-to-b from-emerald-900 via-slate-800 to-emerald-800 text-white">
+                <SheetHeader className="p-6 border-b border-emerald-700 bg-gradient-to-r from-emerald-800 to-emerald-700 text-white">
                   <SheetTitle className="text-left text-white font-bold text-xl">Parent Portal</SheetTitle>
                   <p className="text-slate-300 text-sm mt-2">Hi-Tech SMS</p>
                 </SheetHeader>
@@ -222,7 +222,7 @@ export const ParentSidebar: React.FC<ParentSidebarProps> = ({
                         <li key={item.id}>
                           <button
                             className={`w-full flex items-center gap-4 px-6 py-4 rounded-xl text-left transition-colors font-medium mx-3 ${
-                              isActive ? 'bg-indigo-700 text-white shadow-md' : 'text-slate-200 hover:bg-indigo-700 hover:text-white'
+                              isActive ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/25' : 'text-slate-200 hover:bg-emerald-700 hover:text-white'
                             }`}
                             onClick={() => {
                               onTabChange(item.id);
@@ -296,8 +296,8 @@ export const ParentSidebar: React.FC<ParentSidebarProps> = ({
                 onClick={() => onTabChange(item.id)}
                 className={`flex flex-col items-center py-3 px-2 min-w-0 flex-1 mobile-nav-transition ${
                   isActive 
-                    ? "text-indigo-600 bg-indigo-50 nav-item-active" 
-                    : "text-gray-600 hover:text-indigo-600 hover:bg-indigo-50"
+                    ? "text-emerald-600 bg-emerald-50 nav-item-active" 
+                    : "text-gray-600 hover:text-emerald-600 hover:bg-emerald-50"
                 }`}
                 aria-current={isActive ? "page" : undefined}
               >

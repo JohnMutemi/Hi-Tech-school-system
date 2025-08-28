@@ -39,21 +39,21 @@ export default function OverviewSection(props: any) {
       <Card className="bg-white/10 backdrop-blur-sm border border-white/20 shadow-xl hover:shadow-2xl transition-all duration-300">
         <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-3 text-white text-lg">
-            <Users className="w-6 h-6 text-indigo-300" />
+            <Users className="w-6 h-6 text-emerald-300" />
             {`Hello, ${parent?.name || parent?.parentName || 'Parent'}!`}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4">
             <div className="relative group flex-shrink-0">
-              <Avatar className="w-20 h-20 border-4 border-indigo-300/50 shadow-xl rounded-full ring-2 ring-white/20">
+              <Avatar className="w-20 h-20 border-4 border-emerald-300/50 shadow-xl rounded-full ring-2 ring-white/20">
                 <img src={parent?.avatarUrl || avatarUrl || "/placeholder-user.jpg"} alt={parent?.parentName} className="rounded-full w-full h-full object-cover" />
-                <div className="bg-indigo-600 text-white text-xl font-semibold flex items-center justify-center w-full h-full rounded-full">
+                <div className="bg-emerald-600 text-white text-xl font-semibold flex items-center justify-center w-full h-full rounded-full">
                   {parent?.parentName?.charAt(0) || "P"}
                 </div>
                 {onAvatarChange && (
                   <label
-                    className="absolute bottom-0 right-0 bg-indigo-600 text-white rounded-full p-1.5 cursor-pointer shadow-lg group-hover:scale-110 transition-transform duration-200"
+                    className="absolute bottom-0 right-0 bg-emerald-600 text-white rounded-full p-1.5 cursor-pointer shadow-lg group-hover:scale-110 transition-transform duration-200"
                     title="Change profile picture"
                   >
                     <input
@@ -68,7 +68,7 @@ export default function OverviewSection(props: any) {
                 )}
                 {avatarUploading && (
                   <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-full">
-                    <span className="text-indigo-600 text-xs font-bold">Uploading...</span>
+                    <span className="text-emerald-600 text-xs font-bold">Uploading...</span>
                   </div>
                 )}
               </Avatar>
@@ -111,7 +111,7 @@ export default function OverviewSection(props: any) {
       <Card className="bg-white/10 backdrop-blur-sm border border-white/20 shadow-xl hover:shadow-2xl transition-all duration-300">
         <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-3 text-white text-lg">
-            <DollarSign className="w-6 h-6 text-indigo-300" />
+            <DollarSign className="w-6 h-6 text-emerald-300" />
             Fee Structure Overview
           </CardTitle>
         </CardHeader>
@@ -139,13 +139,13 @@ export default function OverviewSection(props: any) {
           <div className="min-h-[200px] flex flex-col justify-center">
             {!selectedId ? (
               <div className="text-center py-8">
-                <DollarSign className="w-12 h-12 text-indigo-300 mx-auto mb-3" />
+                <DollarSign className="w-12 h-12 text-emerald-300 mx-auto mb-3" />
                 <p className="text-white font-semibold text-base">Please select a child to view the fee structure.</p>
                 <p className="text-slate-300 text-sm mt-1">Choose from the dropdown above to see detailed fee information.</p>
               </div>
             ) : loading ? (
               <div className="flex flex-col items-center justify-center py-8">
-                <svg className="animate-spin h-8 w-8 text-indigo-300 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <svg className="animate-spin h-8 w-8 text-emerald-300 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
                 </svg>

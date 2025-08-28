@@ -47,20 +47,28 @@ export default function ParentDashboard({ schoolCode, parentId }: { schoolCode: 
   };
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 relative">
-      {/* Background Pattern */}
-      <div className="absolute inset-0 opacity-5">
+    <div className="flex min-h-screen bg-gradient-to-br from-emerald-900 via-slate-800 to-emerald-800 relative">
+      {/* Enhanced Background Pattern */}
+      <div className="absolute inset-0 opacity-10">
         <div className="absolute inset-0" style={{
-          backgroundImage: `radial-gradient(circle at 25% 25%, #6366f1 0%, transparent 50%), 
-                           radial-gradient(circle at 75% 75%, #8b5cf6 0%, transparent 50%)`,
-          backgroundSize: '400px 400px'
+          backgroundImage: `radial-gradient(circle at 25% 25%, #10b981 0%, transparent 50%), 
+                           radial-gradient(circle at 75% 75%, #059669 0%, transparent 50%),
+                           radial-gradient(circle at 50% 50%, #6ee7b7 0%, transparent 70%)`,
+          backgroundSize: '400px 400px, 300px 300px, 500px 500px'
         }}></div>
+      </div>
+      
+      {/* Floating Elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-20 left-10 w-20 h-20 bg-emerald-400/10 rounded-full blur-xl"></div>
+        <div className="absolute top-40 right-20 w-32 h-32 bg-emerald-300/8 rounded-full blur-2xl"></div>
+        <div className="absolute bottom-20 left-1/4 w-24 h-24 bg-emerald-500/6 rounded-full blur-xl"></div>
       </div>
       
       <ParentSidebar
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        colorTheme="#6366f1"
+        colorTheme="#10b981"
         onLogout={handleLogout}
         parent={parent}
         onAvatarChange={handleAvatarChange}
@@ -82,7 +90,7 @@ export default function ParentDashboard({ schoolCode, parentId }: { schoolCode: 
               {/* Content Header */}
               <div className="mb-8 pb-6 border-b border-white/10">
                 <div className="flex items-center gap-3">
-                  <div className="w-1 h-8 bg-gradient-to-b from-indigo-400 to-purple-400 rounded-full"></div>
+                  <div className="w-1 h-8 bg-gradient-to-b from-emerald-400 to-emerald-600 rounded-full"></div>
                   <h2 className="text-white text-xl lg:text-2xl font-semibold capitalize">
                     {activeTab === 'fees' ? 'Fee Management' : 
                      activeTab === 'children' ? 'My Children' :

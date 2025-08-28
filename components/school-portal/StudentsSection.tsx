@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Edit, Trash2, Eye } from "lucide-react";
+import { Plus, Edit, Trash2, Eye, GraduationCap } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -297,12 +297,26 @@ export default function StudentsSection({ schoolCode, colorTheme, toast }: Stude
   };
 
   return (
-    <Card>
-      <CardHeader>
+    <Card className="shadow-lg border-0 rounded-2xl bg-gradient-to-br from-white to-purple-50/30">
+      <CardHeader className="border-b border-purple-100/50 bg-gradient-to-r from-purple-50 to-pink-50 rounded-t-2xl">
         <CardTitle className="flex items-center justify-between">
-          <span>Students</span>
-          <div className="flex gap-2">
-            <Button onClick={() => setShowStudentModal(true)} style={{ backgroundColor: colorTheme }}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center shadow-lg">
+              <GraduationCap className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <span className="text-xl font-bold text-gray-800">Students</span>
+              <div className="text-sm text-gray-600 font-normal">
+                {students.length} {students.length === 1 ? 'student' : 'students'} enrolled
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <Button 
+              onClick={() => setShowStudentModal(true)} 
+              style={{ backgroundColor: colorTheme }}
+              className="rounded-xl shadow-md hover:shadow-lg transition-all duration-200 px-6 py-2 font-medium"
+            >
               <Plus className="w-4 h-4 mr-2" />
               Add Student
             </Button>
@@ -312,80 +326,144 @@ export default function StudentsSection({ schoolCode, colorTheme, toast }: Stude
               onSuccess={handleImportSuccess}
               variant="outline"
               size="sm"
+              className="rounded-xl border-purple-200 hover:bg-purple-50 transition-colors"
             />
           </div>
         </CardTitle>
-        <CardDescription>Manage your school's student records.</CardDescription>
+        <CardDescription className="text-gray-600 mt-2">
+          Manage your school's student records and enrollment data
+        </CardDescription>
       </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Admission No.</TableHead>
-              <TableHead>Class</TableHead>
-              <TableHead>Parent Name</TableHead>
-              <TableHead>Parent Phone</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {students.map((student: any) => (
-              <TableRow key={student.id}>
-                <TableCell>{student.user?.name || student.name || 'N/A'}</TableCell>
-                <TableCell>{student.admissionNumber}</TableCell>
-                <TableCell>
-                  {student.class?.name || classes.find((cls: any) => cls.id === student.classId)?.name || "N/A"}
-                </TableCell>
-                <TableCell>{student.parentName}</TableCell>
-                <TableCell>{student.parentPhone}</TableCell>
-                <TableCell>{student.user?.email || student.email || 'N/A'}</TableCell>
-                <TableCell>
-                  <div className="flex space-x-2">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => setViewingStudent(student)}
-                      title="View Details"
-                    >
-                      <Eye className="w-4 h-4 text-blue-500" />
-                    </Button>
-                    {/* Edit logic can be added here */}
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
+      <CardContent className="p-0">
+        {students.length === 0 ? (
+          <div className="text-center py-16 px-6">
+            <div className="w-20 h-20 rounded-full bg-purple-100 flex items-center justify-center mx-auto mb-4">
+              <GraduationCap className="w-10 h-10 text-purple-500" />
+            </div>
+            <h3 className="text-xl font-semibold text-gray-800 mb-2">No Students Yet</h3>
+            <p className="text-gray-600 mb-6 max-w-md mx-auto">
+              Start by adding your first student or importing multiple students at once
+            </p>
+            <div className="flex gap-3 justify-center">
+              <Button 
+                onClick={() => setShowStudentModal(true)} 
+                style={{ backgroundColor: colorTheme }}
+                className="rounded-xl shadow-md hover:shadow-lg transition-all duration-200"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add First Student
+              </Button>
+              <BulkImport 
+                entityType="students" 
+                schoolCode={schoolCode} 
+                onSuccess={handleImportSuccess}
+                variant="outline"
+                className="rounded-xl border-purple-200 hover:bg-purple-50"
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-gray-50/50">
+                <TableRow className="border-b border-gray-200/60 hover:bg-transparent">
+                  <TableHead className="font-semibold text-gray-700 py-4 px-6">
+                    <div className="flex items-center gap-2">
+                      <GraduationCap className="w-4 h-4" />
+                      Student
+                    </div>
+                  </TableHead>
+                  <TableHead className="font-semibold text-gray-700 py-4">Admission No.</TableHead>
+                  <TableHead className="font-semibold text-gray-700 py-4">Class</TableHead>
+                  <TableHead className="font-semibold text-gray-700 py-4">Parent Info</TableHead>
+                  <TableHead className="font-semibold text-gray-700 py-4">Contact</TableHead>
+                  <TableHead className="font-semibold text-gray-700 py-4 px-6">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {students.map((student: any) => (
+                  <TableRow 
+                    key={student.id}
+                    className="border-b border-gray-100 hover:bg-purple-50/30 transition-colors group"
+                  >
+                    <TableCell className="py-4 px-6">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center text-white font-semibold shadow-md">
+                          {(student.user?.name || student.name || 'S')?.charAt(0)?.toUpperCase()}
+                        </div>
+                        <div>
+                          <div className="font-semibold text-gray-800">{student.user?.name || student.name || 'N/A'}</div>
+                          <div className="text-sm text-gray-500">{student.user?.email || student.email || 'No email'}</div>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-mono bg-blue-100 text-blue-800">
+                        {student.admissionNumber}
+                      </span>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-indigo-100 text-indigo-800">
+                        {student.class?.name || classes.find((cls: any) => cls.id === student.classId)?.name || "N/A"}
+                      </span>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <div>
+                        <div className="font-medium text-gray-800">{student.parentName}</div>
+                        <div className="text-sm text-gray-500">{student.parentPhone}</div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <div className="text-gray-700">{student.parentPhone}</div>
+                    </TableCell>
+                    <TableCell className="py-4 px-6">
+                      <div className="flex space-x-2">
                         <Button
-                          size="icon"
-                          variant="ghost"
-                          title="Delete Student"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setViewingStudent(student)}
+                          title="View Details"
+                          className="rounded-lg border-purple-200 hover:bg-purple-50 text-purple-600 opacity-75 group-hover:opacity-100 transition-all"
                         >
-                          <Trash2 className="w-4 h-4 text-red-500" />
+                          <Eye className="w-4 h-4" />
                         </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Student</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Are you sure you want to delete {student.user?.name || student.name}? This action cannot be undone and will permanently remove the student and their associated data.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction 
-                            onClick={() => deleteStudent(student.id)}
-                            className="bg-red-600 hover:bg-red-700"
-                          >
-                            Delete Student
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              title="Delete Student"
+                              className="rounded-lg border-red-200 hover:bg-red-50 text-red-600 opacity-75 group-hover:opacity-100 transition-all"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Student</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete {student.user?.name || student.name}? This action cannot be undone and will permanently remove the student and their associated data.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction 
+                                onClick={() => deleteStudent(student.id)}
+                                className="bg-red-600 hover:bg-red-700"
+                              >
+                                Delete Student
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
 
         {/* Add Student Modal */}
         <Dialog open={showStudentModal} onOpenChange={setShowStudentModal}>
