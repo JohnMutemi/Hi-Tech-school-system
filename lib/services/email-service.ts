@@ -23,6 +23,9 @@ interface PaymentNotificationData {
   balanceAfter?: number
   balanceBefore?: number
   receiptDownloadUrl?: string
+  receiptDownloadUrlA3?: string
+  receiptDownloadUrlA4?: string
+  receiptDownloadUrlA5?: string
   feesStatementUrl?: string
   academicYearId?: string
   admissionNumber?: string
@@ -46,18 +49,32 @@ export class EmailService {
   private config: EmailConfig | null = null
 
   // Helper function to generate receipt download URL (direct PDF)
-  private generateReceiptDownloadUrl(schoolCode: string, receiptNumber: string): string {
+  private generateReceiptDownloadUrl(schoolCode: string, receiptNumber: string, size: string = 'A4'): string {
     // Create a secure URL that leads to the receipt download endpoint (direct PDF)
     let baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
     // Remove trailing slash to avoid double slashes
     baseUrl = baseUrl.replace(/\/$/, '')
-    const url = `${baseUrl}/api/schools/${schoolCode}/receipts/${receiptNumber}/download`
+    const url = `${baseUrl}/api/schools/${schoolCode}/receipts/${receiptNumber}/download?size=${size}`
     console.log('🔍 Receipt Download URL Debug:', {
       NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL,
       baseUrl,
+      size,
       generatedUrl: url
     })
     return url
+  }
+
+  // Helper function to generate multiple receipt download URLs for different sizes
+  private generateReceiptDownloadUrls(schoolCode: string, receiptNumber: string): {
+    receiptDownloadUrlA3: string;
+    receiptDownloadUrlA4: string;
+    receiptDownloadUrlA5: string;
+  } {
+    return {
+      receiptDownloadUrlA3: this.generateReceiptDownloadUrl(schoolCode, receiptNumber, 'A3'),
+      receiptDownloadUrlA4: this.generateReceiptDownloadUrl(schoolCode, receiptNumber, 'A4'),
+      receiptDownloadUrlA5: this.generateReceiptDownloadUrl(schoolCode, receiptNumber, 'A5')
+    }
   }
 
   // Helper function to generate fees statement PDF URL
@@ -111,12 +128,16 @@ export class EmailService {
     }
 
     try {
-      // Generate receipt download URL if not provided
+      // Generate receipt download URLs if not provided
       if (!paymentData.receiptDownloadUrl && paymentData.receiptNumber) {
-        paymentData.receiptDownloadUrl = this.generateReceiptDownloadUrl(
+        const receiptUrls = this.generateReceiptDownloadUrls(
           paymentData.schoolCode, 
           paymentData.receiptNumber
         )
+        paymentData.receiptDownloadUrl = receiptUrls.receiptDownloadUrlA4 // Default to A4
+        paymentData.receiptDownloadUrlA3 = receiptUrls.receiptDownloadUrlA3
+        paymentData.receiptDownloadUrlA4 = receiptUrls.receiptDownloadUrlA4
+        paymentData.receiptDownloadUrlA5 = receiptUrls.receiptDownloadUrlA5
       }
 
       // Generate fees statement URL if not provided
@@ -743,21 +764,35 @@ export class EmailService {
         </div>
             
         <!-- Download Section with Clear Call-to-Action -->
-            ${data.receiptDownloadUrl || data.feesStatementUrl ? `
+            ${data.receiptDownloadUrlA3 || data.receiptDownloadUrlA4 || data.receiptDownloadUrlA5 || data.feesStatementUrl ? `
             <div class="download-section">
             <div class="download-title">📋 Access Your Documents</div>
-            <div class="download-subtitle">Download or view your payment receipt and complete fee statement with just one click</div>
+            <div class="download-subtitle">Download your payment receipt in multiple formats and complete fee statement</div>
                 
             <div class="button-container">
-                    ${data.receiptDownloadUrl ? `
-                    <div style="text-align: center;">
-                    <a href="${data.receiptDownloadUrl}" class="download-button receipt-button">
-                        <span style="font-size: 20px;">🧾</span>
-                            <div>
-                            <div style="font-weight: 700;">Download Payment Receipt</div>
-                            <div style="font-size: 13px; opacity: 0.9;">PDF Download • Print Ready • High Quality</div>
-                            </div>
-                        </a>
+                    ${data.receiptDownloadUrlA3 || data.receiptDownloadUrlA4 || data.receiptDownloadUrlA5 ? `
+                    <div style="text-align: center; margin-bottom: 20px;">
+                        <div style="font-weight: 700; margin-bottom: 10px; color: #374151;">🧾 Payment Receipt Downloads</div>
+                        <div style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;">
+                            ${data.receiptDownloadUrlA3 ? `
+                            <a href="${data.receiptDownloadUrlA3}" style="background: #3b82f6; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 14px; display: inline-block; margin: 4px;">
+                                📄 A3 Format
+                            </a>
+                            ` : ''}
+                            ${data.receiptDownloadUrlA4 ? `
+                            <a href="${data.receiptDownloadUrlA4}" style="background: #10b981; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 14px; display: inline-block; margin: 4px;">
+                                📄 A4 Format
+                            </a>
+                            ` : ''}
+                            ${data.receiptDownloadUrlA5 ? `
+                            <a href="${data.receiptDownloadUrlA5}" style="background: #8b5cf6; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 14px; display: inline-block; margin: 4px;">
+                                📄 A5 Format
+                            </a>
+                            ` : ''}
+                        </div>
+                        <div style="font-size: 12px; color: #6b7280; margin-top: 8px;">
+                            PDF Downloads • Print Ready • High Quality
+                        </div>
                     </div>
                     ` : ''}
                     
@@ -776,7 +811,7 @@ export class EmailService {
                 
             <div class="download-note">
                 <strong>📋 Document Details:</strong><br>
-                • <strong>Payment Receipt:</strong> Detailed view of this transaction with multiple download formats<br>
+                • <strong>Payment Receipt:</strong> Professional receipt with multiple format options (A3, A4, A5) matching bursar system<br>
                 • <strong>Fee Statement:</strong> Comprehensive academic year overview including all payments and balances
                 </div>
             </div>
