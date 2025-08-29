@@ -45,14 +45,14 @@ interface PaymentNotificationData {
 export class EmailService {
   private config: EmailConfig | null = null
 
-  // Helper function to generate receipt view URL
-  private generateReceiptViewUrl(schoolCode: string, receiptNumber: string): string {
-    // Create a secure URL that leads to the receipt view endpoint
+  // Helper function to generate receipt download URL (direct PDF)
+  private generateReceiptDownloadUrl(schoolCode: string, receiptNumber: string): string {
+    // Create a secure URL that leads to the receipt download endpoint (direct PDF)
     let baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
     // Remove trailing slash to avoid double slashes
     baseUrl = baseUrl.replace(/\/$/, '')
-    const url = `${baseUrl}/api/schools/${schoolCode}/receipts/${receiptNumber}/view`
-    console.log('🔍 Receipt URL Debug:', {
+    const url = `${baseUrl}/api/schools/${schoolCode}/receipts/${receiptNumber}/download`
+    console.log('🔍 Receipt Download URL Debug:', {
       NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL,
       baseUrl,
       generatedUrl: url
@@ -111,9 +111,9 @@ export class EmailService {
     }
 
     try {
-      // Generate receipt view URL if not provided
+      // Generate receipt download URL if not provided
       if (!paymentData.receiptDownloadUrl && paymentData.receiptNumber) {
-        paymentData.receiptDownloadUrl = this.generateReceiptViewUrl(
+        paymentData.receiptDownloadUrl = this.generateReceiptDownloadUrl(
           paymentData.schoolCode, 
           paymentData.receiptNumber
         )
@@ -502,13 +502,13 @@ export class EmailService {
             box-shadow: 0 8px 25px rgba(0,0,0,0.2);
         }
         .receipt-button {
-            background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%);
-            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
-            border-color: #6366f1;
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
+            border-color: #f59e0b;
         }
         .receipt-button:hover {
-            background: linear-gradient(135deg, #4338ca 0%, #3730a3 100%);
-            box-shadow: 0 8px 25px rgba(99, 102, 241, 0.6);
+            background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+            box-shadow: 0 8px 25px rgba(245, 158, 11, 0.6);
         }
         .statement-button {
             background: linear-gradient(135deg, #10b981 0%, #059669 100%);
@@ -752,10 +752,10 @@ export class EmailService {
                     ${data.receiptDownloadUrl ? `
                     <div style="text-align: center;">
                     <a href="${data.receiptDownloadUrl}" class="download-button receipt-button">
-                        <span style="font-size: 20px;">📄</span>
+                        <span style="font-size: 20px;">🧾</span>
                             <div>
-                            <div style="font-weight: 700;">View Payment Receipt</div>
-                            <div style="font-size: 13px; opacity: 0.9;">Interactive • PDF Download • Print Ready</div>
+                            <div style="font-weight: 700;">Download Payment Receipt</div>
+                            <div style="font-size: 13px; opacity: 0.9;">PDF Download • Print Ready • High Quality</div>
                             </div>
                         </a>
                     </div>
@@ -864,11 +864,11 @@ Applied to next term fees` : ''}
 ${data.receiptDownloadUrl || data.feesStatementUrl ? `
 📄 YOUR PAYMENT DOCUMENTS:
 
-${data.receiptDownloadUrl ? `🧾 View Interactive Receipt: ${data.receiptDownloadUrl}
-   • View online with unified layout
-   • Download as PDF (A3/A4/A5 formats)
-   • Print directly from browser
-   • Save as text file` : ''}
+${data.receiptDownloadUrl ? `🧾 Download Payment Receipt: ${data.receiptDownloadUrl}
+   • Direct PDF download
+   • High quality format
+   • Print ready
+   • Save and archive` : ''}
 
 ${data.feesStatementUrl ? `📊 Complete Fee Statement: ${data.feesStatementUrl}
    • Full academic year summary

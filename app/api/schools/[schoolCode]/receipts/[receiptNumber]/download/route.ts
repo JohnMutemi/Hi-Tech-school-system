@@ -11,6 +11,8 @@ export async function GET(
 ) {
   try {
     const { schoolCode, receiptNumber } = params
+    const { searchParams } = new URL(request.url)
+    const size = searchParams.get('size') || 'A4' // Default to A4
 
     // Find the school
     const school = await prisma.school.findUnique({
@@ -87,15 +89,15 @@ export async function GET(
 
     console.log('Generating PDF with data:', JSON.stringify(receiptData, null, 2))
 
-    // Generate PDF receipt
-    const pdfBuffer = await generateReceiptPDF(receiptData)
+    // Generate PDF receipt with specified size
+    const pdfBuffer = await generateReceiptPDF(receiptData, size as 'A3' | 'A4' | 'A5')
 
     // Return PDF as download
     return new NextResponse(pdfBuffer, {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="Receipt-${receiptNumber}.pdf"`,
+        'Content-Disposition': `attachment; filename="Receipt-${receiptNumber}-${size}.pdf"`,
         'Content-Length': pdfBuffer.length.toString(),
       },
     })

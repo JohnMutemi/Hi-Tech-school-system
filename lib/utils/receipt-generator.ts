@@ -72,15 +72,17 @@ function convertNumberToWords(amount: number): string {
   return result.trim();
 }
 
-export async function generateReceiptPDF(data: ReceiptData): Promise<Buffer> {
+export async function generateReceiptPDF(data: ReceiptData, size: 'A3' | 'A4' | 'A5' = 'A4'): Promise<Buffer> {
   try {
     console.log('Starting PDF generation with commercial aesthetic:', JSON.stringify(data, null, 2))
     
     // Import jsPDF dynamically to avoid SSR issues
     const { jsPDF } = await import('jspdf')
     
-    // Create new PDF document
-    const doc = new jsPDF()
+    // Create new PDF document with specified size
+    const doc = new jsPDF({
+      format: size.toLowerCase()
+    })
     
     // Set font
     doc.setFont('helvetica')
