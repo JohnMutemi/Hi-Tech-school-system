@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
-import { generateReceiptPDF } from '@/lib/utils/receipt-generator'
+import { generateEnhancedReceiptPDF } from '@/lib/utils/enhanced-receipt-generator'
 
 const prisma = new PrismaClient()
 
@@ -89,8 +89,8 @@ export async function GET(
 
     console.log('Generating PDF with data:', JSON.stringify(receiptData, null, 2))
 
-    // Generate PDF receipt with specified size
-    const pdfBuffer = await generateReceiptPDF(receiptData, size as 'A3' | 'A4' | 'A5')
+    // Generate enhanced PDF receipt with specified size
+    const pdfBuffer = await generateEnhancedReceiptPDF(receiptData, size as 'A3' | 'A4' | 'A5')
 
     // Return PDF as download
     return new NextResponse(pdfBuffer, {

@@ -113,30 +113,30 @@ export default function ReceiptsSection({
     const student = students.find(s => s.id === receipt.studentId);
     
     return {
-      receiptNumber: receipt.receiptNumber || "N/A",
+      receiptNumber: receipt.receiptNumber || `RCP-${Date.now()}`,
       paymentId: receipt.paymentId || receipt.id,
       studentId: receipt.studentId,
       schoolCode,
       amount: receipt.amount || 0,
       paymentMethod: receipt.paymentMethod || "manual",
-      feeType: receipt.feeType || "School Fees",
-      term: receipt.term || "N/A",
+      feeType: receipt.feeType || receipt.description || "School Fees",
+      term: receipt.term || "Term 1",
       academicYear: receipt.academicYear || new Date().getFullYear().toString(),
       reference: receipt.referenceNumber || receipt.reference || "N/A",
       transactionId: receipt.transactionId,
       status: receipt.status || "completed",
-      issuedAt: new Date(receipt.paymentDate || receipt.createdAt),
+      issuedAt: new Date(receipt.paymentDate || receipt.createdAt || Date.now()),
       issuedBy: receipt.issuedBy || "School System",
       schoolName: receipt.schoolName || "Hi-Tech School",
-      studentName: receipt.studentName || student?.name || student?.fullName || "N/A",
+      studentName: receipt.studentName || student?.name || student?.fullName || "Student",
       admissionNumber: receipt.admissionNumber || student?.admissionNumber || "N/A",
-      parentName: receipt.parentName,
+      parentName: receipt.parentName || student?.parent?.name,
       currency: receipt.currency || "KES",
-      termOutstandingBefore: receipt.termOutstandingBefore,
-      termOutstandingAfter: receipt.termOutstandingAfter,
-      academicYearOutstandingBefore: receipt.academicYearOutstandingBefore,
-      academicYearOutstandingAfter: receipt.academicYearOutstandingAfter,
-      carryForward: receipt.carryForward
+      termOutstandingBefore: receipt.termOutstandingBefore || 0,
+      termOutstandingAfter: receipt.termOutstandingAfter || 0,
+      academicYearOutstandingBefore: receipt.academicYearOutstandingBefore || 0,
+      academicYearOutstandingAfter: receipt.academicYearOutstandingAfter || 0,
+      carryForward: receipt.carryForward || 0
     };
   };
 
@@ -149,26 +149,20 @@ export default function ReceiptsSection({
   const handleDownloadReceipt = async (receipt: any) => {
     setDownloadingReceipt(receipt.id);
     try {
-      // Try to use the API endpoint for receipt download if available
-      if (receipt.receiptNumber) {
-        const downloadUrl = `/api/schools/${schoolCode}/receipts/${receipt.receiptNumber}/download`;
-        window.open(downloadUrl, '_blank');
-      } else {
-        // Fallback: trigger the enhanced receipt download
-        const receiptData = convertToReceiptData(receipt);
-        setSelectedReceipt(receiptData);
-        setShowReceiptModal(true);
-        
-        toast({
-          title: "Receipt Opened",
-          description: "You can download the receipt from the modal using the download buttons.",
-        });
-      }
+      // Always use the EnhancedReceipt component for consistent downloads (same as bursar dashboard)
+      const receiptData = convertToReceiptData(receipt);
+      setSelectedReceipt(receiptData);
+      setShowReceiptModal(true);
+      
+      toast({
+        title: "Receipt Ready",
+        description: "Use the download buttons (A3, A4, A5, TXT) or Print to get your receipt in the desired format.",
+      });
     } catch (error) {
       console.error('Download error:', error);
       toast({
         title: "Download Error",
-        description: "Failed to download receipt. Please try again.",
+        description: "Failed to open receipt. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -403,7 +397,7 @@ export default function ReceiptsSection({
                               variant="outline"
                               onClick={() => handleDownloadReceipt(receipt)}
                               disabled={downloadingReceipt === receipt.id}
-                              title="Download Receipt"
+                              title="Download Receipt (A3, A4, A5, TXT, Print)"
                             >
                               {downloadingReceipt === receipt.id ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
