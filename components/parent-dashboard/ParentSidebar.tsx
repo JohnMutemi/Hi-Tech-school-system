@@ -3,7 +3,7 @@ import {
   Sparkles, 
   Users, 
   DollarSign, 
-  // Receipt, 
+  Receipt, 
   BarChart2, 
   Settings, 
   LogOut,
@@ -30,7 +30,7 @@ const NAV_ITEMS = [
   { id: "overview", label: "Overview", icon: Sparkles },
   { id: "children", label: "My Children", icon: Users },
   { id: "fees", label: "Fee Management", icon: DollarSign },
-  // { id: "receipts", label: "Receipts", icon: Receipt },
+  { id: "receipts", label: "Receipts", icon: Receipt },
   { id: "performance", label: "Academic Performance", icon: BarChart2 },
   { id: "settings", label: "Account Settings", icon: Settings },
 ];

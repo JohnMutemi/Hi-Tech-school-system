@@ -6,6 +6,7 @@ import StickyHeader from "@/components/parent-dashboard/StickyHeader";
 import OverviewSection from "@/components/parent-dashboard/OverviewSection";
 import ChildrenSection from "@/components/parent-dashboard/ChildrenSection";
 import FeesManagement from "@/components/parent-dashboard/FeesManagement";
+import ReceiptsSection from "@/components/parent-dashboard/ReceiptsSection";
 import PerformanceSection from "@/components/parent-dashboard/PerformanceSection";
 import SettingsSection from "@/components/parent-dashboard/SettingsSection";
 import { useState, useEffect } from "react";
@@ -36,6 +37,15 @@ export default function ParentDashboard({ schoolCode, parentId }: { schoolCode: 
           schoolCode={schoolCode}
           selectedId={selectedId}
           setSelectedId={setSelectedId}
+        />;
+      case "receipts":
+        return <ReceiptsSection 
+          receipts={dashboard.receipts}
+          students={dashboard.students}
+          schoolCode={schoolCode}
+          loading={dashboard.loadingReceipts}
+          error={dashboard.receiptsError}
+          refreshReceipts={dashboard.fetchAllReceipts}
         />;
       case "performance":
         return <PerformanceSection {...dashboard} />;

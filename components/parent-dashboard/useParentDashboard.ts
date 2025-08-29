@@ -232,6 +232,7 @@ export function useParentDashboard(schoolCode: string, parentId?: string) {
     loadingPayments,
     paymentsError,
     refreshPayments,
+    fetchAllReceipts,
     handleAvatarChange,
     handleLogout,
     // Add all handlers and utility functions here
