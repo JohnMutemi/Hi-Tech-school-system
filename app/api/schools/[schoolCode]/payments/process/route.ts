@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { academicYearTransitionService } from "@/lib/services/academic-year-transition-service";
 
 const prisma = new PrismaClient();
 
@@ -134,15 +135,29 @@ export async function POST(
       }
     });
 
-    // Create receipt record
-    // Compute academic year and term balances AFTER applying this payment
-    const appliedToCurrent = Math.min(amount, balanceData.currentTermBalance);
-    const carryForwardApplied = Math.max(0, amount - appliedToCurrent);
-    const newNextTermBalance = Math.max(0, balanceData.nextTermBalance - carryForwardApplied);
-    const academicYearOutstandingAfter = Math.max(
-      0,
-      balanceData.academicYearOutstandingBefore - appliedToCurrent - Math.min(carryForwardApplied, balanceData.nextTermBalance)
-    );
+    // Create receipt record with enhanced carry forward logic
+    let carryForwardDetails = null;
+    try {
+      carryForwardDetails = await academicYearTransitionService.processPaymentWithCarryForward(
+        student.id,
+        amount,
+        academicYearRecord.id,
+        termRecord.id
+      );
+    } catch (error) {
+      console.error('Error processing payment with carry forward:', error);
+      // Fallback to simple calculation
+      carryForwardDetails = {
+        appliedToCurrent: Math.min(amount, balanceData.currentTermBalance),
+        overpayment: Math.max(0, amount - Math.min(amount, balanceData.currentTermBalance)),
+        newTermBalance: Math.max(0, balanceData.currentTermBalance - amount),
+        newAcademicYearBalance: Math.max(0, balanceData.academicYearOutstandingBefore - amount)
+      };
+    }
+    
+    const appliedToCurrent = carryForwardDetails.appliedToCurrent;
+    const carryForwardApplied = carryForwardDetails.overpayment;
+    const academicYearOutstandingAfter = carryForwardDetails.newAcademicYearBalance;
 
     const receipt = await prisma.receipt.create({
       data: {
@@ -154,11 +169,12 @@ export async function POST(
         academicYearOutstandingBefore: balanceData.academicYearOutstandingBefore,
         academicYearOutstandingAfter: academicYearOutstandingAfter,
         termOutstandingBefore: balanceData.termOutstandingBefore,
-        termOutstandingAfter: Math.max(0, balanceData.currentTermBalance - appliedToCurrent),
+        termOutstandingAfter: carryForwardDetails.newTermBalance,
         academicYearId: academicYearRecord.id,
         termId: termRecord.id,
         paymentMethod: paymentMethod,
         referenceNumber: finalReferenceNumber,
+        carryForward: carryForwardApplied || 0,
       }
     });
 

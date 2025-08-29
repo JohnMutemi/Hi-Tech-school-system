@@ -39,6 +39,7 @@ interface PaymentNotificationData {
   academicYearOutstandingBefore?: number
   academicYearOutstandingAfter?: number
   carryForward?: number
+  paymentId?: string
 }
 
 export class EmailService {
@@ -331,10 +332,11 @@ export class EmailService {
             overflow: hidden;
         }
         .header { 
-            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); 
+            background: linear-gradient(135deg, #1e40af 0%, #3730a3 100%); 
             color: white; 
             padding: 30px; 
             text-align: center; 
+            border-bottom: 3px solid #f59e0b;
         }
         .header h1 {
             font-size: 24px;
@@ -348,19 +350,21 @@ export class EmailService {
         }
         .email-intro {
             padding: 30px;
-            background: #f0fdf4;
+            background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
             border-bottom: 1px solid #bbf7d0;
             text-align: center;
         }
         .email-intro h2 {
-            color: #166534;
+            color: #14532d;
             margin: 0 0 10px 0;
-            font-size: 20px;
+            font-size: 22px;
+            font-weight: 700;
         }
         .email-intro p {
-            color: #15803d;
+            color: #166534;
             margin: 0;
             font-size: 16px;
+            font-weight: 500;
         }
         .receipt-preview {
             margin: 30px;
@@ -450,23 +454,26 @@ export class EmailService {
             margin: 2px 0 0 0;
         }
         .download-section {
-            background: #f0f9ff;
-            border: 2px solid #0ea5e9;
-            border-radius: 12px;
-            padding: 30px;
+            background: linear-gradient(135deg, #fff7ed 0%, #fef3c7 100%);
+            border: 2px solid #f59e0b;
+            border-radius: 16px;
+            padding: 35px;
             margin: 30px;
             text-align: center;
+            box-shadow: 0 8px 25px rgba(245, 158, 11, 0.1);
         }
         .download-title {
-            color: #0c4a6e;
-            font-size: 20px;
-            font-weight: 600;
-            margin: 0 0 10px 0;
+            color: #92400e;
+            font-size: 22px;
+            font-weight: 700;
+            margin: 0 0 8px 0;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.1);
         }
         .download-subtitle {
-            color: #0369a1;
-            margin: 0 0 25px 0;
-            font-size: 14px;
+            color: #d97706;
+            margin: 0 0 30px 0;
+            font-size: 15px;
+            font-weight: 500;
         }
         .button-container {
             display: flex;
@@ -478,31 +485,49 @@ export class EmailService {
             display: inline-flex;
             align-items: center;
             color: white;
-            padding: 15px 25px;
+            padding: 18px 28px;
             text-decoration: none;
-            border-radius: 8px;
-            font-weight: 600;
-            min-width: 180px;
-            gap: 10px;
+            border-radius: 12px;
+            font-weight: 700;
+            min-width: 200px;
+            gap: 12px;
             transition: all 0.3s ease;
-            font-size: 14px;
+            font-size: 15px;
+            border: 2px solid transparent;
+            position: relative;
+            overflow: hidden;
+        }
+        .download-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
         }
         .receipt-button {
-            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+            background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+            border-color: #6366f1;
+        }
+        .receipt-button:hover {
+            background: linear-gradient(135deg, #4338ca 0%, #3730a3 100%);
+            box-shadow: 0 8px 25px rgba(99, 102, 241, 0.6);
         }
         .statement-button {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+            border-color: #10b981;
+        }
+        .statement-button:hover {
             background: linear-gradient(135deg, #059669 0%, #047857 100%);
-            box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.6);
         }
         .download-note {
-            margin-top: 20px;
-            padding: 15px;
-            background: rgba(59, 130, 246, 0.1);
-            border-radius: 6px;
-            font-size: 13px;
-            color: #475569;
-            border-left: 4px solid #3b82f6;
+            margin-top: 25px;
+            padding: 20px;
+            background: rgba(245, 158, 11, 0.08);
+            border-radius: 10px;
+            font-size: 14px;
+            color: #78350f;
+            border: 1px solid rgba(245, 158, 11, 0.2);
+            border-left: 4px solid #f59e0b;
         }
         .footer { 
             background: #f9fafb;
@@ -529,7 +554,6 @@ export class EmailService {
         <div class="header">
             <h1>${data.schoolName}</h1>
             <p>School Code: ${data.schoolCode || 'N/A'}</p>
-            <p>📧 ${(data.schoolCode || 'school').toLowerCase()}@school.ac.ke | 📞 +254-XXX-XXXXXX</p>
         </div>
         
         <div class="email-intro">
@@ -560,13 +584,9 @@ export class EmailService {
                                 <span style="width: 14px; height: 14px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 8px;">🏢</span>
                                 School Code: <span style="color: white; font-weight: 600;">${data.schoolCode || 'N/A'}</span>
                         </div>
-                            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
-                                <span style="width: 14px; height: 14px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 8px;">📧</span>
-                                ${(data.schoolCode || 'school').toLowerCase()}@school.ac.ke
-                        </div>
                             <div style="display: flex; align-items: center; gap: 6px;">
-                                <span style="width: 14px; height: 14px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 8px;">📞</span>
-                                +254-XXX-XXXXXX
+                                <span style="width: 14px; height: 14px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 8px;">📧</span>
+                                Contact: School Administration
                     </div>
                 </div>
             </div>
@@ -725,17 +745,17 @@ export class EmailService {
         <!-- Download Section with Clear Call-to-Action -->
             ${data.receiptDownloadUrl || data.feesStatementUrl ? `
             <div class="download-section">
-            <div class="download-title">📄 Your Payment Documents</div>
-            <div class="download-subtitle">Access your receipt and fee statement instantly - they'll open in your browser with full download options.</div>
+            <div class="download-title">📋 Access Your Documents</div>
+            <div class="download-subtitle">Download or view your payment receipt and complete fee statement with just one click</div>
                 
             <div class="button-container">
                     ${data.receiptDownloadUrl ? `
                     <div style="text-align: center;">
                     <a href="${data.receiptDownloadUrl}" class="download-button receipt-button">
-                        <span style="font-size: 18px;">🧾</span>
+                        <span style="font-size: 20px;">📄</span>
                             <div>
-                            <div style="font-weight: 600;">View Interactive Receipt</div>
-                            <div style="font-size: 12px; opacity: 0.9;">View online • Download PDF • Print</div>
+                            <div style="font-weight: 700;">View Payment Receipt</div>
+                            <div style="font-size: 13px; opacity: 0.9;">Interactive • PDF Download • Print Ready</div>
                             </div>
                         </a>
                     </div>
@@ -744,10 +764,10 @@ export class EmailService {
                     ${data.feesStatementUrl ? `
                     <div style="text-align: center;">
                     <a href="${data.feesStatementUrl}" class="download-button statement-button">
-                        <span style="font-size: 18px;">📊</span>
+                        <span style="font-size: 20px;">📊</span>
                             <div>
-                            <div style="font-weight: 600;">Complete Fee Statement</div>
-                            <div style="font-size: 12px; opacity: 0.9;">Full academic year summary (PDF)</div>
+                            <div style="font-weight: 700;">Download Fee Statement</div>
+                            <div style="font-size: 13px; opacity: 0.9;">Complete Academic Year Summary</div>
                             </div>
                         </a>
                     </div>
@@ -755,9 +775,9 @@ export class EmailService {
                 </div>
                 
             <div class="download-note">
-                <strong>💡 What's Available:</strong><br>
-                • <strong>Interactive Receipt:</strong> View this payment with unified layout, download as PDF (A3/A4/A5), print, or save as text<br>
-                • <strong>Fee Statement:</strong> Complete overview of all fees and payments for the academic year
+                <strong>📋 Document Details:</strong><br>
+                • <strong>Payment Receipt:</strong> Detailed view of this transaction with multiple download formats<br>
+                • <strong>Fee Statement:</strong> Comprehensive academic year overview including all payments and balances
                 </div>
             </div>
             ` : ''}
@@ -794,7 +814,7 @@ export class EmailService {
     const text = `
 ${data.schoolName}
 School Code: ${data.schoolCode || 'N/A'}
-📧 ${(data.schoolCode || 'school').toLowerCase()}@school.ac.ke | 📞 +254-XXX-XXXXXX
+Contact: School Administration
 
 ✅ PAYMENT SUCCESSFULLY RECEIVED!
 

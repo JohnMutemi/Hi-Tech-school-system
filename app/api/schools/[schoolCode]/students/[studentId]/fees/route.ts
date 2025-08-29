@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
+import { academicYearTransitionService } from '@/lib/services/academic-year-transition-service';
 
 const prisma = new PrismaClient();
 
@@ -294,8 +295,37 @@ export async function GET(
       console.log(`Fee structure ${index + 1}: ID=${fs.id}, Term=${fs.term}, Amount=${fs.totalAmount}, AcademicYearId=${fs.academicYearId}, TermId=${fs.termId}`);
     });
 
+    // Check for carry forward from previous academic year
     let carryForward = 0;
-    const termBalances = filteredFeeStructures.map((fs, index) => {
+    if (filteredFeeStructures.length > 0) {
+      const firstTerm = filteredFeeStructures[0];
+      const academicYearNumber = parseInt(firstTerm.year);
+      
+      // Get previous year's closing balance
+      try {
+        const previousYearBalance = await prisma.studentYearlyBalance.findUnique({
+          where: {
+            studentId_academicYear: {
+              studentId: student.id,
+              academicYear: academicYearNumber - 1
+            }
+          }
+        });
+        
+        if (previousYearBalance && previousYearBalance.closingBalance > 0) {
+          carryForward = previousYearBalance.closingBalance;
+          console.log(`Academic year carry forward from ${academicYearNumber - 1}: KES ${carryForward}`);
+        }
+      } catch (error) {
+        console.log('No previous year balance found, starting with zero carry forward');
+      }
+    }
+    
+    const termBalances = [];
+    let academicYearCarryForward = null;
+    
+    for (let index = 0; index < filteredFeeStructures.length; index++) {
+      const fs = filteredFeeStructures[index];
       const charges = transactions
         .filter(txn => txn.termId === fs.termId && txn.academicYearId === fs.academicYearId && txn.type === 'invoice')
         .reduce((sum, txn) => sum + (txn.debit || 0), 0);
@@ -352,9 +382,35 @@ export async function GET(
       // Update carry forward for next term (unless it's the last term)
       if (!isLastTerm) {
         carryForward = carryToNext;
+      } else {
+        // This is the last term of the academic year
+        // Handle end-of-year carry forward
+        if (carryToNext !== 0) {
+          const academicYearNumber = parseInt(fs.year);
+          academicYearCarryForward = {
+            studentId: student.id,
+            nextAcademicYear: academicYearNumber + 1,
+            carryForwardAmount: carryToNext
+          };
+          console.log(`End-of-year carry forward to ${academicYearNumber + 1}: KES ${carryToNext}`);
+        }
       }
-      return result;
-    });
+      
+      termBalances.push(result);
+    }
+    
+    // Handle year-end carry forward after the loop
+    if (academicYearCarryForward) {
+      try {
+        await academicYearTransitionService.handleYearEndCarryForward(
+          academicYearCarryForward.studentId,
+          academicYearCarryForward.nextAcademicYear,
+          academicYearCarryForward.carryForwardAmount
+        );
+      } catch (error) {
+        console.error('Error handling year-end carry forward:', error);
+      }
+    }
 
     let arrearsRecords = await prisma.studentArrear.findMany({
       where: {
