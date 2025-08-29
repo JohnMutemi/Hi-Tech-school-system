@@ -56,6 +56,8 @@ export async function GET(
 ) {
   try {
     const { schoolCode, receiptNumber } = params
+    
+    console.log('Receipt view request:', { schoolCode, receiptNumber });
 
     // Get school first
     const school = await prisma.school.findUnique({
@@ -63,11 +65,14 @@ export async function GET(
     })
 
     if (!school) {
+      console.log('School not found:', schoolCode);
       return NextResponse.json(
         { error: 'School not found' },
         { status: 404 }
       )
     }
+
+    console.log('School found:', school.name);
 
     // Get receipt with related data
     const receipt = await prisma.receipt.findFirst({
@@ -92,7 +97,10 @@ export async function GET(
       }
     })
 
+    console.log('Receipt query result:', receipt ? 'Found' : 'Not found');
+
     if (!receipt) {
+      console.log('Receipt not found:', receiptNumber);
       return NextResponse.json(
         { error: 'Receipt not found' },
         { status: 404 }
@@ -378,21 +386,21 @@ export async function GET(
                     <div class="details-grid">
                         ${receiptData.termOutstandingBefore !== undefined ? `
                         <div class="detail-item">
-                            <span>Term Balance Before:</span>
+                            <span>${receiptData.term} Balance Before:</span>
                             <p>${receiptData.currency} ${receiptData.termOutstandingBefore.toLocaleString()}</p>
                         </div>
                         <div class="detail-item">
-                            <span>Term Balance After:</span>
+                            <span>${receiptData.term} Balance After:</span>
                             <p style="color: ${receiptData.termOutstandingAfter <= 0 ? '#059669' : '#d97706'};">${receiptData.currency} ${receiptData.termOutstandingAfter?.toLocaleString() || '0'}</p>
                         </div>
                         ` : ''}
                         ${receiptData.academicYearOutstandingBefore !== undefined ? `
                         <div class="detail-item">
-                            <span>Year Balance Before:</span>
+                            <span>Academic Year Balance Before:</span>
                             <p>${receiptData.currency} ${receiptData.academicYearOutstandingBefore.toLocaleString()}</p>
                         </div>
                         <div class="detail-item">
-                            <span>Year Balance After:</span>
+                            <span>Academic Year Balance After:</span>
                             <p style="color: ${receiptData.academicYearOutstandingAfter <= 0 ? '#059669' : '#d97706'};">${receiptData.currency} ${receiptData.academicYearOutstandingAfter?.toLocaleString() || '0'}</p>
                         </div>
                         ` : ''}

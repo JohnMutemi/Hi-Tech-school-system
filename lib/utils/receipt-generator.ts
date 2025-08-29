@@ -111,9 +111,8 @@ export async function generateReceiptPDF(data: ReceiptData): Promise<Buffer> {
     
     // Contact information with icons
     doc.setFontSize(7)
-    doc.text(`🏢 School Code: ${data.schoolCode}`, 40, 32)
-    doc.text(`📧 ${data.schoolCode.toLowerCase()}@school.ac.ke`, 40, 36)
-    doc.text(`📞 +254-XXX-XXXXXX`, 40, 40)
+    doc.text(`📧 ${data.schoolCode.toLowerCase()}@school.ac.ke`, 40, 32)
+    doc.text(`📞 +254-XXX-XXXXXX`, 40, 36)
     
     // Enhanced Date and Receipt boxes (right side)
     // Date box with shadow effect

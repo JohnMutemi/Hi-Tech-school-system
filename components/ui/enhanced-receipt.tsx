@@ -360,7 +360,6 @@ Thank you for your payment!
             <h1 className="text-2xl font-bold text-gray-900 mb-1">
               {receiptData.schoolName}
             </h1>
-            <p className="text-gray-600 text-sm mb-3">School Code: {receiptData.schoolCode}</p>
             <p className="text-gray-500 text-sm">{receiptData.schoolCode.toLowerCase()}@school.ac.ke</p>
           </div>
           

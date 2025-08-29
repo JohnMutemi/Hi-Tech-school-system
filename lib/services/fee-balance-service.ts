@@ -545,6 +545,9 @@ class FeeBalanceService {
       // Calculate updated balance after payment
       const updatedBalance = await this.calculateStudentBalance(studentId, academicYear, term);
 
+      // Calculate term-specific balances
+      const termBalance = await this.calculateTermBalance(studentId, academicYear, term);
+      
       // Create receipt record
       const receipt = await prisma.receipt.create({
         data: {
@@ -555,8 +558,8 @@ class FeeBalanceService {
           paymentDate: payment.paymentDate,
           academicYearOutstandingBefore: balanceBefore,
           academicYearOutstandingAfter: updatedBalance.balance,
-          termOutstandingBefore: balanceBefore,
-          termOutstandingAfter: updatedBalance.balance,
+          termOutstandingBefore: termBalance.balance,
+          termOutstandingAfter: Math.max(0, termBalance.balance - amount),
           academicYearId: academicYearRecord.id,
           termId: termRecord.id,
           paymentMethod,
@@ -573,6 +576,87 @@ class FeeBalanceService {
       console.error('Error recording payment:', error);
       throw error;
     }
+  }
+
+  /**
+   * Calculate term-specific balance for a student
+   */
+  async calculateTermBalance(
+    studentId: string, 
+    academicYear: string, 
+    term: string
+  ): Promise<StudentFeeBalance> {
+    const student = await prisma.student.findUnique({
+      where: { id: studentId },
+      include: {
+        class: {
+          include: {
+            grade: true,
+          },
+        },
+        school: true,
+      },
+    });
+
+    if (!student) {
+      throw new Error(`Student with ID ${studentId} not found`);
+    }
+
+    // Get term-specific fee structure
+    const feeStructure = await prisma.termlyFeeStructure.findFirst({
+      where: {
+        schoolId: student.schoolId,
+        gradeId: student.class?.gradeId || '',
+        year: parseInt(academicYear),
+        term: term,
+        isActive: true,
+      },
+    });
+
+    if (!feeStructure) {
+      return {
+        balance: 0,
+        amountDue: 0,
+        amountPaid: 0,
+        breakdown: {},
+        feeStructure: null,
+        student: {
+          id: studentId,
+          name: student.user?.name || 'Unknown',
+          admissionNumber: student.admissionNumber || 'N/A',
+          className: student.class?.name || 'N/A',
+          gradeName: student.class?.grade?.name || 'N/A',
+        },
+      };
+    }
+
+    // Get payments for this specific term
+    const payments = await prisma.payment.findMany({
+      where: {
+        studentId,
+        termId: feeStructure.termId,
+      },
+      orderBy: { paymentDate: 'asc' },
+    });
+
+    const totalCharges = Number(feeStructure.totalAmount);
+    const totalPayments = payments.reduce((sum, p) => sum + p.amount, 0);
+    const balance = Math.max(0, totalCharges - totalPayments);
+
+    return {
+      balance,
+      amountDue: totalCharges,
+      amountPaid: totalPayments,
+      breakdown: feeStructure.breakdown || {},
+      feeStructure,
+      student: {
+        id: studentId,
+        name: student.user?.name || 'Unknown',
+        admissionNumber: student.admissionNumber || 'N/A',
+        className: student.class?.name || 'N/A',
+        gradeName: student.class?.grade?.name || 'N/A',
+      },
+    };
   }
 
   /**

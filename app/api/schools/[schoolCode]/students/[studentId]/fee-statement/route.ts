@@ -304,7 +304,38 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       }
     });
 
-    // Return structured data
+    // Calculate term-specific balances
+    const termBalances = new Map();
+    let currentBalance = arrearsBroughtForward;
+    
+    for (const row of allRows) {
+      currentBalance += (row.debit || 0) - (row.credit || 0);
+      const termKey = `${row.termName}-${row.academicYearName}`;
+      if (row.termName && !termBalances.has(termKey)) {
+        // Initialize term balance tracking
+        termBalances.set(termKey, {
+          termName: row.termName,
+          academicYearName: row.academicYearName,
+          charges: 0,
+          payments: 0,
+          balance: 0,
+          termId: row.termId,
+          academicYearId: row.academicYearId
+        });
+      }
+      
+      if (row.termName) {
+        const termData = termBalances.get(termKey);
+        if (row.type === 'invoice') {
+          termData.charges += (row.debit || 0);
+        } else if (row.type === 'payment') {
+          termData.payments += (row.credit || 0);
+        }
+        termData.balance = termData.charges - termData.payments;
+      }
+    }
+
+    // Return structured data with term-specific balances
     return NextResponse.json({
       student: {
         name: studentDetails?.user?.name || 'Student',
@@ -315,6 +346,7 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       },
       academicYear: academicYear?.name || 'Academic Year',
       statement: allRows,
+      termBalances: Array.from(termBalances.values()),
       summary: {
         totalDebit,
         totalCredit,
