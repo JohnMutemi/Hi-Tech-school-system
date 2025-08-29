@@ -70,7 +70,7 @@ export async function GET(
     }
 
     // Get receipt with related data
-    const receipt = await prisma.receipt.findUnique({
+    const receipt = await prisma.receipt.findFirst({
       where: { receiptNumber },
       include: {
         student: {
@@ -457,4 +457,3 @@ export async function GET(
     )
   }
 }
-
