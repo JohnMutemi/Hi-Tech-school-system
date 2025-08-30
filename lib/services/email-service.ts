@@ -48,22 +48,21 @@ interface PaymentNotificationData {
 export class EmailService {
   private config: EmailConfig | null = null
 
-  // Helper function to generate receipt download URL (direct PDF)
+  // Helper function to generate receipt download URL (same as bursar dashboard)
   private generateReceiptDownloadUrl(schoolCode: string, receiptNumber: string, size: string = 'A4'): string {
-    // Create a secure URL that leads to the receipt download endpoint (direct PDF)
     let baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-    // Remove trailing slash to avoid double slashes
     baseUrl = baseUrl.replace(/\/$/, '')
     
     // Ensure HTTPS in production
-    if (baseUrl.includes('localhost') === false && !baseUrl.startsWith('https://')) {
+    if (!baseUrl.includes('localhost') && !baseUrl.startsWith('https://')) {
       baseUrl = baseUrl.replace('http://', 'https://')
     }
     
+    // Use the exact same endpoint as bursar dashboard
     const url = `${baseUrl}/api/schools/${schoolCode}/receipts/${receiptNumber}/download?size=${size}`
-    console.log('🔍 Receipt Download URL Debug:', {
-      NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL,
+    console.log('🔍 Receipt Download URL (Bursar Format):', {
       baseUrl,
+      receiptNumber,
       size,
       generatedUrl: url
     })
@@ -83,22 +82,22 @@ export class EmailService {
     }
   }
 
-  // Helper function to generate fees statement PDF URL
+  // Helper function to generate fees statement PDF URL (same as bursar dashboard)
   private generateFeesStatementUrl(schoolCode: string, studentId: string, academicYearId?: string): string {
     let baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-    // Remove trailing slash to avoid double slashes
     baseUrl = baseUrl.replace(/\/$/, '')
     
     // Ensure HTTPS in production
-    if (baseUrl.includes('localhost') === false && !baseUrl.startsWith('https://')) {
+    if (!baseUrl.includes('localhost') && !baseUrl.startsWith('https://')) {
       baseUrl = baseUrl.replace('http://', 'https://')
     }
     
+    // Use the exact same endpoint as bursar dashboard
     const yearParam = academicYearId ? `?academicYearId=${academicYearId}` : ''
     const url = `${baseUrl}/api/schools/${schoolCode}/students/${studentId}/fee-statement/pdf${yearParam}`
-    console.log('🔍 Fees Statement URL Debug:', {
-      NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL,
+    console.log('🔍 Fee Statement URL (Bursar Format):', {
       baseUrl,
+      studentId,
       academicYearId,
       generatedUrl: url
     })
@@ -153,9 +152,14 @@ export class EmailService {
         paymentData.receiptDownloadUrlA5 = receiptUrls.receiptDownloadUrlA5
       }
 
-      // Generate fees statement URL if not provided
+      // Generate fees statement URL if not provided (same as bursar dashboard)
       if (!paymentData.feesStatementUrl && paymentData.studentId) {
         try {
+          console.log('📊 Generating fee statement URL:', {
+            schoolCode: paymentData.schoolCode,
+            studentId: paymentData.studentId,
+            academicYearId: paymentData.academicYearId
+          })
           paymentData.feesStatementUrl = this.generateFeesStatementUrl(
             paymentData.schoolCode,
             paymentData.studentId,
