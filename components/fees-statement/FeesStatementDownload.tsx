@@ -174,11 +174,11 @@ export function FeesStatementDownload({
         link.click();
         document.body.removeChild(link);
         window.URL.revokeObjectURL(url);
-        
-        toast({
-          title: 'Success',
-          description: 'Fee statement downloaded successfully',
-        });
+      
+      toast({
+        title: 'Success',
+        description: 'Fee statement downloaded successfully',
+      });
       } else {
         throw new Error('Failed to download fee statement');
       }

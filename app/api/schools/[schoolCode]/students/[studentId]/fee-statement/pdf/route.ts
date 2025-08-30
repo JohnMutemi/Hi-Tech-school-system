@@ -1,7 +1,5 @@
 import { PrismaClient } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 
 const prisma = new PrismaClient();
 
@@ -48,6 +46,10 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     if (!school) {
       return NextResponse.json({ error: 'School not found' }, { status: 404 });
     }
+
+    // Import jsPDF dynamically to avoid SSR issues
+    const { jsPDF } = await import('jspdf');
+    const autoTable = (await import('jspdf-autotable')).default;
 
     // Generate PDF
     console.log('📄 Starting PDF generation...');

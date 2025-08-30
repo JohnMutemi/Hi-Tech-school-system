@@ -360,168 +360,281 @@ export class EmailService {
         body { 
             font-family: Inter, system-ui, sans-serif; 
             line-height: 1.6; 
-            color: #333; 
+            color: #334155; 
             margin: 0; 
             padding: 0; 
-            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 50%, #cbd5e1 100%);
+            min-height: 100vh;
         }
         .email-container { 
-            max-width: 700px; 
+            max-width: 750px; 
             margin: 20px auto; 
             padding: 0;
             background: white;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-            border: 2px solid #e5e7eb;
-            border-radius: 12px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            border: 1px solid #e2e8f0;
+            border-radius: 24px;
             overflow: hidden;
+            backdrop-filter: blur(16px);
         }
         .header { 
-            background: linear-gradient(135deg, #1e40af 0%, #3730a3 100%); 
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%); 
             color: white; 
-            padding: 30px; 
+            padding: 40px; 
             text-align: center; 
-            border-bottom: 3px solid #f59e0b;
+            position: relative;
+            border-bottom: 4px solid #3b82f6;
+            overflow: hidden;
+        }
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at 25% 25%, #1e40af 0%, transparent 50%), 
+                        radial-gradient(circle at 75% 75%, #3b82f6 0%, transparent 50%);
+            opacity: 0.1;
+        }
+        .header-content {
+            position: relative;
+            z-index: 1;
+        }
+        .school-icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            box-shadow: 0 20px 25px -5px rgba(59, 130, 246, 0.4);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+        .school-icon::before {
+            content: '🏫';
+            font-size: 32px;
         }
         .header h1 {
-            font-size: 24px;
-            font-weight: bold;
-            margin: 0 0 5px 0;
+            font-size: 28px;
+            font-weight: 800;
+            margin: 0 0 8px 0;
+            letter-spacing: -0.025em;
         }
-        .header p {
-            font-size: 12px;
-            color: #dbeafe;
-            margin: 2px 0;
+        .header .subtitle {
+            font-size: 16px;
+            color: #94a3b8;
+            margin: 0 0 5px 0;
+            font-weight: 600;
+        }
+        .header .timestamp {
+            font-size: 14px;
+            color: #64748b;
+            margin: 0;
+            font-weight: 500;
         }
         .email-intro {
-            padding: 30px;
+            padding: 40px;
             background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
-            border-bottom: 1px solid #bbf7d0;
+            border-bottom: 1px solid #a7f3d0;
             text-align: center;
+            position: relative;
+        }
+        .success-icon {
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            box-shadow: 0 10px 25px rgba(5, 150, 105, 0.3);
+        }
+        .success-icon::before {
+            content: '✅';
+            font-size: 24px;
         }
         .email-intro h2 {
-            color: #14532d;
-            margin: 0 0 10px 0;
-            font-size: 22px;
-            font-weight: 700;
+            color: #065f46;
+            margin: 0 0 12px 0;
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: -0.025em;
         }
         .email-intro p {
-            color: #166534;
+            color: #047857;
             margin: 0;
             font-size: 16px;
-            font-weight: 500;
+            font-weight: 600;
         }
         .receipt-preview {
             margin: 30px;
-            background: white;
-            border: 2px solid #e5e7eb;
-            border-radius: 8px;
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            border: 2px solid #e2e8f0;
+            border-radius: 16px;
             overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
         }
         .receipt-header {
-            padding: 20px;
-            border-bottom: 1px solid #e5e7eb;
-            background: #f9fafb;
-        }
-        .receipt-header h3 {
-            margin: 0 0 10px 0;
-            color: #374151;
-            font-size: 18px;
-        }
-        .receipt-info {
+            padding: 25px;
+            border-bottom: 2px solid #e2e8f0;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
             display: flex;
             justify-content: space-between;
             align-items: center;
-            font-size: 14px;
-            color: #6b7280;
-            margin-top: 10px;
+        }
+        .receipt-header h3 {
+            margin: 0;
+            color: #1e293b;
+            font-size: 20px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .receipt-header h3::before {
+            content: '🧾';
+            font-size: 20px;
         }
         .status-badge {
-            background: #dcfce7;
-            color: #166534;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
+            background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+            color: #065f46;
+            padding: 8px 16px;
+            border-radius: 25px;
+            font-size: 13px;
+            font-weight: 700;
+            border: 2px solid #a7f3d0;
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
         }
         .receipt-content { 
-            padding: 25px; 
+            padding: 30px; 
         }
         .section {
-            margin-bottom: 25px;
+            margin-bottom: 30px;
         }
         .section h4 {
-            font-size: 14px;
-            font-weight: 600;
-            color: #374151;
-            margin: 0 0 10px 0;
+            font-size: 16px;
+            font-weight: 700;
+            color: #1e293b;
+            margin: 0 0 15px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
         .section-box {
-            background: #f9fafb;
-            padding: 15px;
-            border-radius: 6px;
-            border: 1px solid #e5e7eb;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            padding: 20px;
+            border-radius: 12px;
+            border: 2px solid #e2e8f0;
         }
         .amount-box {
-            background: #f0fdf4;
-            border: 2px solid #bbf7d0;
-            padding: 20px;
-            border-radius: 8px;
+            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+            border: 3px solid #a7f3d0;
+            padding: 30px;
+            border-radius: 16px;
             text-align: center;
-            margin: 20px 0;
+            margin: 25px 0;
+            position: relative;
+            overflow: hidden;
+        }
+        .amount-box::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at 30% 30%, rgba(5, 150, 105, 0.1) 0%, transparent 50%);
+        }
+        .amount-content {
+            position: relative;
+            z-index: 1;
         }
         .amount-value {
-            font-size: 24px;
-            font-weight: bold;
-            color: #166534;
-            margin: 0;
+            font-size: 36px;
+            font-weight: 900;
+            color: #065f46;
+            margin: 0 0 8px 0;
+            letter-spacing: -0.025em;
         }
         .amount-words {
             font-style: italic;
-            color: #374151;
-            margin: 5px 0 0 0;
-            font-size: 14px;
+            color: #047857;
+            margin: 0;
+            font-size: 16px;
+            font-weight: 600;
         }
         .details-grid { 
             display: grid; 
             grid-template-columns: 1fr 1fr; 
-            gap: 15px; 
-            font-size: 14px;
+            gap: 20px; 
+            font-size: 15px;
+        }
+        .detail-item {
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
         }
         .detail-item span {
-            color: #6b7280;
-            font-size: 12px; 
-            font-weight: 500;
+            color: #64748b;
+            font-size: 13px; 
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+            display: block;
+            margin-bottom: 5px;
         }
         .detail-item p {
-            color: #374151;
-            font-weight: 600;
-            margin: 2px 0 0 0;
+            color: #1e293b;
+            font-weight: 700;
+            margin: 0;
+            font-size: 15px;
         }
         .download-section {
-            background: linear-gradient(135deg, #fff7ed 0%, #fef3c7 100%);
-            border: 2px solid #f59e0b;
-            border-radius: 16px;
-            padding: 35px;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+            border-radius: 20px;
+            padding: 40px;
             margin: 30px;
             text-align: center;
-            box-shadow: 0 8px 25px rgba(245, 158, 11, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+        .download-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at 25% 25%, #1e40af 0%, transparent 50%), 
+                        radial-gradient(circle at 75% 75%, #3b82f6 0%, transparent 50%);
+            opacity: 0.1;
+        }
+        .download-content {
+            position: relative;
+            z-index: 1;
         }
         .download-title {
-            color: #92400e;
-            font-size: 22px;
-            font-weight: 700;
-            margin: 0 0 8px 0;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            color: #f8fafc;
+            font-size: 24px;
+            font-weight: 800;
+            margin: 0 0 10px 0;
+            letter-spacing: -0.025em;
         }
         .download-subtitle {
-            color: #d97706;
+            color: #94a3b8;
             margin: 0 0 30px 0;
-            font-size: 15px;
-            font-weight: 500;
+            font-size: 16px;
+            font-weight: 600;
         }
         .button-container {
             display: flex;
-            gap: 15px;
+            gap: 20px;
             justify-content: center;
             flex-wrap: wrap;
         }
@@ -529,29 +642,29 @@ export class EmailService {
             display: inline-flex;
             align-items: center;
             color: white;
-            padding: 18px 28px;
+            padding: 18px 30px;
             text-decoration: none;
-            border-radius: 12px;
+            border-radius: 16px;
             font-weight: 700;
-            min-width: 200px;
+            min-width: 220px;
             gap: 12px;
             transition: all 0.3s ease;
-            font-size: 15px;
-            border: 2px solid transparent;
+            font-size: 16px;
             position: relative;
             overflow: hidden;
+            border: 2px solid transparent;
         }
         .download-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+            transform: translateY(-3px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
         }
         .receipt-button {
-            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-            box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
-            border-color: #f59e0b;
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+            border-color: #3b82f6;
         }
         .receipt-button:hover {
-            background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+            background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
             box-shadow: 0 8px 25px rgba(245, 158, 11, 0.6);
         }
         .statement-button {
@@ -562,6 +675,17 @@ export class EmailService {
         .statement-button:hover {
             background: linear-gradient(135deg, #059669 0%, #047857 100%);
             box-shadow: 0 8px 25px rgba(16, 185, 129, 0.6);
+        }
+        .footer { 
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border-top: 2px solid #e2e8f0;
+            padding: 30px;
+            text-align: center; 
+            color: #64748b; 
+            font-size: 13px;
+        }
+        .footer p {
+            margin: 5px 0;
         }
         .download-note {
             margin-top: 25px;
@@ -596,118 +720,164 @@ export class EmailService {
 <body>
     <div class="email-container">
         <div class="header">
-            <h1>${data.schoolName}</h1>
-            <p>School Code: ${data.schoolCode || 'N/A'}</p>
+            <div class="header-content">
+                <div class="school-icon"></div>
+                <h1>${data.schoolName}</h1>
+                <p class="subtitle">Financial Management System</p>
+                <p class="timestamp">Payment Processed: ${new Date(data.paymentDate).toLocaleString()}</p>
+            </div>
         </div>
         
         <div class="email-intro">
-            <h2>✅ Payment Successfully Received!</h2>
-            <p>Your payment has been processed and a receipt has been generated.</p>
+            <div class="success-icon"></div>
+            <h2>Payment Successfully Received!</h2>
+            <p>Your payment has been processed and all documents are ready for download.</p>
         </div>
         
-        <!-- Payment Summary Card -->
-        <div style="margin: 30px; background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 2px solid #10b981; border-radius: 16px; padding: 30px; text-align: center;">
-            <div style="display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 20px;">
-                <div style="width: 50px; height: 50px; background: #10b981; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-                    <span style="font-size: 24px; color: white;">💰</span>
-            </div>
-                <div style="text-align: left;">
-                    <h3 style="margin: 0; font-size: 24px; font-weight: bold; color: #065f46;">Payment Confirmed</h3>
-                    <p style="margin: 0; font-size: 14px; color: #047857;">Receipt No: ${data.receiptNumber}</p>
-                </div>
+        <!-- Payment Receipt Preview -->
+        <div class="receipt-preview">
+            <div class="receipt-header">
+                <h3>Payment Receipt</h3>
+                <div class="status-badge">Confirmed</div>
             </div>
             
-            <div style="background: white; border-radius: 12px; padding: 20px; margin: 20px 0; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; text-align: left;">
-                    <div>
-                        <p style="margin: 0 0 5px 0; font-size: 14px; color: #6b7280; font-weight: 500;">Student Name</p>
-                        <p style="margin: 0; font-size: 16px; font-weight: bold; color: #111827;">${data.studentName}</p>
-                </div>
-                    <div>
-                        <p style="margin: 0 0 5px 0; font-size: 14px; color: #6b7280; font-weight: 500;">Amount Paid</p>
-                        <p style="margin: 0; font-size: 18px; font-weight: bold; color: #10b981;">KES ${data.amount.toLocaleString()}</p>
-                        </div>
-                    <div>
-                        <p style="margin: 0 0 5px 0; font-size: 14px; color: #6b7280; font-weight: 500;">Payment Date</p>
-                        <p style="margin: 0; font-size: 16px; font-weight: 600; color: #111827;">${new Date(data.paymentDate).toLocaleDateString()}</p>
+            <div class="receipt-content">
+                <!-- Amount Section -->
+                <div class="amount-box">
+                    <div class="amount-content">
+                        <h4 class="amount-value">KES ${data.amount.toLocaleString()}</h4>
+                        <p class="amount-words">${this.convertNumberToWords(data.amount)} Kenyan Shillings Only</p>
                     </div>
-                    <div>
-                        <p style="margin: 0 0 5px 0; font-size: 14px; color: #6b7280; font-weight: 500;">Academic Period</p>
-                        <p style="margin: 0; font-size: 16px; font-weight: 600; color: #111827;">${data.academicYear || 'N/A'} - ${data.termName || 'N/A'}</p>
-                            </div>
                 </div>
-            </div>
-            
-            <div style="margin-top: 20px;">
-                <p style="margin: 0; font-size: 16px; color: #047857; font-weight: 600;">
-                    ${data.paymentMethod ? `Paid via ${data.paymentMethod.replace('_', ' ')}` : 'Payment completed successfully'}
-                </p>
-                ${(data.academicYearOutstandingAfter !== undefined && data.academicYearOutstandingAfter > 0) ? `
-                <p style="margin: 8px 0 0 0; font-size: 14px; color: #d97706; font-weight: 500;">
-                    Remaining balance: KES ${data.academicYearOutstandingAfter.toLocaleString()}
-                </p>
-                ` : (data.balanceAfter !== undefined && data.balanceAfter > 0) ? `
-                <p style="margin: 8px 0 0 0; font-size: 14px; color: #d97706; font-weight: 500;">
-                    Remaining balance: KES ${data.balanceAfter.toLocaleString()}
-                </p>
-                ` : `
-                <p style="margin: 8px 0 0 0; font-size: 14px; color: #059669; font-weight: 500;">
-                    ✅ Account fully paid
-                </p>
-                `}
+                
+                <!-- Payment Details -->
+                <div class="section">
+                    <h4>💳 Payment Information</h4>
+                    <div class="details-grid">
+                        <div class="detail-item">
+                            <span>Receipt Number</span>
+                            <p>${data.receiptNumber}</p>
+                        </div>
+                        <div class="detail-item">
+                            <span>Payment Date</span>
+                            <p>${new Date(data.paymentDate).toLocaleDateString()}</p>
+                        </div>
+                        <div class="detail-item">
+                            <span>Payment Method</span>
+                            <p>${data.paymentMethod ? data.paymentMethod.replace('_', ' ') : 'N/A'}</p>
+                        </div>
+                        <div class="detail-item">
+                            <span>Receipt Status</span>
+                            <p style="color: #059669; font-weight: 700;">✅ Confirmed</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Student Details -->
+                <div class="section">
+                    <h4>👨‍🎓 Student Information</h4>
+                    <div class="details-grid">
+                        <div class="detail-item">
+                            <span>Student Name</span>
+                            <p>${data.studentName}</p>
+                        </div>
+                        <div class="detail-item">
+                            <span>Admission Number</span>
+                            <p>${data.admissionNumber || 'N/A'}</p>
+                        </div>
+                        <div class="detail-item">
+                            <span>Academic Year</span>
+                            <p>${data.academicYear || 'N/A'}</p>
+                        </div>
+                        <div class="detail-item">
+                            <span>Academic Period</span>
+                            <p>${data.academicYear || 'N/A'} - ${data.termName || 'N/A'}</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Balance Information -->
+                <div class="section">
+                    <h4>💰 Balance Summary</h4>
+                    <div class="section-box">
+                        <div class="details-grid">
+                            ${data.balanceBefore !== undefined ? `
+                            <div class="detail-item">
+                                <span>Balance Before</span>
+                                <p>KES ${data.balanceBefore.toLocaleString()}</p>
+                            </div>
+                            ` : ''}
+                            <div class="detail-item">
+                                <span>Amount Paid</span>
+                                <p style="color: #059669; font-weight: 800;">KES ${data.amount.toLocaleString()}</p>
+                            </div>
+                            ${(data.academicYearOutstandingAfter !== undefined) ? `
+                            <div class="detail-item">
+                                <span>Remaining Balance</span>
+                                <p style="color: ${data.academicYearOutstandingAfter > 0 ? '#d97706' : '#059669'}; font-weight: 800;">
+                                    KES ${data.academicYearOutstandingAfter.toLocaleString()}
+                                </p>
+                            </div>
+                            ` : (data.balanceAfter !== undefined) ? `
+                            <div class="detail-item">
+                                <span>Balance After</span>
+                                <p style="color: ${data.balanceAfter > 0 ? '#d97706' : '#059669'}; font-weight: 800;">
+                                    KES ${data.balanceAfter.toLocaleString()}
+                                </p>
+                            </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
             
         <!-- Download Section with Clear Call-to-Action -->
             ${data.receiptDownloadUrlA3 || data.receiptDownloadUrlA4 || data.receiptDownloadUrlA5 || data.feesStatementUrl ? `
             <div class="download-section">
-            <div class="download-title">📋 Access Your Documents</div>
-            <div class="download-subtitle">Download your payment receipt in multiple formats and complete fee statement</div>
-                
-            <div class="button-container">
-                    ${data.receiptDownloadUrlA3 || data.receiptDownloadUrlA4 || data.receiptDownloadUrlA5 ? `
-                    <div style="text-align: center; margin-bottom: 20px;">
-                        <div style="font-weight: 700; margin-bottom: 10px; color: #374151;">🧾 Payment Receipt Downloads</div>
-                        <div style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;">
+                <div class="download-content">
+                    <div class="download-title">📋 Access Your Documents</div>
+                    <div class="download-subtitle">Download your payment documents and complete academic fee statement</div>
+                    
+                    <div class="button-container">
+                        ${data.receiptDownloadUrlA4 ? `
+                        <a href="${data.receiptDownloadUrlA4}" class="download-button receipt-button">
+                            🧾 Download Receipt (A4)
+                        </a>
+                        ` : ''}
+                        
+                        ${data.feesStatementUrl ? `
+                        <a href="${data.feesStatementUrl}" class="download-button statement-button">
+                            📊 Download Fee Statement
+                        </a>
+                        ` : ''}
+                    </div>
+                    
+                    ${data.receiptDownloadUrlA3 || data.receiptDownloadUrlA5 ? `
+                    <div style="margin-top: 25px; padding: 20px; background: rgba(59, 130, 246, 0.1); border-radius: 12px; border: 1px solid rgba(59, 130, 246, 0.2);">
+                        <p style="margin: 0 0 15px 0; font-size: 14px; color: #f8fafc; font-weight: 600; text-align: center;">
+                            📄 Alternative Receipt Formats
+                        </p>
+                        <div style="display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;">
                             ${data.receiptDownloadUrlA3 ? `
-                            <a href="${data.receiptDownloadUrlA3}" style="background: #3b82f6; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 14px; display: inline-block; margin: 4px;">
-                                📄 A3 Format
-                            </a>
-                            ` : ''}
-                            ${data.receiptDownloadUrlA4 ? `
-                            <a href="${data.receiptDownloadUrlA4}" style="background: #10b981; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 14px; display: inline-block; margin: 4px;">
-                                📄 A4 Format
+                            <a href="${data.receiptDownloadUrlA3}" style="background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%); color: white; padding: 10px 18px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; gap: 8px; transition: all 0.3s ease;">
+                                📋 A3 Format
                             </a>
                             ` : ''}
                             ${data.receiptDownloadUrlA5 ? `
-                            <a href="${data.receiptDownloadUrlA5}" style="background: #8b5cf6; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 14px; display: inline-block; margin: 4px;">
-                                📄 A5 Format
+                            <a href="${data.receiptDownloadUrlA5}" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white; padding: 10px 18px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; gap: 8px; transition: all 0.3s ease;">
+                                🗒️ A5 Format
                             </a>
                             ` : ''}
-                        </div>
-                        <div style="font-size: 12px; color: #6b7280; margin-top: 8px;">
-                            PDF Downloads • Print Ready • High Quality
                         </div>
                     </div>
                     ` : ''}
                     
-                    ${data.feesStatementUrl ? `
-                    <div style="text-align: center;">
-                    <a href="${data.feesStatementUrl}" class="download-button statement-button">
-                        <span style="font-size: 20px;">📊</span>
-                            <div>
-                            <div style="font-weight: 700;">Download Fee Statement</div>
-                            <div style="font-size: 13px; opacity: 0.9;">Complete Academic Year Summary</div>
-                            </div>
-                        </a>
+                    <div style="margin-top: 25px; padding: 20px; background: rgba(16, 185, 129, 0.1); border-radius: 12px; border: 1px solid rgba(16, 185, 129, 0.2);">
+                        <p style="margin: 0; font-size: 14px; color: #f8fafc; font-weight: 500; text-align: center; line-height: 1.5;">
+                            💡 <strong>Pro Tip:</strong> Save these documents for your records. The fee statement provides a complete academic year summary.
+                        </p>
                     </div>
-                    ` : ''}
-                </div>
-                
-            <div class="download-note">
-                <strong>📋 Document Details:</strong><br>
-                • <strong>Payment Receipt:</strong> Professional receipt with multiple format options (A3, A4, A5) matching bursar system<br>
-                • <strong>Fee Statement:</strong> Comprehensive academic year overview including all payments and balances
                 </div>
             </div>
             ` : ''}
@@ -720,21 +890,47 @@ export class EmailService {
             </p>
         </div>
         
-        <div class="footer">
-            <p><strong>${data.schoolName}</strong></p>
-            <p><strong>Received By:</strong> ${data.issuedBy || 'Bursar'}</p>
-            <p><strong>Processed through:</strong> Bursar Portal</p>
-            <p>This is a computer-generated receipt and does not require a signature.</p>
-            <p>For any queries, please contact the school administration.</p>
-            <p style="margin-top: 15px; font-size: 11px; color: #94a3b8;">
-                Generated on ${new Date().toLocaleDateString('en-GB', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                })}
-            </p>
+        <!-- Professional Footer -->
+        <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border-top: 2px solid #e2e8f0; padding: 30px; text-align: center;">
+            <div style="display: flex; justify-content: center; align-items: center; gap: 15px; margin-bottom: 20px;">
+                <div style="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg border border-blue-500/20; width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); display: flex; align-items: center; justify-content: center;">
+                    🏫
+                </div>
+                <div style="text-align: left;">
+                    <h4 style="margin: 0; font-size: 18px; font-weight: 700; color: #1e293b;">${data.schoolName}</h4>
+                    <p style="margin: 0; font-size: 14px; color: #64748b; font-weight: 500;">Bursar Portal • Financial Management</p>
+                </div>
+            </div>
+            
+            <div style="background: white; border-radius: 12px; padding: 20px; margin: 20px 0; border: 1px solid #e2e8f0;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; text-align: center;">
+                    <div>
+                        <p style="margin: 0 0 5px 0; font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.025em;">Processed By</p>
+                        <p style="margin: 0; font-size: 14px; color: #1e293b; font-weight: 700;">${data.issuedBy || 'Bursar Portal'}</p>
+                    </div>
+                    <div>
+                        <p style="margin: 0 0 5px 0; font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.025em;">Generated</p>
+                        <p style="margin: 0; font-size: 14px; color: #1e293b; font-weight: 700;">${new Date().toLocaleDateString('en-GB', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        })}</p>
+                    </div>
+                    <div>
+                        <p style="margin: 0 0 5px 0; font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.025em;">Status</p>
+                        <p style="margin: 0; font-size: 14px; color: #059669; font-weight: 700;">✅ Verified</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="margin-top: 20px; padding: 15px; background: rgba(59, 130, 246, 0.1); border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.2);">
+                <p style="margin: 0; font-size: 13px; color: #1e40af; font-weight: 500; line-height: 1.4;">
+                    📧 This is a computer-generated receipt and does not require a signature.<br>
+                    For any queries, please contact the school administration or bursar office.
+                </p>
+            </div>
         </div>
     </div>
 </body>
