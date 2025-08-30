@@ -13,17 +13,31 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     const { searchParams } = new URL(request.url);
     const academicYearId = searchParams.get('academicYearId');
 
-    // Get the fee statement data using the existing logic
-    const feeStatementResponse = await fetch(
-      `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/schools/${schoolCode}/students/${studentId}/fee-statement${academicYearId ? `?academicYearId=${academicYearId}` : ''}`,
+    // Get the fee statement data directly instead of using internal fetch
+    console.log('🔍 Generating fee statement data directly...');
+    
+    // Import and call the fee statement logic directly
+    const { GET: getFeeStatement } = await import('../route');
+    const feeStatementRequest = new NextRequest(
+      `${process.env.NEXT_PUBLIC_BASE_URL || 'https://yoursite.com'}/api/schools/${schoolCode}/students/${studentId}/fee-statement${academicYearId ? `?academicYearId=${academicYearId}` : ''}`,
       { method: 'GET' }
     );
-
+    
+    const feeStatementResponse = await getFeeStatement(feeStatementRequest, { params: { schoolCode, studentId } });
+    
     if (!feeStatementResponse.ok) {
-      return NextResponse.json({ error: 'Failed to fetch fee statement data' }, { status: 400 });
+      console.error('❌ Fee statement generation failed');
+      return NextResponse.json({ 
+        error: 'Failed to generate fee statement data'
+      }, { status: 400 });
     }
 
     const statementData = await feeStatementResponse.json();
+    console.log('✅ Fee statement data received:', {
+      studentName: statementData.student?.name,
+      academicYear: statementData.academicYear,
+      statementCount: statementData.statement?.length || 0
+    });
 
     // Get school details
     const school = await prisma.school.findUnique({ 
@@ -36,6 +50,7 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     }
 
     // Generate PDF
+    console.log('📄 Starting PDF generation...');
     const pdf = new jsPDF();
     
     // Header
@@ -157,16 +172,20 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     });
 
     // Enhanced Summary with Term and Academic Year Breakdown
-    let finalY = (pdf as any).lastAutoTable.finalY + 20;
+    let finalY = (pdf as any).lastAutoTable.finalY + 15;
+    const pageHeight = pdf.internal.pageSize.height;
+    
+    // Calculate required space for summary section
+    let requiredSpace = 60; // Base space for headers
+    if (statementData.termBalances && statementData.termBalances.length > 0) {
+      requiredSpace += (statementData.termBalances.length * 12) + 20; // Term balances
+    }
+    requiredSpace += 70; // Summary details and footer
     
     // Check if we need a new page for the summary
-    const pageHeight = pdf.internal.pageSize.height;
-    const summaryStartY = finalY;
-    const summaryHeight = 80; // Estimated height needed for summary section
-    
-    if (summaryStartY + summaryHeight > pageHeight - 30) {
+    if (finalY + requiredSpace > pageHeight - 30) {
       pdf.addPage();
-      finalY = 20;
+      finalY = 30;
     }
     
     pdf.setFont('helvetica', 'bold');
@@ -189,6 +208,16 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       
       statementData.termBalances.forEach((termBalance: any, index: number) => {
         summaryY += 12;
+        
+        // Check if we need a new page for term balances
+        if (summaryY > pageHeight - 50) {
+          pdf.addPage();
+          summaryY = 30;
+          pdf.setFont('helvetica', 'bold');
+          pdf.text('Term Balances (Continued):', 20, summaryY);
+          summaryY += 15;
+        }
+        
         pdf.setFont('helvetica', 'normal');
         pdf.text(`${termBalance.termName} ${termBalance.academicYearName}:`, 30, summaryY);
         pdf.text(`KES ${Number(termBalance.balance || 0).toLocaleString()}`, 130, summaryY);
@@ -197,6 +226,13 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     
     // Overall Summary Details
     summaryY += 20;
+    
+    // Check if we need a new page for summary details
+    if (summaryY + 50 > pageHeight - 30) {
+      pdf.addPage();
+      summaryY = 30;
+    }
+    
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(11);
     pdf.text('Summary Details:', 20, summaryY);
@@ -217,18 +253,29 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       summaryY += 10;
     });
 
-    // Footer - ensure it's at the bottom of the page
-    const footerY = Math.max(summaryY + 20, pageHeight - 20);
+    // Footer - ensure proper spacing from content
+    summaryY += 20;
+    const currentPage = pdf.internal.getCurrentPageInfo().pageNumber;
+    const currentPageHeight = pdf.internal.pageSize.height;
+    
+    // If footer would be too close to content or bottom, add spacing
+    let footerY = Math.max(summaryY, currentPageHeight - 30);
+    if (footerY - summaryY < 10) {
+      footerY = summaryY + 15;
+    }
+    
     pdf.setFontSize(8);
     pdf.setFont('helvetica', 'italic');
     pdf.text(`Generated on: ${new Date().toLocaleString()}`, 20, footerY);
     pdf.text(`${school.name} - Fee Statement`, 105, footerY, { align: 'center' });
 
     // Generate the PDF buffer
+    console.log('📄 Generating PDF buffer...');
     const pdfBuffer = pdf.output('arraybuffer');
     
     // Create filename
     const filename = `Fee-Statement-${statementData.student.name?.replace(/[^a-zA-Z0-9]/g, '-') || 'Student'}-${statementData.academicYear?.replace(/[^a-zA-Z0-9]/g, '-') || 'Academic-Year'}.pdf`;
+    console.log('✅ PDF generated successfully:', filename);
 
     // Return PDF as response
     return new Response(pdfBuffer, {

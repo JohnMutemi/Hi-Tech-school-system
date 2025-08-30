@@ -89,7 +89,7 @@ export async function GET(
 
     console.log('Generating PDF with data:', JSON.stringify(receiptData, null, 2))
 
-    // Generate enhanced PDF receipt with specified size
+    // Generate enhanced PDF receipt with specified size (same format as bursar)
     const pdfBuffer = await generateEnhancedReceiptPDF(receiptData, size as 'A3' | 'A4' | 'A5')
 
     // Return PDF as download

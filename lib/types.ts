@@ -11,6 +11,7 @@ export interface School {
   status: "active" | "setup" | "suspended"
 }
 
+
 export interface SchoolAdmin {
   id: string
   email: string
