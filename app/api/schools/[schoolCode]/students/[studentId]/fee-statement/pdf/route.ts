@@ -157,7 +157,7 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     });
 
     // Enhanced Summary with Term and Academic Year Breakdown
-    const finalY = (pdf as any).lastAutoTable.finalY + 20;
+    let finalY = (pdf as any).lastAutoTable.finalY + 20;
     
     // Check if we need a new page for the summary
     const pageHeight = pdf.internal.pageSize.height;
