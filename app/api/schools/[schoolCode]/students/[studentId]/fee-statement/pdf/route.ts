@@ -68,19 +68,47 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       yPosition += 7;
     });
 
-    // Fee Statement Table
+    // Fee Statement Table with improved layout
     yPosition += 10;
     
-    const tableColumns = ['No.', 'Ref', 'Date', 'Description', 'Debit (KES)', 'Credit (KES)', 'Balance (KES)'];
-    const tableRows = (statementData.statement || []).map((item: any, index: number) => [
-      (item.no || index + 1).toString(),
-      item.ref || '-',
-      item.date ? new Date(item.date).toLocaleDateString() : '-',
-      item.description || '-',
-      item.debit ? Number(item.debit).toLocaleString() : '-',
-      item.credit ? Number(item.credit).toLocaleString() : '-',
-      Number(item.balance || 0).toLocaleString()
-    ]);
+    const tableColumns = ['No.', 'Ref', 'Date', 'Description', 'Debit (KES)', 'Credit (KES)', 'Term Bal. (KES)', 'Year Bal. (KES)'];
+    const tableRows = (statementData.statement || []).map((item: any, index: number) => {
+      // Style special rows differently
+      if (item.type === 'term-header') {
+        return [
+          '',
+          '',
+          '',
+          item.description || '',
+          '',
+          '',
+          '',
+          ''
+        ];
+      } else if (item.type === 'term-closing') {
+        return [
+          '',
+          '',
+          '',
+          item.description || '',
+          '',
+          '',
+          Number(item.termBalance || 0).toLocaleString(),
+          Number(item.academicYearBalance || 0).toLocaleString()
+        ];
+      } else {
+        return [
+          (item.no || '').toString(),
+          item.ref || '-',
+          item.date ? new Date(item.date).toLocaleDateString() : '-',
+          item.description || '-',
+          item.debit ? Number(item.debit).toLocaleString() : '-',
+          item.credit ? Number(item.credit).toLocaleString() : '-',
+          item.termBalance ? Number(item.termBalance).toLocaleString() : '-',
+          item.academicYearBalance ? Number(item.academicYearBalance).toLocaleString() : '-'
+        ];
+      }
+    });
 
     autoTable(pdf, {
       head: [tableColumns],
@@ -97,22 +125,64 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
         cellPadding: 3
       },
       columnStyles: {
-        0: { halign: 'center', cellWidth: 15 }, // No.
-        1: { halign: 'center', cellWidth: 25 }, // Ref
-        2: { halign: 'center', cellWidth: 25 }, // Date
-        3: { halign: 'left', cellWidth: 45 }, // Description
-        4: { halign: 'right', cellWidth: 25 }, // Debit
-        5: { halign: 'right', cellWidth: 25 }, // Credit
-        6: { halign: 'right', cellWidth: 25 } // Balance
+        0: { halign: 'center', cellWidth: 12 }, // No.
+        1: { halign: 'center', cellWidth: 20 }, // Ref
+        2: { halign: 'center', cellWidth: 20 }, // Date
+        3: { halign: 'left', cellWidth: 40 }, // Description
+        4: { halign: 'right', cellWidth: 22 }, // Debit
+        5: { halign: 'right', cellWidth: 22 }, // Credit
+        6: { halign: 'right', cellWidth: 22 }, // Term Balance
+        7: { halign: 'right', cellWidth: 22 } // Academic Year Balance
+      },
+      didParseCell: function(data: any) {
+        // Style term headers and closing balances differently
+        const cellText = data.cell.text[0];
+        if (cellText && cellText.includes('===')) {
+          // Term header
+          data.cell.styles.fillColor = [52, 152, 219]; // Blue background
+          data.cell.styles.textColor = [255, 255, 255]; // White text
+          data.cell.styles.fontStyle = 'bold';
+        } else if (cellText && cellText.includes('TERM') && cellText.includes('BALANCE')) {
+          // Term closing balance
+          data.cell.styles.fillColor = [241, 196, 15]; // Yellow background
+          data.cell.styles.textColor = [0, 0, 0]; // Black text
+          data.cell.styles.fontStyle = 'bold';
+        } else if (cellText && cellText.includes('BROUGHT FORWARD')) {
+          // Brought forward row
+          data.cell.styles.fillColor = [231, 76, 60]; // Red background
+          data.cell.styles.textColor = [255, 255, 255]; // White text
+          data.cell.styles.fontStyle = 'bold';
+        }
       }
     });
 
-    // Summary
+    // Enhanced Summary with Term and Academic Year Breakdown
     const finalY = (pdf as any).lastAutoTable.finalY + 20;
     
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(12);
-    pdf.text('SUMMARY', 20, finalY);
+    pdf.text('FINANCIAL SUMMARY', 20, finalY);
+    
+    // Academic Year Summary
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(10);
+    pdf.text('Academic Year Balance:', 20, finalY + 15);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(`KES ${Number(statementData.summary?.finalAcademicYearBalance || 0).toLocaleString()}`, 130, finalY + 15);
+    
+    // Term Balances Summary
+    if (statementData.termBalances && statementData.termBalances.length > 0) {
+      let summaryY = finalY + 30;
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Term Balances:', 20, summaryY);
+      
+      statementData.termBalances.forEach((termBalance: any, index: number) => {
+        summaryY += 10;
+        pdf.setFont('helvetica', 'normal');
+        pdf.text(`${termBalance.termName} ${termBalance.academicYearName}:`, 30, summaryY);
+        pdf.text(`KES ${Number(termBalance.balance || 0).toLocaleString()}`, 130, summaryY);
+      });
+    }
     
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(10);

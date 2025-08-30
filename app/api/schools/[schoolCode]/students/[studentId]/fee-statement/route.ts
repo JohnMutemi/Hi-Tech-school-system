@@ -239,50 +239,120 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     // Sort all transactions by date
     transactions = transactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    // Calculate running balance and insert TERM CLOSING BALANCE rows
-    let runningBalance = 0;
-    let lastTermKey = '';
-    let termClosingRows: any[] = [];
-    transactions = transactions.map((txn, idx) => {
-      runningBalance += (txn.debit || 0) - (txn.credit || 0);
-      const result = {
-        ...txn,
-        balance: runningBalance
-      };
-      // If this is the last transaction for a term, add a closing balance row
-      const thisTermKey = `${txn.academicYearId || ''}-${txn.termId || ''}`;
-      const nextTxn = transactions[idx + 1];
-      const nextTermKey = nextTxn ? `${nextTxn.academicYearId || ''}-${nextTxn.termId || ''}` : '';
-      if (thisTermKey && thisTermKey !== nextTermKey) {
-        termClosingRows.push({
-          ref: '',
-          description: `TERM CLOSING BALANCE - ${txn.termName} ${txn.academicYearName}`,
-          debit: '',
-          credit: '',
-          date: txn.date,
-          type: 'term-closing',
+    // Group transactions by term for better balance tracking
+    const termGroups = new Map();
+    
+    // Group transactions by term
+    transactions.forEach(txn => {
+      const termKey = `${txn.academicYearId || 'no-year'}-${txn.termId || 'no-term'}`;
+      if (!termGroups.has(termKey)) {
+        termGroups.set(termKey, {
           termId: txn.termId,
-          academicYearId: txn.academicYearId,
           termName: txn.termName,
+          academicYearId: txn.academicYearId,
           academicYearName: txn.academicYearName,
-          balance: runningBalance
+          transactions: []
         });
       }
-      return result;
+      termGroups.get(termKey).transactions.push(txn);
     });
 
-    // Add row numbers
-    transactions = transactions.map((txn, idx) => ({
-      no: idx + 1,
-      ...txn
-    }));
-    // Add term closing rows after all transactions
-    const allRows = [...transactions, ...termClosingRows].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    // Process transactions with improved balance tracking
+    let academicYearRunningBalance = arrearsBroughtForward;
+    const allRows: any[] = [];
+    let rowNumber = 1;
+
+    // Add arrears brought forward if any
+    if (arrearsBroughtForward !== 0) {
+      allRows.push({
+        no: rowNumber++,
+        ref: 'B/F',
+        description: 'BALANCE BROUGHT FORWARD',
+        debit: arrearsBroughtForward > 0 ? arrearsBroughtForward : 0,
+        credit: arrearsBroughtForward < 0 ? Math.abs(arrearsBroughtForward) : 0,
+        date: new Date(new Date().getFullYear(), 0, 1), // Start of academic year
+        type: 'brought-forward',
+        academicYearBalance: arrearsBroughtForward,
+        termBalance: 0,
+        termName: 'Previous Terms',
+        academicYearName: 'Brought Forward'
+      });
+    }
+
+    // Process each term group
+    Array.from(termGroups.values()).forEach(termGroup => {
+      let termRunningBalance = 0;
+      
+      // Add term header
+      if (termGroup.termName && termGroup.termName !== 'no-term') {
+        allRows.push({
+          no: '',
+          ref: '',
+          description: `=== ${termGroup.termName.toUpperCase()} ${termGroup.academicYearName} ===`,
+          debit: '',
+          credit: '',
+          date: termGroup.transactions[0]?.date,
+          type: 'term-header',
+          termId: termGroup.termId,
+          termName: termGroup.termName,
+          academicYearId: termGroup.academicYearId,
+          academicYearName: termGroup.academicYearName,
+          academicYearBalance: academicYearRunningBalance,
+          termBalance: 0
+        });
+      }
+
+      // Process transactions within the term
+      termGroup.transactions.forEach(txn => {
+        const debitAmount = txn.debit || 0;
+        const creditAmount = txn.credit || 0;
+        
+        // Update balances
+        termRunningBalance += debitAmount - creditAmount;
+        academicYearRunningBalance += debitAmount - creditAmount;
+
+        allRows.push({
+          no: rowNumber++,
+          ref: txn.ref,
+          description: txn.description,
+          debit: debitAmount,
+          credit: creditAmount,
+          date: txn.date,
+          type: txn.type,
+          termId: txn.termId,
+          termName: txn.termName,
+          academicYearId: txn.academicYearId,
+          academicYearName: txn.academicYearName,
+          academicYearBalance: academicYearRunningBalance,
+          termBalance: termRunningBalance
+        });
+      });
+
+      // Add term closing balance if there were transactions
+      if (termGroup.transactions.length > 0 && termGroup.termName && termGroup.termName !== 'no-term') {
+        allRows.push({
+          no: '',
+          ref: '',
+          description: `TERM ${termGroup.termName.toUpperCase()} BALANCE`,
+          debit: '',
+          credit: '',
+          date: termGroup.transactions[termGroup.transactions.length - 1]?.date,
+          type: 'term-closing',
+          termId: termGroup.termId,
+          termName: termGroup.termName,
+          academicYearId: termGroup.academicYearId,
+          academicYearName: termGroup.academicYearName,
+          academicYearBalance: academicYearRunningBalance,
+          termBalance: termRunningBalance,
+          isClosingBalance: true
+        });
+      }
+    });
 
     // Calculate summary
     const totalDebit = allRows.reduce((sum, row) => sum + (parseFloat(row.debit) || 0), 0);
     const totalCredit = allRows.reduce((sum, row) => sum + (parseFloat(row.credit) || 0), 0);
-    const finalBalance = allRows.length > 0 ? allRows[allRows.length - 1].balance : 0;
+    const finalAcademicYearBalance = allRows.length > 0 ? (allRows[allRows.length - 1].academicYearBalance || 0) : arrearsBroughtForward;
 
     // Get academic year name
     const academicYear = await prisma.academicYear.findUnique({
@@ -304,27 +374,24 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       }
     });
 
-    // Calculate term-specific balances
+    // Calculate term-specific balances from processed data
     const termBalances = new Map();
-    let currentBalance = arrearsBroughtForward;
     
-    for (const row of allRows) {
-      currentBalance += (row.debit || 0) - (row.credit || 0);
-      const termKey = `${row.termName}-${row.academicYearName}`;
-      if (row.termName && !termBalances.has(termKey)) {
-        // Initialize term balance tracking
-        termBalances.set(termKey, {
-          termName: row.termName,
-          academicYearName: row.academicYearName,
-          charges: 0,
-          payments: 0,
-          balance: 0,
-          termId: row.termId,
-          academicYearId: row.academicYearId
-        });
-      }
-      
-      if (row.termName) {
+    allRows.forEach(row => {
+      if (row.termName && row.termName !== 'Previous Terms' && row.type !== 'term-header' && row.type !== 'term-closing') {
+        const termKey = `${row.termName}-${row.academicYearName}`;
+        if (!termBalances.has(termKey)) {
+          termBalances.set(termKey, {
+            termName: row.termName,
+            academicYearName: row.academicYearName,
+            charges: 0,
+            payments: 0,
+            balance: 0,
+            termId: row.termId,
+            academicYearId: row.academicYearId
+          });
+        }
+        
         const termData = termBalances.get(termKey);
         if (row.type === 'invoice') {
           termData.charges += (row.debit || 0);
@@ -333,7 +400,7 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
         }
         termData.balance = termData.charges - termData.payments;
       }
-    }
+    });
 
     // Return structured data with term-specific balances
     return NextResponse.json({
@@ -350,9 +417,11 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       summary: {
         totalDebit,
         totalCredit,
-        finalBalance,
+        finalAcademicYearBalance,
+        finalBalance: finalAcademicYearBalance, // For backward compatibility
         totalPayments: totalCredit,
-        totalCharges: totalDebit
+        totalCharges: totalDebit,
+        arrearsBroughtForward
       }
     });
   } catch (error) {

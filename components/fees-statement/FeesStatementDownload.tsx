@@ -366,33 +366,86 @@ export function FeesStatementDownload({
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-gray-200">
-                        <th className="text-left py-2 px-2">No.</th>
-                        <th className="text-left py-2 px-2">Ref</th>
-                        <th className="text-left py-2 px-2">Date</th>
-                        <th className="text-left py-2 px-2">Description</th>
-                        <th className="text-right py-2 px-2">Debit</th>
-                        <th className="text-right py-2 px-2">Credit</th>
-                        <th className="text-right py-2 px-2">Balance</th>
+                      <tr className="bg-blue-50 border-b-2 border-blue-200">
+                        <th className="py-3 px-2 text-left font-semibold text-blue-800">No.</th>
+                        <th className="py-3 px-2 text-left font-semibold text-blue-800">Ref</th>
+                        <th className="py-3 px-2 text-left font-semibold text-blue-800">Date</th>
+                        <th className="py-3 px-2 text-left font-semibold text-blue-800">Description</th>
+                        <th className="py-3 px-2 text-right font-semibold text-blue-800">Debit</th>
+                        <th className="py-3 px-2 text-right font-semibold text-blue-800">Credit</th>
+                        <th className="py-3 px-2 text-right font-semibold text-blue-800">Term Bal.</th>
+                        <th className="py-3 px-2 text-right font-semibold text-blue-800">Year Bal.</th>
                       </tr>
                     </thead>
                     <tbody>
                       {statementData.statement && statementData.statement.length > 0 ? (
                         <>
-                          {statementData.statement.slice(0, 5).map((item, index) => (
-                            <tr key={index} className="border-b border-gray-100">
-                              <td className="py-2 px-2">{item.no || index + 1}</td>
-                              <td className="py-2 px-2 font-mono text-xs">{item.ref || '-'}</td>
-                              <td className="py-2 px-2">{item.date ? new Date(item.date).toLocaleDateString() : '-'}</td>
-                              <td className="py-2 px-2">{item.description || '-'}</td>
-                              <td className="py-2 px-2 text-right">{item.debit ? formatCurrency(Number(item.debit)) : '-'}</td>
-                              <td className="py-2 px-2 text-right">{item.credit ? formatCurrency(Number(item.credit)) : '-'}</td>
-                              <td className="py-2 px-2 text-right font-medium">{formatCurrency(Number(item.balance) || 0)}</td>
-                            </tr>
-                          ))}
+                          {statementData.statement.slice(0, 5).map((item, index) => {
+                            // Handle special row types with different styling
+                            if (item.type === 'term-header') {
+                              return (
+                                <tr key={index} className="bg-blue-100 border-b border-blue-200">
+                                  <td colSpan={8} className="py-3 px-2 text-center font-bold text-blue-800">
+                                    {item.description}
+                                  </td>
+                                </tr>
+                              );
+                            } else if (item.type === 'term-closing') {
+                              return (
+                                <tr key={index} className="bg-yellow-100 border-b border-yellow-200">
+                                  <td className="py-2 px-2"></td>
+                                  <td className="py-2 px-2"></td>
+                                  <td className="py-2 px-2"></td>
+                                  <td className="py-2 px-2 font-bold text-yellow-800">{item.description}</td>
+                                  <td className="py-2 px-2"></td>
+                                  <td className="py-2 px-2"></td>
+                                  <td className="py-2 px-2 text-right font-bold text-yellow-800">
+                                    {formatCurrency(Number(item.termBalance) || 0)}
+                                  </td>
+                                  <td className="py-2 px-2 text-right font-bold text-yellow-800">
+                                    {formatCurrency(Number(item.academicYearBalance) || 0)}
+                                  </td>
+                                </tr>
+                              );
+                            } else if (item.type === 'brought-forward') {
+                              return (
+                                <tr key={index} className="bg-red-100 border-b border-red-200">
+                                  <td className="py-2 px-2 font-bold text-red-800">{item.no || ''}</td>
+                                  <td className="py-2 px-2 font-mono text-xs font-bold text-red-800">{item.ref || '-'}</td>
+                                  <td className="py-2 px-2 font-bold text-red-800">{item.date ? new Date(item.date).toLocaleDateString() : '-'}</td>
+                                  <td className="py-2 px-2 font-bold text-red-800">{item.description || '-'}</td>
+                                  <td className="py-2 px-2 text-right font-bold text-red-800">{item.debit ? formatCurrency(Number(item.debit)) : '-'}</td>
+                                  <td className="py-2 px-2 text-right font-bold text-red-800">{item.credit ? formatCurrency(Number(item.credit)) : '-'}</td>
+                                  <td className="py-2 px-2 text-right font-bold text-red-800">
+                                    {item.termBalance ? formatCurrency(Number(item.termBalance)) : '-'}
+                                  </td>
+                                  <td className="py-2 px-2 text-right font-bold text-red-800">
+                                    {item.academicYearBalance ? formatCurrency(Number(item.academicYearBalance)) : '-'}
+                                  </td>
+                                </tr>
+                              );
+                            } else {
+                              return (
+                                <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                                  <td className="py-2 px-2">{item.no || ''}</td>
+                                  <td className="py-2 px-2 font-mono text-xs">{item.ref || '-'}</td>
+                                  <td className="py-2 px-2">{item.date ? new Date(item.date).toLocaleDateString() : '-'}</td>
+                                  <td className="py-2 px-2">{item.description || '-'}</td>
+                                  <td className="py-2 px-2 text-right">{item.debit ? formatCurrency(Number(item.debit)) : '-'}</td>
+                                  <td className="py-2 px-2 text-right">{item.credit ? formatCurrency(Number(item.credit)) : '-'}</td>
+                                  <td className="py-2 px-2 text-right font-medium">
+                                    {item.termBalance ? formatCurrency(Number(item.termBalance)) : '-'}
+                                  </td>
+                                  <td className="py-2 px-2 text-right font-medium">
+                                    {item.academicYearBalance ? formatCurrency(Number(item.academicYearBalance)) : '-'}
+                                  </td>
+                                </tr>
+                              );
+                            }
+                          })}
                           {statementData.statement.length > 5 && (
                             <tr>
-                              <td colSpan={7} className="py-2 px-2 text-center text-gray-500 text-sm">
+                              <td colSpan={8} className="py-2 px-2 text-center text-gray-500 text-sm">
                                 ... and {statementData.statement.length - 5} more entries
                               </td>
                             </tr>
@@ -400,7 +453,7 @@ export function FeesStatementDownload({
                         </>
                       ) : (
                         <tr>
-                          <td colSpan={7} className="py-4 px-2 text-center text-gray-500">
+                          <td colSpan={8} className="py-4 px-2 text-center text-gray-500">
                             No transactions found for this academic year
                           </td>
                         </tr>

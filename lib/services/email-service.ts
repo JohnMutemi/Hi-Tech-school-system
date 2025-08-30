@@ -596,8 +596,8 @@ export class EmailService {
                                 <span style="font-size: 16px;">🏫</span>
             </div>
                             <div>
-                                <h3 style="margin: 0; font-size: 20px; font-weight: bold; letter-spacing: 0.5px;">${data.schoolName}</h3>
-                                <p style="margin: 0; font-size: 12px; color: #dbeafe; font-weight: 500;">Excellence in Education</p>
+                                <h3 style="margin: 0; font-size: 20px; font-weight: bold; letter-spacing: 0.5px;">MONEY RECEIPT</h3>
+                                <p style="margin: 0; font-size: 12px; color: #dbeafe; font-weight: 500;">Payment Confirmation</p>
                 </div>
                         </div>
                         <div style="font-size: 10px; color: #dbeafe; line-height: 1.5;">
