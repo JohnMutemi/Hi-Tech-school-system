@@ -10,8 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Download, DollarSign, Receipt, ChevronDown, FileText } from "lucide-react";
 import { PaymentModal } from "@/components/payment/payment-modal";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+// Removed jsPDF imports as we're now using the enhanced PDF endpoint
 
 interface FeesSectionProps {
   schoolCode: string;
@@ -213,69 +212,51 @@ export default function FeesSection({
   const totalBalance =
     statement.length > 0 ? statement[statement.length - 1].balance || 0 : 0;
 
-  // PDF export handler
+  // PDF export handler - using enhanced endpoint from email section
   const handleDownloadPDF = async () => {
-    const doc = new jsPDF();
-    doc.setFontSize(22);
-    doc.setFont("helvetica", "bold");
-    doc.text("LOGO HERE", 12, 22);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(16);
-    doc.text("Fee Statement", 60, 20);
-    doc.setFontSize(10);
-    doc.text(`Student: ${child?.fullName || child?.name || ""}`, 60, 28);
-    doc.text(`Class: ${child?.gradeName || ""}`, 60, 34);
-    doc.text(
-      `Period: ${currentAcademicYear?.name || ""} ${
-        terms.find((t) => t.id === selectedTermId)?.name || ""
-      }`,
-      60,
-      40
-    );
-    autoTable(doc, {
-      startY: 45,
-      head: [
-        [
-          "No.",
-          "Ref",
-          "Date",
-          "Description",
-          "Debit (KES)",
-          "Credit (KES)",
-          "Balance (KES)",
-        ],
-      ],
-      body: [
-        ...statement.map((item: any) => [
-          item.no,
-          item.ref,
-          new Date(item.date).toLocaleDateString(),
-          item.description,
-          item.debit ? item.debit.toLocaleString() : "-",
-          item.credit ? item.credit.toLocaleString() : "-",
-          item.balance?.toLocaleString() || "-",
-        ]),
-        [
-          {
-            content: "TOTAL",
-            colSpan: 4,
-            styles: { halign: "right", fontStyle: "bold" },
-          },
-          totalDebit ? totalDebit.toLocaleString() : "-",
-          totalCredit ? totalCredit.toLocaleString() : "-",
-          totalBalance ? totalBalance.toLocaleString() : "-",
-        ],
-      ],
-      theme: "grid",
-      headStyles: { fillColor: [44, 62, 80] },
-      styles: { fontSize: 9 },
-      didDrawCell: (data) => {
-        if (data.row.index === statement.length) {
-          data.cell.styles.fontStyle = "bold";
+    if (!child?.id || !selectedYearId) {
+      alert('Please select a student and academic year');
+      return;
+    }
+
+    try {
+      // Use the enhanced PDF endpoint from email section
+      const response = await fetch(
+        `/api/schools/${schoolCode}/students/${child.id}/fee-statement/pdf?academicYearId=${selectedYearId}`
+      );
+      
+      if (response.ok) {
+        // Get the PDF blob from the response
+        const blob = await response.blob();
+        
+        // Create a download link
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        
+        // Extract filename from response headers or create default
+        const contentDisposition = response.headers.get('Content-Disposition');
+        let filename = `Fee_Statement_${child?.fullName || child?.name || "Student"}.pdf`;
+        
+        if (contentDisposition) {
+          const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+          if (filenameMatch) {
+            filename = filenameMatch[1];
+          }
         }
-      },
-    });
-    doc.save(`Fee_Statement_${child?.fullName || child?.name || ""}.pdf`);
+        
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      } else {
+        throw new Error('Failed to download fee statement');
+      }
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      alert('Failed to download fee statement. Please try again.');
+    }
   };
 
   return (

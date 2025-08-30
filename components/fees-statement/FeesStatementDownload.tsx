@@ -44,6 +44,9 @@ interface FeeStatementData {
     debit: number;
     credit: number;
     balance: number;
+    type?: string;
+    termBalance?: number;
+    academicYearBalance?: number;
   }>;
   summary: {
     totalDebit: number;
@@ -136,194 +139,54 @@ export function FeesStatementDownload({
   };
 
   const handleDownloadPDF = async () => {
-    if (!statementData) return;
+    if (!selectedAcademicYear) return;
 
     try {
       setLoading(true);
       
-      const doc = new jsPDF();
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
+      // Use the enhanced PDF endpoint from email section
+      const response = await fetch(
+        `/api/schools/${schoolCode}/students/${studentId}/fee-statement/pdf?academicYearId=${selectedAcademicYear}`
+      );
       
-      // Header
-      doc.setFontSize(20);
-      doc.setFont('helvetica', 'bold');
-      doc.text('FEE STATEMENT', pageWidth / 2, 20, { align: 'center' });
-      
-      // Student and school info
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`Student: ${statementData.student?.name || 'Student'}`, 20, 35);
-      doc.text(`Admission No: ${statementData.student?.admissionNumber || 'N/A'}`, 20, 42);
-      doc.text(`Class: ${statementData.student?.gradeName || 'N/A'} - ${statementData.student?.className || 'N/A'}`, 20, 49);
-      doc.text(`Academic Year: ${statementData.academicYear || 'Academic Year'}`, 20, 56);
-      if (statementData.student?.parentName) {
-        doc.text(`Parent: ${statementData.student.parentName}`, 20, 63);
-      }
-      doc.text(`Generated: ${new Date().toLocaleDateString()}`, 20, 70);
-      
-      // Enhanced Statement table with proper termly balance tracking
-      const tableColumns = ['No.', 'Ref', 'Date', 'Description', 'Debit (KES)', 'Credit (KES)', 'Balance (KES)'];
-      const tableRows = (statementData.statement || []).map((item: any, index: number) => {
-        // Handle special row types with different styling
-        if (item.type === 'term-header') {
-          return [
-            '',
-            '',
-            '',
-            item.description || '',
-            '',
-            '',
-            ''
-          ];
-        } else if (item.type === 'term-closing') {
-          return [
-            '',
-            '',
-            '',
-            item.description || '',
-            '',
-            '',
-            Number(item.balance || item.termBalance || item.academicYearBalance || 0).toLocaleString()
-          ];
-        } else if (item.type === 'brought-forward') {
-          return [
-            (item.no || '').toString(),
-            item.ref || '-',
-            item.date ? new Date(item.date).toLocaleDateString() : '-',
-            item.description || '-',
-            item.debit ? Number(item.debit).toLocaleString() : '-',
-            item.credit ? Number(item.credit).toLocaleString() : '-',
-            Number(item.balance || item.termBalance || item.academicYearBalance || 0).toLocaleString()
-          ];
-        } else {
-          return [
-          (item.no || index + 1).toString(),
-          item.ref || '-',
-          item.date ? new Date(item.date).toLocaleDateString() : '-',
-          item.description || '-',
-          item.debit ? Number(item.debit).toLocaleString() : '-',
-          item.credit ? Number(item.credit).toLocaleString() : '-',
-            Number(item.balance || item.termBalance || item.academicYearBalance || 0).toLocaleString()
-          ];
-        }
-      });
-
-      autoTable(doc, {
-        startY: 80,
-        head: [tableColumns],
-        body: tableRows,
-        theme: 'striped',
-        headStyles: { 
-          fillColor: [41, 128, 185],
-          textColor: 255,
-          fontSize: 10,
-          fontStyle: 'bold'
-        },
-        styles: { 
-          fontSize: 9,
-          cellPadding: 3
-        },
-        columnStyles: {
-          0: { halign: 'center', cellWidth: 12 },
-          1: { halign: 'center', cellWidth: 20 },
-          2: { halign: 'center', cellWidth: 20 },
-          3: { halign: 'left', cellWidth: 50 },
-          4: { halign: 'right', cellWidth: 25 },
-          5: { halign: 'right', cellWidth: 25 },
-          6: { halign: 'right', cellWidth: 25 }
-        },
-        didParseCell: function(data: any) {
-          // Style term headers and closing balances differently
-          const cellText = data.cell.text[0];
-          if (cellText && cellText.includes('===')) {
-            // Term header
-            data.cell.styles.fillColor = [52, 152, 219]; // Blue background
-            data.cell.styles.textColor = [255, 255, 255]; // White text
-            data.cell.styles.fontStyle = 'bold';
-          } else if (cellText && (cellText.includes('TERM') && cellText.includes('BALANCE'))) {
-            // Term closing balance
-            data.cell.styles.fillColor = [241, 196, 15]; // Yellow background
-            data.cell.styles.textColor = [0, 0, 0]; // Black text
-            data.cell.styles.fontStyle = 'bold';
-          } else if (cellText && cellText.includes('BROUGHT FORWARD')) {
-            // Brought forward row
-            data.cell.styles.fillColor = [231, 76, 60]; // Red background
-            data.cell.styles.textColor = [255, 255, 255]; // White text
-            data.cell.styles.fontStyle = 'bold';
+      if (response.ok) {
+        // Get the PDF blob from the response
+        const blob = await response.blob();
+        
+        // Create a download link
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        
+        // Extract filename from response headers or create default
+        const contentDisposition = response.headers.get('Content-Disposition');
+        let filename = `Fee_Statement_${studentName.replace(/\s+/g, '_')}.pdf`;
+        
+        if (contentDisposition) {
+          const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+          if (filenameMatch) {
+            filename = filenameMatch[1];
           }
         }
-      });
-      
-      // Enhanced Summary with Term Balances
-      const finalY = (doc as any).lastAutoTable.finalY + 20;
-      
-      // Check if we need a new page for the summary
-      const pageHeight = doc.internal.pageSize.height;
-      const summaryStartY = finalY;
-      const summaryHeight = 80; // Estimated height needed for summary section
-      
-      if (summaryStartY + summaryHeight > pageHeight - 30) {
-        doc.addPage();
-        finalY = 20;
-      }
-      
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text('FINANCIAL SUMMARY', 20, finalY);
-      
-      // Term Balances Summary (if available)
-      let summaryY = finalY + 20;
-      if (statementData.termBalances && statementData.termBalances.length > 0) {
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(11);
-        doc.text('Term Balances:', 20, summaryY);
         
-        statementData.termBalances.forEach((termBalance: any) => {
-          summaryY += 12;
-          doc.setFont('helvetica', 'normal');
-          doc.text(`${termBalance.termName || termBalance.term} ${termBalance.academicYearName || termBalance.year}:`, 30, summaryY);
-          doc.text(`KES ${Number(termBalance.balance || 0).toLocaleString()}`, 130, summaryY);
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        
+        toast({
+          title: 'Success',
+          description: 'Fee statement downloaded successfully',
         });
-        summaryY += 15;
+      } else {
+        throw new Error('Failed to download fee statement');
       }
-      
-      // Overall Summary
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(11);
-      doc.text('Academic Year Balance:', 20, summaryY);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`KES ${Number(statementData.summary?.finalAcademicYearBalance || statementData.summary?.finalBalance || 0).toLocaleString()}`, 130, summaryY);
-      
-      summaryY += 20;
-      doc.setFont('helvetica', 'bold');
-      doc.text('Summary Details:', 20, summaryY);
-      
-      summaryY += 15;
-      doc.setFont('helvetica', 'normal');
-      doc.text(`Total Charges: KES ${(statementData.summary?.totalDebit || 0).toLocaleString()}`, 20, summaryY);
-      doc.text(`Total Payments: KES ${(statementData.summary?.totalCredit || 0).toLocaleString()}`, 20, summaryY + 10);
-      doc.text(`Final Balance: KES ${(statementData.summary?.finalBalance || 0).toLocaleString()}`, 20, summaryY + 20);
-      
-      // Footer - ensure it's at the bottom of the page
-      const footerY = Math.max(summaryY + 40, pageHeight - 20);
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'italic');
-      doc.text('This is a computer-generated statement. Please contact the school for any discrepancies.', pageWidth / 2, footerY, { align: 'center' });
-      
-      // Save the PDF
-      const fileName = `Fee_Statement_${studentName.replace(/\s+/g, '_')}_${(statementData.academicYear || 'Academic_Year').replace(/\s+/g, '_')}.pdf`;
-      doc.save(fileName);
-      
-      toast({
-        title: 'Success',
-        description: 'Fee statement downloaded successfully',
-      });
     } catch (error) {
-      console.error('Error generating PDF:', error);
+      console.error('Error downloading PDF:', error);
       toast({
         title: 'Error',
-        description: 'Failed to generate PDF',
+        description: 'Failed to download fee statement',
         variant: 'destructive',
       });
     } finally {
@@ -489,34 +352,34 @@ export function FeesStatementDownload({
                             } else if (item.type === 'term-closing') {
                               return (
                                 <tr key={index} className="bg-yellow-100 border-b border-yellow-200">
-                                  <td className="py-2 px-1 sm:px-2"></td>
-                                  <td className="py-2 px-1 sm:px-2 hidden sm:table-cell"></td>
-                                  <td className="py-2 px-1 sm:px-2"></td>
-                                  <td className="py-2 px-1 sm:px-2 font-bold text-yellow-800">{item.description}</td>
-                                  <td className="py-2 px-1 sm:px-2"></td>
-                                  <td className="py-2 px-1 sm:px-2"></td>
-                                  <td className="py-2 px-1 sm:px-2 text-right font-bold text-yellow-800 hidden lg:table-cell">
+                                  <td className="py-2 px-2"></td>
+                                  <td className="py-2 px-2"></td>
+                                  <td className="py-2 px-2"></td>
+                                  <td className="py-2 px-2 font-bold text-yellow-800">{item.description}</td>
+                                  <td className="py-2 px-2"></td>
+                                  <td className="py-2 px-2"></td>
+                                  <td className="py-2 px-2 text-right font-bold text-yellow-800">
                                     {formatCurrency(Number(item.termBalance) || 0)}
                                   </td>
-                                  <td className="py-2 px-1 sm:px-2 text-right font-bold text-yellow-800">
-                                    {formatCurrency(Number(item.balance || item.academicYearBalance) || 0)}
+                                  <td className="py-2 px-2 text-right font-bold text-yellow-800">
+                                    {formatCurrency(Number(item.academicYearBalance) || 0)}
                                   </td>
                                 </tr>
                               );
                             } else if (item.type === 'brought-forward') {
                               return (
                                 <tr key={index} className="bg-red-100 border-b border-red-200">
-                                  <td className="py-1 sm:py-2 px-1 sm:px-2 font-bold text-red-800">{item.no || ''}</td>
-                                  <td className="py-1 sm:py-2 px-1 sm:px-2 font-mono text-xs font-bold text-red-800 hidden sm:table-cell">{item.ref || '-'}</td>
-                                  <td className="py-1 sm:py-2 px-1 sm:px-2 font-bold text-red-800">{item.date ? new Date(item.date).toLocaleDateString() : '-'}</td>
-                                  <td className="py-1 sm:py-2 px-1 sm:px-2 font-bold text-red-800 truncate max-w-[100px]">{item.description || '-'}</td>
-                                  <td className="py-1 sm:py-2 px-1 sm:px-2 text-right font-bold text-red-800">{item.debit ? formatCurrency(Number(item.debit)) : '-'}</td>
-                                  <td className="py-1 sm:py-2 px-1 sm:px-2 text-right font-bold text-red-800">{item.credit ? formatCurrency(Number(item.credit)) : '-'}</td>
-                                  <td className="py-1 sm:py-2 px-1 sm:px-2 text-right font-bold text-red-800 hidden lg:table-cell">
+                                  <td className="py-2 px-2 font-bold text-red-800">{item.no || ''}</td>
+                                  <td className="py-2 px-2 font-mono text-xs font-bold text-red-800">{item.ref || '-'}</td>
+                                  <td className="py-2 px-2 font-bold text-red-800">{item.date ? new Date(item.date).toLocaleDateString() : '-'}</td>
+                                  <td className="py-2 px-2 font-bold text-red-800">{item.description || '-'}</td>
+                                  <td className="py-2 px-2 text-right font-bold text-red-800">{item.debit ? formatCurrency(Number(item.debit)) : '-'}</td>
+                                  <td className="py-2 px-2 text-right font-bold text-red-800">{item.credit ? formatCurrency(Number(item.credit)) : '-'}</td>
+                                  <td className="py-2 px-2 text-right font-bold text-red-800">
                                     {item.termBalance ? formatCurrency(Number(item.termBalance)) : '-'}
                                   </td>
-                                  <td className="py-1 sm:py-2 px-1 sm:px-2 text-right font-bold text-red-800">
-                                    {formatCurrency(Number(item.balance || item.academicYearBalance) || 0)}
+                                  <td className="py-2 px-2 text-right font-bold text-red-800">
+                                    {item.academicYearBalance ? formatCurrency(Number(item.academicYearBalance)) : '-'}
                                   </td>
                                 </tr>
                               );
