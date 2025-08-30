@@ -257,44 +257,59 @@ export function FeesStatementDownload({
       
       // Enhanced Summary with Term Balances
       const finalY = (doc as any).lastAutoTable.finalY + 20;
-      doc.setFontSize(12);
+      
+      // Check if we need a new page for the summary
+      const pageHeight = doc.internal.pageSize.height;
+      const summaryStartY = finalY;
+      const summaryHeight = 80; // Estimated height needed for summary section
+      
+      if (summaryStartY + summaryHeight > pageHeight - 30) {
+        doc.addPage();
+        finalY = 20;
+      }
+      
+      doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
       doc.text('FINANCIAL SUMMARY', 20, finalY);
       
       // Term Balances Summary (if available)
+      let summaryY = finalY + 20;
       if (statementData.termBalances && statementData.termBalances.length > 0) {
-        let summaryY = finalY + 15;
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10);
+        doc.setFontSize(11);
         doc.text('Term Balances:', 20, summaryY);
         
         statementData.termBalances.forEach((termBalance: any) => {
-          summaryY += 10;
+          summaryY += 12;
           doc.setFont('helvetica', 'normal');
           doc.text(`${termBalance.termName || termBalance.term} ${termBalance.academicYearName || termBalance.year}:`, 30, summaryY);
           doc.text(`KES ${Number(termBalance.balance || 0).toLocaleString()}`, 130, summaryY);
         });
-        summaryY += 10;
-      } else {
-        let summaryY = finalY + 15;
+        summaryY += 15;
       }
       
       // Overall Summary
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.text('Academic Year Balance:', 20, finalY + 15);
+      doc.setFontSize(11);
+      doc.text('Academic Year Balance:', 20, summaryY);
       doc.setFont('helvetica', 'normal');
-      doc.text(`KES ${Number(statementData.summary?.finalAcademicYearBalance || statementData.summary?.finalBalance || 0).toLocaleString()}`, 130, finalY + 15);
+      doc.text(`KES ${Number(statementData.summary?.finalAcademicYearBalance || statementData.summary?.finalBalance || 0).toLocaleString()}`, 130, summaryY);
       
+      summaryY += 20;
+      doc.setFont('helvetica', 'bold');
+      doc.text('Summary Details:', 20, summaryY);
+      
+      summaryY += 15;
       doc.setFont('helvetica', 'normal');
-      doc.text(`Total Charges: KES ${(statementData.summary?.totalDebit || 0).toLocaleString()}`, 20, finalY + 30);
-      doc.text(`Total Payments: KES ${(statementData.summary?.totalCredit || 0).toLocaleString()}`, 20, finalY + 37);
-      doc.text(`Final Balance: KES ${(statementData.summary?.finalBalance || 0).toLocaleString()}`, 20, finalY + 44);
+      doc.text(`Total Charges: KES ${(statementData.summary?.totalDebit || 0).toLocaleString()}`, 20, summaryY);
+      doc.text(`Total Payments: KES ${(statementData.summary?.totalCredit || 0).toLocaleString()}`, 20, summaryY + 10);
+      doc.text(`Final Balance: KES ${(statementData.summary?.finalBalance || 0).toLocaleString()}`, 20, summaryY + 20);
       
-      // Footer
+      // Footer - ensure it's at the bottom of the page
+      const footerY = Math.max(summaryY + 40, pageHeight - 20);
       doc.setFontSize(8);
       doc.setFont('helvetica', 'italic');
-      doc.text('This is a computer-generated statement. Please contact the school for any discrepancies.', pageWidth / 2, pageHeight - 10, { align: 'center' });
+      doc.text('This is a computer-generated statement. Please contact the school for any discrepancies.', pageWidth / 2, footerY, { align: 'center' });
       
       // Save the PDF
       const fileName = `Fee_Statement_${studentName.replace(/\s+/g, '_')}_${(statementData.academicYear || 'Academic_Year').replace(/\s+/g, '_')}.pdf`;

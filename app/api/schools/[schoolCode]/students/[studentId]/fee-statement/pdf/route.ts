@@ -159,34 +159,49 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     // Enhanced Summary with Term and Academic Year Breakdown
     const finalY = (pdf as any).lastAutoTable.finalY + 20;
     
+    // Check if we need a new page for the summary
+    const pageHeight = pdf.internal.pageSize.height;
+    const summaryStartY = finalY;
+    const summaryHeight = 80; // Estimated height needed for summary section
+    
+    if (summaryStartY + summaryHeight > pageHeight - 30) {
+      pdf.addPage();
+      finalY = 20;
+    }
+    
     pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(12);
+    pdf.setFontSize(14);
     pdf.text('FINANCIAL SUMMARY', 20, finalY);
     
     // Academic Year Summary
+    let summaryY = finalY + 20;
     pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(10);
-    pdf.text('Academic Year Balance:', 20, finalY + 15);
+    pdf.setFontSize(11);
+    pdf.text('Academic Year Balance:', 20, summaryY);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(`KES ${Number(statementData.summary?.finalAcademicYearBalance || 0).toLocaleString()}`, 130, finalY + 15);
+    pdf.text(`KES ${Number(statementData.summary?.finalAcademicYearBalance || 0).toLocaleString()}`, 130, summaryY);
     
     // Term Balances Summary
     if (statementData.termBalances && statementData.termBalances.length > 0) {
-      let summaryY = finalY + 30;
+      summaryY += 20;
       pdf.setFont('helvetica', 'bold');
       pdf.text('Term Balances:', 20, summaryY);
       
       statementData.termBalances.forEach((termBalance: any, index: number) => {
-        summaryY += 10;
+        summaryY += 12;
         pdf.setFont('helvetica', 'normal');
         pdf.text(`${termBalance.termName} ${termBalance.academicYearName}:`, 30, summaryY);
         pdf.text(`KES ${Number(termBalance.balance || 0).toLocaleString()}`, 130, summaryY);
       });
     }
     
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(10);
+    // Overall Summary Details
+    summaryY += 20;
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(11);
+    pdf.text('Summary Details:', 20, summaryY);
     
+    summaryY += 15;
     const summary = statementData.summary || {};
     const summaryInfo = [
       [`Total Charges:`, `KES ${Number(summary.totalDebit || 0).toLocaleString()}`],
@@ -194,20 +209,20 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       [`Final Balance:`, `KES ${Number(summary.finalBalance || 0).toLocaleString()}`]
     ];
 
-    let summaryY = finalY + 10;
     summaryInfo.forEach(([label, value]) => {
       pdf.setFont('helvetica', 'bold');
       pdf.text(label, 20, summaryY);
       pdf.setFont('helvetica', 'normal');
       pdf.text(value, 80, summaryY);
-      summaryY += 7;
+      summaryY += 10;
     });
 
-    // Footer
+    // Footer - ensure it's at the bottom of the page
+    const footerY = Math.max(summaryY + 20, pageHeight - 20);
     pdf.setFontSize(8);
     pdf.setFont('helvetica', 'italic');
-    pdf.text(`Generated on: ${new Date().toLocaleString()}`, 20, pdf.internal.pageSize.height - 15);
-    pdf.text(`${school.name} - Fee Statement`, 105, pdf.internal.pageSize.height - 15, { align: 'center' });
+    pdf.text(`Generated on: ${new Date().toLocaleString()}`, 20, footerY);
+    pdf.text(`${school.name} - Fee Statement`, 105, footerY, { align: 'center' });
 
     // Generate the PDF buffer
     const pdfBuffer = pdf.output('arraybuffer');
