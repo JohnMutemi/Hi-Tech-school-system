@@ -198,12 +198,12 @@ export function FeesStatementDownload({
           ];
         } else {
           return [
-            (item.no || index + 1).toString(),
-            item.ref || '-',
-            item.date ? new Date(item.date).toLocaleDateString() : '-',
-            item.description || '-',
-            item.debit ? Number(item.debit).toLocaleString() : '-',
-            item.credit ? Number(item.credit).toLocaleString() : '-',
+          (item.no || index + 1).toString(),
+          item.ref || '-',
+          item.date ? new Date(item.date).toLocaleDateString() : '-',
+          item.description || '-',
+          item.debit ? Number(item.debit).toLocaleString() : '-',
+          item.credit ? Number(item.credit).toLocaleString() : '-',
             Number(item.balance || item.termBalance || item.academicYearBalance || 0).toLocaleString()
           ];
         }
@@ -261,38 +261,35 @@ export function FeesStatementDownload({
       doc.setFont('helvetica', 'bold');
       doc.text('FINANCIAL SUMMARY', 20, finalY);
       
-      let currentY = finalY + 15;
-      
       // Term Balances Summary (if available)
       if (statementData.termBalances && statementData.termBalances.length > 0) {
+        let summaryY = finalY + 15;
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(10);
-        doc.text('Term Balances:', 20, currentY);
-        currentY += 10;
+        doc.text('Term Balances:', 20, summaryY);
         
         statementData.termBalances.forEach((termBalance: any) => {
+          summaryY += 10;
           doc.setFont('helvetica', 'normal');
-          doc.text(`${termBalance.termName || termBalance.term} ${termBalance.academicYearName || termBalance.year}:`, 30, currentY);
-          doc.text(`KES ${Number(termBalance.balance || 0).toLocaleString()}`, 130, currentY);
-          currentY += 10;
+          doc.text(`${termBalance.termName || termBalance.term} ${termBalance.academicYearName || termBalance.year}:`, 30, summaryY);
+          doc.text(`KES ${Number(termBalance.balance || 0).toLocaleString()}`, 130, summaryY);
         });
-        currentY += 5; // Extra spacing after term balances
+        summaryY += 10;
+      } else {
+        let summaryY = finalY + 15;
       }
       
-      // Overall Summary - properly spaced
+      // Overall Summary
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
-      doc.text('Academic Year Balance:', 20, currentY);
+      doc.text('Academic Year Balance:', 20, finalY + 15);
       doc.setFont('helvetica', 'normal');
-      doc.text(`KES ${Number(statementData.summary?.finalAcademicYearBalance || statementData.summary?.finalBalance || 0).toLocaleString()}`, 130, currentY);
-      currentY += 10;
+      doc.text(`KES ${Number(statementData.summary?.finalAcademicYearBalance || statementData.summary?.finalBalance || 0).toLocaleString()}`, 130, finalY + 15);
       
       doc.setFont('helvetica', 'normal');
-      doc.text(`Total Charges: KES ${(statementData.summary?.totalDebit || 0).toLocaleString()}`, 20, currentY);
-      currentY += 10;
-      doc.text(`Total Payments: KES ${(statementData.summary?.totalCredit || 0).toLocaleString()}`, 20, currentY);
-      currentY += 10;
-      doc.text(`Final Balance: KES ${(statementData.summary?.finalBalance || 0).toLocaleString()}`, 20, currentY);
+      doc.text(`Total Charges: KES ${(statementData.summary?.totalDebit || 0).toLocaleString()}`, 20, finalY + 30);
+      doc.text(`Total Payments: KES ${(statementData.summary?.totalCredit || 0).toLocaleString()}`, 20, finalY + 37);
+      doc.text(`Final Balance: KES ${(statementData.summary?.finalBalance || 0).toLocaleString()}`, 20, finalY + 44);
       
       // Footer
       doc.setFontSize(8);
@@ -440,66 +437,6 @@ export function FeesStatementDownload({
                 </CardContent>
               </Card>
             </div>
-
-            {/* Financial Summary */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Financial Summary</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {/* Term Balances */}
-                  {statementData.termBalances && statementData.termBalances.length > 0 && (
-                    <div className="space-y-3">
-                      <h4 className="font-semibold text-gray-800">Term Balances</h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {statementData.termBalances.map((termBalance: any, index: number) => (
-                          <div key={index} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                            <div className="text-sm font-medium text-gray-700 mb-1">
-                              {termBalance.termName || termBalance.term} {termBalance.academicYearName || termBalance.year}
-                            </div>
-                            <div className="text-lg font-bold text-gray-900">
-                              {formatCurrency(Number(termBalance.balance) || 0)}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Overall Summary */}
-                  <div className="space-y-3 pt-2 border-t border-gray-200">
-                    <h4 className="font-semibold text-gray-800">Overall Summary</h4>
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                        <span className="font-medium text-gray-700">Academic Year Balance:</span>
-                        <span className="font-bold text-gray-900">
-                          {formatCurrency(Number(statementData.summary?.finalAcademicYearBalance || statementData.summary?.finalBalance || 0))}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                        <span className="font-medium text-gray-700">Total Charges:</span>
-                        <span className="font-bold text-gray-900">
-                          {formatCurrency(Number(statementData.summary?.totalDebit || 0))}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                        <span className="font-medium text-gray-700">Total Payments:</span>
-                        <span className="font-bold text-gray-900">
-                          {formatCurrency(Number(statementData.summary?.totalCredit || 0))}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center py-2">
-                        <span className="font-medium text-gray-700">Final Balance:</span>
-                        <span className="font-bold text-gray-900">
-                          {formatCurrency(Number(statementData.summary?.finalBalance || 0))}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
 
             {/* Statement Preview */}
             <Card>

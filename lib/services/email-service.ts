@@ -587,7 +587,7 @@ export class EmailService {
             <div style="display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 20px;">
                 <div style="width: 50px; height: 50px; background: #10b981; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
                     <span style="font-size: 24px; color: white;">💰</span>
-                </div>
+            </div>
                 <div style="text-align: left;">
                     <h3 style="margin: 0; font-size: 24px; font-weight: bold; color: #065f46;">Payment Confirmed</h3>
                     <p style="margin: 0; font-size: 14px; color: #047857;">Receipt No: ${data.receiptNumber}</p>
@@ -599,11 +599,11 @@ export class EmailService {
                     <div>
                         <p style="margin: 0 0 5px 0; font-size: 14px; color: #6b7280; font-weight: 500;">Student Name</p>
                         <p style="margin: 0; font-size: 16px; font-weight: bold; color: #111827;">${data.studentName}</p>
-                    </div>
+                </div>
                     <div>
                         <p style="margin: 0 0 5px 0; font-size: 14px; color: #6b7280; font-weight: 500;">Amount Paid</p>
                         <p style="margin: 0; font-size: 18px; font-weight: bold; color: #10b981;">KES ${data.amount.toLocaleString()}</p>
-                    </div>
+                        </div>
                     <div>
                         <p style="margin: 0 0 5px 0; font-size: 14px; color: #6b7280; font-weight: 500;">Payment Date</p>
                         <p style="margin: 0; font-size: 16px; font-weight: 600; color: #111827;">${new Date(data.paymentDate).toLocaleDateString()}</p>
@@ -611,7 +611,7 @@ export class EmailService {
                     <div>
                         <p style="margin: 0 0 5px 0; font-size: 14px; color: #6b7280; font-weight: 500;">Academic Period</p>
                         <p style="margin: 0; font-size: 16px; font-weight: 600; color: #111827;">${data.academicYear || 'N/A'} - ${data.termName || 'N/A'}</p>
-                    </div>
+                            </div>
                 </div>
             </div>
             
