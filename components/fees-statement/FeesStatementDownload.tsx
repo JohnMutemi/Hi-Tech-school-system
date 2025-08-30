@@ -150,7 +150,7 @@ export function FeesStatementDownload({
       doc.setFont('helvetica', 'bold');
       doc.text('FEE STATEMENT', pageWidth / 2, 20, { align: 'center' });
       
-      // School and student info
+      // Student and school info
       doc.setFontSize(12);
       doc.setFont('helvetica', 'normal');
       doc.text(`Student: ${statementData.student?.name || 'Student'}`, 20, 35);
@@ -162,53 +162,134 @@ export function FeesStatementDownload({
       }
       doc.text(`Generated: ${new Date().toLocaleDateString()}`, 20, 70);
       
-      // Statement table
+      // Enhanced Statement table with proper termly balance tracking
+      const tableColumns = ['No.', 'Ref', 'Date', 'Description', 'Debit (KES)', 'Credit (KES)', 'Balance (KES)'];
+      const tableRows = (statementData.statement || []).map((item: any, index: number) => {
+        // Handle special row types with different styling
+        if (item.type === 'term-header') {
+          return [
+            '',
+            '',
+            '',
+            item.description || '',
+            '',
+            '',
+            ''
+          ];
+        } else if (item.type === 'term-closing') {
+          return [
+            '',
+            '',
+            '',
+            item.description || '',
+            '',
+            '',
+            Number(item.balance || item.termBalance || item.academicYearBalance || 0).toLocaleString()
+          ];
+        } else if (item.type === 'brought-forward') {
+          return [
+            (item.no || '').toString(),
+            item.ref || '-',
+            item.date ? new Date(item.date).toLocaleDateString() : '-',
+            item.description || '-',
+            item.debit ? Number(item.debit).toLocaleString() : '-',
+            item.credit ? Number(item.credit).toLocaleString() : '-',
+            Number(item.balance || item.termBalance || item.academicYearBalance || 0).toLocaleString()
+          ];
+        } else {
+          return [
+            (item.no || index + 1).toString(),
+            item.ref || '-',
+            item.date ? new Date(item.date).toLocaleDateString() : '-',
+            item.description || '-',
+            item.debit ? Number(item.debit).toLocaleString() : '-',
+            item.credit ? Number(item.credit).toLocaleString() : '-',
+            Number(item.balance || item.termBalance || item.academicYearBalance || 0).toLocaleString()
+          ];
+        }
+      });
+
       autoTable(doc, {
         startY: 80,
-        head: [
-          ['No.', 'Ref', 'Date', 'Description', 'Debit (KES)', 'Credit (KES)', 'Balance (KES)']
-        ],
-        body: (statementData.statement || []).map((item, index) => [
-          (item.no || index + 1).toString(),
-          item.ref || '-',
-          item.date ? new Date(item.date).toLocaleDateString() : '-',
-          item.description || '-',
-          item.debit ? Number(item.debit).toLocaleString() : '-',
-          item.credit ? Number(item.credit).toLocaleString() : '-',
-          Number(item.balance || 0).toLocaleString()
-        ]),
-        theme: 'grid',
+        head: [tableColumns],
+        body: tableRows,
+        theme: 'striped',
         headStyles: { 
-          fillColor: [44, 62, 80],
+          fillColor: [41, 128, 185],
           textColor: 255,
-          fontSize: 10
+          fontSize: 10,
+          fontStyle: 'bold'
         },
         styles: { 
           fontSize: 9,
           cellPadding: 3
         },
         columnStyles: {
-          0: { cellWidth: 15 },
-          1: { cellWidth: 25 },
-          2: { cellWidth: 25 },
-          3: { cellWidth: 50 },
-          4: { cellWidth: 25, halign: 'right' },
-          5: { cellWidth: 25, halign: 'right' },
-          6: { cellWidth: 25, halign: 'right' }
+          0: { halign: 'center', cellWidth: 12 },
+          1: { halign: 'center', cellWidth: 20 },
+          2: { halign: 'center', cellWidth: 20 },
+          3: { halign: 'left', cellWidth: 50 },
+          4: { halign: 'right', cellWidth: 25 },
+          5: { halign: 'right', cellWidth: 25 },
+          6: { halign: 'right', cellWidth: 25 }
+        },
+        didParseCell: function(data: any) {
+          // Style term headers and closing balances differently
+          const cellText = data.cell.text[0];
+          if (cellText && cellText.includes('===')) {
+            // Term header
+            data.cell.styles.fillColor = [52, 152, 219]; // Blue background
+            data.cell.styles.textColor = [255, 255, 255]; // White text
+            data.cell.styles.fontStyle = 'bold';
+          } else if (cellText && (cellText.includes('TERM') && cellText.includes('BALANCE'))) {
+            // Term closing balance
+            data.cell.styles.fillColor = [241, 196, 15]; // Yellow background
+            data.cell.styles.textColor = [0, 0, 0]; // Black text
+            data.cell.styles.fontStyle = 'bold';
+          } else if (cellText && cellText.includes('BROUGHT FORWARD')) {
+            // Brought forward row
+            data.cell.styles.fillColor = [231, 76, 60]; // Red background
+            data.cell.styles.textColor = [255, 255, 255]; // White text
+            data.cell.styles.fontStyle = 'bold';
+          }
         }
       });
       
-      // Summary section
-      const finalY = (doc as any).lastAutoTable.finalY + 10;
+      // Enhanced Summary with Term Balances
+      const finalY = (doc as any).lastAutoTable.finalY + 20;
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
-      doc.text('SUMMARY:', 20, finalY);
+      doc.text('FINANCIAL SUMMARY', 20, finalY);
       
+      // Term Balances Summary (if available)
+      if (statementData.termBalances && statementData.termBalances.length > 0) {
+        let summaryY = finalY + 15;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.text('Term Balances:', 20, summaryY);
+        
+        statementData.termBalances.forEach((termBalance: any) => {
+          summaryY += 10;
+          doc.setFont('helvetica', 'normal');
+          doc.text(`${termBalance.termName || termBalance.term} ${termBalance.academicYearName || termBalance.year}:`, 30, summaryY);
+          doc.text(`KES ${Number(termBalance.balance || 0).toLocaleString()}`, 130, summaryY);
+        });
+        summaryY += 10;
+      } else {
+        let summaryY = finalY + 15;
+      }
+      
+      // Overall Summary
+      doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
+      doc.text('Academic Year Balance:', 20, finalY + 15);
       doc.setFont('helvetica', 'normal');
-      doc.text(`Total Charges: KES ${(statementData.summary?.totalDebit || 0).toLocaleString()}`, 20, finalY + 10);
-      doc.text(`Total Payments: KES ${(statementData.summary?.totalCredit || 0).toLocaleString()}`, 20, finalY + 17);
-      doc.text(`Outstanding Balance: KES ${(statementData.summary?.finalBalance || 0).toLocaleString()}`, 20, finalY + 24);
+      doc.text(`KES ${Number(statementData.summary?.finalAcademicYearBalance || statementData.summary?.finalBalance || 0).toLocaleString()}`, 130, finalY + 15);
+      
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Total Charges: KES ${(statementData.summary?.totalDebit || 0).toLocaleString()}`, 20, finalY + 30);
+      doc.text(`Total Payments: KES ${(statementData.summary?.totalCredit || 0).toLocaleString()}`, 20, finalY + 37);
+      doc.text(`Final Balance: KES ${(statementData.summary?.finalBalance || 0).toLocaleString()}`, 20, finalY + 44);
       
       // Footer
       doc.setFontSize(8);
@@ -316,41 +397,41 @@ export function FeesStatementDownload({
         {/* Statement Summary */}
         {statementData && statementData.summary && (
           <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
               <Card className="bg-blue-50 border-blue-200">
-                <CardContent className="p-4">
+                <CardContent className="p-3 sm:p-4 min-h-[100px] flex flex-col justify-center">
                   <div className="flex items-center gap-2 mb-2">
-                    <DollarSign className="w-4 h-4 text-blue-600" />
-                    <span className="text-sm font-medium text-blue-700">Total Charges</span>
+                    <DollarSign className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 flex-shrink-0" />
+                    <span className="text-xs sm:text-sm font-medium text-blue-700 truncate">Total Charges</span>
                   </div>
-                  <div className="text-xl font-bold text-blue-900">
+                  <div className="text-lg sm:text-xl font-bold text-blue-900 truncate">
                     {formatCurrency(statementData.summary?.totalDebit || 0)}
                   </div>
                 </CardContent>
               </Card>
               
               <Card className="bg-green-50 border-green-200">
-                <CardContent className="p-4">
+                <CardContent className="p-3 sm:p-4 min-h-[100px] flex flex-col justify-center">
                   <div className="flex items-center gap-2 mb-2">
-                    <CheckCircle className="w-4 h-4 text-green-600" />
-                    <span className="text-sm font-medium text-green-700">Total Payments</span>
+                    <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 flex-shrink-0" />
+                    <span className="text-xs sm:text-sm font-medium text-green-700 truncate">Total Payments</span>
                   </div>
-                  <div className="text-xl font-bold text-green-900">
+                  <div className="text-lg sm:text-xl font-bold text-green-900 truncate">
                     {formatCurrency(statementData.summary?.totalCredit || 0)}
                   </div>
                 </CardContent>
               </Card>
               
-              <Card className="bg-amber-50 border-amber-200">
-                <CardContent className="p-4">
+              <Card className="bg-amber-50 border-amber-200 sm:col-span-2 lg:col-span-1">
+                <CardContent className="p-3 sm:p-4 min-h-[100px] flex flex-col justify-center">
                   <div className="flex items-center gap-2 mb-2">
-                    <Clock className="w-4 h-4 text-amber-600" />
-                    <span className="text-sm font-medium text-amber-700">Outstanding</span>
+                    <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600 flex-shrink-0" />
+                    <span className="text-xs sm:text-sm font-medium text-amber-700 truncate">Outstanding</span>
                   </div>
-                  <div className="text-xl font-bold text-amber-900">
+                  <div className="text-lg sm:text-xl font-bold text-amber-900 truncate mb-2">
                     {formatCurrency(statementData.summary?.finalBalance || 0)}
                   </div>
-                  <Badge className={`mt-1 ${getBalanceStatus(statementData.summary?.finalBalance || 0).color}`}>
+                  <Badge className={`text-xs ${getBalanceStatus(statementData.summary?.finalBalance || 0).color} max-w-fit`}>
                     {getBalanceStatus(statementData.summary?.finalBalance || 0).status}
                   </Badge>
                 </CardContent>
@@ -364,17 +445,17 @@ export function FeesStatementDownload({
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-xs sm:text-sm">
                     <thead>
                       <tr className="bg-blue-50 border-b-2 border-blue-200">
-                        <th className="py-3 px-2 text-left font-semibold text-blue-800">No.</th>
-                        <th className="py-3 px-2 text-left font-semibold text-blue-800">Ref</th>
-                        <th className="py-3 px-2 text-left font-semibold text-blue-800">Date</th>
-                        <th className="py-3 px-2 text-left font-semibold text-blue-800">Description</th>
-                        <th className="py-3 px-2 text-right font-semibold text-blue-800">Debit</th>
-                        <th className="py-3 px-2 text-right font-semibold text-blue-800">Credit</th>
-                        <th className="py-3 px-2 text-right font-semibold text-blue-800">Term Bal.</th>
-                        <th className="py-3 px-2 text-right font-semibold text-blue-800">Year Bal.</th>
+                        <th className="py-2 sm:py-3 px-1 sm:px-2 text-left font-semibold text-blue-800 min-w-[30px]">No.</th>
+                        <th className="py-2 sm:py-3 px-1 sm:px-2 text-left font-semibold text-blue-800 min-w-[50px] hidden sm:table-cell">Ref</th>
+                        <th className="py-2 sm:py-3 px-1 sm:px-2 text-left font-semibold text-blue-800 min-w-[60px]">Date</th>
+                        <th className="py-2 sm:py-3 px-1 sm:px-2 text-left font-semibold text-blue-800 min-w-[100px]">Description</th>
+                        <th className="py-2 sm:py-3 px-1 sm:px-2 text-right font-semibold text-blue-800 min-w-[60px]">Debit</th>
+                        <th className="py-2 sm:py-3 px-1 sm:px-2 text-right font-semibold text-blue-800 min-w-[60px]">Credit</th>
+                        <th className="py-2 sm:py-3 px-1 sm:px-2 text-right font-semibold text-blue-800 min-w-[60px] hidden lg:table-cell">T.Bal.</th>
+                        <th className="py-2 sm:py-3 px-1 sm:px-2 text-right font-semibold text-blue-800 min-w-[60px]">Balance</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -393,50 +474,50 @@ export function FeesStatementDownload({
                             } else if (item.type === 'term-closing') {
                               return (
                                 <tr key={index} className="bg-yellow-100 border-b border-yellow-200">
-                                  <td className="py-2 px-2"></td>
-                                  <td className="py-2 px-2"></td>
-                                  <td className="py-2 px-2"></td>
-                                  <td className="py-2 px-2 font-bold text-yellow-800">{item.description}</td>
-                                  <td className="py-2 px-2"></td>
-                                  <td className="py-2 px-2"></td>
-                                  <td className="py-2 px-2 text-right font-bold text-yellow-800">
+                                  <td className="py-2 px-1 sm:px-2"></td>
+                                  <td className="py-2 px-1 sm:px-2 hidden sm:table-cell"></td>
+                                  <td className="py-2 px-1 sm:px-2"></td>
+                                  <td className="py-2 px-1 sm:px-2 font-bold text-yellow-800">{item.description}</td>
+                                  <td className="py-2 px-1 sm:px-2"></td>
+                                  <td className="py-2 px-1 sm:px-2"></td>
+                                  <td className="py-2 px-1 sm:px-2 text-right font-bold text-yellow-800 hidden lg:table-cell">
                                     {formatCurrency(Number(item.termBalance) || 0)}
                                   </td>
-                                  <td className="py-2 px-2 text-right font-bold text-yellow-800">
-                                    {formatCurrency(Number(item.academicYearBalance) || 0)}
+                                  <td className="py-2 px-1 sm:px-2 text-right font-bold text-yellow-800">
+                                    {formatCurrency(Number(item.balance || item.academicYearBalance) || 0)}
                                   </td>
                                 </tr>
                               );
                             } else if (item.type === 'brought-forward') {
                               return (
                                 <tr key={index} className="bg-red-100 border-b border-red-200">
-                                  <td className="py-2 px-2 font-bold text-red-800">{item.no || ''}</td>
-                                  <td className="py-2 px-2 font-mono text-xs font-bold text-red-800">{item.ref || '-'}</td>
-                                  <td className="py-2 px-2 font-bold text-red-800">{item.date ? new Date(item.date).toLocaleDateString() : '-'}</td>
-                                  <td className="py-2 px-2 font-bold text-red-800">{item.description || '-'}</td>
-                                  <td className="py-2 px-2 text-right font-bold text-red-800">{item.debit ? formatCurrency(Number(item.debit)) : '-'}</td>
-                                  <td className="py-2 px-2 text-right font-bold text-red-800">{item.credit ? formatCurrency(Number(item.credit)) : '-'}</td>
-                                  <td className="py-2 px-2 text-right font-bold text-red-800">
+                                  <td className="py-1 sm:py-2 px-1 sm:px-2 font-bold text-red-800">{item.no || ''}</td>
+                                  <td className="py-1 sm:py-2 px-1 sm:px-2 font-mono text-xs font-bold text-red-800 hidden sm:table-cell">{item.ref || '-'}</td>
+                                  <td className="py-1 sm:py-2 px-1 sm:px-2 font-bold text-red-800">{item.date ? new Date(item.date).toLocaleDateString() : '-'}</td>
+                                  <td className="py-1 sm:py-2 px-1 sm:px-2 font-bold text-red-800 truncate max-w-[100px]">{item.description || '-'}</td>
+                                  <td className="py-1 sm:py-2 px-1 sm:px-2 text-right font-bold text-red-800">{item.debit ? formatCurrency(Number(item.debit)) : '-'}</td>
+                                  <td className="py-1 sm:py-2 px-1 sm:px-2 text-right font-bold text-red-800">{item.credit ? formatCurrency(Number(item.credit)) : '-'}</td>
+                                  <td className="py-1 sm:py-2 px-1 sm:px-2 text-right font-bold text-red-800 hidden lg:table-cell">
                                     {item.termBalance ? formatCurrency(Number(item.termBalance)) : '-'}
                                   </td>
-                                  <td className="py-2 px-2 text-right font-bold text-red-800">
-                                    {item.academicYearBalance ? formatCurrency(Number(item.academicYearBalance)) : '-'}
+                                  <td className="py-1 sm:py-2 px-1 sm:px-2 text-right font-bold text-red-800">
+                                    {formatCurrency(Number(item.balance || item.academicYearBalance) || 0)}
                                   </td>
                                 </tr>
                               );
                             } else {
                               return (
                                 <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
-                                  <td className="py-2 px-2">{item.no || ''}</td>
-                                  <td className="py-2 px-2 font-mono text-xs">{item.ref || '-'}</td>
-                                  <td className="py-2 px-2">{item.date ? new Date(item.date).toLocaleDateString() : '-'}</td>
-                                  <td className="py-2 px-2">{item.description || '-'}</td>
-                                  <td className="py-2 px-2 text-right">{item.debit ? formatCurrency(Number(item.debit)) : '-'}</td>
-                                  <td className="py-2 px-2 text-right">{item.credit ? formatCurrency(Number(item.credit)) : '-'}</td>
-                                  <td className="py-2 px-2 text-right font-medium">
+                                  <td className="py-1 sm:py-2 px-1 sm:px-2 text-xs sm:text-sm">{item.no || ''}</td>
+                                  <td className="py-1 sm:py-2 px-1 sm:px-2 font-mono text-xs hidden sm:table-cell">{item.ref || '-'}</td>
+                                  <td className="py-1 sm:py-2 px-1 sm:px-2 text-xs sm:text-sm">{item.date ? new Date(item.date).toLocaleDateString() : '-'}</td>
+                                  <td className="py-1 sm:py-2 px-1 sm:px-2 text-xs sm:text-sm truncate max-w-[100px]">{item.description || '-'}</td>
+                                  <td className="py-1 sm:py-2 px-1 sm:px-2 text-right text-xs sm:text-sm">{item.debit ? formatCurrency(Number(item.debit)) : '-'}</td>
+                                  <td className="py-1 sm:py-2 px-1 sm:px-2 text-right text-xs sm:text-sm">{item.credit ? formatCurrency(Number(item.credit)) : '-'}</td>
+                                  <td className="py-1 sm:py-2 px-1 sm:px-2 text-right font-medium text-xs sm:text-sm hidden lg:table-cell">
                                     {item.termBalance ? formatCurrency(Number(item.termBalance)) : '-'}
                                   </td>
-                                  <td className="py-2 px-2 text-right font-medium">
+                                  <td className="py-1 sm:py-2 px-1 sm:px-2 text-right font-medium text-xs sm:text-sm">
                                     {item.academicYearBalance ? formatCurrency(Number(item.academicYearBalance)) : '-'}
                                   </td>
                                 </tr>

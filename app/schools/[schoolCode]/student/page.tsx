@@ -415,41 +415,49 @@ export default function StudentDashboardPage({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+            <div className="p-3 sm:p-4 bg-green-50 rounded-lg border border-green-200 min-h-[80px] flex flex-col justify-center">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-green-600">Total Fees</p>
-                  <p className="text-2xl font-bold text-green-800">KES 60K</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-green-600 truncate">Total Fees</p>
+                  <p className="text-lg sm:text-2xl font-bold text-green-800 truncate">KES 60K</p>
                 </div>
-                <DollarSign className="w-8 h-8 text-green-600" />
+                <div className="flex-shrink-0 ml-2">
+                  <DollarSign className="w-6 h-6 sm:w-8 sm:h-8 text-green-600" />
+                </div>
               </div>
             </div>
-            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="p-3 sm:p-4 bg-blue-50 rounded-lg border border-blue-200 min-h-[80px] flex flex-col justify-center">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-blue-600">Paid</p>
-                  <p className="text-2xl font-bold text-blue-800">KES 45K</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-blue-600 truncate">Paid</p>
+                  <p className="text-lg sm:text-2xl font-bold text-blue-800 truncate">KES 45K</p>
                 </div>
-                <CheckCircle className="w-8 h-8 text-blue-600" />
+                <div className="flex-shrink-0 ml-2">
+                  <CheckCircle className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" />
+                </div>
               </div>
             </div>
-            <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+            <div className="p-3 sm:p-4 bg-orange-50 rounded-lg border border-orange-200 min-h-[80px] flex flex-col justify-center">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-orange-600">Outstanding</p>
-                  <p className="text-2xl font-bold text-orange-800">KES 15K</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-orange-600 truncate">Outstanding</p>
+                  <p className="text-lg sm:text-2xl font-bold text-orange-800 truncate">KES 15K</p>
                 </div>
-                <AlertCircle className="w-8 h-8 text-orange-600" />
+                <div className="flex-shrink-0 ml-2">
+                  <AlertCircle className="w-6 h-6 sm:w-8 sm:h-8 text-orange-600" />
+                </div>
               </div>
             </div>
-            <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+            <div className="p-3 sm:p-4 bg-purple-50 rounded-lg border border-purple-200 min-h-[80px] flex flex-col justify-center">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-purple-600">Due Date</p>
-                  <p className="text-lg font-bold text-purple-800">15th Dec</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-purple-600 truncate">Due Date</p>
+                  <p className="text-sm sm:text-lg font-bold text-purple-800 truncate">15th Dec</p>
                 </div>
-                <Calendar className="w-8 h-8 text-purple-600" />
+                <div className="flex-shrink-0 ml-2">
+                  <Calendar className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600" />
+                </div>
               </div>
             </div>
           </div>

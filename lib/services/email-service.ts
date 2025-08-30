@@ -582,184 +582,56 @@ export class EmailService {
             <p>Your payment has been processed and a receipt has been generated.</p>
         </div>
         
-        <div class="receipt-preview">
-            <!-- Premium Receipt Header -->
-            <div style="background: linear-gradient(135deg, #1d4ed8 0%, #3730a3 100%); color: white; padding: 20px; position: relative; overflow: hidden;">
-                <!-- Decorative elements -->
-                <div style="position: absolute; top: -20px; right: -20px; width: 80px; height: 80px; background: rgba(255,255,255,0.1); border-radius: 50%;"></div>
-                <div style="position: absolute; bottom: -15px; left: -15px; width: 60px; height: 60px; background: rgba(255,255,255,0.05); border-radius: 50%;"></div>
-                
-                <div style="display: flex; justify-content: space-between; align-items: start; position: relative;">
-                    <div style="flex: 1;">
-                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-                            <div style="width: 40px; height: 40px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.3);">
-                                <span style="font-size: 16px;">🏫</span>
-            </div>
-                            <div>
-                                <h3 style="margin: 0; font-size: 20px; font-weight: bold; letter-spacing: 0.5px;">MONEY RECEIPT</h3>
-                                <p style="margin: 0; font-size: 12px; color: #dbeafe; font-weight: 500;">Payment Confirmation</p>
+        <!-- Payment Summary Card -->
+        <div style="margin: 30px; background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 2px solid #10b981; border-radius: 16px; padding: 30px; text-align: center;">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 20px;">
+                <div style="width: 50px; height: 50px; background: #10b981; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                    <span style="font-size: 24px; color: white;">💰</span>
                 </div>
-                        </div>
-                        <div style="font-size: 10px; color: #dbeafe; line-height: 1.5;">
-                            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
-                                <span style="width: 14px; height: 14px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 8px;">🏢</span>
-                                School Code: <span style="color: white; font-weight: 600;">${data.schoolCode || 'N/A'}</span>
-                        </div>
-                            <div style="display: flex; align-items: center; gap: 6px;">
-                                <span style="width: 14px; height: 14px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 8px;">📧</span>
-                                Contact: School Administration
-                    </div>
+                <div style="text-align: left;">
+                    <h3 style="margin: 0; font-size: 24px; font-weight: bold; color: #065f46;">Payment Confirmed</h3>
+                    <p style="margin: 0; font-size: 14px; color: #047857;">Receipt No: ${data.receiptNumber}</p>
                 </div>
             </div>
             
-                    <div style="text-align: right; margin-left: 20px;">
-                        <div style="background: rgba(255,255,255,0.95); color: #1d4ed8; padding: 8px 12px; border-radius: 8px; margin-bottom: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border: 1px solid rgba(255,255,255,0.5);">
-                            <p style="margin: 0; font-size: 10px; font-weight: 600; color: #3730a3;">DATE</p>
-                            <p style="margin: 0; font-size: 12px; font-weight: bold; color: #000;">${new Date(data.paymentDate).toLocaleDateString()}</p>
-                </div>
-                        <div style="background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); color: #000; padding: 8px 12px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border: 1px solid #d97706;">
-                            <p style="margin: 0; font-size: 10px; font-weight: 600; color: #92400e;">RECEIPT NO</p>
-                            <p style="margin: 0; font-size: 12px; font-weight: bold;">${data.receiptNumber}</p>
-                        </div>
-                        </div>
-                        </div>
-            </div>
-
-            <!-- Invoice/Receipt Label -->
-            <div style="background: #2563eb; color: white; text-align: center; padding: 8px;">
-                <h4 style="margin: 0; font-size: 14px; font-weight: bold;">MONEY RECEIPT</h4>
-            </div>
-
-            <div class="receipt-content" style="padding: 20px;">
-                <!-- Enhanced Customer Information Section -->
-                <div style="background: linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%); border: 2px solid #2563eb; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
-                    <div style="margin-bottom: 15px;">
-                        <div style="background: white; border: 2px solid #bfdbfe; padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
-                                <span style="width: 20px; height: 20px; background: #eff6ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px;">👤</span>
-                                <h5 style="color: #2563eb; font-size: 12px; font-weight: bold; margin: 0;">STUDENT NAME:</h5>
-                            </div>
-                            <p style="margin: 0; font-weight: bold; font-size: 16px; color: #374151;">${data.studentName}</p>
-                        </div>
+            <div style="background: white; border-radius: 12px; padding: 20px; margin: 20px 0; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; text-align: left;">
+                    <div>
+                        <p style="margin: 0 0 5px 0; font-size: 14px; color: #6b7280; font-weight: 500;">Student Name</p>
+                        <p style="margin: 0; font-size: 16px; font-weight: bold; color: #111827;">${data.studentName}</p>
                     </div>
                     <div>
-                        <div style="background: white; border: 2px solid #bfdbfe; padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
-                                <span style="width: 20px; height: 20px; background: #eff6ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px;">🆔</span>
-                                <h5 style="color: #2563eb; font-size: 12px; font-weight: bold; margin: 0;">ADMISSION NO:</h5>
-                            </div>
-                            <p style="margin: 0; font-weight: bold; font-size: 16px; color: #374151;">${data.admissionNumber || 'N/A'}</p>
-                            ${data.parentName ? `
-                            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #eff6ff;">
-                                <p style="margin: 0; font-size: 12px; color: #2563eb; font-weight: 500;">Parent/Guardian: ${data.parentName}</p>
-                        </div>
-                        ` : ''}
+                        <p style="margin: 0 0 5px 0; font-size: 14px; color: #6b7280; font-weight: 500;">Amount Paid</p>
+                        <p style="margin: 0; font-size: 18px; font-weight: bold; color: #10b981;">KES ${data.amount.toLocaleString()}</p>
+                    </div>
+                    <div>
+                        <p style="margin: 0 0 5px 0; font-size: 14px; color: #6b7280; font-weight: 500;">Payment Date</p>
+                        <p style="margin: 0; font-size: 16px; font-weight: 600; color: #111827;">${new Date(data.paymentDate).toLocaleDateString()}</p>
+                    </div>
+                    <div>
+                        <p style="margin: 0 0 5px 0; font-size: 14px; color: #6b7280; font-weight: 500;">Academic Period</p>
+                        <p style="margin: 0; font-size: 16px; font-weight: 600; color: #111827;">${data.academicYear || 'N/A'} - ${data.termName || 'N/A'}</p>
                     </div>
                 </div>
             </div>
             
-                <!-- Items Table -->
-                <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-                    <thead>
-                        <tr style="background: #2563eb; color: white;">
-                            <th style="border: 1px solid #1d4ed8; padding: 8px; text-align: center; font-size: 11px;">NO.</th>
-                            <th style="border: 1px solid #1d4ed8; padding: 8px; text-align: left; font-size: 11px;">DESCRIPTION</th>
-                            <th style="border: 1px solid #1d4ed8; padding: 8px; text-align: center; font-size: 11px;">QTY</th>
-                            <th style="border: 1px solid #1d4ed8; padding: 8px; text-align: center; font-size: 11px;">UNIT PRICE</th>
-                            <th style="border: 1px solid #1d4ed8; padding: 8px; text-align: center; font-size: 11px;">AMOUNT</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td style="border: 1px solid #d1d5db; padding: 8px; text-align: center; font-weight: 600;">1</td>
-                            <td style="border: 1px solid #d1d5db; padding: 8px;">
-                                <div style="font-weight: 600; color: #374151;">${data.feeType || 'School Fees'}</div>
-                                <div style="font-size: 11px; color: #6b7280;">${data.academicYear || 'N/A'} - ${data.termName || 'N/A'}</div>
-                                <div style="font-size: 10px; color: #9ca3af;">Payment: ${data.paymentMethod ? data.paymentMethod.replace('_', ' ') : 'N/A'}</div>
-                            </td>
-                            <td style="border: 1px solid #d1d5db; padding: 8px; text-align: center;">1</td>
-                            <td style="border: 1px solid #d1d5db; padding: 8px; text-align: right;">KES ${data.amount.toLocaleString()}</td>
-                            <td style="border: 1px solid #d1d5db; padding: 8px; text-align: right; font-weight: bold;">KES ${data.amount.toLocaleString()}</td>
-                        </tr>
-                        ${(data.academicYearOutstandingBefore !== undefined || data.academicYearOutstandingAfter !== undefined || data.balanceBefore !== undefined || data.balanceAfter !== undefined) ? `
-                        <tr style="background: #f9fafb;">
-                            <td style="border: 1px solid #d1d5db; padding: 8px; text-align: center; font-weight: 600;">2</td>
-                            <td style="border: 1px solid #d1d5db; padding: 8px;">
-                                <div style="font-weight: 600; color: #374151;">Account Balance Summary</div>
-                                <div style="font-size: 11px; color: #6b7280;">
-                                    Balance Before: KES ${(data.academicYearOutstandingBefore || data.balanceBefore || 0).toLocaleString()}<br>
-                                    Balance After: KES ${(data.academicYearOutstandingAfter || data.balanceAfter || 0).toLocaleString()}
-                </div>
-                            </td>
-                            <td style="border: 1px solid #d1d5db; padding: 8px; text-align: center;">-</td>
-                            <td style="border: 1px solid #d1d5db; padding: 8px; text-align: center;">-</td>
-                            <td style="border: 1px solid #d1d5db; padding: 8px; text-align: center;">-</td>
-                        </tr>
-                        ` : ''}
-                        ${data.carryForward && data.carryForward > 0 ? `
-                        <tr style="background: #eff6ff;">
-                            <td style="border: 1px solid #d1d5db; padding: 8px; text-align: center; font-weight: 600; color: #2563eb;">3</td>
-                            <td style="border: 1px solid #d1d5db; padding: 8px;">
-                                <div style="font-weight: 600; color: #2563eb;">Overpayment Carried Forward</div>
-                                <div style="font-size: 11px; color: #3b82f6;">Applied to next term fees</div>
-                            </td>
-                            <td style="border: 1px solid #d1d5db; padding: 8px; text-align: center; color: #2563eb;">1</td>
-                            <td style="border: 1px solid #d1d5db; padding: 8px; text-align: right; color: #2563eb;">KES ${data.carryForward.toLocaleString()}</td>
-                            <td style="border: 1px solid #d1d5db; padding: 8px; text-align: right; font-weight: bold; color: #2563eb;">KES ${data.carryForward.toLocaleString()}</td>
-                        </tr>
-                        ` : ''}
-                    </tbody>
-                </table>
-
-                <!-- Terms and Total Section -->
-                <div style="border-top: 2px solid #2563eb; display: grid; grid-template-columns: 1fr 1fr;">
-                    <div style="padding: 15px; border-right: 1px solid #d1d5db;">
-                        <div style="font-size: 11px; color: #6b7280;">
-                            <p style="font-weight: bold; margin: 0 0 5px 0;">TERMS & CONDITIONS:</p>
-                            <p style="margin: 2px 0;">Payment received in good condition</p>
-                            <p style="margin: 2px 0;">No refund of money after payment</p>
-                            <p style="margin: 8px 0 0 0; font-weight: 600;">Thanks for your patronage.</p>
-                        </div>
-                        </div>
-                    <div style="background: #fecaca; padding: 15px; text-align: right;">
-                        <div style="background: #dc2626; color: white; padding: 8px 15px; font-weight: bold; font-size: 14px; border-radius: 4px; display: inline-block;">
-                            TOTAL KES ${data.amount.toLocaleString()}
-                        </div>
-                        </div>
-                    </div>
-
-                <!-- Amount in Words -->
-                <div style="border-top: 1px solid #d1d5db; padding: 15px; background: #f9fafb;">
-                    <h5 style="font-size: 12px; font-weight: bold; color: #374151; margin: 0 0 5px 0;">Amount in words:</h5>
-                    <p style="margin: 0; font-weight: 600; color: #374151;">${this.convertNumberToWords(data.amount)} Kenyan Shillings Only</p>
-            </div>
-            
-                <!-- Signatures -->
-                <div style="border-top: 1px solid #d1d5db; padding: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
-                    <div style="text-align: center;">
-                        <div style="border-top: 1px solid #6b7280; width: 80%; margin: 20px auto 8px auto;"></div>
-                        <p style="margin: 0; font-size: 12px; font-weight: bold; color: #374151;">Soft's signature</p>
-                </div>
-                    <div style="text-align: center;">
-                        <div style="background: #2563eb; color: white; padding: 6px 12px; border-radius: 4px; font-weight: bold; font-size: 11px; margin-bottom: 15px; display: inline-block;">
-                            Thanks For Your Patronage!
-                        </div>
-                        <div style="border-top: 1px solid #6b7280; width: 80%; margin: 0 auto 8px auto;"></div>
-                        <p style="margin: 0; font-size: 12px; font-weight: bold; color: #374151;">Customer's signature</p>
-                            </div>
-                        </div>
-
-                <!-- Reference Information -->
-                ${(data.reference || data.transactionId || data.paymentId) ? `
-                <div style="border-top: 1px solid #d1d5db; padding: 15px; background: #f9fafb;">
-                    <div style="font-size: 11px; color: #6b7280;">
-                        ${data.paymentId ? `<p style="margin: 2px 0;"><span style="font-weight: 600;">Payment ID:</span> ${data.paymentId}</p>` : ''}
-                        ${data.transactionId ? `<p style="margin: 2px 0;"><span style="font-weight: 600;">Transaction ID:</span> ${data.transactionId}</p>` : ''}
-                        ${data.reference ? `<p style="margin: 2px 0;"><span style="font-weight: 600;">Reference:</span> ${data.reference}</p>` : ''}
-                        <p style="margin: 8px 0 0 0; text-align: center;"><span style="font-weight: 600;">Issued by:</span> ${data.issuedBy || 'Bursar'} | <span style="font-weight: 600;">Generated:</span> ${new Date().toLocaleDateString()}</p>
-                </div>
-            </div>
-            ` : ''}
+            <div style="margin-top: 20px;">
+                <p style="margin: 0; font-size: 16px; color: #047857; font-weight: 600;">
+                    ${data.paymentMethod ? `Paid via ${data.paymentMethod.replace('_', ' ')}` : 'Payment completed successfully'}
+                </p>
+                ${(data.academicYearOutstandingAfter !== undefined && data.academicYearOutstandingAfter > 0) ? `
+                <p style="margin: 8px 0 0 0; font-size: 14px; color: #d97706; font-weight: 500;">
+                    Remaining balance: KES ${data.academicYearOutstandingAfter.toLocaleString()}
+                </p>
+                ` : (data.balanceAfter !== undefined && data.balanceAfter > 0) ? `
+                <p style="margin: 8px 0 0 0; font-size: 14px; color: #d97706; font-weight: 500;">
+                    Remaining balance: KES ${data.balanceAfter.toLocaleString()}
+                </p>
+                ` : `
+                <p style="margin: 8px 0 0 0; font-size: 14px; color: #059669; font-weight: 500;">
+                    ✅ Account fully paid
+                </p>
+                `}
             </div>
         </div>
             
