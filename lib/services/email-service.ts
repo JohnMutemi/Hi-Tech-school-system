@@ -54,6 +54,12 @@ export class EmailService {
     let baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
     // Remove trailing slash to avoid double slashes
     baseUrl = baseUrl.replace(/\/$/, '')
+    
+    // Ensure HTTPS in production
+    if (baseUrl.includes('localhost') === false && !baseUrl.startsWith('https://')) {
+      baseUrl = baseUrl.replace('http://', 'https://')
+    }
+    
     const url = `${baseUrl}/api/schools/${schoolCode}/receipts/${receiptNumber}/download?size=${size}`
     console.log('🔍 Receipt Download URL Debug:', {
       NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL,
@@ -82,11 +88,18 @@ export class EmailService {
     let baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
     // Remove trailing slash to avoid double slashes
     baseUrl = baseUrl.replace(/\/$/, '')
+    
+    // Ensure HTTPS in production
+    if (baseUrl.includes('localhost') === false && !baseUrl.startsWith('https://')) {
+      baseUrl = baseUrl.replace('http://', 'https://')
+    }
+    
     const yearParam = academicYearId ? `?academicYearId=${academicYearId}` : ''
     const url = `${baseUrl}/api/schools/${schoolCode}/students/${studentId}/fee-statement/pdf${yearParam}`
     console.log('🔍 Fees Statement URL Debug:', {
       NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL,
       baseUrl,
+      academicYearId,
       generatedUrl: url
     })
     return url
@@ -142,11 +155,17 @@ export class EmailService {
 
       // Generate fees statement URL if not provided
       if (!paymentData.feesStatementUrl && paymentData.studentId) {
-        paymentData.feesStatementUrl = this.generateFeesStatementUrl(
-          paymentData.schoolCode,
-          paymentData.studentId,
-          paymentData.academicYearId
-        )
+        try {
+          paymentData.feesStatementUrl = this.generateFeesStatementUrl(
+            paymentData.schoolCode,
+            paymentData.studentId,
+            paymentData.academicYearId
+          )
+          console.log('✅ Generated fees statement URL:', paymentData.feesStatementUrl)
+        } catch (error) {
+          console.error('❌ Error generating fees statement URL:', error)
+          paymentData.feesStatementUrl = undefined
+        }
       }
 
       const emailContent = this.generatePaymentConfirmationEmail(paymentData)
