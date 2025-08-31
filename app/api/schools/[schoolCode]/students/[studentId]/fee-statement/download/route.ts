@@ -88,15 +88,38 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     
     const tableColumns = ['No.', 'Ref', 'Date', 'Description', 'Debit (KES)', 'Credit (KES)', 'Balance (KES)'];
     const tableRows = (statementData.statement || []).map((item: any, index: number) => {
-      return [
-        (item.no || index + 1).toString(),
-        item.ref || '-',
-        item.date ? new Date(item.date).toLocaleDateString() : '-',
-        item.description || '-',
-        item.debit ? Number(item.debit).toLocaleString() : '-',
-        item.credit ? Number(item.credit).toLocaleString() : '-',
-        item.balance ? Number(item.balance).toLocaleString() : '-'
-      ];
+      // Handle different types of rows
+      if (item.type === 'term-header') {
+        return [
+          '',
+          '',
+          '',
+          `=== ${item.description || item.termName?.toUpperCase()} ===`,
+          '',
+          '',
+          ''
+        ];
+      } else if (item.type === 'term-closing') {
+        return [
+          '',
+          '',
+          '',
+          `TERM ${item.termName?.toUpperCase()} BALANCE`,
+          '',
+          '',
+          Number(item.termBalance || 0).toLocaleString()
+        ];
+      } else {
+        return [
+          (item.no || index + 1).toString(),
+          item.ref || '-',
+          item.date ? new Date(item.date).toLocaleDateString() : '-',
+          item.description || '-',
+          item.debit ? Number(item.debit).toLocaleString() : '-',
+          item.credit ? Number(item.credit).toLocaleString() : '-',
+          item.balance ? Number(item.balance).toLocaleString() : '-'
+        ];
+      }
     });
 
     autoTable(pdf, {
@@ -121,6 +144,28 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
         4: { halign: 'right', cellWidth: 25 }, // Debit
         5: { halign: 'right', cellWidth: 25 }, // Credit
         6: { halign: 'right', cellWidth: 25 } // Balance
+      },
+      didParseCell: function(data: any) {
+        // Style term headers and closing balances differently
+        const cellText = data.cell.text[0];
+        if (cellText && cellText.includes('===')) {
+          // Term header - make it stand out with blue background
+          data.cell.styles.fillColor = [52, 152, 219]; // Blue background
+          data.cell.styles.textColor = [255, 255, 255]; // White text
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.fontSize = 10;
+        } else if (cellText && cellText.includes('TERM') && cellText.includes('BALANCE')) {
+          // Term closing balance - make it stand out with yellow background
+          data.cell.styles.fillColor = [241, 196, 15]; // Yellow background
+          data.cell.styles.textColor = [0, 0, 0]; // Black text
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.fontSize = 10;
+        } else if (cellText && cellText.includes('BROUGHT FORWARD')) {
+          // Brought forward row - make it stand out with red background
+          data.cell.styles.fillColor = [231, 76, 60]; // Red background
+          data.cell.styles.textColor = [255, 255, 255]; // White text
+          data.cell.styles.fontStyle = 'bold';
+        }
       }
     });
 
@@ -128,8 +173,15 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     let finalY = (pdf as any).lastAutoTable.finalY + 15;
     const pageHeight = pdf.internal.pageSize.height;
     
+    // Calculate required space for summary section
+    let requiredSpace = 60; // Base space for headers
+    if (statementData.termBalances && statementData.termBalances.length > 0) {
+      requiredSpace += (statementData.termBalances.length * 12) + 20; // Term balances
+    }
+    requiredSpace += 70; // Summary details and footer
+    
     // Check if we need a new page for the summary
-    if (finalY + 60 > pageHeight - 30) {
+    if (finalY + requiredSpace > pageHeight - 30) {
       pdf.addPage();
       finalY = 30;
     }
@@ -138,8 +190,52 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     pdf.setFontSize(14);
     pdf.text('FINANCIAL SUMMARY', 20, finalY);
     
-    // Summary Details
+    // Academic Year Summary
     let summaryY = finalY + 20;
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(11);
+    pdf.text('Academic Year Balance:', 20, summaryY);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(`KES ${Number(statementData.summary?.finalBalance || 0).toLocaleString()}`, 130, summaryY);
+    
+    // Term Balances Summary
+    if (statementData.termBalances && statementData.termBalances.length > 0) {
+      summaryY += 20;
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Term Balances:', 20, summaryY);
+      
+      statementData.termBalances.forEach((termBalance: any, index: number) => {
+        summaryY += 12;
+        
+        // Check if we need a new page for term balances
+        if (summaryY > pageHeight - 50) {
+          pdf.addPage();
+          summaryY = 30;
+          pdf.setFont('helvetica', 'bold');
+          pdf.text('Term Balances (Continued):', 20, summaryY);
+          summaryY += 15;
+        }
+        
+        pdf.setFont('helvetica', 'normal');
+        pdf.text(`${termBalance.termName} ${termBalance.academicYearName}:`, 30, summaryY);
+        pdf.text(`KES ${Number(termBalance.balance || 0).toLocaleString()}`, 130, summaryY);
+      });
+    }
+    
+    // Overall Summary Details
+    summaryY += 20;
+    
+    // Check if we need a new page for summary details
+    if (summaryY + 50 > pageHeight - 30) {
+      pdf.addPage();
+      summaryY = 30;
+    }
+    
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(11);
+    pdf.text('Summary Details:', 20, summaryY);
+    
+    summaryY += 15;
     const summary = statementData.summary || {};
     const summaryInfo = [
       [`Total Charges:`, `KES ${Number(summary.totalDebit || 0).toLocaleString()}`],
@@ -157,7 +253,6 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
 
     // Footer
     summaryY += 20;
-    const currentPage = pdf.internal.getCurrentPageInfo().pageNumber;
     const currentPageHeight = pdf.internal.pageSize.height;
     
     // If footer would be too close to content or bottom, add spacing
