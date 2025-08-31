@@ -257,8 +257,9 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       termGroups.get(termKey).transactions.push(txn);
     });
 
-    // Process transactions with improved balance tracking
+    // Process transactions with improved balance tracking and carry-forward logic
     let academicYearRunningBalance = arrearsBroughtForward;
+    let carryForwardToNextTerm = 0; // Track overpayments/outstanding to carry forward
     const allRows: any[] = [];
     let rowNumber = 1;
 
@@ -279,9 +280,46 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       });
     }
 
-    // Process each term group
-    Array.from(termGroups.values()).forEach(termGroup => {
+    // Sort term groups by academic year and term order
+    const termOrder: Record<string, number> = { 'Term 1': 1, 'Term 2': 2, 'Term 3': 3 };
+    const sortedTermGroups = Array.from(termGroups.values()).sort((a, b) => {
+      // First sort by academic year
+      if (a.academicYearName !== b.academicYearName) {
+        return (a.academicYearName || '').localeCompare(b.academicYearName || '');
+      }
+      // Then sort by term order
+      return (termOrder[a.termName || ''] || 0) - (termOrder[b.termName || ''] || 0);
+    });
+
+    // Process each term group with carry-forward logic
+    sortedTermGroups.forEach((termGroup, index) => {
       let termRunningBalance = 0;
+      
+      // Apply carry-forward from previous term
+      if (carryForwardToNextTerm !== 0) {
+        const carryForwardDescription = carryForwardToNextTerm > 0 
+          ? `BALANCE CARRIED FORWARD FROM PREVIOUS TERM`
+          : `OVERPAYMENT CARRIED FORWARD FROM PREVIOUS TERM`;
+        
+        allRows.push({
+          no: rowNumber++,
+          ref: 'C/F',
+          description: carryForwardDescription,
+          debit: carryForwardToNextTerm > 0 ? carryForwardToNextTerm : 0,
+          credit: carryForwardToNextTerm < 0 ? Math.abs(carryForwardToNextTerm) : 0,
+          date: termGroup.transactions[0]?.date || new Date(),
+          type: 'carry-forward',
+          termId: termGroup.termId,
+          termName: termGroup.termName,
+          academicYearId: termGroup.academicYearId,
+          academicYearName: termGroup.academicYearName,
+          academicYearBalance: academicYearRunningBalance,
+          termBalance: carryForwardToNextTerm
+        });
+        
+        // Apply carry-forward to term balance
+        termRunningBalance = carryForwardToNextTerm;
+      }
       
       // Add term header
       if (termGroup.termName && termGroup.termName !== 'no-term') {
@@ -298,7 +336,7 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
           academicYearId: termGroup.academicYearId,
           academicYearName: termGroup.academicYearName,
           academicYearBalance: academicYearRunningBalance,
-          termBalance: 0
+          termBalance: termRunningBalance
         });
       }
 
@@ -346,6 +384,15 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
           termBalance: termRunningBalance,
           isClosingBalance: true
         });
+      }
+
+      // Calculate carry-forward for next term
+      // If this is not the last term, carry forward the balance
+      if (index < sortedTermGroups.length - 1) {
+        carryForwardToNextTerm = termRunningBalance;
+      } else {
+        // Last term - no carry forward to next term
+        carryForwardToNextTerm = 0;
       }
     });
 

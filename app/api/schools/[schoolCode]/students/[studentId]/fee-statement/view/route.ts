@@ -428,18 +428,35 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
                                     <td class="amount" style="font-size: 16px; color: ${textColor};">${termBalance.toLocaleString()}</td>
                                 </tr>
                             `;
-                        } else if (item.type === 'brought-forward') {
-                            return `
-                                <tr style="background: #fef2f2; border-left: 4px solid #dc2626; font-weight: bold;">
-                                    <td style="color: #dc2626;">${item.no || ''}</td>
-                                    <td style="color: #dc2626; font-family: monospace;">${item.ref || '-'}</td>
-                                    <td style="color: #dc2626;">${item.date ? new Date(item.date).toLocaleDateString() : '-'}</td>
-                                    <td style="color: #dc2626;">${item.description || '-'}</td>
-                                    <td class="amount debit">${item.debit ? Number(item.debit).toLocaleString() : '-'}</td>
-                                    <td class="amount credit">${item.credit ? Number(item.credit).toLocaleString() : '-'}</td>
-                                    <td class="amount" style="color: #dc2626;">${item.balance ? Number(item.balance).toLocaleString() : '-'}</td>
-                                </tr>
-                            `;
+                                                 } else if (item.type === 'brought-forward') {
+                           return `
+                             <tr style="background: #fef2f2; border-left: 4px solid #dc2626; font-weight: bold;">
+                               <td style="color: #dc2626;">${item.no || ''}</td>
+                               <td style="color: #dc2626; font-family: monospace;">${item.ref || '-'}</td>
+                               <td style="color: #dc2626;">${item.date ? new Date(item.date).toLocaleDateString() : '-'}</td>
+                               <td style="color: #dc2626;">${item.description || '-'}</td>
+                               <td class="amount debit">${item.debit ? Number(item.debit).toLocaleString() : '-'}</td>
+                               <td class="amount credit">${item.credit ? Number(item.credit).toLocaleString() : '-'}</td>
+                               <td class="amount" style="color: #dc2626;">${item.balance ? Number(item.balance).toLocaleString() : '-'}</td>
+                             </tr>
+                           `;
+                         } else if (item.type === 'carry-forward') {
+                           const carryForwardAmount = Number(item.termBalance) || 0;
+                           const isOverpayment = carryForwardAmount < 0;
+                           const bgColor = isOverpayment ? '#dcfce7' : '#fef3c7';
+                           const textColor = isOverpayment ? '#16a34a' : '#d97706';
+                           
+                           return `
+                             <tr style="background: ${bgColor}; border-left: 4px solid #3b82f6; font-weight: bold;">
+                               <td style="text-align: center; color: #3b82f6; font-size: 18px;">→</td>
+                               <td style="color: #3b82f6; font-family: monospace;">${item.ref || '-'}</td>
+                               <td style="color: #3b82f6;">${item.date ? new Date(item.date).toLocaleDateString() : '-'}</td>
+                               <td style="color: #3b82f6;">${item.description || '-'}</td>
+                               <td class="amount" style="color: #3b82f6;">${item.debit ? Number(item.debit).toLocaleString() : '-'}</td>
+                               <td class="amount" style="color: #3b82f6;">${item.credit ? Number(item.credit).toLocaleString() : '-'}</td>
+                               <td class="amount" style="color: ${textColor}; font-weight: bold;">${carryForwardAmount.toLocaleString()}</td>
+                             </tr>
+                           `;
                         } else {
                             return `
                                 <tr>

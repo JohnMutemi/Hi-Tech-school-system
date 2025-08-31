@@ -396,6 +396,28 @@ export function FeesStatementDownload({
                                   </td>
                                 </tr>
                               );
+                            } else if (item.type === 'carry-forward') {
+                              const carryForwardAmount = Number(item.termBalance) || 0;
+                              const isOverpayment = carryForwardAmount < 0;
+                              const bgColor = isOverpayment ? 'bg-green-100 border-green-200' : 'bg-orange-100 border-orange-200';
+                              const textColor = isOverpayment ? 'text-green-800' : 'text-orange-800';
+                              
+                              return (
+                                <tr key={index} className={`${bgColor} border-b-2 border-l-4 border-l-blue-500 font-bold`}>
+                                  <td className="py-2 px-2 text-center font-bold text-blue-600">→</td>
+                                  <td className="py-2 px-2 font-mono text-xs font-bold text-blue-600">{item.ref || '-'}</td>
+                                  <td className="py-2 px-2 font-bold text-blue-600">{item.date ? new Date(item.date).toLocaleDateString() : '-'}</td>
+                                  <td className="py-2 px-2 font-bold text-blue-600">{item.description || '-'}</td>
+                                  <td className="py-2 px-2 text-right font-bold text-blue-600">{item.debit ? formatCurrency(Number(item.debit)) : '-'}</td>
+                                  <td className="py-2 px-2 text-right font-bold text-blue-600">{item.credit ? formatCurrency(Number(item.credit)) : '-'}</td>
+                                  <td className="py-2 px-2 text-right font-bold text-blue-600">
+                                    {formatCurrency(carryForwardAmount)}
+                                  </td>
+                                  <td className="py-2 px-2 text-right font-bold text-blue-600">
+                                    {item.academicYearBalance ? formatCurrency(Number(item.academicYearBalance)) : '-'}
+                                  </td>
+                                </tr>
+                              );
                             } else {
                               return (
                                 <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">

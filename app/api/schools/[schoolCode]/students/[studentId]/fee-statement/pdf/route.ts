@@ -113,6 +113,17 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
           Number(item.termBalance || 0).toLocaleString(),
           Number(item.academicYearBalance || 0).toLocaleString()
         ];
+      } else if (item.type === 'carry-forward') {
+        return [
+          '→',
+          item.ref || '-',
+          item.date ? new Date(item.date).toLocaleDateString() : '-',
+          item.description || '-',
+          item.debit ? Number(item.debit).toLocaleString() : '-',
+          item.credit ? Number(item.credit).toLocaleString() : '-',
+          Number(item.termBalance || 0).toLocaleString(),
+          Number(item.academicYearBalance || 0).toLocaleString()
+        ];
       } else {
         return [
           (item.no || '').toString(),

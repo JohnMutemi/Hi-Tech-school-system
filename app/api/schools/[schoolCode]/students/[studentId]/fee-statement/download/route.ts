@@ -119,6 +119,16 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
           item.credit ? Number(item.credit).toLocaleString() : '-',
           item.balance ? Number(item.balance).toLocaleString() : '-'
         ];
+      } else if (item.type === 'carry-forward') {
+        return [
+          '→',
+          item.ref || '-',
+          item.date ? new Date(item.date).toLocaleDateString() : '-',
+          item.description || '-',
+          item.debit ? Number(item.debit).toLocaleString() : '-',
+          item.credit ? Number(item.credit).toLocaleString() : '-',
+          Number(item.termBalance || 0).toLocaleString()
+        ];
       } else {
         return [
           (item.no || index + 1).toString(),
