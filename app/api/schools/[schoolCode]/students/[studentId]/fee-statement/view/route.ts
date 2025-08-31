@@ -445,13 +445,17 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
                            const isOverpayment = carryForwardAmount < 0;
                            const bgColor = isOverpayment ? '#dcfce7' : '#fef3c7';
                            const textColor = isOverpayment ? '#16a34a' : '#d97706';
+                           const statusText = isOverpayment ? 'OVERPAYMENT' : 'OUTSTANDING';
                            
                            return `
                              <tr style="background: ${bgColor}; border-left: 4px solid #3b82f6; font-weight: bold;">
                                <td style="text-align: center; color: #3b82f6; font-size: 18px;">→</td>
                                <td style="color: #3b82f6; font-family: monospace;">${item.ref || '-'}</td>
                                <td style="color: #3b82f6;">${item.date ? new Date(item.date).toLocaleDateString() : '-'}</td>
-                               <td style="color: #3b82f6;">${item.description || '-'}</td>
+                               <td style="color: #3b82f6;">
+                                 ${item.description || '-'}
+                                 <span style="background: ${isOverpayment ? '#16a34a' : '#d97706'}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 8px;">${statusText}</span>
+                               </td>
                                <td class="amount" style="color: #3b82f6;">${item.debit ? Number(item.debit).toLocaleString() : '-'}</td>
                                <td class="amount" style="color: #3b82f6;">${item.credit ? Number(item.credit).toLocaleString() : '-'}</td>
                                <td class="amount" style="color: ${textColor}; font-weight: bold;">${carryForwardAmount.toLocaleString()}</td>

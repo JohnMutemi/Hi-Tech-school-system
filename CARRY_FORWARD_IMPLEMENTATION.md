@@ -8,9 +8,10 @@ This implementation adds proper carry-forward logic to the fee statement system,
 ### 1. Enhanced Balance Calculation with Carry-Forward
 - **Location**: `app/api/schools/[schoolCode]/students/[studentId]/fee-statement/route.ts`
 - **Logic**: 
-  - Overpayments (negative balances) are carried forward to reduce next term's charges
+  - Overpayments show as 0 balance for the term, with excess amount carried forward as credit
   - Outstanding balances (positive balances) are carried forward to increase next term's balance
   - Carry-forward entries are clearly marked in the statement
+  - Term closing balances show effective balance (0 if overpaid, actual amount if outstanding)
 
 ### 2. Carry-Forward Row Display
 - **Visual Indicators**: Arrow (→) symbol for carry-forward entries
@@ -93,10 +94,11 @@ border-left: 4px solid #3b82f6 (blue)
 Term 1:
 - Charges: KES 5,000
 - Payments: KES 6,300
-- Balance: -KES 1,300 (Overpayment)
+- Balance: KES 0 (Fully Paid)
+- Overpayment: KES 1,300
 
 Term 2:
-- Carry-Forward: -KES 1,300 (Overpayment)
+- Carry-Forward: KES 1,300 (Credit - reduces charges)
 - Charges: KES 7,000
 - Effective Balance: KES 5,700 (7,000 - 1,300)
 ```
@@ -121,7 +123,7 @@ Term 2:
 {
   no: rowNumber++,
   ref: 'C/F',
-  description: 'OVERPAYMENT CARRIED FORWARD FROM PREVIOUS TERM' | 'BALANCE CARRIED FORWARD FROM PREVIOUS TERM',
+  description: 'OVERPAYMENT FROM PREVIOUS TERM (REDUCES CURRENT TERM CHARGES)' | 'OUTSTANDING BALANCE CARRIED FORWARD FROM PREVIOUS TERM',
   debit: carryForwardToNextTerm > 0 ? carryForwardToNextTerm : 0,
   credit: carryForwardToNextTerm < 0 ? Math.abs(carryForwardToNextTerm) : 0,
   date: termGroup.transactions[0]?.date || new Date(),

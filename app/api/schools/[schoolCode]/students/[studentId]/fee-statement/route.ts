@@ -297,9 +297,10 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       
       // Apply carry-forward from previous term
       if (carryForwardToNextTerm !== 0) {
-        const carryForwardDescription = carryForwardToNextTerm > 0 
-          ? `BALANCE CARRIED FORWARD FROM PREVIOUS TERM`
-          : `OVERPAYMENT CARRIED FORWARD FROM PREVIOUS TERM`;
+        const isOverpayment = carryForwardToNextTerm < 0;
+        const carryForwardDescription = isOverpayment 
+          ? `OVERPAYMENT FROM PREVIOUS TERM (REDUCES CURRENT TERM CHARGES)`
+          : `OUTSTANDING BALANCE CARRIED FORWARD FROM PREVIOUS TERM`;
         
         allRows.push({
           no: rowNumber++,
@@ -368,12 +369,15 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
 
       // Add term closing balance if there were transactions
       if (termGroup.transactions.length > 0 && termGroup.termName && termGroup.termName !== 'no-term') {
+        // For term closing, show the effective balance (0 if overpaid, actual balance if outstanding)
+        const effectiveTermBalance = termRunningBalance > 0 ? termRunningBalance : 0;
+        
         allRows.push({
           no: '',
           ref: '',
           description: `TERM ${termGroup.termName.toUpperCase()} BALANCE`,
-          debit: termRunningBalance > 0 ? termRunningBalance : 0,
-          credit: termRunningBalance < 0 ? Math.abs(termRunningBalance) : 0,
+          debit: effectiveTermBalance > 0 ? effectiveTermBalance : 0,
+          credit: effectiveTermBalance < 0 ? Math.abs(effectiveTermBalance) : 0,
           date: termGroup.transactions[termGroup.transactions.length - 1]?.date,
           type: 'term-closing',
           termId: termGroup.termId,
@@ -381,7 +385,7 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
           academicYearId: termGroup.academicYearId,
           academicYearName: termGroup.academicYearName,
           academicYearBalance: academicYearRunningBalance,
-          termBalance: termRunningBalance,
+          termBalance: effectiveTermBalance,
           isClosingBalance: true
         });
       }

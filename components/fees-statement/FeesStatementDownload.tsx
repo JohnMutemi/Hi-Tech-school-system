@@ -401,13 +401,19 @@ export function FeesStatementDownload({
                               const isOverpayment = carryForwardAmount < 0;
                               const bgColor = isOverpayment ? 'bg-green-100 border-green-200' : 'bg-orange-100 border-orange-200';
                               const textColor = isOverpayment ? 'text-green-800' : 'text-orange-800';
+                              const statusText = isOverpayment ? 'OVERPAYMENT' : 'OUTSTANDING';
                               
                               return (
                                 <tr key={index} className={`${bgColor} border-b-2 border-l-4 border-l-blue-500 font-bold`}>
                                   <td className="py-2 px-2 text-center font-bold text-blue-600">→</td>
                                   <td className="py-2 px-2 font-mono text-xs font-bold text-blue-600">{item.ref || '-'}</td>
                                   <td className="py-2 px-2 font-bold text-blue-600">{item.date ? new Date(item.date).toLocaleDateString() : '-'}</td>
-                                  <td className="py-2 px-2 font-bold text-blue-600">{item.description || '-'}</td>
+                                  <td className="py-2 px-2 font-bold text-blue-600 flex items-center gap-2">
+                                    {item.description || '-'}
+                                    <Badge className={`text-xs ${isOverpayment ? 'bg-green-200 text-green-800 border-green-300' : 'bg-orange-200 text-orange-800 border-orange-300'}`}>
+                                      {statusText}
+                                    </Badge>
+                                  </td>
                                   <td className="py-2 px-2 text-right font-bold text-blue-600">{item.debit ? formatCurrency(Number(item.debit)) : '-'}</td>
                                   <td className="py-2 px-2 text-right font-bold text-blue-600">{item.credit ? formatCurrency(Number(item.credit)) : '-'}</td>
                                   <td className="py-2 px-2 text-right font-bold text-blue-600">
