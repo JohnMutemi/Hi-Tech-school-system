@@ -47,95 +47,48 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
 
     // Import jsPDF dynamically to avoid SSR issues
     const { jsPDF } = await import('jspdf');
-    
-    // Create PDF document
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const margin = 20;
-    let yPosition = 20;
+    const autoTable = (await import('jspdf-autotable')).default;
 
-    // Header
-    pdf.setFillColor(102, 126, 234); // Blue background
-    pdf.rect(0, 0, pageWidth, 40, 'F');
+    // Generate PDF
+    console.log('📄 Starting PDF generation for direct download...');
+    const pdf = new jsPDF();
     
-    pdf.setTextColor(255, 255, 255); // White text
-    pdf.setFontSize(24);
+    // Header
+    pdf.setFontSize(20);
     pdf.setFont('helvetica', 'bold');
-    const titleWidth = pdf.getTextWidth(school.name);
-    pdf.text(school.name, (pageWidth - titleWidth) / 2, 20);
+    pdf.text(school.name, 105, 20, { align: 'center' });
     
     pdf.setFontSize(16);
-    pdf.setFont('helvetica', 'normal');
-    const subtitleWidth = pdf.getTextWidth('Fee Statement');
-    pdf.text('Fee Statement', (pageWidth - subtitleWidth) / 2, 30);
-
-    yPosition = 50;
-
+    pdf.text('FEE STATEMENT', 105, 30, { align: 'center' });
+    
     // Student Information
-    pdf.setTextColor(0, 0, 0); // Black text
-    pdf.setFontSize(14);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('Student Information', margin, yPosition);
-    yPosition += 10;
-
     pdf.setFontSize(12);
     pdf.setFont('helvetica', 'normal');
     
     const studentInfo = [
-      ['Student Name:', statementData.student?.name || 'N/A'],
-      ['Admission Number:', statementData.student?.admissionNumber || 'N/A'],
-      ['Grade:', statementData.student?.gradeName || 'N/A'],
-      ['Class:', statementData.student?.className || 'N/A'],
-      ['Academic Year:', statementData.academicYear || 'N/A'],
-      ['Parent/Guardian:', statementData.student?.parentName || 'N/A']
+      [`Student Name:`, statementData.student.name || 'N/A'],
+      [`Admission Number:`, statementData.student.admissionNumber || 'N/A'],
+      [`Grade:`, statementData.student.gradeName || 'N/A'],
+      [`Class:`, statementData.student.className || 'N/A'],
+      [`Academic Year:`, statementData.academicYear || 'N/A'],
+      [`Parent/Guardian:`, statementData.student.parentName || 'N/A'],
     ];
 
+    let yPosition = 45;
     studentInfo.forEach(([label, value]) => {
       pdf.setFont('helvetica', 'bold');
-      pdf.text(label, margin, yPosition);
+      pdf.text(label, 20, yPosition);
       pdf.setFont('helvetica', 'normal');
-      pdf.text(value, margin + 50, yPosition);
-      yPosition += 8;
+      pdf.text(value, 80, yPosition);
+      yPosition += 7;
     });
 
+    // Fee Statement Table with improved layout
     yPosition += 10;
-
-    // Statement Table
-    pdf.setFontSize(14);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('Transaction History', margin, yPosition);
-    yPosition += 10;
-
-    // Table headers
-    const headers = ['No.', 'Ref', 'Date', 'Description', 'Debit (KES)', 'Credit (KES)', 'Balance (KES)'];
-    const columnWidths = [15, 25, 30, 60, 25, 25, 25];
-    let xPosition = margin;
-
-    pdf.setFillColor(102, 126, 234); // Blue background for headers
-    pdf.setTextColor(255, 255, 255); // White text
-    pdf.setFontSize(10);
-    pdf.setFont('helvetica', 'bold');
-
-    headers.forEach((header, index) => {
-      pdf.rect(xPosition, yPosition, columnWidths[index], 8, 'F');
-      pdf.text(header, xPosition + 2, yPosition + 6);
-      xPosition += columnWidths[index];
-    });
-
-    yPosition += 8;
-
-    // Table data
-    pdf.setTextColor(0, 0, 0); // Black text
-    pdf.setFont('helvetica', 'normal');
-
-    (statementData.statement || []).forEach((item: any, index: number) => {
-      if (yPosition > 250) { // Check if we need a new page
-        pdf.addPage();
-        yPosition = 20;
-      }
-
-      xPosition = margin;
-      const rowData = [
+    
+    const tableColumns = ['No.', 'Ref', 'Date', 'Description', 'Debit (KES)', 'Credit (KES)', 'Balance (KES)'];
+    const tableRows = (statementData.statement || []).map((item: any, index: number) => {
+      return [
         (item.no || index + 1).toString(),
         item.ref || '-',
         item.date ? new Date(item.date).toLocaleDateString() : '-',
@@ -144,54 +97,87 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
         item.credit ? Number(item.credit).toLocaleString() : '-',
         item.balance ? Number(item.balance).toLocaleString() : '-'
       ];
-
-      rowData.forEach((cell, cellIndex) => {
-        pdf.rect(xPosition, yPosition, columnWidths[cellIndex], 8, 'S');
-        pdf.text(cell, xPosition + 2, yPosition + 6);
-        xPosition += columnWidths[cellIndex];
-      });
-
-      yPosition += 8;
     });
 
-    yPosition += 10;
+    autoTable(pdf, {
+      head: [tableColumns],
+      body: tableRows,
+      startY: yPosition,
+      theme: 'striped',
+      headStyles: {
+        fillColor: [41, 128, 185],
+        textColor: 255,
+        fontStyle: 'bold'
+      },
+      styles: {
+        fontSize: 9,
+        cellPadding: 3
+      },
+      columnStyles: {
+        0: { halign: 'center', cellWidth: 12 }, // No.
+        1: { halign: 'center', cellWidth: 20 }, // Ref
+        2: { halign: 'center', cellWidth: 20 }, // Date
+        3: { halign: 'left', cellWidth: 50 }, // Description
+        4: { halign: 'right', cellWidth: 25 }, // Debit
+        5: { halign: 'right', cellWidth: 25 }, // Credit
+        6: { halign: 'right', cellWidth: 25 } // Balance
+      }
+    });
 
-    // Summary
-    pdf.setFontSize(14);
+    // Summary Section
+    let finalY = (pdf as any).lastAutoTable.finalY + 15;
+    const pageHeight = pdf.internal.pageSize.height;
+    
+    // Check if we need a new page for the summary
+    if (finalY + 60 > pageHeight - 30) {
+      pdf.addPage();
+      finalY = 30;
+    }
+    
     pdf.setFont('helvetica', 'bold');
-    pdf.text('Financial Summary', margin, yPosition);
-    yPosition += 10;
-
-    pdf.setFontSize(12);
-    pdf.setFont('helvetica', 'normal');
-
-    const summaryItems = [
-      ['Total Charges:', `KES ${Number(statementData.summary?.totalDebit || 0).toLocaleString()}`],
-      ['Total Payments:', `KES ${Number(statementData.summary?.totalCredit || 0).toLocaleString()}`],
-      ['Final Balance:', `KES ${Number(statementData.summary?.finalBalance || 0).toLocaleString()}`]
+    pdf.setFontSize(14);
+    pdf.text('FINANCIAL SUMMARY', 20, finalY);
+    
+    // Summary Details
+    let summaryY = finalY + 20;
+    const summary = statementData.summary || {};
+    const summaryInfo = [
+      [`Total Charges:`, `KES ${Number(summary.totalDebit || 0).toLocaleString()}`],
+      [`Total Payments:`, `KES ${Number(summary.totalCredit || 0).toLocaleString()}`],
+      [`Final Balance:`, `KES ${Number(summary.finalBalance || 0).toLocaleString()}`]
     ];
 
-    summaryItems.forEach(([label, value]) => {
+    summaryInfo.forEach(([label, value]) => {
       pdf.setFont('helvetica', 'bold');
-      pdf.text(label, margin, yPosition);
+      pdf.text(label, 20, summaryY);
       pdf.setFont('helvetica', 'normal');
-      pdf.text(value, margin + 80, yPosition);
-      yPosition += 8;
+      pdf.text(value, 80, summaryY);
+      summaryY += 10;
     });
 
     // Footer
-    yPosition = 270;
-    pdf.setFontSize(10);
-    pdf.setFont('helvetica', 'normal');
-    pdf.setTextColor(128, 128, 128); // Gray text
-    pdf.text(`Generated on: ${new Date().toLocaleString()}`, margin, yPosition);
-    pdf.text(`${school.name} - Fee Statement`, margin, yPosition + 5);
-
-    // Generate PDF buffer
-    const pdfBuffer = Buffer.from(pdf.output('arraybuffer'));
-    const filename = `Fee_Statement_${statementData.student?.name?.replace(/\s+/g, '_') || 'Student'}_${statementData.academicYear || 'Current'}.pdf`;
+    summaryY += 20;
+    const currentPage = pdf.internal.getCurrentPageInfo().pageNumber;
+    const currentPageHeight = pdf.internal.pageSize.height;
     
-    console.log('✅ PDF generated successfully:', filename);
+    // If footer would be too close to content or bottom, add spacing
+    let footerY = Math.max(summaryY, currentPageHeight - 30);
+    if (footerY - summaryY < 10) {
+      footerY = summaryY + 15;
+    }
+    
+    pdf.setFontSize(8);
+    pdf.setFont('helvetica', 'italic');
+    pdf.text(`Generated on: ${new Date().toLocaleString()}`, 20, footerY);
+    pdf.text(`${school.name} - Fee Statement`, 105, footerY, { align: 'center' });
+
+    // Generate the PDF buffer
+    console.log('📄 Generating PDF buffer for direct download...');
+    const pdfBuffer = pdf.output('arraybuffer');
+    
+    // Create filename
+    const filename = `Fee-Statement-${statementData.student.name?.replace(/[^a-zA-Z0-9]/g, '-') || 'Student'}-${statementData.academicYear?.replace(/[^a-zA-Z0-9]/g, '-') || 'Academic-Year'}.pdf`;
+    console.log('✅ PDF generated successfully for direct download:', filename);
 
     // Return PDF as response
     return new Response(pdfBuffer, {
