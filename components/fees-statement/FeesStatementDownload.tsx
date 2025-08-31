@@ -144,9 +144,9 @@ export function FeesStatementDownload({
     try {
       setLoading(true);
       
-      // Use the enhanced PDF endpoint from email section
+      // Use the direct download endpoint
       const response = await fetch(
-        `/api/schools/${schoolCode}/students/${studentId}/fee-statement/pdf?academicYearId=${selectedAcademicYear}`
+        `/api/schools/${schoolCode}/students/${studentId}/fee-statement/download?academicYearId=${selectedAcademicYear}`
       );
       
       if (response.ok) {

@@ -11,22 +11,31 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     const { searchParams } = new URL(request.url);
     const academicYearId = searchParams.get('academicYearId');
 
-    // Get the fee statement data
+    // Get the fee statement data directly instead of using internal fetch
+    console.log('🔍 Generating fee statement data directly...');
+    
+    // Import and call the fee statement logic directly
     const { GET: getFeeStatement } = await import('../route');
     const feeStatementRequest = new NextRequest(
-      `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/schools/${schoolCode}/students/${studentId}/fee-statement${academicYearId ? `?academicYearId=${academicYearId}` : ''}`,
+      `${process.env.NEXT_PUBLIC_BASE_URL || 'https://yoursite.com'}/api/schools/${schoolCode}/students/${studentId}/fee-statement${academicYearId ? `?academicYearId=${academicYearId}` : ''}`,
       { method: 'GET' }
     );
     
     const feeStatementResponse = await getFeeStatement(feeStatementRequest, { params: { schoolCode, studentId } });
     
     if (!feeStatementResponse.ok) {
+      console.error('❌ Fee statement generation failed');
       return NextResponse.json({ 
         error: 'Failed to generate fee statement data'
       }, { status: 400 });
     }
 
     const statementData = await feeStatementResponse.json();
+    console.log('✅ Fee statement data received:', {
+      studentName: statementData.student?.name,
+      academicYear: statementData.academicYear,
+      statementCount: statementData.statement?.length || 0
+    });
 
     // Get school details
     const school = await prisma.school.findUnique({ 
@@ -40,7 +49,7 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
 
     // Create base URL for downloads
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-    const pdfDownloadUrl = `${baseUrl}/api/schools/${schoolCode}/students/${studentId}/fee-statement/pdf${academicYearId ? `?academicYearId=${academicYearId}` : ''}`;
+    const pdfDownloadUrl = `${baseUrl}/api/schools/${schoolCode}/students/${studentId}/fee-statement/download${academicYearId ? `?academicYearId=${academicYearId}` : ''}`;
 
     // Create HTML page that replicates the exact bursar dashboard fee statement experience
     const html = `
@@ -345,7 +354,7 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
             </div>
             <div class="download-actions">
                 <a href="${pdfDownloadUrl}" class="download-btn btn-primary" download>
-                    📄 Download PDF
+                    📄 Download Statement
                 </a>
                 <a href="#" class="download-btn btn-print" onclick="window.print(); return false;">
                     🖨️ Print

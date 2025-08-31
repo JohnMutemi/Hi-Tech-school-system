@@ -82,8 +82,8 @@ export class EmailService {
     }
   }
 
-  // Helper function to generate fee statement view URL (like bursar dashboard)
-  private generateFeeStatementViewUrl(schoolCode: string, studentId: string, academicYearId?: string): string {
+  // Helper function to generate fee statement direct download URL
+  private generateFeeStatementDownloadUrl(schoolCode: string, studentId: string, academicYearId?: string): string {
     let baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
     baseUrl = baseUrl.replace(/\/$/, '')
     
@@ -92,10 +92,10 @@ export class EmailService {
       baseUrl = baseUrl.replace('http://', 'https://')
     }
     
-    // Use the view endpoint (like bursar dashboard)
+    // Use the direct download endpoint
     const yearParam = academicYearId ? `?academicYearId=${academicYearId}` : ''
-    const url = `${baseUrl}/api/schools/${schoolCode}/students/${studentId}/fee-statement/view${yearParam}`
-    console.log('🔍 Fee Statement View URL:', {
+    const url = `${baseUrl}/api/schools/${schoolCode}/students/${studentId}/fee-statement/download${yearParam}`
+    console.log('🔍 Fee Statement Direct Download URL:', {
       baseUrl,
       studentId,
       academicYearId,
@@ -142,22 +142,22 @@ export class EmailService {
     try {
       // Note: Receipt downloads removed - only school can issue receipts
 
-      // Generate fees statement URL if not provided (same as bursar dashboard)
+      // Generate fees statement direct download URL if not provided
       if (!paymentData.feesStatementUrl && paymentData.studentId) {
         try {
-          console.log('📊 Generating fee statement URL:', {
+          console.log('📊 Generating fee statement direct download URL:', {
             schoolCode: paymentData.schoolCode,
             studentId: paymentData.studentId,
             academicYearId: paymentData.academicYearId
           })
-          paymentData.feesStatementUrl = this.generateFeeStatementViewUrl(
+          paymentData.feesStatementUrl = this.generateFeeStatementDownloadUrl(
             paymentData.schoolCode,
             paymentData.studentId,
             paymentData.academicYearId
           )
-          console.log('✅ Generated fees statement URL:', paymentData.feesStatementUrl)
+          console.log('✅ Generated fees statement direct download URL:', paymentData.feesStatementUrl)
         } catch (error) {
-          console.error('❌ Error generating fees statement URL:', error)
+          console.error('❌ Error generating fees statement direct download URL:', error)
           paymentData.feesStatementUrl = undefined
         }
       }
@@ -421,7 +421,7 @@ export class EmailService {
         }
         .header .timestamp {
             font-size: 14px;
-            color: #64748b;
+            color: #e2e8f0;
             margin: 0;
             font-weight: 500;
         }
@@ -826,18 +826,18 @@ export class EmailService {
             ${data.feesStatementUrl ? `
             <div class="download-section">
                 <div class="download-content">
-                    <div class="download-title">📊 Your Fee Statement</div>
-                    <div class="download-subtitle">View and download your complete academic fee statement</div>
+                    <div class="download-title">📄 Your Fee Statement</div>
+                    <div class="download-subtitle">Download your complete academic fee statement directly</div>
                     
                     <div class="button-container">
-                        <a href="${data.feesStatementUrl}" class="download-button statement-button" target="_blank">
-                            📊 View Fee Statement
+                        <a href="${data.feesStatementUrl}" class="download-button statement-button" download>
+                            📄 Download Fee Statement
                         </a>
                     </div>
                     
                     <div style="margin-top: 25px; padding: 20px; background: rgba(16, 185, 129, 0.1); border-radius: 12px; border: 1px solid rgba(16, 185, 129, 0.2);">
                         <p style="margin: 0; font-size: 14px; color: #f8fafc; font-weight: 500; text-align: center; line-height: 1.5;">
-                            💡 <strong>Tip:</strong> This link will open your complete fee statement where you can view and download it as a PDF.
+                            💡 <strong>Tip:</strong> This link will directly download your complete fee statement as a PDF file.
                         </p>
                     </div>
                 </div>

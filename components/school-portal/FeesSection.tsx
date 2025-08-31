@@ -220,9 +220,9 @@ export default function FeesSection({
     }
 
     try {
-      // Use the enhanced PDF endpoint from email section
+      // Use the direct download endpoint
       const response = await fetch(
-        `/api/schools/${schoolCode}/students/${child.id}/fee-statement/pdf?academicYearId=${selectedYearId}`
+        `/api/schools/${schoolCode}/students/${child.id}/fee-statement/download?academicYearId=${selectedYearId}`
       );
       
       if (response.ok) {
