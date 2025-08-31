@@ -3,89 +3,39 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
-// Helper function to convert numbers to words
-function convertAmountToWords(amount: number): string {
-  if (amount === 0) return 'Zero';
-  
-  const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
-  const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
-  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
-  const thousands = ['', 'Thousand', 'Million', 'Billion'];
-
-  function convertHundreds(num: number): string {
-    let result = '';
-    
-    if (num >= 100) {
-      result += ones[Math.floor(num / 100)] + ' Hundred ';
-      num %= 100;
-    }
-    
-    if (num >= 20) {
-      result += tens[Math.floor(num / 10)] + ' ';
-      num %= 10;
-    } else if (num >= 10) {
-      result += teens[num - 10] + ' ';
-      return result;
-    }
-    
-    if (num > 0) {
-      result += ones[num] + ' ';
-    }
-    
-    return result;
-  }
-
-  let result = '';
-  let thousandCounter = 0;
-  
-  while (amount > 0) {
-    if (amount % 1000 !== 0) {
-      result = convertHundreds(amount % 1000) + thousands[thousandCounter] + ' ' + result;
-    }
-    amount = Math.floor(amount / 1000);
-    thousandCounter++;
-  }
-  
-  return result.trim();
-}
-
-// GET - View receipt by receipt number
+// GET - View receipt by receipt number (exactly like bursar dashboard modal)
 export async function GET(
   request: NextRequest,
   { params }: { params: { schoolCode: string; receiptNumber: string } }
 ) {
   try {
     const { schoolCode, receiptNumber } = params
-    
-    console.log('Receipt view request:', { schoolCode, receiptNumber });
 
-    // Get school first
+    // Find the school
     const school = await prisma.school.findUnique({
       where: { code: schoolCode }
     })
 
     if (!school) {
-      console.log('School not found:', schoolCode);
       return NextResponse.json(
         { error: 'School not found' },
         { status: 404 }
       )
     }
 
-    console.log('School found:', school.name);
-
-    // Get receipt with related data
+    // Find the receipt
     const receipt = await prisma.receipt.findFirst({
-      where: { receiptNumber },
+      where: {
+        receiptNumber,
+        student: {
+          schoolId: school.id
+        }
+      },
       include: {
         student: {
           include: {
             user: true,
-            parent: {
-              include: {
-                user: true
-              }
-            }
+            parent: true
           }
         },
         payment: {
@@ -97,10 +47,7 @@ export async function GET(
       }
     })
 
-    console.log('Receipt query result:', receipt ? 'Found' : 'Not found');
-
     if (!receipt) {
-      console.log('Receipt not found:', receiptNumber);
       return NextResponse.json(
         { error: 'Receipt not found' },
         { status: 404 }
@@ -128,7 +75,6 @@ export async function GET(
       status: receipt.payment?.status || 'COMPLETED',
       issuedBy: 'Bursar',
       reference: receipt.payment?.referenceNumber,
-
       transactionId: receipt.payment?.transactionId,
       termOutstandingBefore: receipt.termOutstandingBefore,
       termOutstandingAfter: receipt.termOutstandingAfter,
@@ -139,312 +85,496 @@ export async function GET(
       issuedAt: receipt.createdAt
     }
 
-    // Create HTML page with the unified receipt
+    // Get download URLs for different formats
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+    const downloadUrls = {
+      A3: `${baseUrl}/api/schools/${schoolCode}/receipts/${receiptNumber}/download?size=A3`,
+      A4: `${baseUrl}/api/schools/${schoolCode}/receipts/${receiptNumber}/download?size=A4`,
+      A5: `${baseUrl}/api/schools/${schoolCode}/receipts/${receiptNumber}/download?size=A5`
+    }
+
+    // Create HTML page that exactly replicates the bursar dashboard modal experience
     const html = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Receipt - ${receiptData.schoolName}</title>
+    <title>Payment Receipt - ${receiptData.schoolName}</title>
     <style>
-        body { 
-            font-family: Inter, system-ui, sans-serif; 
-            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-            min-height: 100vh;
+        * {
             margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: rgba(0, 0, 0, 0.5);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             padding: 20px;
         }
-        .receipt-container { 
-            max-width: 700px; 
-            margin: 0 auto; 
+        
+        .modal-container {
             background: white;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-            border: 2px solid #e5e7eb;
-            font-family: Inter, system-ui, sans-serif;
-            min-height: 800px;
+            border-radius: 12px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+            max-width: 800px;
+            width: 100%;
+            max-height: 90vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
         }
-        .header { 
-            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); 
-            color: white; 
-            padding: 30px; 
-            text-align: center; 
-        }
-        .header h1 {
-            font-size: 24px;
-            font-weight: bold;
-            margin: 0 0 5px 0;
-        }
-        .header p {
-            font-size: 12px;
-            color: #dbeafe;
-            margin: 2px 0;
-        }
-        .receipt-header {
-            padding: 30px;
-            border-bottom: 1px solid #e5e7eb;
-        }
-        .receipt-header h2 {
-            font-size: 20px;
-            font-weight: bold;
-            color: #374151;
-            margin: 0 0 10px 0;
-        }
-        .receipt-info {
+        
+        .modal-header {
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            border-bottom: 1px solid #e2e8f0;
+            padding: 16px 24px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            font-size: 14px;
-            color: #6b7280;
-            margin-top: 15px;
         }
-        .status-badge {
-            background: #dcfce7;
-            color: #166534;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
+        
+        .modal-title {
+            font-size: 18px;
             font-weight: 600;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
-        .content { 
-            padding: 30px; 
+        
+        .download-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
         }
-        .section {
+        
+        .download-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 8px 12px;
+            font-size: 12px;
+            font-weight: 500;
+            border: 1px solid;
+            border-radius: 6px;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+        
+        .btn-a3 {
+            background: white;
+            border-color: #3b82f6;
+            color: #1d4ed8;
+        }
+        
+        .btn-a3:hover {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
+        .btn-a4 {
+            background: white;
+            border-color: #10b981;
+            color: #047857;
+        }
+        
+        .btn-a4:hover {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .btn-a5 {
+            background: white;
+            border-color: #8b5cf6;
+            color: #7c3aed;
+        }
+        
+        .btn-a5:hover {
+            background: #ede9fe;
+            color: #6d28d9;
+        }
+        
+        .btn-txt {
+            background: white;
+            border-color: #6b7280;
+            color: #4b5563;
+        }
+        
+        .btn-txt:hover {
+            background: #f9fafb;
+            color: #374151;
+        }
+        
+        .btn-print {
+            background: white;
+            border-color: #f59e0b;
+            color: #d97706;
+        }
+        
+        .btn-print:hover {
+            background: #fef3c7;
+            color: #b45309;
+        }
+        
+        .modal-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0;
+        }
+        
+        .receipt-container {
+            background: white;
+            padding: 40px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        
+        .receipt-header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        
+        .school-name {
+            font-size: 24px;
+            font-weight: bold;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }
+        
+        .receipt-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #059669;
+            margin-bottom: 8px;
+        }
+        
+        .receipt-number {
+            font-size: 14px;
+            color: #64748b;
+        }
+        
+        .receipt-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
             margin-bottom: 30px;
         }
-        .section h3 {
-            font-size: 14px;
-            font-weight: 600;
-            color: #374151;
-            margin: 0 0 10px 0;
-        }
-        .section-box {
-            background: #f9fafb;
+        
+        .info-section {
+            background: #f8fafc;
             padding: 20px;
             border-radius: 8px;
-            border: 1px solid #e5e7eb;
+            border: 1px solid #e2e8f0;
         }
-        .amount-box {
-            background: #f0fdf4;
-            border: 2px solid #bbf7d0;
+        
+        .info-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 12px;
+        }
+        
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        
+        .info-label {
+            font-weight: 500;
+            color: #64748b;
+        }
+        
+        .info-value {
+            font-weight: 500;
+            color: #1e293b;
+        }
+        
+        .amount-section {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            color: white;
             padding: 20px;
             border-radius: 8px;
             text-align: center;
             margin: 20px 0;
         }
+        
+        .amount-label {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 4px;
+        }
+        
         .amount-value {
             font-size: 28px;
             font-weight: bold;
-            color: #166534;
         }
-        .details-grid { 
-            display: grid; 
-            grid-template-columns: 1fr 1fr; 
-            gap: 20px; 
-            font-size: 14px;
+        
+        .balance-section {
+            background: #f1f5f9;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #cbd5e1;
+            margin: 20px 0;
         }
-        .detail-item span {
-            color: #6b7280;
-            font-size: 12px;
-        }
-        .detail-item p {
-            color: #374151;
-            font-weight: 600;
-            margin: 2px 0 0 0;
-        }
-        .bottom-section {
+        
+        .balance-row {
             display: flex;
             justify-content: space-between;
-            align-items: end;
-            padding-top: 40px;
+            margin-bottom: 8px;
+            font-size: 14px;
         }
-        .signature-area {
+        
+        .balance-row:last-child {
+            margin-bottom: 0;
+            padding-top: 8px;
+            border-top: 1px solid #cbd5e1;
+            font-weight: 600;
+        }
+        
+        .footer {
             text-align: center;
-        }
-        .signature-line {
-            border-top: 1px solid #6b7280;
-            width: 120px;
-            margin: 0 auto 10px auto;
-        }
-        .footer { 
-            background: #f9fafb;
-            border-top: 1px solid #e5e7eb;
-            padding: 20px;
-            text-align: center; 
-            color: #6b7280; 
+            padding-top: 20px;
+            border-top: 1px solid #e2e8f0;
+            color: #64748b;
             font-size: 12px;
         }
-        @media (max-width: 600px) {
-            .receipt-container { margin: 10px; }
-            .details-grid { grid-template-columns: 1fr; }
-            .header { padding: 30px 20px; }
+        
+        @media (max-width: 768px) {
+            .modal-container {
+                margin: 10px;
+                max-height: 95vh;
+            }
+            
+            .download-actions {
+                justify-content: center;
+            }
+            
+            .receipt-info {
+                grid-template-columns: 1fr;
+            }
+            
+            .receipt-container {
+                padding: 20px;
+            }
         }
+        
         @media print {
-            body { margin: 0; padding: 15px; background: white; }
-            .no-print { display: none !important; }
-            .receipt-container { 
-                box-shadow: none !important; 
-                border: none !important;
-                max-width: 100% !important;
+            body {
+                background: white;
+                padding: 0;
+            }
+            
+            .modal-container {
+                box-shadow: none;
+                max-width: none;
+                max-height: none;
+            }
+            
+            .modal-header {
+                display: none;
             }
         }
     </style>
 </head>
 <body>
-    <div class="receipt-container">
-        <div class="header">
-            <h1>${receiptData.schoolName}</h1>
-            <p>School Code: ${receiptData.schoolCode}</p>
-            <p>📧 ${receiptData.schoolCode.toLowerCase()}@school.ac.ke | 📞 +254-XXX-XXXXXX</p>
-        </div>
-        
-        <div class="receipt-header">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <h2>MONEY RECEIPT</h2>
-                    <p style="margin: 0; font-size: 14px; color: #6b7280;">Receipt No: <strong style="color: #2563eb;">${receiptData.receiptNumber}</strong></p>
-                </div>
-                <div style="text-align: right;">
-                    <p style="margin: 0; font-size: 14px; color: #6b7280;">Date: <strong>${new Date(receiptData.issuedAt).toLocaleDateString('en-GB', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                    })}</strong></p>
-                    <div style="margin-top: 10px;">
-                        <span class="status-badge">✓ ${receiptData.status || 'PAID'}</span>
-                    </div>
-                </div>
+    <div class="modal-container">
+        <!-- Header with download buttons (exactly like bursar dashboard) -->
+        <div class="modal-header">
+            <div class="modal-title">
+                🧾 Payment Receipt
+            </div>
+            <div class="download-actions">
+                <a href="${downloadUrls.A3}" class="download-btn btn-a3" download>
+                    📄 A3
+                </a>
+                <a href="${downloadUrls.A4}" class="download-btn btn-a4" download>
+                    📄 A4
+                </a>
+                <a href="${downloadUrls.A5}" class="download-btn btn-a5" download>
+                    📄 A5
+                </a>
+                <a href="#" class="download-btn btn-txt" onclick="downloadTXT(); return false;">
+                    📄 TXT
+                </a>
+                <a href="#" class="download-btn btn-print" onclick="window.print(); return false;">
+                    🖨️ Print
+                </a>
             </div>
         </div>
         
-        <div class="content">
-            <!-- Received From -->
-            <div class="section">
-                <h3>Received with thanks from:</h3>
-                <div class="section-box">
-                    <p style="font-size: 18px; font-weight: bold; color: #374151; margin: 0 0 5px 0;">${receiptData.studentName}</p>
-                    <p style="margin: 0; font-size: 14px; color: #6b7280;">Admission No: ${receiptData.admissionNumber}</p>
-                    ${receiptData.parentName ? `<p style="margin: 0; font-size: 14px; color: #6b7280;">Parent/Guardian: ${receiptData.parentName}</p>` : ''}
-
+        <!-- Receipt content (exactly like bursar dashboard) -->
+        <div class="modal-content">
+            <div class="receipt-container" id="receipt-content">
+                <div class="receipt-header">
+                    <div class="school-name">${receiptData.schoolName}</div>
+                    <div class="receipt-title">PAYMENT RECEIPT</div>
+                    <div class="receipt-number">Receipt #: ${receiptData.receiptNumber}</div>
                 </div>
-            </div>
-
-            <!-- Amount -->
-            <div class="section">
-                <h3>Amount:</h3>
-                <div class="amount-box">
-                    <div class="amount-value">${receiptData.currency} ${receiptData.amount.toLocaleString()}</div>
-                </div>
-            </div>
-
-            <!-- In Words -->
-            <div class="section">
-                <h3>In words:</h3>
-                <div class="section-box">
-                    <p style="margin: 0; font-style: italic; color: #374151;">${convertAmountToWords(receiptData.amount)} ${receiptData.currency || 'Kenyan Shillings'} Only</p>
-                </div>
-            </div>
-
-            <!-- For -->
-            <div class="section">
-                <h3>For:</h3>
-                <div class="section-box">
-                    <div class="details-grid">
-                        <div class="detail-item">
-                            <span>Fee Type:</span>
-                            <p>${receiptData.feeType || 'School Fees'}</p>
+                
+                <div class="receipt-info">
+                    <div class="info-section">
+                        <div class="info-title">Student Information</div>
+                        <div class="info-row">
+                            <span class="info-label">Name:</span>
+                            <span class="info-value">${receiptData.studentName}</span>
                         </div>
-                        <div class="detail-item">
-                            <span>Academic Year:</span>
-                            <p>${receiptData.academicYear || 'N/A'}</p>
+                        <div class="info-row">
+                            <span class="info-label">Admission No:</span>
+                            <span class="info-value">${receiptData.admissionNumber || 'N/A'}</span>
                         </div>
-                        <div class="detail-item">
-                            <span>Term:</span>
-                            <p>${receiptData.term || 'N/A'}</p>
+                        <div class="info-row">
+                            <span class="info-label">Parent/Guardian:</span>
+                            <span class="info-value">${receiptData.parentName || 'N/A'}</span>
                         </div>
-                        <div class="detail-item">
-                            <span>Payment Method:</span>
-                            <p style="text-transform: capitalize;">${receiptData.paymentMethod.replace('_', ' ')}</p>
-                        </div>
-                    </div>
-                    ${receiptData.reference ? `
-                    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
-                        <span style="color: #6b7280; font-size: 12px;">Reference:</span>
-                        <p style="margin: 2px 0 0 0; font-family: monospace; font-size: 12px; word-break: break-all;">${receiptData.reference}</p>
-                    </div>
-                    ` : ''}
-                </div>
-            </div>
-
-            <!-- Balance Information -->
-            ${(receiptData.termOutstandingBefore !== undefined || receiptData.academicYearOutstandingBefore !== undefined) ? `
-            <div class="section">
-                <h3>Account Balance:</h3>
-                <div class="section-box">
-                    <div class="details-grid">
-                        ${receiptData.termOutstandingBefore !== undefined ? `
-                        <div class="detail-item">
-                            <span>${receiptData.term} Balance Before:</span>
-                            <p>${receiptData.currency} ${receiptData.termOutstandingBefore.toLocaleString()}</p>
-                        </div>
-                        <div class="detail-item">
-                            <span>${receiptData.term} Balance After:</span>
-                            <p style="color: ${receiptData.termOutstandingAfter <= 0 ? '#059669' : '#d97706'};">${receiptData.currency} ${receiptData.termOutstandingAfter?.toLocaleString() || '0'}</p>
-                        </div>
-                        ` : ''}
-                        ${receiptData.academicYearOutstandingBefore !== undefined ? `
-                        <div class="detail-item">
-                            <span>Academic Year Balance Before:</span>
-                            <p>${receiptData.currency} ${receiptData.academicYearOutstandingBefore.toLocaleString()}</p>
-                        </div>
-                        <div class="detail-item">
-                            <span>Academic Year Balance After:</span>
-                            <p style="color: ${receiptData.academicYearOutstandingAfter <= 0 ? '#059669' : '#d97706'};">${receiptData.currency} ${receiptData.academicYearOutstandingAfter?.toLocaleString() || '0'}</p>
-                        </div>
-                        ` : ''}
                     </div>
                     
-                    ${receiptData.carryForward && receiptData.carryForward > 0 ? `
-                    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb; background: #eff6ff; padding: 15px; border-radius: 6px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <span style="color: #1d4ed8; font-weight: 600; font-size: 14px;">Overpayment Carried Forward:</span>
-                            <span style="color: #1d4ed8; font-weight: bold;">${receiptData.currency} ${receiptData.carryForward.toLocaleString()}</span>
+                    <div class="info-section">
+                        <div class="info-title">Payment Details</div>
+                        <div class="info-row">
+                            <span class="info-label">Date:</span>
+                            <span class="info-value">${new Date(receiptData.paymentDate).toLocaleDateString()}</span>
                         </div>
-                        <p style="margin: 5px 0 0 0; font-size: 12px; color: #3b82f6;">Applied to next term fees</p>
+                        <div class="info-row">
+                            <span class="info-label">Method:</span>
+                            <span class="info-value">${receiptData.paymentMethod}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Reference:</span>
+                            <span class="info-value">${receiptData.reference || 'N/A'}</span>
+                        </div>
                     </div>
-                    ` : ''}
+                </div>
+                
+                <div class="amount-section">
+                    <div class="amount-label">Amount Paid</div>
+                    <div class="amount-value">${receiptData.currency} ${receiptData.amount.toLocaleString()}</div>
+                </div>
+                
+                <div class="receipt-info">
+                    <div class="info-section">
+                        <div class="info-title">Academic Information</div>
+                        <div class="info-row">
+                            <span class="info-label">Academic Year:</span>
+                            <span class="info-value">${receiptData.academicYear}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Term:</span>
+                            <span class="info-value">${receiptData.term}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Fee Type:</span>
+                            <span class="info-value">${receiptData.feeType}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="info-section">
+                        <div class="info-title">Transaction Details</div>
+                        <div class="info-row">
+                            <span class="info-label">Status:</span>
+                            <span class="info-value" style="color: #059669; font-weight: 600;">${receiptData.status}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Issued By:</span>
+                            <span class="info-value">${receiptData.issuedBy}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Transaction ID:</span>
+                            <span class="info-value">${receiptData.transactionId || 'N/A'}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="balance-section">
+                    <div class="info-title" style="margin-bottom: 12px;">Balance Information</div>
+                    <div class="balance-row">
+                        <span>Outstanding Before Payment:</span>
+                        <span>${receiptData.currency} ${(receiptData.academicYearOutstandingBefore || 0).toLocaleString()}</span>
+                    </div>
+                    <div class="balance-row">
+                        <span>Amount Paid:</span>
+                        <span>${receiptData.currency} ${receiptData.amount.toLocaleString()}</span>
+                    </div>
+                    <div class="balance-row">
+                        <span>Outstanding After Payment:</span>
+                        <span>${receiptData.currency} ${(receiptData.academicYearOutstandingAfter || 0).toLocaleString()}</span>
+                    </div>
+                </div>
+                
+                <div class="footer">
+                    <p>This is a computer-generated receipt and does not require a signature.</p>
+                    <p>Generated on: ${new Date().toLocaleDateString()} | ${receiptData.schoolName}</p>
+                    <p>For queries, contact the school administration.</p>
                 </div>
             </div>
-            ` : ''}
-
-            <!-- Bottom Section -->
-            <div class="bottom-section">
-                <div>
-                    <p style="margin: 0; font-size: 14px; color: #6b7280;">Payment ID: <span style="font-family: monospace;">${receiptData.paymentId}</span></p>
-                    ${receiptData.transactionId ? `<p style="margin: 0; font-size: 14px; color: #6b7280;">Transaction ID: <span style="font-family: monospace; font-size: 12px;">${receiptData.transactionId}</span></p>` : ''}
-                </div>
-                <div class="signature-area">
-                    <div class="signature-line"></div>
-                    <p style="margin: 0; font-size: 14px; font-weight: 600;">Money Receiver Sign</p>
-                    <p style="margin: 0; font-size: 12px; color: #6b7280;">${receiptData.issuedBy}</p>
-                </div>
-            </div>
-
-            <!-- Download Section -->
-            <div class="no-print" style="text-align: center; margin: 40px 0; padding: 20px; background: #f0f9ff; border-radius: 8px; border: 2px solid #0ea5e9;">
-                <h3 style="margin: 0 0 15px; color: #0369a1;">📄 Download Options</h3>
-                <a href="/api/schools/${receiptData.schoolCode}/receipts/${receiptData.receiptNumber}/download" style="display: inline-block; padding: 10px 20px; margin: 5px; background: #2563eb; color: white; text-decoration: none; border-radius: 6px; font-weight: 600;">Download PDF</a>
-                <button onclick="window.print()" style="display: inline-block; padding: 10px 20px; margin: 5px; background: white; color: #2563eb; border: 2px solid #2563eb; border-radius: 6px; font-weight: 600; cursor: pointer;">Print Receipt</button>
-            </div>
-        </div>
-        
-        <div class="footer">
-            <p>This is a computer-generated receipt and does not require a signature.</p>
-            <p>For queries, contact the school administration | Generated: ${new Date().toLocaleDateString()}</p>
         </div>
     </div>
+    
+    <script>
+        function downloadTXT() {
+            const content = \`
+PAYMENT RECEIPT
+===============
+
+School: ${receiptData.schoolName}
+Receipt Number: ${receiptData.receiptNumber}
+
+STUDENT INFORMATION
+-------------------
+Name: ${receiptData.studentName}
+Admission Number: ${receiptData.admissionNumber || 'N/A'}
+Parent/Guardian: ${receiptData.parentName || 'N/A'}
+
+PAYMENT DETAILS
+---------------
+Date: ${new Date(receiptData.paymentDate).toLocaleDateString()}
+Amount: ${receiptData.currency} ${receiptData.amount.toLocaleString()}
+Method: ${receiptData.paymentMethod}
+Reference: ${receiptData.reference || 'N/A'}
+
+ACADEMIC INFORMATION
+--------------------
+Academic Year: ${receiptData.academicYear}
+Term: ${receiptData.term}
+Fee Type: ${receiptData.feeType}
+
+TRANSACTION DETAILS
+-------------------
+Status: ${receiptData.status}
+Issued By: ${receiptData.issuedBy}
+Transaction ID: ${receiptData.transactionId || 'N/A'}
+
+BALANCE INFORMATION
+-------------------
+Outstanding Before: ${receiptData.currency} ${(receiptData.academicYearOutstandingBefore || 0).toLocaleString()}
+Amount Paid: ${receiptData.currency} ${receiptData.amount.toLocaleString()}
+Outstanding After: ${receiptData.currency} ${(receiptData.academicYearOutstandingAfter || 0).toLocaleString()}
+
+Generated on: ${new Date().toLocaleDateString()}
+${receiptData.schoolName}
+This is a computer-generated receipt.
+            \`;
+            
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'Receipt-${receiptData.receiptNumber}.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+    </script>
 </body>
 </html>
     `

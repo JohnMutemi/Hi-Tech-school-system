@@ -82,8 +82,8 @@ export class EmailService {
     }
   }
 
-  // Helper function to generate fees statement PDF URL (same as bursar dashboard)
-  private generateFeesStatementUrl(schoolCode: string, studentId: string, academicYearId?: string): string {
+  // Helper function to generate fee statement view URL (like bursar dashboard)
+  private generateFeeStatementViewUrl(schoolCode: string, studentId: string, academicYearId?: string): string {
     let baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
     baseUrl = baseUrl.replace(/\/$/, '')
     
@@ -92,10 +92,10 @@ export class EmailService {
       baseUrl = baseUrl.replace('http://', 'https://')
     }
     
-    // Use the exact same endpoint as bursar dashboard
+    // Use the view endpoint (like bursar dashboard)
     const yearParam = academicYearId ? `?academicYearId=${academicYearId}` : ''
-    const url = `${baseUrl}/api/schools/${schoolCode}/students/${studentId}/fee-statement/pdf${yearParam}`
-    console.log('🔍 Fee Statement URL (Bursar Format):', {
+    const url = `${baseUrl}/api/schools/${schoolCode}/students/${studentId}/fee-statement/view${yearParam}`
+    console.log('🔍 Fee Statement View URL:', {
       baseUrl,
       studentId,
       academicYearId,
@@ -140,17 +140,7 @@ export class EmailService {
     }
 
     try {
-      // Generate receipt download URLs if not provided
-      if (!paymentData.receiptDownloadUrl && paymentData.receiptNumber) {
-        const receiptUrls = this.generateReceiptDownloadUrls(
-          paymentData.schoolCode, 
-          paymentData.receiptNumber
-        )
-        paymentData.receiptDownloadUrl = receiptUrls.receiptDownloadUrlA4 // Default to A4
-        paymentData.receiptDownloadUrlA3 = receiptUrls.receiptDownloadUrlA3
-        paymentData.receiptDownloadUrlA4 = receiptUrls.receiptDownloadUrlA4
-        paymentData.receiptDownloadUrlA5 = receiptUrls.receiptDownloadUrlA5
-      }
+      // Note: Receipt downloads removed - only school can issue receipts
 
       // Generate fees statement URL if not provided (same as bursar dashboard)
       if (!paymentData.feesStatementUrl && paymentData.studentId) {
@@ -160,7 +150,7 @@ export class EmailService {
             studentId: paymentData.studentId,
             academicYearId: paymentData.academicYearId
           })
-          paymentData.feesStatementUrl = this.generateFeesStatementUrl(
+          paymentData.feesStatementUrl = this.generateFeeStatementViewUrl(
             paymentData.schoolCode,
             paymentData.studentId,
             paymentData.academicYearId
@@ -378,12 +368,12 @@ export class EmailService {
             backdrop-filter: blur(16px);
         }
         .header { 
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%); 
+            background: linear-gradient(135deg, #4b5563 0%, #6b7280 100%); 
             color: white; 
             padding: 40px; 
             text-align: center; 
             position: relative;
-            border-bottom: 4px solid #3b82f6;
+            border-bottom: 4px solid #6366f1;
             overflow: hidden;
         }
         .header::before {
@@ -393,9 +383,9 @@ export class EmailService {
             left: 0;
             right: 0;
             bottom: 0;
-            background: radial-gradient(circle at 25% 25%, #1e40af 0%, transparent 50%), 
-                        radial-gradient(circle at 75% 75%, #3b82f6 0%, transparent 50%);
-            opacity: 0.1;
+            background: radial-gradient(circle at 25% 25%, #6366f1 0%, transparent 50%), 
+                        radial-gradient(circle at 75% 75%, #8b5cf6 0%, transparent 50%);
+            opacity: 0.05;
         }
         .header-content {
             position: relative;
@@ -404,13 +394,13 @@ export class EmailService {
         .school-icon {
             width: 80px;
             height: 80px;
-            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
             border-radius: 20px;
             display: flex;
             align-items: center;
             justify-content: center;
             margin: 0 auto 20px;
-            box-shadow: 0 20px 25px -5px rgba(59, 130, 246, 0.4);
+            box-shadow: 0 20px 25px -5px rgba(96, 165, 250, 0.3);
             border: 2px solid rgba(255, 255, 255, 0.1);
         }
         .school-icon::before {
@@ -445,13 +435,13 @@ export class EmailService {
         .success-icon {
             width: 64px;
             height: 64px;
-            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             margin: 0 auto 20px;
-            box-shadow: 0 10px 25px rgba(5, 150, 105, 0.3);
+            box-shadow: 0 10px 25px rgba(52, 211, 153, 0.25);
         }
         .success-icon::before {
             content: '✅';
@@ -832,50 +822,22 @@ export class EmailService {
             </div>
         </div>
             
-        <!-- Download Section with Clear Call-to-Action -->
-            ${data.receiptDownloadUrlA3 || data.receiptDownloadUrlA4 || data.receiptDownloadUrlA5 || data.feesStatementUrl ? `
+        <!-- Fee Statement Section -->
+            ${data.feesStatementUrl ? `
             <div class="download-section">
                 <div class="download-content">
-                    <div class="download-title">📋 Access Your Documents</div>
-                    <div class="download-subtitle">Download your payment documents and complete academic fee statement</div>
+                    <div class="download-title">📊 Your Fee Statement</div>
+                    <div class="download-subtitle">View and download your complete academic fee statement</div>
                     
                     <div class="button-container">
-                        ${data.receiptDownloadUrlA4 ? `
-                        <a href="${data.receiptDownloadUrlA4}" class="download-button receipt-button">
-                            🧾 Download Receipt (A4)
+                        <a href="${data.feesStatementUrl}" class="download-button statement-button" target="_blank">
+                            📊 View Fee Statement
                         </a>
-                        ` : ''}
-                        
-                        ${data.feesStatementUrl ? `
-                        <a href="${data.feesStatementUrl}" class="download-button statement-button">
-                            📊 Download Fee Statement
-                        </a>
-                        ` : ''}
                     </div>
-                    
-                    ${data.receiptDownloadUrlA3 || data.receiptDownloadUrlA5 ? `
-                    <div style="margin-top: 25px; padding: 20px; background: rgba(59, 130, 246, 0.1); border-radius: 12px; border: 1px solid rgba(59, 130, 246, 0.2);">
-                        <p style="margin: 0 0 15px 0; font-size: 14px; color: #f8fafc; font-weight: 600; text-align: center;">
-                            📄 Alternative Receipt Formats
-                        </p>
-                        <div style="display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;">
-                            ${data.receiptDownloadUrlA3 ? `
-                            <a href="${data.receiptDownloadUrlA3}" style="background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%); color: white; padding: 10px 18px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; gap: 8px; transition: all 0.3s ease;">
-                                📋 A3 Format
-                            </a>
-                            ` : ''}
-                            ${data.receiptDownloadUrlA5 ? `
-                            <a href="${data.receiptDownloadUrlA5}" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white; padding: 10px 18px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; gap: 8px; transition: all 0.3s ease;">
-                                🗒️ A5 Format
-                            </a>
-                            ` : ''}
-                        </div>
-                    </div>
-                    ` : ''}
                     
                     <div style="margin-top: 25px; padding: 20px; background: rgba(16, 185, 129, 0.1); border-radius: 12px; border: 1px solid rgba(16, 185, 129, 0.2);">
                         <p style="margin: 0; font-size: 14px; color: #f8fafc; font-weight: 500; text-align: center; line-height: 1.5;">
-                            💡 <strong>Pro Tip:</strong> Save these documents for your records. The fee statement provides a complete academic year summary.
+                            💡 <strong>Tip:</strong> This link will open your complete fee statement where you can view and download it as a PDF.
                         </p>
                     </div>
                 </div>
@@ -987,18 +949,13 @@ Applied to next term fees` : ''}
                       Money Receiver Sign
                         ${data.issuedBy || 'Bursar'}
 
-${data.receiptDownloadUrl || data.feesStatementUrl ? `
-📄 YOUR PAYMENT DOCUMENTS:
+${data.feesStatementUrl ? `
+📊 YOUR FEE STATEMENT:
 
-${data.receiptDownloadUrl ? `🧾 Download Payment Receipt: ${data.receiptDownloadUrl}
-   • Direct PDF download
-   • High quality format
-   • Print ready
-   • Save and archive` : ''}
-
-${data.feesStatementUrl ? `📊 Complete Fee Statement: ${data.feesStatementUrl}
-   • Full academic year summary
-   • PDF format ready for download` : ''}
+Fee Statement: ${data.feesStatementUrl}
+   • Complete academic year summary
+   • View and download as PDF
+   • Detailed payment history
 ` : ''}
 
 ===============================================
