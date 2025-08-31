@@ -16,10 +16,11 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     
     // Import and call the fee statement logic directly
     const { GET: getFeeStatement } = await import('../route');
-    const feeStatementRequest = new NextRequest(
-      `${process.env.NEXT_PUBLIC_BASE_URL || 'https://yoursite.com'}/api/schools/${schoolCode}/students/${studentId}/fee-statement${academicYearId ? `?academicYearId=${academicYearId}` : ''}`,
-      { method: 'GET' }
-    );
+    
+    // Create a mock request for the fee statement logic
+    const feeStatementUrl = new URL(request.url);
+    feeStatementUrl.pathname = feeStatementUrl.pathname.replace('/view', '');
+    const feeStatementRequest = new NextRequest(feeStatementUrl.toString(), { method: 'GET' });
     
     const feeStatementResponse = await getFeeStatement(feeStatementRequest, { params: { schoolCode, studentId } });
     
@@ -48,7 +49,7 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     }
 
     // Create base URL for downloads
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://yoursite.com';
     const pdfDownloadUrl = `${baseUrl}/api/schools/${schoolCode}/students/${studentId}/fee-statement/download${academicYearId ? `?academicYearId=${academicYearId}` : ''}`;
 
     // Create HTML page that replicates the exact bursar dashboard fee statement experience

@@ -50,7 +50,7 @@ export class EmailService {
 
   // Helper function to generate receipt download URL (same as bursar dashboard)
   private generateReceiptDownloadUrl(schoolCode: string, receiptNumber: string, size: string = 'A4'): string {
-    let baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+    let baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://yoursite.com'
     baseUrl = baseUrl.replace(/\/$/, '')
     
     // Ensure HTTPS in production
@@ -84,7 +84,7 @@ export class EmailService {
 
   // Helper function to generate fee statement direct download URL
   private generateFeeStatementDownloadUrl(schoolCode: string, studentId: string, academicYearId?: string): string {
-    let baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+    let baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://yoursite.com'
     baseUrl = baseUrl.replace(/\/$/, '')
     
     // Ensure HTTPS in production

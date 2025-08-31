@@ -17,12 +17,13 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       academicYearId
     });
 
-    // Get the fee statement data directly
+    // Get the fee statement data directly by calling the logic
     const { GET: getFeeStatement } = await import('../route');
-    const feeStatementRequest = new NextRequest(
-      `${process.env.NEXT_PUBLIC_BASE_URL || 'https://yoursite.com'}/api/schools/${schoolCode}/students/${studentId}/fee-statement${academicYearId ? `?academicYearId=${academicYearId}` : ''}`,
-      { method: 'GET' }
-    );
+    
+    // Create a mock request for the fee statement logic
+    const feeStatementUrl = new URL(request.url);
+    feeStatementUrl.pathname = feeStatementUrl.pathname.replace('/download', '');
+    const feeStatementRequest = new NextRequest(feeStatementUrl.toString(), { method: 'GET' });
     
     const feeStatementResponse = await getFeeStatement(feeStatementRequest, { params: { schoolCode, studentId } });
     

@@ -86,7 +86,7 @@ export async function GET(
     }
 
     // Get download URLs for different formats
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://yoursite.com'
     const downloadUrls = {
       A3: `${baseUrl}/api/schools/${schoolCode}/receipts/${receiptNumber}/download?size=A3`,
       A4: `${baseUrl}/api/schools/${schoolCode}/receipts/${receiptNumber}/download?size=A4`,
