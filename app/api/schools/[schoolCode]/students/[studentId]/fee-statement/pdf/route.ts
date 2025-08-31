@@ -104,12 +104,12 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
         ];
       } else if (item.type === 'term-closing') {
         return [
-          '',
+          '★',
           '',
           '',
           item.description || '',
-          '',
-          '',
+          item.debit ? Number(item.debit).toLocaleString() : '-',
+          item.credit ? Number(item.credit).toLocaleString() : '-',
           Number(item.termBalance || 0).toLocaleString(),
           Number(item.academicYearBalance || 0).toLocaleString()
         ];

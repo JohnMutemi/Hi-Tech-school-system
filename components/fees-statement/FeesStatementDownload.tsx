@@ -350,18 +350,31 @@ export function FeesStatementDownload({
                                 </tr>
                               );
                             } else if (item.type === 'term-closing') {
+                              const termBalance = Number(item.termBalance) || 0;
+                              const balanceColor = termBalance > 0 ? 'text-red-800 bg-red-100 border-red-300' : 'text-green-800 bg-green-100 border-green-300';
+                              const balanceStatus = termBalance > 0 ? 'OUTSTANDING' : 'PAID';
+                              
                               return (
-                                <tr key={index} className="bg-yellow-100 border-b border-yellow-200">
-                                  <td className="py-2 px-2"></td>
-                                  <td className="py-2 px-2"></td>
-                                  <td className="py-2 px-2"></td>
-                                  <td className="py-2 px-2 font-bold text-yellow-800">{item.description}</td>
-                                  <td className="py-2 px-2"></td>
-                                  <td className="py-2 px-2"></td>
-                                  <td className="py-2 px-2 text-right font-bold text-yellow-800">
-                                    {formatCurrency(Number(item.termBalance) || 0)}
+                                <tr key={index} className={`${balanceColor} border-b-2 border-l-4 border-l-amber-500 font-bold`}>
+                                  <td className="py-3 px-2 text-center font-bold">★</td>
+                                  <td className="py-3 px-2"></td>
+                                  <td className="py-3 px-2"></td>
+                                  <td className="py-3 px-2 font-bold text-lg flex items-center gap-2">
+                                    {item.description}
+                                    <Badge className={`text-xs ${termBalance > 0 ? 'bg-red-200 text-red-800 border-red-300' : 'bg-green-200 text-green-800 border-green-300'}`}>
+                                      {balanceStatus}
+                                    </Badge>
                                   </td>
-                                  <td className="py-2 px-2 text-right font-bold text-yellow-800">
+                                  <td className="py-3 px-2 text-right font-bold">
+                                    {item.debit ? formatCurrency(Number(item.debit)) : '-'}
+                                  </td>
+                                  <td className="py-3 px-2 text-right font-bold">
+                                    {item.credit ? formatCurrency(Number(item.credit)) : '-'}
+                                  </td>
+                                  <td className="py-3 px-2 text-right font-bold text-lg">
+                                    {formatCurrency(termBalance)}
+                                  </td>
+                                  <td className="py-3 px-2 text-right font-bold text-lg">
                                     {formatCurrency(Number(item.academicYearBalance) || 0)}
                                   </td>
                                 </tr>

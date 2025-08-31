@@ -16,11 +16,10 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     
     // Import and call the fee statement logic directly
     const { GET: getFeeStatement } = await import('../route');
-    
-    // Create a mock request for the fee statement logic
-    const feeStatementUrl = new URL(request.url);
-    feeStatementUrl.pathname = feeStatementUrl.pathname.replace('/view', '');
-    const feeStatementRequest = new NextRequest(feeStatementUrl.toString(), { method: 'GET' });
+    const feeStatementRequest = new NextRequest(
+      `${process.env.NEXT_PUBLIC_BASE_URL || 'https://yoursite.com'}/api/schools/${schoolCode}/students/${studentId}/fee-statement${academicYearId ? `?academicYearId=${academicYearId}` : ''}`,
+      { method: 'GET' }
+    );
     
     const feeStatementResponse = await getFeeStatement(feeStatementRequest, { params: { schoolCode, studentId } });
     
@@ -49,7 +48,7 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     }
 
     // Create base URL for downloads
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://yoursite.com';
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
     const pdfDownloadUrl = `${baseUrl}/api/schools/${schoolCode}/students/${studentId}/fee-statement/download${academicYearId ? `?academicYearId=${academicYearId}` : ''}`;
 
     // Create HTML page that replicates the exact bursar dashboard fee statement experience
@@ -404,17 +403,57 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
                     </tr>
                 </thead>
                 <tbody>
-                    ${(statementData.statement || []).map((item, index) => `
-                        <tr>
-                            <td>${item.no || index + 1}</td>
-                            <td>${item.ref || '-'}</td>
-                            <td>${item.date ? new Date(item.date).toLocaleDateString() : '-'}</td>
-                            <td>${item.description || '-'}</td>
-                            <td class="amount debit">${item.debit ? Number(item.debit).toLocaleString() : '-'}</td>
-                            <td class="amount credit">${item.credit ? Number(item.credit).toLocaleString() : '-'}</td>
-                            <td class="amount">${item.balance ? Number(item.balance).toLocaleString() : '-'}</td>
-                        </tr>
-                    `).join('')}
+                    ${(statementData.statement || []).map((item, index) => {
+                        // Handle special row types
+                        if (item.type === 'term-header') {
+                            return `
+                                <tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; font-weight: bold;">
+                                    <td colspan="7" style="text-align: center; padding: 15px; font-size: 16px;">
+                                        ${item.description || ''}
+                                    </td>
+                                </tr>
+                            `;
+                        } else if (item.type === 'term-closing') {
+                            const termBalance = Number(item.termBalance) || 0;
+                            const balanceColor = termBalance > 0 ? '#fee2e2' : '#dcfce7';
+                            const textColor = termBalance > 0 ? '#dc2626' : '#16a34a';
+                            return `
+                                <tr style="background: ${balanceColor}; border-left: 4px solid #f59e0b; font-weight: bold;">
+                                    <td style="text-align: center; color: #f59e0b; font-size: 18px;">★</td>
+                                    <td></td>
+                                    <td></td>
+                                    <td style="font-size: 16px; color: ${textColor};">${item.description || ''}</td>
+                                    <td class="amount" style="color: ${textColor};">${item.debit ? Number(item.debit).toLocaleString() : '-'}</td>
+                                    <td class="amount" style="color: ${textColor};">${item.credit ? Number(item.credit).toLocaleString() : '-'}</td>
+                                    <td class="amount" style="font-size: 16px; color: ${textColor};">${termBalance.toLocaleString()}</td>
+                                </tr>
+                            `;
+                        } else if (item.type === 'brought-forward') {
+                            return `
+                                <tr style="background: #fef2f2; border-left: 4px solid #dc2626; font-weight: bold;">
+                                    <td style="color: #dc2626;">${item.no || ''}</td>
+                                    <td style="color: #dc2626; font-family: monospace;">${item.ref || '-'}</td>
+                                    <td style="color: #dc2626;">${item.date ? new Date(item.date).toLocaleDateString() : '-'}</td>
+                                    <td style="color: #dc2626;">${item.description || '-'}</td>
+                                    <td class="amount debit">${item.debit ? Number(item.debit).toLocaleString() : '-'}</td>
+                                    <td class="amount credit">${item.credit ? Number(item.credit).toLocaleString() : '-'}</td>
+                                    <td class="amount" style="color: #dc2626;">${item.balance ? Number(item.balance).toLocaleString() : '-'}</td>
+                                </tr>
+                            `;
+                        } else {
+                            return `
+                                <tr>
+                                    <td>${item.no || index + 1}</td>
+                                    <td>${item.ref || '-'}</td>
+                                    <td>${item.date ? new Date(item.date).toLocaleDateString() : '-'}</td>
+                                    <td>${item.description || '-'}</td>
+                                    <td class="amount debit">${item.debit ? Number(item.debit).toLocaleString() : '-'}</td>
+                                    <td class="amount credit">${item.credit ? Number(item.credit).toLocaleString() : '-'}</td>
+                                    <td class="amount">${item.balance ? Number(item.balance).toLocaleString() : '-'}</td>
+                                </tr>
+                            `;
+                        }
+                    }).join('')}
                 </tbody>
             </table>
             
