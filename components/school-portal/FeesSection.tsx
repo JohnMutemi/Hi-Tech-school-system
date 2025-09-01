@@ -193,11 +193,17 @@ export default function FeesSection({
   const academicYearOutstanding = feeSummary?.academicYearOutstanding || 0;
   const termBalances = feeSummary?.termBalances || [];
   const arrears = feeSummary?.arrears || 0;
-  const currentTermId = currentTerm?.id;
-  const currentTermSummary = termBalances.find(
-    (f: any) => f.termId === currentTermId
+  
+  // Use selected term instead of current term for balance display
+  const selectedTermSummary = termBalances.find(
+    (f: any) => f.termId === selectedTermId
   );
-  const outstandingFees = currentTermSummary?.balance || 0;
+  
+  // If a specific term is selected, show that term's balance, otherwise show academic year outstanding
+  const outstandingFees = selectedTermId && selectedTermSummary 
+    ? selectedTermSummary.balance 
+    : academicYearOutstanding;
+  
   const outstanding = feeSummary?.outstanding || 0;
 
   // Calculate totals for statement
