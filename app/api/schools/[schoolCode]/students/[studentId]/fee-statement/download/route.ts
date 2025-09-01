@@ -15,7 +15,8 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     console.log('🔍 Direct download requested for fee statement:', {
       schoolCode: decodedSchoolCode,
       studentId,
-      academicYearId
+      academicYearId,
+      size
     });
 
     // Get the fee statement data directly
@@ -35,6 +36,21 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     }
 
     const statementData = await feeStatementResponse.json();
+    
+    console.log('📊 Statement data received:', {
+      hasStatement: !!statementData.statement,
+      statementLength: statementData.statement?.length || 0,
+      hasSummary: !!statementData.summary,
+      student: statementData.student?.name || 'Unknown'
+    });
+
+    // Validate statement data
+    if (!statementData || !statementData.statement) {
+      console.error('❌ Invalid statement data received');
+      return NextResponse.json({ 
+        error: 'Invalid fee statement data'
+      }, { status: 400 });
+    }
 
     // Get school details
     const school = await prisma.school.findUnique({ 
@@ -47,17 +63,22 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     }
 
     // Import jsPDF dynamically to avoid SSR issues
+    console.log('📦 Importing jsPDF and autoTable...');
     const { jsPDF } = await import('jspdf');
     const autoTable = (await import('jspdf-autotable')).default;
 
     // Generate PDF with Enhanced Theme
     console.log('📄 Starting enhanced PDF generation for direct download...');
+    console.log('📐 PDF format:', size);
+    
     const format = (size as 'A3' | 'A4' | 'A5').toLowerCase() as any;
     const pdf = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
       format: format
     });
+    
+    console.log('✅ jsPDF instance created successfully');
     
     // Enhanced Header with Green Theme
     pdf.setFontSize(22);
@@ -201,6 +222,13 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       }
     });
 
+    console.log('📊 Creating fee statement table...');
+    console.log('📋 Table data:', { 
+      columns: tableColumns.length, 
+      rows: tableRows.length,
+      startY: yPosition 
+    });
+    
     autoTable(pdf, {
       head: [tableColumns],
       body: tableRows,
@@ -338,8 +366,9 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     const filename = `Fee-Statement-${statementData.student.name?.replace(/[^a-zA-Z0-9]/g, '-') || 'Student'}-${statementData.academicYear?.replace(/[^a-zA-Z0-9]/g, '-') || 'Academic-Year'}-${size}.pdf`;
     console.log('✅ PDF generated successfully for direct download:', filename);
 
-    // Return PDF as response
-    return new Response(pdfBuffer, {
+    // Return PDF as download (matching receipt download pattern)
+    return new NextResponse(pdfBuffer, {
+      status: 200,
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="${filename}"`,
