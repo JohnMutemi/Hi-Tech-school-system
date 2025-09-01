@@ -411,8 +411,14 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
                 📊 Fee Statement
             </div>
             <div class="download-actions">
-                <a href="${pdfDownloadUrl}" class="download-btn btn-primary" download>
-                    📄 Download Statement
+                <a href="${pdfDownloadUrl}&size=A3" class="download-btn btn-primary" download>
+                    📄 A3 PDF
+                </a>
+                <a href="${pdfDownloadUrl}&size=A4" class="download-btn btn-primary" download>
+                    📄 A4 PDF
+                </a>
+                <a href="${pdfDownloadUrl}&size=A5" class="download-btn btn-primary" download>
+                    📄 A5 PDF
                 </a>
                 <a href="#" class="download-btn btn-print" onclick="window.print(); return false;">
                     🖨️ Print

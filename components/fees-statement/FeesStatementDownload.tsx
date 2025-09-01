@@ -138,15 +138,15 @@ export function FeesStatementDownload({
     }
   };
 
-  const handleDownloadPDF = async () => {
+  const handleDownloadPDF = async (format: 'A3' | 'A4' | 'A5' = 'A4') => {
     if (!selectedAcademicYear) return;
 
     try {
       setLoading(true);
       
-      // Use the direct download endpoint
+      // Use the direct download endpoint with format parameter
       const response = await fetch(
-        `/api/schools/${schoolCode}/students/${studentId}/fee-statement/download?academicYearId=${selectedAcademicYear}`
+        `/api/schools/${schoolCode}/students/${studentId}/fee-statement/download?academicYearId=${selectedAcademicYear}&size=${format}`
       );
       
       if (response.ok) {
@@ -160,7 +160,7 @@ export function FeesStatementDownload({
         
         // Extract filename from response headers or create default
         const contentDisposition = response.headers.get('Content-Disposition');
-        let filename = `Fee_Statement_${studentName.replace(/\s+/g, '_')}.pdf`;
+        let filename = `Fee_Statement_${studentName.replace(/\s+/g, '_')}_${format}.pdf`;
         
         if (contentDisposition) {
           const filenameMatch = contentDisposition.match(/filename="(.+)"/);
@@ -177,7 +177,7 @@ export function FeesStatementDownload({
       
       toast({
         title: 'Success',
-        description: 'Fee statement downloaded successfully',
+        description: `Fee statement (${format}) downloaded successfully`,
       });
       } else {
         throw new Error('Failed to download fee statement');
@@ -187,6 +187,77 @@ export function FeesStatementDownload({
       toast({
         title: 'Error',
         description: 'Failed to download fee statement',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDownloadTXT = () => {
+    if (!statementData) return;
+
+    try {
+      setLoading(true);
+
+      // Create text version of fee statement
+      const textContent = `
+${schoolCode.toUpperCase()} SCHOOL
+FEE STATEMENT
+===============================================
+
+Student Name: ${studentName}
+Admission Number: ${admissionNumber}
+Grade: ${gradeName}
+Class: ${className}
+${parentName ? `Parent/Guardian: ${parentName}` : ''}
+Academic Year: ${academicYears.find(y => y.id === selectedAcademicYear)?.name || 'Academic Year'}
+Generated: ${new Date().toLocaleDateString()}
+
+FINANCIAL SUMMARY
+===============================================
+Total Charges: ${formatCurrency(statementData.summary?.totalDebit || 0)}
+Total Payments: ${formatCurrency(statementData.summary?.totalCredit || 0)}
+Outstanding Balance: ${formatCurrency(statementData.summary?.finalBalance || 0)}
+
+TRANSACTION DETAILS
+===============================================
+${statementData.statement?.map((item, index) => {
+  if (item.type === 'term-header') {
+    return `\n--- ${item.description} ---`;
+  } else if (item.type === 'term-closing') {
+    return `TERM BALANCE: ${item.description}`;
+  } else if (item.type === 'carry-forward') {
+    return `→ ${item.description}`;
+  } else {
+    return `${item.no || index + 1}. ${item.date ? new Date(item.date).toLocaleDateString() : ''} | ${item.description} | Debit: ${item.debit ? formatCurrency(Number(item.debit)) : '-'} | Credit: ${item.credit ? formatCurrency(Number(item.credit)) : '-'} | Balance: ${item.academicYearBalance ? formatCurrency(Number(item.academicYearBalance)) : '-'}`;
+  }
+}).join('\n')}
+
+===============================================
+This is a computer-generated statement.
+      `.trim();
+
+      // Create and download file
+      const blob = new Blob([textContent], { type: 'text/plain' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `fee-statement-${studentName.replace(/\s+/g, '_')}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Success',
+        description: 'Fee statement (TXT) downloaded successfully',
+      });
+    } catch (error) {
+      console.error('Error downloading TXT:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to download text file',
         variant: 'destructive',
       });
     } finally {
@@ -213,57 +284,85 @@ export function FeesStatementDownload({
   };
 
   return (
-    <Card className="w-full max-w-4xl mx-auto">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-3">
-          <FileText className="w-6 h-6 text-blue-600" />
-          Fee Statement Download
+    <Card className="w-full max-w-4xl mx-auto border-0 shadow-2xl bg-gradient-to-br from-white via-green-50 to-emerald-50">
+      <CardHeader className="bg-gradient-to-r from-green-600 via-green-500 to-emerald-600 text-white rounded-t-lg">
+        <CardTitle className="flex items-center gap-3 text-xl">
+          <div className="p-2 bg-white/20 rounded-lg">
+            <FileText className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <span className="font-bold">📊 Fee Statement Portal</span>
+            <div className="text-sm font-normal opacity-90 mt-1">Professional Academic Financial Report</div>
+          </div>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-6 p-6">
         {/* Student Information */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <User className="w-4 h-4 text-gray-600" />
-              <span className="font-medium">{studentName}</span>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-6 bg-gradient-to-r from-green-50 via-emerald-50 to-green-50 rounded-xl border-l-4 border-green-500 shadow-lg">
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-green-100 rounded-lg">
+                <User className="w-5 h-5 text-green-700" />
+              </div>
+              <div>
+                <span className="font-bold text-green-900 text-lg">{studentName}</span>
+                <div className="text-sm text-green-600 font-mono">{admissionNumber}</div>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <School className="w-4 h-4 text-gray-600" />
-              <span className="text-sm text-gray-600">{gradeName} - {className}</span>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-green-100 rounded-lg">
+                <School className="w-5 h-5 text-green-700" />
+              </div>
+              <div>
+                <span className="font-medium text-green-800">{gradeName}</span>
+                <span className="text-green-600 mx-2">•</span>
+                <span className="text-green-700">{className}</span>
+              </div>
             </div>
-            <div className="text-sm text-gray-500 font-mono">{admissionNumber}</div>
           </div>
-          <div className="space-y-2">
+          <div className="space-y-3">
             {parentName && (
-              <div className="flex items-center gap-2">
-                <User className="w-4 h-4 text-gray-600" />
-                <span className="text-sm text-gray-600">Parent: {parentName}</span>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-emerald-100 rounded-lg">
+                  <User className="w-5 h-5 text-emerald-700" />
+                </div>
+                <div>
+                  <div className="text-sm text-emerald-600 font-medium">Parent/Guardian</div>
+                  <span className="font-medium text-emerald-800">{parentName}</span>
+                </div>
               </div>
             )}
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-gray-600" />
-              <span className="text-sm text-gray-600">
-                {academicYears.find(y => y.id === selectedAcademicYear)?.name || 'Select Academic Year'}
-              </span>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-emerald-100 rounded-lg">
+                <Calendar className="w-5 h-5 text-emerald-700" />
+              </div>
+              <div>
+                <div className="text-sm text-emerald-600 font-medium">Academic Year</div>
+                <span className="font-medium text-emerald-800">
+                  {academicYears.find(y => y.id === selectedAcademicYear)?.name || 'Select Academic Year'}
+                </span>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Academic Year Selection */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-700">Select Academic Year</label>
+        <div className="space-y-3">
+          <label className="text-sm font-bold text-green-800 flex items-center gap-2">
+            <Calendar className="w-4 h-4" />
+            Select Academic Year
+          </label>
           <Select value={selectedAcademicYear} onValueChange={setSelectedAcademicYear} disabled={loadingYears}>
-            <SelectTrigger className="w-full">
+            <SelectTrigger className="w-full border-2 border-green-200 focus:border-green-500 bg-white hover:bg-green-50 transition-colors">
               <SelectValue placeholder="Select academic year" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="border-green-200">
               {academicYears.map((year) => (
-                <SelectItem key={year.id} value={year.id}>
+                <SelectItem key={year.id} value={year.id} className="hover:bg-green-50 focus:bg-green-100">
                   <div className="flex items-center gap-2">
                     <span>{year.name}</span>
                     {year.isCurrent && (
-                      <Badge variant="secondary" className="text-xs">Current</Badge>
+                      <Badge className="text-xs bg-green-500 text-white">Current</Badge>
                     )}
                   </div>
                 </SelectItem>
@@ -275,41 +374,56 @@ export function FeesStatementDownload({
         {/* Statement Summary */}
         {statementData && statementData.summary && (
           <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-              <Card className="bg-blue-50 border-blue-200">
-                <CardContent className="p-3 sm:p-4 min-h-[100px] flex flex-col justify-center">
-                  <div className="flex items-center gap-2 mb-2">
-                    <DollarSign className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 flex-shrink-0" />
-                    <span className="text-xs sm:text-sm font-medium text-blue-700 truncate">Total Charges</span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <Card className="bg-gradient-to-br from-emerald-50 to-green-100 border-2 border-emerald-200 shadow-lg hover:shadow-xl transition-all duration-300">
+                <CardContent className="p-4 min-h-[120px] flex flex-col justify-center">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 bg-emerald-500 text-white rounded-lg">
+                      <DollarSign className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <span className="text-sm font-bold text-emerald-800">Total Charges</span>
+                      <div className="text-xs text-emerald-600">School Fees Invoiced</div>
+                    </div>
                   </div>
-                  <div className="text-lg sm:text-xl font-bold text-blue-900 truncate">
+                  <div className="text-xl font-bold text-emerald-900">
                     {formatCurrency(statementData.summary?.totalDebit || 0)}
                   </div>
                 </CardContent>
               </Card>
               
-              <Card className="bg-green-50 border-green-200">
-                <CardContent className="p-3 sm:p-4 min-h-[100px] flex flex-col justify-center">
-                  <div className="flex items-center gap-2 mb-2">
-                    <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 flex-shrink-0" />
-                    <span className="text-xs sm:text-sm font-medium text-green-700 truncate">Total Payments</span>
+              <Card className="bg-gradient-to-br from-green-50 to-emerald-100 border-2 border-green-200 shadow-lg hover:shadow-xl transition-all duration-300">
+                <CardContent className="p-4 min-h-[120px] flex flex-col justify-center">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 bg-green-500 text-white rounded-lg">
+                      <CheckCircle className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <span className="text-sm font-bold text-green-800">Total Payments</span>
+                      <div className="text-xs text-green-600">Amount Received</div>
+                    </div>
                   </div>
-                  <div className="text-lg sm:text-xl font-bold text-green-900 truncate">
+                  <div className="text-xl font-bold text-green-900">
                     {formatCurrency(statementData.summary?.totalCredit || 0)}
                   </div>
                 </CardContent>
               </Card>
               
-              <Card className="bg-amber-50 border-amber-200 sm:col-span-2 lg:col-span-1">
-                <CardContent className="p-3 sm:p-4 min-h-[100px] flex flex-col justify-center">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600 flex-shrink-0" />
-                    <span className="text-xs sm:text-sm font-medium text-amber-700 truncate">Outstanding</span>
+              <Card className="bg-gradient-to-br from-amber-50 to-orange-100 border-2 border-amber-200 shadow-lg hover:shadow-xl transition-all duration-300 sm:col-span-2 lg:col-span-1">
+                <CardContent className="p-4 min-h-[120px] flex flex-col justify-center">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 bg-amber-500 text-white rounded-lg">
+                      <Clock className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <span className="text-sm font-bold text-amber-800">Outstanding Balance</span>
+                      <div className="text-xs text-amber-600">Amount Due</div>
+                    </div>
                   </div>
-                  <div className="text-lg sm:text-xl font-bold text-amber-900 truncate mb-2">
+                  <div className="text-xl font-bold text-amber-900 mb-2">
                     {formatCurrency(statementData.summary?.finalBalance || 0)}
                   </div>
-                  <Badge className={`text-xs ${getBalanceStatus(statementData.summary?.finalBalance || 0).color} max-w-fit`}>
+                  <Badge className={`text-xs font-bold px-3 py-1 ${getBalanceStatus(statementData.summary?.finalBalance || 0).color}`}>
                     {getBalanceStatus(statementData.summary?.finalBalance || 0).status}
                   </Badge>
                 </CardContent>
@@ -491,25 +605,62 @@ export function FeesStatementDownload({
           </div>
         )}
 
-        {/* Download Button */}
-        <div className="flex justify-center">
-          <Button
-            onClick={handleDownloadPDF}
-            disabled={loading || !statementData || !selectedAcademicYear}
-            className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-lg hover:shadow-xl transition-all duration-200 px-8 py-3 border-0"
-          >
-            {loading ? (
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                Generating PDF...
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
+        {/* Download Actions */}
+        <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-6 rounded-xl border-2 border-green-200">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-bold text-green-800 flex items-center gap-2">
                 <Download className="w-5 h-5" />
-                Download Fee Statement (PDF)
-              </div>
-            )}
-          </Button>
+                Download Fee Statement
+              </h3>
+              <p className="text-sm text-green-600">Choose your preferred format and size</p>
+            </div>
+          </div>
+          
+          <div className="flex flex-wrap gap-3 justify-center">
+            <Button
+              onClick={() => handleDownloadPDF('A3')}
+              disabled={loading || !statementData || !selectedAcademicYear}
+              className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 border-0"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              A3 PDF
+            </Button>
+            
+            <Button
+              onClick={() => handleDownloadPDF('A4')}
+              disabled={loading || !statementData || !selectedAcademicYear}
+              className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 border-0"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              A4 PDF
+            </Button>
+            
+            <Button
+              onClick={() => handleDownloadPDF('A5')}
+              disabled={loading || !statementData || !selectedAcademicYear}
+              className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 border-0"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              A5 PDF
+            </Button>
+            
+            <Button
+              onClick={handleDownloadTXT}
+              disabled={loading || !statementData || !selectedAcademicYear}
+              className="bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 border-0"
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              TXT File
+            </Button>
+          </div>
+          
+          {loading && (
+            <div className="flex items-center justify-center gap-2 mt-4 text-green-700">
+              <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin"></div>
+              Generating fee statement...
+            </div>
+          )}
         </div>
 
         {/* Info Note */}

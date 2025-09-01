@@ -10,6 +10,7 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     const decodedSchoolCode = decodeURIComponent(schoolCode);
     const { searchParams } = new URL(request.url);
     const academicYearId = searchParams.get('academicYearId');
+    const size = searchParams.get('size') || 'A4'; // Default to A4
 
     console.log('🔍 Direct download requested for fee statement:', {
       schoolCode: decodedSchoolCode,
@@ -51,7 +52,12 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
 
     // Generate PDF with Enhanced Theme
     console.log('📄 Starting enhanced PDF generation for direct download...');
-    const pdf = new jsPDF();
+    const format = (size as 'A3' | 'A4' | 'A5').toLowerCase() as any;
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: format
+    });
     
     // Enhanced Header with Green Theme
     pdf.setFontSize(22);
@@ -328,8 +334,8 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     console.log('📄 Generating PDF buffer for direct download...');
     const pdfBuffer = pdf.output('arraybuffer');
     
-    // Create filename
-    const filename = `Fee-Statement-${statementData.student.name?.replace(/[^a-zA-Z0-9]/g, '-') || 'Student'}-${statementData.academicYear?.replace(/[^a-zA-Z0-9]/g, '-') || 'Academic-Year'}.pdf`;
+    // Create filename with size
+    const filename = `Fee-Statement-${statementData.student.name?.replace(/[^a-zA-Z0-9]/g, '-') || 'Student'}-${statementData.academicYear?.replace(/[^a-zA-Z0-9]/g, '-') || 'Academic-Year'}-${size}.pdf`;
     console.log('✅ PDF generated successfully for direct download:', filename);
 
     // Return PDF as response
