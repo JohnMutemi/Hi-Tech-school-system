@@ -88,10 +88,28 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
         }
         
         .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #00b32a 0%, #007a20 100%);
             color: white;
             padding: 30px;
             text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M0,0 Q50,30 100,0 L100,100 L0,100 Z" fill="rgba(255,255,255,0.1)"/></svg>');
+            background-size: cover;
+        }
+        
+        .header-content {
+            position: relative;
+            z-index: 1;
         }
         
         .header h1 {
@@ -183,9 +201,20 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
             gap: 20px;
             margin-bottom: 30px;
             padding: 20px;
-            background: #f8f9ff;
-            border-radius: 10px;
-            border-left: 5px solid #667eea;
+            background: linear-gradient(135deg, #e8f8f5 0%, #d4edda 100%);
+            border-radius: 15px;
+            border-left: 5px solid #00b32a;
+            box-shadow: 0 4px 15px rgba(0, 179, 42, 0.1);
+            position: relative;
+        }
+        
+        .student-info::before {
+            content: '📊';
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            font-size: 24px;
+            opacity: 0.7;
         }
         
         .info-item {
@@ -214,12 +243,23 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
         }
         
         .statement-table th {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #00b32a 0%, #007a20 100%);
             color: white;
             padding: 15px 10px;
             text-align: left;
             font-weight: 600;
             font-size: 14px;
+            position: relative;
+        }
+        
+        .statement-table th::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: rgba(255,255,255,0.3);
         }
         
         .statement-table td {
@@ -253,16 +293,28 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
         
         .summary {
             margin-top: 30px;
-            padding: 20px;
-            background: linear-gradient(135deg, #f8f9ff 0%, #e8f2ff 100%);
-            border-radius: 10px;
-            border: 2px solid #667eea;
+            padding: 25px;
+            background: linear-gradient(135deg, #e8f8f5 0%, #d1f2eb 100%);
+            border-radius: 15px;
+            border: 2px solid #00b32a;
+            box-shadow: 0 8px 25px rgba(0, 179, 42, 0.15);
+            position: relative;
+        }
+        
+        .summary::before {
+            content: '💰';
+            position: absolute;
+            top: 20px;
+            right: 25px;
+            font-size: 28px;
+            opacity: 0.7;
         }
         
         .summary h3 {
-            color: #667eea;
+            color: #007a20;
             margin-bottom: 15px;
-            font-size: 1.3em;
+            font-size: 1.4em;
+            font-weight: 700;
         }
         
         .summary-item {
@@ -273,11 +325,14 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
         }
         
         .summary-item.total {
-            border-top: 2px solid #667eea;
+            border-top: 2px solid #00b32a;
             margin-top: 10px;
             padding-top: 15px;
             font-weight: 700;
             font-size: 18px;
+            background: rgba(0, 179, 42, 0.1);
+            border-radius: 8px;
+            padding: 15px 10px;
         }
         
         .footer {
@@ -343,8 +398,11 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
 <body>
     <div class="container">
         <div class="header">
-            <h1>${school.name}</h1>
-            <h2>Fee Statement</h2>
+            <div class="header-content">
+                <h1>🏫 ${school.name}</h1>
+                <h2>💳 Fee Statement Portal</h2>
+                <p style="margin-top: 10px; opacity: 0.9; font-size: 14px;">Professional Academic Financial Report</p>
+            </div>
         </div>
         
         <!-- Header with download button (like receipt view) -->
@@ -407,58 +465,88 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
                         // Handle special row types
                         if (item.type === 'term-header') {
                             return `
-                                <tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; font-weight: bold;">
-                                    <td colspan="7" style="text-align: center; padding: 15px; font-size: 16px;">
-                                        ${item.description || ''}
+                                <tr style="background: linear-gradient(135deg, #00b32a 0%, #007a20 100%); color: white; font-weight: bold; box-shadow: 0 2px 8px rgba(0, 179, 42, 0.3);">
+                                    <td colspan="7" style="text-align: center; padding: 18px; font-size: 18px; text-shadow: 0 1px 2px rgba(0,0,0,0.3); position: relative;">
+                                        🏫 ${item.description || ''}
                                     </td>
                                 </tr>
                             `;
                         } else if (item.type === 'term-closing') {
                             const termBalance = Number(item.termBalance) || 0;
-                            const balanceColor = termBalance > 0 ? '#fee2e2' : '#dcfce7';
-                            const textColor = termBalance > 0 ? '#dc2626' : '#16a34a';
+                            const isOverpaid = termBalance < 0;
+                            const isPaid = termBalance === 0;
+                            
+                            let balanceColor, textColor, statusIcon, statusText;
+                            if (isOverpaid) {
+                                balanceColor = '#d1f2eb';
+                                textColor = '#00b32a';
+                                statusIcon = '💚';
+                                statusText = 'OVERPAID';
+                            } else if (isPaid) {
+                                balanceColor = '#d4edda';
+                                textColor = '#155724';
+                                statusIcon = '✅';
+                                statusText = 'PAID';
+                            } else {
+                                balanceColor = '#fff3cd';
+                                textColor = '#856404';
+                                statusIcon = '⚠️';
+                                statusText = 'OUTSTANDING';
+                            }
+                            
                             return `
-                                <tr style="background: ${balanceColor}; border-left: 4px solid #f59e0b; font-weight: bold;">
-                                    <td style="text-align: center; color: #f59e0b; font-size: 18px;">★</td>
+                                <tr style="background: ${balanceColor}; border-left: 6px solid ${textColor}; font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                    <td style="text-align: center; color: ${textColor}; font-size: 20px;">${statusIcon}</td>
                                     <td></td>
                                     <td></td>
-                                    <td style="font-size: 16px; color: ${textColor};">${item.description || ''}</td>
-                                    <td class="amount" style="color: ${textColor};">${item.debit ? Number(item.debit).toLocaleString() : '-'}</td>
-                                    <td class="amount" style="color: ${textColor};">${item.credit ? Number(item.credit).toLocaleString() : '-'}</td>
-                                    <td class="amount" style="font-size: 16px; color: ${textColor};">${termBalance.toLocaleString()}</td>
+                                    <td style="font-size: 16px; color: ${textColor}; display: flex; align-items: center; gap: 8px;">
+                                        ${item.description || ''}
+                                        <span style="background: ${textColor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: bold;">${statusText}</span>
+                                    </td>
+                                    <td class="amount" style="color: ${textColor}; font-weight: bold;">${item.debit ? Number(item.debit).toLocaleString() : '-'}</td>
+                                    <td class="amount" style="color: ${textColor}; font-weight: bold;">${item.credit ? Number(item.credit).toLocaleString() : '-'}</td>
+                                    <td class="amount" style="font-size: 18px; color: ${textColor}; font-weight: bold;">${Math.abs(termBalance).toLocaleString()}</td>
                                 </tr>
                             `;
                                                  } else if (item.type === 'brought-forward') {
+                           const isOverpayment = item.isOverpayment;
+                           const bgColor = isOverpayment ? '#d1f2eb' : '#fff3cd';
+                           const textColor = isOverpayment ? '#00b32a' : '#856404';
+                           const borderColor = isOverpayment ? '#00b32a' : '#ffc107';
+                           const icon = isOverpayment ? '💚' : '📋';
+                           
                            return `
-                             <tr style="background: #fef2f2; border-left: 4px solid #dc2626; font-weight: bold;">
-                               <td style="color: #dc2626;">${item.no || ''}</td>
-                               <td style="color: #dc2626; font-family: monospace;">${item.ref || '-'}</td>
-                               <td style="color: #dc2626;">${item.date ? new Date(item.date).toLocaleDateString() : '-'}</td>
-                               <td style="color: #dc2626;">${item.description || '-'}</td>
-                               <td class="amount debit">${item.debit ? Number(item.debit).toLocaleString() : '-'}</td>
-                               <td class="amount credit">${item.credit ? Number(item.credit).toLocaleString() : '-'}</td>
-                               <td class="amount" style="color: #dc2626;">${item.balance ? Number(item.balance).toLocaleString() : '-'}</td>
+                             <tr style="background: ${bgColor}; border-left: 6px solid ${borderColor}; font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                               <td style="color: ${textColor}; text-align: center; font-size: 18px;">${icon}</td>
+                               <td style="color: ${textColor}; font-family: monospace; font-weight: bold;">${item.ref || '-'}</td>
+                               <td style="color: ${textColor}; font-weight: bold;">${item.date ? new Date(item.date).toLocaleDateString() : '-'}</td>
+                               <td style="color: ${textColor}; font-weight: bold;">${item.description || '-'}</td>
+                               <td class="amount" style="color: ${textColor}; font-weight: bold;">${item.debit ? Number(item.debit).toLocaleString() : '-'}</td>
+                               <td class="amount" style="color: ${textColor}; font-weight: bold;">${item.credit ? Number(item.credit).toLocaleString() : '-'}</td>
+                               <td class="amount" style="color: ${textColor}; font-weight: bold; font-size: 16px;">${item.balance ? Number(item.balance).toLocaleString() : '-'}</td>
                              </tr>
                            `;
                          } else if (item.type === 'carry-forward') {
                            const carryForwardAmount = Number(item.termBalance) || 0;
                            const isOverpayment = carryForwardAmount < 0;
-                           const bgColor = isOverpayment ? '#dcfce7' : '#fef3c7';
-                           const textColor = isOverpayment ? '#16a34a' : '#d97706';
-                           const statusText = isOverpayment ? 'OVERPAYMENT' : 'OUTSTANDING';
+                           const bgColor = isOverpayment ? '#d1f2eb' : '#fff3cd';
+                           const textColor = isOverpayment ? '#00b32a' : '#856404';
+                           const borderColor = '#00b32a';
+                           const statusText = isOverpayment ? 'CREDIT' : 'OUTSTANDING';
+                           const icon = isOverpayment ? '🔄💚' : '🔄⚠️';
                            
                            return `
-                             <tr style="background: ${bgColor}; border-left: 4px solid #3b82f6; font-weight: bold;">
-                               <td style="text-align: center; color: #3b82f6; font-size: 18px;">→</td>
-                               <td style="color: #3b82f6; font-family: monospace;">${item.ref || '-'}</td>
-                               <td style="color: #3b82f6;">${item.date ? new Date(item.date).toLocaleDateString() : '-'}</td>
-                               <td style="color: #3b82f6;">
+                             <tr style="background: ${bgColor}; border-left: 6px solid ${borderColor}; font-weight: bold; box-shadow: 0 2px 8px rgba(0,179,42,0.2);">
+                               <td style="text-align: center; color: ${borderColor}; font-size: 16px;">${icon}</td>
+                               <td style="color: ${borderColor}; font-family: monospace; font-weight: bold;">${item.ref || '-'}</td>
+                               <td style="color: ${borderColor}; font-weight: bold;">${item.date ? new Date(item.date).toLocaleDateString() : '-'}</td>
+                               <td style="color: ${borderColor}; font-weight: bold; display: flex; align-items: center; gap: 8px;">
                                  ${item.description || '-'}
-                                 <span style="background: ${isOverpayment ? '#16a34a' : '#d97706'}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 8px;">${statusText}</span>
+                                 <span style="background: ${isOverpayment ? '#00b32a' : '#ffc107'}; color: white; padding: 3px 8px; border-radius: 12px; font-size: 10px; font-weight: bold;">${statusText}</span>
                                </td>
-                               <td class="amount" style="color: #3b82f6;">${item.debit ? Number(item.debit).toLocaleString() : '-'}</td>
-                               <td class="amount" style="color: #3b82f6;">${item.credit ? Number(item.credit).toLocaleString() : '-'}</td>
-                               <td class="amount" style="color: ${textColor}; font-weight: bold;">${carryForwardAmount.toLocaleString()}</td>
+                               <td class="amount" style="color: ${borderColor}; font-weight: bold;">${item.debit ? Number(item.debit).toLocaleString() : '-'}</td>
+                               <td class="amount" style="color: ${borderColor}; font-weight: bold;">${item.credit ? Number(item.credit).toLocaleString() : '-'}</td>
+                               <td class="amount" style="color: ${textColor}; font-weight: bold; font-size: 16px;">${Math.abs(carryForwardAmount).toLocaleString()}</td>
                              </tr>
                            `;
                         } else {

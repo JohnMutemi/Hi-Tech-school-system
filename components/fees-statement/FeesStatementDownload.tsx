@@ -325,15 +325,15 @@ export function FeesStatementDownload({
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs sm:text-sm">
                     <thead>
-                      <tr className="bg-blue-50 border-b-2 border-blue-200">
-                        <th className="py-2 sm:py-3 px-1 sm:px-2 text-left font-semibold text-blue-800 min-w-[30px]">No.</th>
-                        <th className="py-2 sm:py-3 px-1 sm:px-2 text-left font-semibold text-blue-800 min-w-[50px] hidden sm:table-cell">Ref</th>
-                        <th className="py-2 sm:py-3 px-1 sm:px-2 text-left font-semibold text-blue-800 min-w-[60px]">Date</th>
-                        <th className="py-2 sm:py-3 px-1 sm:px-2 text-left font-semibold text-blue-800 min-w-[100px]">Description</th>
-                        <th className="py-2 sm:py-3 px-1 sm:px-2 text-right font-semibold text-blue-800 min-w-[60px]">Debit</th>
-                        <th className="py-2 sm:py-3 px-1 sm:px-2 text-right font-semibold text-blue-800 min-w-[60px]">Credit</th>
-                        <th className="py-2 sm:py-3 px-1 sm:px-2 text-right font-semibold text-blue-800 min-w-[60px] hidden lg:table-cell">T.Bal.</th>
-                        <th className="py-2 sm:py-3 px-1 sm:px-2 text-right font-semibold text-blue-800 min-w-[60px]">Balance</th>
+                      <tr className="bg-gradient-to-r from-green-500 to-green-600 border-b-2 border-green-300">
+                        <th className="py-3 sm:py-4 px-1 sm:px-2 text-left font-bold text-white min-w-[30px]">No.</th>
+                        <th className="py-3 sm:py-4 px-1 sm:px-2 text-left font-bold text-white min-w-[50px] hidden sm:table-cell">Ref</th>
+                        <th className="py-3 sm:py-4 px-1 sm:px-2 text-left font-bold text-white min-w-[60px]">Date</th>
+                        <th className="py-3 sm:py-4 px-1 sm:px-2 text-left font-bold text-white min-w-[100px]">Description</th>
+                        <th className="py-3 sm:py-4 px-1 sm:px-2 text-right font-bold text-white min-w-[60px]">Debit</th>
+                        <th className="py-3 sm:py-4 px-1 sm:px-2 text-right font-bold text-white min-w-[60px]">Credit</th>
+                        <th className="py-3 sm:py-4 px-1 sm:px-2 text-right font-bold text-white min-w-[60px] hidden lg:table-cell">T.Bal.</th>
+                        <th className="py-3 sm:py-4 px-1 sm:px-2 text-right font-bold text-white min-w-[60px]">Balance</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -343,26 +343,44 @@ export function FeesStatementDownload({
                             // Handle special row types with different styling
                             if (item.type === 'term-header') {
                               return (
-                                <tr key={index} className="bg-blue-100 border-b border-blue-200">
-                                  <td colSpan={8} className="py-3 px-2 text-center font-bold text-blue-800">
-                                    {item.description}
+                                <tr key={index} className="bg-gradient-to-r from-green-500 to-green-600 border-b border-green-300 text-white shadow-md">
+                                  <td colSpan={8} className="py-4 px-2 text-center font-bold text-lg">
+                                    🏫 {item.description}
                                   </td>
                                 </tr>
                               );
                             } else if (item.type === 'term-closing') {
                               const termBalance = Number(item.termBalance) || 0;
-                              const balanceColor = termBalance > 0 ? 'text-red-800 bg-red-100 border-red-300' : 'text-green-800 bg-green-100 border-green-300';
-                              const balanceStatus = termBalance > 0 ? 'OUTSTANDING' : 'PAID';
+                              const isOverpaid = termBalance < 0;
+                              const isPaid = termBalance === 0;
+                              
+                              let balanceColor, statusIcon, statusText, statusBadgeColor;
+                              if (isOverpaid) {
+                                balanceColor = 'text-green-800 bg-green-100 border-green-300';
+                                statusIcon = '💚';
+                                statusText = 'OVERPAID';
+                                statusBadgeColor = 'bg-green-500 text-white';
+                              } else if (isPaid) {
+                                balanceColor = 'text-green-800 bg-green-50 border-green-300';
+                                statusIcon = '✅';
+                                statusText = 'PAID';
+                                statusBadgeColor = 'bg-green-600 text-white';
+                              } else {
+                                balanceColor = 'text-yellow-800 bg-yellow-100 border-yellow-300';
+                                statusIcon = '⚠️';
+                                statusText = 'OUTSTANDING';
+                                statusBadgeColor = 'bg-yellow-500 text-white';
+                              }
                               
                               return (
-                                <tr key={index} className={`${balanceColor} border-b-2 border-l-4 border-l-amber-500 font-bold`}>
-                                  <td className="py-3 px-2 text-center font-bold">★</td>
+                                <tr key={index} className={`${balanceColor} border-b-2 border-l-6 border-l-green-500 font-bold shadow-sm`}>
+                                  <td className="py-3 px-2 text-center font-bold text-xl">{statusIcon}</td>
+                                  <td className="py-3 px-2 hidden sm:table-cell"></td>
                                   <td className="py-3 px-2"></td>
-                                  <td className="py-3 px-2"></td>
-                                  <td className="py-3 px-2 font-bold text-lg flex items-center gap-2">
+                                  <td className="py-3 px-2 font-bold text-base flex items-center gap-2">
                                     {item.description}
-                                    <Badge className={`text-xs ${termBalance > 0 ? 'bg-red-200 text-red-800 border-red-300' : 'bg-green-200 text-green-800 border-green-300'}`}>
-                                      {balanceStatus}
+                                    <Badge className={`text-xs font-bold px-2 py-1 ${statusBadgeColor}`}>
+                                      {statusText}
                                     </Badge>
                                   </td>
                                   <td className="py-3 px-2 text-right font-bold">
@@ -371,8 +389,8 @@ export function FeesStatementDownload({
                                   <td className="py-3 px-2 text-right font-bold">
                                     {item.credit ? formatCurrency(Number(item.credit)) : '-'}
                                   </td>
-                                  <td className="py-3 px-2 text-right font-bold text-lg">
-                                    {formatCurrency(termBalance)}
+                                  <td className="py-3 px-2 text-right font-bold text-lg hidden lg:table-cell">
+                                    {formatCurrency(Math.abs(termBalance))}
                                   </td>
                                   <td className="py-3 px-2 text-right font-bold text-lg">
                                     {formatCurrency(Number(item.academicYearBalance) || 0)}
@@ -380,18 +398,23 @@ export function FeesStatementDownload({
                                 </tr>
                               );
                             } else if (item.type === 'brought-forward') {
+                              const isOverpayment = (item as any).isOverpayment;
+                              const bgColor = isOverpayment ? 'bg-green-100 border-green-200' : 'bg-yellow-100 border-yellow-200';
+                              const textColor = isOverpayment ? 'text-green-800' : 'text-yellow-800';
+                              const icon = isOverpayment ? '💚' : '📋';
+                              
                               return (
-                                <tr key={index} className="bg-red-100 border-b border-red-200">
-                                  <td className="py-2 px-2 font-bold text-red-800">{item.no || ''}</td>
-                                  <td className="py-2 px-2 font-mono text-xs font-bold text-red-800">{item.ref || '-'}</td>
-                                  <td className="py-2 px-2 font-bold text-red-800">{item.date ? new Date(item.date).toLocaleDateString() : '-'}</td>
-                                  <td className="py-2 px-2 font-bold text-red-800">{item.description || '-'}</td>
-                                  <td className="py-2 px-2 text-right font-bold text-red-800">{item.debit ? formatCurrency(Number(item.debit)) : '-'}</td>
-                                  <td className="py-2 px-2 text-right font-bold text-red-800">{item.credit ? formatCurrency(Number(item.credit)) : '-'}</td>
-                                  <td className="py-2 px-2 text-right font-bold text-red-800">
+                                <tr key={index} className={`${bgColor} border-b border-l-6 border-l-green-500 font-bold shadow-sm`}>
+                                  <td className="py-3 px-2 text-center font-bold text-lg">{icon}</td>
+                                  <td className="py-3 px-2 font-mono text-xs font-bold hidden sm:table-cell">{item.ref || '-'}</td>
+                                  <td className="py-3 px-2 font-bold">{item.date ? new Date(item.date).toLocaleDateString() : '-'}</td>
+                                  <td className="py-3 px-2 font-bold">{item.description || '-'}</td>
+                                  <td className="py-3 px-2 text-right font-bold">{item.debit ? formatCurrency(Number(item.debit)) : '-'}</td>
+                                  <td className="py-3 px-2 text-right font-bold">{item.credit ? formatCurrency(Number(item.credit)) : '-'}</td>
+                                  <td className="py-3 px-2 text-right font-bold hidden lg:table-cell">
                                     {item.termBalance ? formatCurrency(Number(item.termBalance)) : '-'}
                                   </td>
-                                  <td className="py-2 px-2 text-right font-bold text-red-800">
+                                  <td className="py-3 px-2 text-right font-bold">
                                     {item.academicYearBalance ? formatCurrency(Number(item.academicYearBalance)) : '-'}
                                   </td>
                                 </tr>
@@ -399,27 +422,29 @@ export function FeesStatementDownload({
                             } else if (item.type === 'carry-forward') {
                               const carryForwardAmount = Number(item.termBalance) || 0;
                               const isOverpayment = carryForwardAmount < 0;
-                              const bgColor = isOverpayment ? 'bg-green-100 border-green-200' : 'bg-orange-100 border-orange-200';
-                              const textColor = isOverpayment ? 'text-green-800' : 'text-orange-800';
-                              const statusText = isOverpayment ? 'OVERPAYMENT' : 'OUTSTANDING';
+                              const bgColor = isOverpayment ? 'bg-green-100 border-green-200' : 'bg-yellow-100 border-yellow-200';
+                              const borderColor = 'border-l-green-500';
+                              const statusText = isOverpayment ? 'CREDIT' : 'OUTSTANDING';
+                              const icon = isOverpayment ? '🔄💚' : '🔄⚠️';
+                              const statusBadgeColor = isOverpayment ? 'bg-green-500 text-white' : 'bg-yellow-500 text-white';
                               
                               return (
-                                <tr key={index} className={`${bgColor} border-b-2 border-l-4 border-l-blue-500 font-bold`}>
-                                  <td className="py-2 px-2 text-center font-bold text-blue-600">→</td>
-                                  <td className="py-2 px-2 font-mono text-xs font-bold text-blue-600">{item.ref || '-'}</td>
-                                  <td className="py-2 px-2 font-bold text-blue-600">{item.date ? new Date(item.date).toLocaleDateString() : '-'}</td>
-                                  <td className="py-2 px-2 font-bold text-blue-600 flex items-center gap-2">
+                                <tr key={index} className={`${bgColor} border-b-2 border-l-6 ${borderColor} font-bold shadow-sm`}>
+                                  <td className="py-3 px-2 text-center font-bold text-green-600 text-base">{icon}</td>
+                                  <td className="py-3 px-2 font-mono text-xs font-bold text-green-600 hidden sm:table-cell">{item.ref || '-'}</td>
+                                  <td className="py-3 px-2 font-bold text-green-600">{item.date ? new Date(item.date).toLocaleDateString() : '-'}</td>
+                                  <td className="py-3 px-2 font-bold text-green-600 flex items-center gap-2">
                                     {item.description || '-'}
-                                    <Badge className={`text-xs ${isOverpayment ? 'bg-green-200 text-green-800 border-green-300' : 'bg-orange-200 text-orange-800 border-orange-300'}`}>
+                                    <Badge className={`text-xs font-bold px-2 py-1 ${statusBadgeColor}`}>
                                       {statusText}
                                     </Badge>
                                   </td>
-                                  <td className="py-2 px-2 text-right font-bold text-blue-600">{item.debit ? formatCurrency(Number(item.debit)) : '-'}</td>
-                                  <td className="py-2 px-2 text-right font-bold text-blue-600">{item.credit ? formatCurrency(Number(item.credit)) : '-'}</td>
-                                  <td className="py-2 px-2 text-right font-bold text-blue-600">
-                                    {formatCurrency(carryForwardAmount)}
+                                  <td className="py-3 px-2 text-right font-bold text-green-600">{item.debit ? formatCurrency(Number(item.debit)) : '-'}</td>
+                                  <td className="py-3 px-2 text-right font-bold text-green-600">{item.credit ? formatCurrency(Number(item.credit)) : '-'}</td>
+                                  <td className="py-3 px-2 text-right font-bold text-green-600 hidden lg:table-cell">
+                                    {formatCurrency(Math.abs(carryForwardAmount))}
                                   </td>
-                                  <td className="py-2 px-2 text-right font-bold text-blue-600">
+                                  <td className="py-3 px-2 text-right font-bold text-green-600">
                                     {item.academicYearBalance ? formatCurrency(Number(item.academicYearBalance)) : '-'}
                                   </td>
                                 </tr>
@@ -471,7 +496,7 @@ export function FeesStatementDownload({
           <Button
             onClick={handleDownloadPDF}
             disabled={loading || !statementData || !selectedAcademicYear}
-            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 px-8 py-3"
+            className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-lg hover:shadow-xl transition-all duration-200 px-8 py-3 border-0"
           >
             {loading ? (
               <div className="flex items-center gap-2">
@@ -488,14 +513,14 @@ export function FeesStatementDownload({
         </div>
 
         {/* Info Note */}
-        <div className="text-center text-sm text-gray-600 bg-blue-50 p-4 rounded-lg">
+        <div className="text-center text-sm text-gray-600 bg-green-50 p-4 rounded-lg border border-green-200">
           <div className="flex items-center justify-center gap-2 mb-2">
-            <AlertCircle className="w-4 h-4 text-blue-600" />
-            <span className="font-medium text-blue-800">Important Information</span>
+            <AlertCircle className="w-4 h-4 text-green-600" />
+            <span className="font-medium text-green-800">Enhanced Fee Statement</span>
           </div>
-          <p>
-            This fee statement includes all charges and payments for the selected academic year. 
-            The PDF will contain a complete breakdown of all transactions and current balance.
+          <p className="text-green-700">
+            🎯 This statement includes advanced overpayment tracking and carry-forward balances. 
+            📊 Enhanced visual indicators show payment status and term-specific balance management.
           </p>
         </div>
       </CardContent>
