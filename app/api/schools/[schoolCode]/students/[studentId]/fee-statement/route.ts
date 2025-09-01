@@ -257,7 +257,7 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       termGroups.get(termKey).transactions.push(txn);
     });
 
-    // Enhanced balance tracking with improved overpayment and carry-forward logic
+    // Process transactions with improved balance tracking and carry-forward logic
     let academicYearRunningBalance = arrearsBroughtForward;
     let carryForwardToNextTerm = 0; // Track overpayments/outstanding to carry forward
     const allRows: any[] = [];
@@ -265,20 +265,18 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
 
     // Add arrears brought forward if any
     if (arrearsBroughtForward !== 0) {
-      const isOverpayment = arrearsBroughtForward < 0;
       allRows.push({
         no: rowNumber++,
         ref: 'B/F',
-        description: isOverpayment ? 'OVERPAYMENT BROUGHT FORWARD (CREDIT BALANCE)' : 'BALANCE BROUGHT FORWARD',
+        description: 'BALANCE BROUGHT FORWARD',
         debit: arrearsBroughtForward > 0 ? arrearsBroughtForward : 0,
         credit: arrearsBroughtForward < 0 ? Math.abs(arrearsBroughtForward) : 0,
         date: new Date(new Date().getFullYear(), 0, 1), // Start of academic year
         type: 'brought-forward',
         academicYearBalance: arrearsBroughtForward,
-        termBalance: arrearsBroughtForward,
+        termBalance: 0,
         termName: 'Previous Terms',
-        academicYearName: 'Brought Forward',
-        isOverpayment: isOverpayment
+        academicYearName: 'Brought Forward'
       });
     }
 
@@ -293,27 +291,19 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       return (termOrder[a.termName || ''] || 0) - (termOrder[b.termName || ''] || 0);
     });
 
-    // Process each term group with enhanced carry-forward logic
+    // Process each term group with carry-forward logic
     sortedTermGroups.forEach((termGroup, index) => {
       let termRunningBalance = 0;
       
-      // Apply carry-forward from previous term with enhanced logic
+      // Apply carry-forward from previous term
       if (carryForwardToNextTerm !== 0) {
         const isOverpayment = carryForwardToNextTerm < 0;
-        const carryForwardAmount = Math.abs(carryForwardToNextTerm);
-        
-        // Determine description based on payment status with clearer messaging
-        let carryForwardDescription, statusIcon;
-        if (isOverpayment) {
-          carryForwardDescription = `→ OVERPAYMENT CREDIT FROM PREVIOUS TERM (KES ${carryForwardAmount.toLocaleString()})`;
-          statusIcon = '💚';
-        } else {
-          carryForwardDescription = `→ OUTSTANDING BALANCE CARRIED FORWARD (KES ${carryForwardAmount.toLocaleString()})`;
-          statusIcon = '⚠️';
-        }
+        const carryForwardDescription = isOverpayment 
+          ? `OVERPAYMENT FROM PREVIOUS TERM (REDUCES CURRENT TERM CHARGES)`
+          : `OUTSTANDING BALANCE CARRIED FORWARD FROM PREVIOUS TERM`;
         
         allRows.push({
-          no: statusIcon,
+          no: rowNumber++,
           ref: 'C/F',
           description: carryForwardDescription,
           debit: carryForwardToNextTerm > 0 ? carryForwardToNextTerm : 0,
@@ -325,15 +315,11 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
           academicYearId: termGroup.academicYearId,
           academicYearName: termGroup.academicYearName,
           academicYearBalance: academicYearRunningBalance,
-          termBalance: carryForwardToNextTerm,
-          isOverpayment: isOverpayment,
-          carryForwardAmount: carryForwardAmount,
-          previousTermBalance: carryForwardToNextTerm // Track the carry-forward amount clearly
+          termBalance: carryForwardToNextTerm
         });
         
-        // Apply carry-forward to running balances
+        // Apply carry-forward to term balance
         termRunningBalance = carryForwardToNextTerm;
-        academicYearRunningBalance += carryForwardToNextTerm;
       }
       
       // Add term header
@@ -383,36 +369,15 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
 
       // Add term closing balance if there were transactions
       if (termGroup.transactions.length > 0 && termGroup.termName && termGroup.termName !== 'no-term') {
-        const isTermOverpaid = termRunningBalance < 0;
-        const termBalanceAmount = Math.abs(termRunningBalance);
-        const willCarryForward = index < sortedTermGroups.length - 1; // Check if there's a next term
-        
-        let termDescription, statusIcon;
-        if (isTermOverpaid) {
-          if (willCarryForward) {
-            termDescription = `TERM ${termGroup.termName.toUpperCase()} - OVERPAID (KES ${termBalanceAmount.toLocaleString()} CREDIT TO NEXT TERM)`;
-          } else {
-            termDescription = `TERM ${termGroup.termName.toUpperCase()} - OVERPAID (KES ${termBalanceAmount.toLocaleString()} CREDIT BALANCE)`;
-          }
-          statusIcon = '✅💚';
-        } else if (termRunningBalance === 0) {
-          termDescription = `TERM ${termGroup.termName.toUpperCase()} - FULLY PAID`;
-          statusIcon = '✅';
-        } else {
-          if (willCarryForward) {
-            termDescription = `TERM ${termGroup.termName.toUpperCase()} - OUTSTANDING (KES ${termBalanceAmount.toLocaleString()} TO NEXT TERM)`;
-          } else {
-            termDescription = `TERM ${termGroup.termName.toUpperCase()} - OUTSTANDING BALANCE`;
-          }
-          statusIcon = '⚠️';
-        }
+        // For term closing, show the effective balance (0 if overpaid, actual balance if outstanding)
+        const effectiveTermBalance = termRunningBalance > 0 ? termRunningBalance : 0;
         
         allRows.push({
-          no: statusIcon,
-          ref: termRunningBalance === 0 ? 'PAID' : (isTermOverpaid ? 'OVERPAID' : 'DUE'),
-          description: termDescription,
-          debit: termRunningBalance > 0 ? termRunningBalance : 0,
-          credit: termRunningBalance < 0 ? Math.abs(termRunningBalance) : 0,
+          no: '',
+          ref: '',
+          description: `TERM ${termGroup.termName.toUpperCase()} BALANCE`,
+          debit: effectiveTermBalance > 0 ? effectiveTermBalance : 0,
+          credit: effectiveTermBalance < 0 ? Math.abs(effectiveTermBalance) : 0,
           date: termGroup.transactions[termGroup.transactions.length - 1]?.date,
           type: 'term-closing',
           termId: termGroup.termId,
@@ -420,13 +385,8 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
           academicYearId: termGroup.academicYearId,
           academicYearName: termGroup.academicYearName,
           academicYearBalance: academicYearRunningBalance,
-          termBalance: termRunningBalance,
-          isClosingBalance: true,
-          isTermOverpaid: isTermOverpaid,
-          termBalanceAmount: termBalanceAmount,
-          paymentStatus: isTermOverpaid ? 'OVERPAID' : (termRunningBalance === 0 ? 'PAID' : 'OUTSTANDING'),
-          willCarryForward: willCarryForward,
-          carryForwardInfo: willCarryForward ? `KES ${termBalanceAmount.toLocaleString()} ${isTermOverpaid ? 'credit' : 'balance'} will be carried to next term` : null
+          termBalance: effectiveTermBalance,
+          isClosingBalance: true
         });
       }
 
