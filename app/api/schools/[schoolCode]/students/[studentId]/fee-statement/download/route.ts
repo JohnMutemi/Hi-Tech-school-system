@@ -49,17 +49,26 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     const { jsPDF } = await import('jspdf');
     const autoTable = (await import('jspdf-autotable')).default;
 
-    // Generate PDF
-    console.log('📄 Starting PDF generation for direct download...');
+    // Generate PDF with Enhanced Theme
+    console.log('📄 Starting enhanced PDF generation for direct download...');
     const pdf = new jsPDF();
     
-    // Header
-    pdf.setFontSize(20);
+    // Enhanced Header with Green Theme
+    pdf.setFontSize(22);
     pdf.setFont('helvetica', 'bold');
-    pdf.text(school.name, 105, 20, { align: 'center' });
+    pdf.setTextColor(0, 100, 0); // Dark green
+    pdf.text(`🏫 ${school.name}`, 105, 20, { align: 'center' });
     
-    pdf.setFontSize(16);
-    pdf.text('FEE STATEMENT', 105, 30, { align: 'center' });
+    pdf.setFontSize(18);
+    pdf.setTextColor(0, 150, 0); // Medium green
+    pdf.text('💳 ENHANCED FEE STATEMENT', 105, 32, { align: 'center' });
+    
+    pdf.setFontSize(10);
+    pdf.setTextColor(80, 80, 80); // Gray
+    pdf.text('Professional Academic Financial Report with Overpayment Tracking', 105, 40, { align: 'center' });
+    
+    // Reset color for rest of content
+    pdf.setTextColor(0, 0, 0);
     
     // Student Information
     pdf.setFontSize(12);
@@ -74,42 +83,105 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       [`Parent/Guardian:`, statementData.student.parentName || 'N/A'],
     ];
 
-    let yPosition = 45;
+    let yPosition = 50;
+    
+    // Student info section header
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(12);
+    pdf.setTextColor(0, 120, 0);
+    pdf.text('📊 STUDENT INFORMATION', 20, yPosition);
+    yPosition += 10;
+    
+    // Draw a subtle border around student info
+    pdf.setDrawColor(0, 179, 42);
+    pdf.setLineWidth(0.5);
+    pdf.rect(15, yPosition - 5, 180, (studentInfo.length * 7) + 10);
+    
+    // Reset colors
+    pdf.setTextColor(0, 0, 0);
+    pdf.setFontSize(11);
+    
     studentInfo.forEach(([label, value]) => {
       pdf.setFont('helvetica', 'bold');
       pdf.text(label, 20, yPosition);
       pdf.setFont('helvetica', 'normal');
-      pdf.text(value, 80, yPosition);
+      pdf.text(value, 85, yPosition);
       yPosition += 7;
     });
+    
+    yPosition += 5;
 
     // Fee Statement Table with improved layout
     yPosition += 10;
     
-    const tableColumns = ['No.', 'Ref', 'Date', 'Description', 'Debit (KES)', 'Credit (KES)', 'Balance (KES)'];
+    const tableColumns = ['No.', 'Ref', 'Date', 'Description', 'Debit (KES)', 'Credit (KES)', 'Term Bal. (KES)', 'Year Bal. (KES)'];
     const tableRows = (statementData.statement || []).map((item: any, index: number) => {
-      // Handle special row types
+      // Enhanced styling for special rows with overpayment tracking
       if (item.type === 'term-header') {
         return [
           '',
           '',
           '',
-          item.description || '',
+          `🏫 ${item.description || ''}`,
+          '',
           '',
           '',
           ''
         ];
       } else if (item.type === 'term-closing') {
+        const termBalance = Number(item.termBalance || 0);
+        const isOverpaid = termBalance < 0;
+        const isPaid = termBalance === 0;
+        
+        let statusIcon;
+        if (isOverpaid) {
+          statusIcon = '💚';
+        } else if (isPaid) {
+          statusIcon = '✅';
+        } else {
+          statusIcon = '⚠️';
+        }
+        
         return [
-          '★',
+          statusIcon,
           '',
           '',
           item.description || '',
           item.debit ? Number(item.debit).toLocaleString() : '-',
           item.credit ? Number(item.credit).toLocaleString() : '-',
-          Number(item.termBalance || 0).toLocaleString()
+          Math.abs(termBalance).toLocaleString(),
+          Number(item.academicYearBalance || 0).toLocaleString()
+        ];
+      } else if (item.type === 'carry-forward') {
+        const carryForwardAmount = Number(item.termBalance || 0);
+        const isOverpayment = carryForwardAmount < 0;
+        const icon = isOverpayment ? '🔄💚' : '🔄⚠️';
+        
+        return [
+          icon,
+          item.ref || '-',
+          item.date ? new Date(item.date).toLocaleDateString() : '-',
+          item.description || '-',
+          item.debit ? Number(item.debit).toLocaleString() : '-',
+          item.credit ? Number(item.credit).toLocaleString() : '-',
+          Math.abs(carryForwardAmount).toLocaleString(),
+          Number(item.academicYearBalance || 0).toLocaleString()
         ];
       } else if (item.type === 'brought-forward') {
+        const isOverpayment = item.isOverpayment;
+        const icon = isOverpayment ? '💚' : '📋';
+        
+        return [
+          icon,
+          item.ref || '-',
+          item.date ? new Date(item.date).toLocaleDateString() : '-',
+          item.description || '-',
+          item.debit ? Number(item.debit).toLocaleString() : '-',
+          item.credit ? Number(item.credit).toLocaleString() : '-',
+          item.termBalance ? Number(item.termBalance).toLocaleString() : '-',
+          item.academicYearBalance ? Number(item.academicYearBalance).toLocaleString() : '-'
+        ];
+      } else {
         return [
           (item.no || '').toString(),
           item.ref || '-',
@@ -117,27 +189,8 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
           item.description || '-',
           item.debit ? Number(item.debit).toLocaleString() : '-',
           item.credit ? Number(item.credit).toLocaleString() : '-',
-          item.balance ? Number(item.balance).toLocaleString() : '-'
-        ];
-      } else if (item.type === 'carry-forward') {
-        return [
-          '→',
-          item.ref || '-',
-          item.date ? new Date(item.date).toLocaleDateString() : '-',
-          item.description || '-',
-          item.debit ? Number(item.debit).toLocaleString() : '-',
-          item.credit ? Number(item.credit).toLocaleString() : '-',
-          Number(item.termBalance || 0).toLocaleString()
-        ];
-      } else {
-        return [
-          (item.no || index + 1).toString(),
-          item.ref || '-',
-          item.date ? new Date(item.date).toLocaleDateString() : '-',
-          item.description || '-',
-          item.debit ? Number(item.debit).toLocaleString() : '-',
-          item.credit ? Number(item.credit).toLocaleString() : '-',
-          item.balance ? Number(item.balance).toLocaleString() : '-'
+          item.termBalance ? Number(item.termBalance).toLocaleString() : '-',
+          item.academicYearBalance ? Number(item.academicYearBalance).toLocaleString() : '-'
         ];
       }
     });
@@ -148,7 +201,7 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       startY: yPosition,
       theme: 'striped',
       headStyles: {
-        fillColor: [41, 128, 185],
+        fillColor: [0, 179, 42], // Safaricom green
         textColor: 255,
         fontStyle: 'bold'
       },
@@ -160,10 +213,64 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
         0: { halign: 'center', cellWidth: 12 }, // No.
         1: { halign: 'center', cellWidth: 20 }, // Ref
         2: { halign: 'center', cellWidth: 20 }, // Date
-        3: { halign: 'left', cellWidth: 50 }, // Description
-        4: { halign: 'right', cellWidth: 25 }, // Debit
-        5: { halign: 'right', cellWidth: 25 }, // Credit
-        6: { halign: 'right', cellWidth: 25 } // Balance
+        3: { halign: 'left', cellWidth: 40 }, // Description
+        4: { halign: 'right', cellWidth: 22 }, // Debit
+        5: { halign: 'right', cellWidth: 22 }, // Credit
+        6: { halign: 'right', cellWidth: 22 }, // Term Balance
+        7: { halign: 'right', cellWidth: 22 } // Academic Year Balance
+      },
+      didParseCell: function(data: any) {
+        // Enhanced styling for special rows with green theme
+        const rowIndex = data.row.index;
+        const originalData = statementData.statement[rowIndex];
+        
+        if (originalData?.type === 'term-header') {
+          // Term header - green gradient
+          data.cell.styles.fillColor = [0, 179, 42]; // Safaricom green
+          data.cell.styles.textColor = [255, 255, 255]; // White text
+          data.cell.styles.fontStyle = 'bold';
+        } else if (originalData?.type === 'term-closing') {
+          // Term closing balance - status-based colors
+          const termBalance = Number(originalData.termBalance || 0);
+          const isOverpaid = termBalance < 0;
+          const isPaid = termBalance === 0;
+          
+          if (isOverpaid) {
+            data.cell.styles.fillColor = [209, 242, 235]; // Light green
+            data.cell.styles.textColor = [0, 100, 0]; // Dark green
+          } else if (isPaid) {
+            data.cell.styles.fillColor = [212, 237, 218]; // Light green
+            data.cell.styles.textColor = [21, 87, 36]; // Dark green
+          } else {
+            data.cell.styles.fillColor = [255, 243, 205]; // Light yellow
+            data.cell.styles.textColor = [133, 100, 4]; // Dark yellow
+          }
+          data.cell.styles.fontStyle = 'bold';
+        } else if (originalData?.type === 'brought-forward') {
+          // Brought forward row - status-based colors
+          const isOverpayment = originalData.isOverpayment;
+          if (isOverpayment) {
+            data.cell.styles.fillColor = [209, 242, 235]; // Light green
+            data.cell.styles.textColor = [0, 120, 0]; // Dark green
+          } else {
+            data.cell.styles.fillColor = [255, 243, 205]; // Light yellow
+            data.cell.styles.textColor = [133, 100, 4]; // Dark yellow
+          }
+          data.cell.styles.fontStyle = 'bold';
+        } else if (originalData?.type === 'carry-forward') {
+          // Carry forward row - green theme with status indicators
+          const carryForwardAmount = Number(originalData.termBalance || 0);
+          const isOverpayment = carryForwardAmount < 0;
+          
+          if (isOverpayment) {
+            data.cell.styles.fillColor = [209, 242, 235]; // Light green
+            data.cell.styles.textColor = [0, 120, 0]; // Dark green
+          } else {
+            data.cell.styles.fillColor = [255, 243, 205]; // Light yellow
+            data.cell.styles.textColor = [133, 100, 4]; // Dark yellow
+          }
+          data.cell.styles.fontStyle = 'bold';
+        }
       }
     });
 
@@ -179,7 +286,9 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(14);
-    pdf.text('FINANCIAL SUMMARY', 20, finalY);
+    pdf.setTextColor(0, 120, 0); // Dark green
+    pdf.text('💰 ENHANCED FINANCIAL SUMMARY', 20, finalY);
+    pdf.setTextColor(0, 0, 0); // Reset to black
     
     // Summary Details
     let summaryY = finalY + 20;
@@ -210,8 +319,10 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     
     pdf.setFontSize(8);
     pdf.setFont('helvetica', 'italic');
+    pdf.setTextColor(100, 100, 100); // Gray
     pdf.text(`Generated on: ${new Date().toLocaleString()}`, 20, footerY);
-    pdf.text(`${school.name} - Fee Statement`, 105, footerY, { align: 'center' });
+    pdf.text(`${school.name} - Enhanced Fee Statement with Overpayment Tracking`, 105, footerY, { align: 'center' });
+    pdf.setTextColor(0, 0, 0); // Reset to black
 
     // Generate the PDF buffer
     console.log('📄 Generating PDF buffer for direct download...');
