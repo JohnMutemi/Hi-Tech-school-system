@@ -54,7 +54,13 @@ async function main() {
 
   // Clean up existing classes and grades for all schools
   console.log('🗑️ Cleaning up existing classes and grades...');
-  
+
+  // TermlyFeeStructure references Grade — must remove before grades
+  const deletedFeeLogs = await prisma.feeStructureLog.deleteMany({});
+  console.log(`✅ Deleted ${deletedFeeLogs.count} fee structure logs`);
+  const deletedTermlyFees = await prisma.termlyFeeStructure.deleteMany({});
+  console.log(`✅ Deleted ${deletedTermlyFees.count} termly fee structures`);
+
   // Delete all existing classes first (to avoid foreign key constraints)
   const deletedClasses = await prisma.class.deleteMany({});
   console.log(`✅ Deleted ${deletedClasses.count} existing classes`);
