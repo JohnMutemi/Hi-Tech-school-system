@@ -79,7 +79,7 @@ export default function StickyHeader({ parent }: StickyHeaderProps) {
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 w-full max-w-full">
         <div className="flex-1 flex justify-center sm:justify-start">
           <h1 className="text-white text-xl lg:text-2xl xl:text-3xl font-bold tracking-normal drop-shadow-lg bg-gradient-to-r from-white via-slate-100 to-indigo-200 bg-clip-text text-transparent text-center sm:text-left leading-relaxed">
-            Welcome, {parent?.schoolName || parent?.school?.name || 'Malioni Primary'}!
+            Welcome, {parent?.school?.name || parent?.schoolName || "your school"}!
           </h1>
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">

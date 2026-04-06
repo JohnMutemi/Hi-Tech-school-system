@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client'
+import { computeStudentFeesSnapshot } from '@/lib/services/student-fees-snapshot'
 
 const prisma = new PrismaClient()
 
@@ -237,14 +238,37 @@ export class EmailService {
         return false
       }
 
-      // Fetch updated balance after payment
-      const { FeeBalanceService } = await import('./fee-balance-service')
-      const feeBalanceService = new FeeBalanceService()
-      const balanceInfo = await feeBalanceService.calculateStudentBalance(
-        payment.studentId,
-        payment.academicYear.name,
-        payment.term.name
-      )
+      // Align balances with parent/bursar fees API (same engine as GET /students/[id]/fees)
+      const studentFull = await prisma.student.findFirst({
+        where: { id: payment.studentId },
+        include: { user: true, class: { include: { grade: true } } },
+      })
+
+      let outstandingAfter = 0
+      let academicYearOutstandingAfter = 0
+      let termOutstandingAfter = 0
+
+      if (studentFull && payment.academicYearId) {
+        const snap = await computeStudentFeesSnapshot(
+          prisma,
+          school,
+          studentFull,
+          payment.academicYearId,
+          { persistYearEndCarryForward: false }
+        )
+        if (!('error' in snap)) {
+          outstandingAfter = snap.outstanding
+          academicYearOutstandingAfter = snap.academicYearOutstanding
+          const termRow = snap.termBalances.find((t) => t.termId === payment.termId)
+          termOutstandingAfter = termRow ? termRow.balance : snap.academicYearOutstanding
+        }
+      }
+
+      const rcpt = payment.receipt
+      const termOutstandingBefore =
+        rcpt?.termOutstandingBefore ?? termOutstandingAfter + payment.amount
+      const academicYearOutstandingBefore =
+        rcpt?.academicYearOutstandingBefore ?? academicYearOutstandingAfter + payment.amount
 
       // Prepare payment notification data
       const paymentNotificationData: PaymentNotificationData = {
@@ -259,22 +283,24 @@ export class EmailService {
         termName: payment.term.name,
         academicYear: payment.academicYear.name,
         academicYearId: payment.academicYear.id,
-        balanceAfter: balanceInfo.balance,
-        balanceBefore: balanceInfo.balance + payment.amount, // Calculate balance before payment
+        balanceAfter: outstandingAfter,
+        balanceBefore: academicYearOutstandingBefore,
         admissionNumber: payment.student.admissionNumber || undefined,
         parentName: payment.student.parentName || undefined,
         currency: 'KES',
         status: 'COMPLETED',
-        issuedBy: 'Bursar',
+        issuedBy: payment.receivedBy || 'School',
         reference: payment.referenceNumber || undefined,
         phoneNumber: payment.student.parent?.phone || undefined,
         transactionId: undefined, // Not available in current schema
         feeType: payment.description || 'School Fees',
-        termOutstandingBefore: balanceInfo.balance + payment.amount, // Use academic year balance as fallback
-        termOutstandingAfter: balanceInfo.balance,
-        academicYearOutstandingBefore: balanceInfo.balance + payment.amount,
-        academicYearOutstandingAfter: balanceInfo.balance,
-        carryForward: 0
+        termOutstandingBefore,
+        termOutstandingAfter,
+        academicYearOutstandingBefore,
+        academicYearOutstandingAfter,
+        carryForward: 0,
+        ...this.generateReceiptDownloadUrls(schoolCode, payment.receiptNumber),
+        receiptDownloadUrl: this.generateReceiptDownloadUrl(schoolCode, payment.receiptNumber, 'A4'),
       }
 
       // Send the notification
@@ -586,41 +612,37 @@ export class EmailService {
             font-size: 15px;
         }
         .download-section {
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
-            border-radius: 20px;
-            padding: 40px;
+            background: linear-gradient(160deg, #f4faf8 0%, #e8f3ef 45%, #ddeee6 100%);
+            border-radius: 18px;
+            padding: 32px 28px;
             margin: 30px;
             text-align: center;
-            position: relative;
-            overflow: hidden;
+            border: 1px solid #c5d8cf;
+            box-shadow: 0 8px 30px rgba(45, 74, 66, 0.06);
         }
         .download-section::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: radial-gradient(circle at 25% 25%, #1e40af 0%, transparent 50%), 
-                        radial-gradient(circle at 75% 75%, #3b82f6 0%, transparent 50%);
-            opacity: 0.1;
+            display: none;
         }
         .download-content {
             position: relative;
             z-index: 1;
         }
         .download-title {
-            color: #f8fafc;
-            font-size: 24px;
-            font-weight: 800;
-            margin: 0 0 10px 0;
-            letter-spacing: -0.025em;
+            color: #2a4d44;
+            font-size: 22px;
+            font-weight: 700;
+            margin: 0 0 8px 0;
+            letter-spacing: -0.02em;
         }
         .download-subtitle {
-            color: #94a3b8;
-            margin: 0 0 30px 0;
-            font-size: 16px;
-            font-weight: 600;
+            color: #5c756d;
+            margin: 0 0 24px 0;
+            font-size: 15px;
+            font-weight: 500;
+            line-height: 1.5;
+            max-width: 520px;
+            margin-left: auto;
+            margin-right: auto;
         }
         .button-container {
             display: flex;
@@ -631,40 +653,35 @@ export class EmailService {
         .download-button {
             display: inline-flex;
             align-items: center;
-            color: white;
-            padding: 18px 30px;
+            justify-content: center;
+            color: #f8fffc;
+            padding: 14px 22px;
             text-decoration: none;
-            border-radius: 16px;
-            font-weight: 700;
-            min-width: 220px;
-            gap: 12px;
-            transition: all 0.3s ease;
-            font-size: 16px;
-            position: relative;
-            overflow: hidden;
-            border: 2px solid transparent;
+            border-radius: 12px;
+            font-weight: 600;
+            min-width: 200px;
+            gap: 10px;
+            transition: all 0.22s ease;
+            font-size: 15px;
+            border: 1px solid transparent;
         }
         .download-button:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px rgba(42, 77, 68, 0.15);
         }
         .receipt-button {
-            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
-            border-color: #3b82f6;
+            background: linear-gradient(135deg, #4a8f9a 0%, #3a737c 100%);
+            border-color: #3a737c;
         }
         .receipt-button:hover {
-            background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
-            box-shadow: 0 8px 25px rgba(245, 158, 11, 0.6);
+            background: linear-gradient(135deg, #3a737c 0%, #2f5f66 100%);
         }
         .statement-button {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
-            border-color: #10b981;
+            background: linear-gradient(135deg, #5a9178 0%, #46725f 100%);
+            border-color: #46725f;
         }
         .statement-button:hover {
-            background: linear-gradient(135deg, #059669 0%, #047857 100%);
-            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.6);
+            background: linear-gradient(135deg, #46725f 0%, #3a5e4f 100%);
         }
         .footer { 
             background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
@@ -822,22 +839,26 @@ export class EmailService {
             </div>
         </div>
             
-        <!-- Fee Statement Section -->
-            ${data.feesStatementUrl ? `
+        <!-- Receipt + annual fee statement downloads -->
+            ${data.receiptDownloadUrlA4 || data.feesStatementUrl ? `
             <div class="download-section">
                 <div class="download-content">
-                    <div class="download-title">📄 Your Fee Statement</div>
-                    <div class="download-subtitle">Download your complete academic fee statement directly</div>
-                    
+                    <div class="download-title">Your documents</div>
+                    <div class="download-subtitle">Download your payment receipt and annual fee statement (PDF). If a link asks you to sign in, open this email while logged into the parent portal in the same browser.</div>
                     <div class="button-container">
-                        <a href="${data.feesStatementUrl}" class="download-button statement-button" download>
-                            📄 Download Fee Statement
-                        </a>
+                        ${data.receiptDownloadUrlA4 ? `
+                        <a href="${data.receiptDownloadUrlA4}" class="download-button receipt-button">Receipt (A4 PDF)</a>
+                        ` : ''}
+                        ${data.receiptDownloadUrlA5 ? `
+                        <a href="${data.receiptDownloadUrlA5}" class="download-button receipt-button">Receipt (compact A5)</a>
+                        ` : ''}
+                        ${data.feesStatementUrl ? `
+                        <a href="${data.feesStatementUrl}" class="download-button statement-button">Annual fee statement</a>
+                        ` : ''}
                     </div>
-                    
-                    <div style="margin-top: 25px; padding: 20px; background: rgba(16, 185, 129, 0.1); border-radius: 12px; border: 1px solid rgba(16, 185, 129, 0.2);">
-                        <p style="margin: 0; font-size: 14px; color: #f8fafc; font-weight: 500; text-align: center; line-height: 1.5;">
-                            💡 <strong>Tip:</strong> This link will directly download your complete fee statement as a PDF file.
+                    <div style="margin-top: 22px; padding: 16px 18px; background: rgba(90, 145, 120, 0.12); border-radius: 10px; border: 1px solid rgba(90, 145, 120, 0.25);">
+                        <p style="margin: 0; font-size: 13px; color: #3d5c52; font-weight: 500; text-align: center; line-height: 1.55;">
+                            The annual statement summarises assessed fees, payments, any overpayment credit, and total balance to help with carry-forward and learner progression.
                         </p>
                     </div>
                 </div>
@@ -949,13 +970,11 @@ Applied to next term fees` : ''}
                       Money Receiver Sign
                         ${data.issuedBy || 'Bursar'}
 
-${data.feesStatementUrl ? `
-📊 YOUR FEE STATEMENT:
-
-Fee Statement: ${data.feesStatementUrl}
-   • Complete academic year summary
-   • View and download as PDF
-   • Detailed payment history
+${data.receiptDownloadUrlA4 || data.feesStatementUrl ? `
+DOCUMENTS (PDF):
+${data.receiptDownloadUrlA4 ? `Receipt (A4): ${data.receiptDownloadUrlA4}` : ''}
+${data.receiptDownloadUrlA5 ? `Receipt (A5): ${data.receiptDownloadUrlA5}` : ''}
+${data.feesStatementUrl ? `Annual fee statement: ${data.feesStatementUrl}` : ''}
 ` : ''}
 
 ===============================================

@@ -42,6 +42,19 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
     if (existingSubject) {
       return NextResponse.json({ error: "Subject code already exists for this school" }, { status: 409 });
     }
+
+    const existingName = await prisma.subject.findFirst({
+      where: {
+        schoolId: schoolContext.schoolId,
+        name: { equals: name.trim(), mode: "insensitive" },
+      },
+    });
+    if (existingName) {
+      return NextResponse.json(
+        { error: "A subject with this name already exists for this school." },
+        { status: 409 }
+      );
+    }
     
     const newSubject = await prisma.subject.create({
       data: {
@@ -74,7 +87,7 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
 export async function PUT(request: NextRequest, { params }: { params: { schoolCode: string } }) {
   try {
     const schoolManager = withSchoolContext(params.schoolCode);
-    await schoolManager.initialize();
+    const schoolContext = await schoolManager.initialize();
     
     const body = await request.json();
     const { id, name, code, description, teacherId } = body;
@@ -87,6 +100,31 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
     const isValidSubject = await schoolManager.validateSchoolOwnership(id, prisma.subject);
     if (!isValidSubject) {
       return NextResponse.json({ error: "Subject not found or access denied" }, { status: 404 });
+    }
+
+    if (code?.trim()) {
+      const codeTaken = await prisma.subject.findFirst({
+        where: {
+          schoolId: schoolContext.schoolId,
+          code: code.trim(),
+          NOT: { id },
+        },
+      });
+      if (codeTaken) {
+        return NextResponse.json({ error: "Subject code already exists for this school." }, { status: 409 });
+      }
+    }
+    if (name?.trim()) {
+      const nameTaken = await prisma.subject.findFirst({
+        where: {
+          schoolId: schoolContext.schoolId,
+          name: { equals: name.trim(), mode: "insensitive" },
+          NOT: { id },
+        },
+      });
+      if (nameTaken) {
+        return NextResponse.json({ error: "A subject with this name already exists for this school." }, { status: 409 });
+      }
     }
     
     const updatedSubject = await prisma.subject.update({

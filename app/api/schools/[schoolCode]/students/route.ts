@@ -1,11 +1,9 @@
-import { PrismaClient } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
-import bcrypt from 'bcryptjs';
 import { generateNextAdmissionNumber } from '@/lib/utils/school-generator';
 import { withSchoolContext } from '@/lib/school-context';
 import { hashDefaultPasswordByRole } from '@/lib/utils/default-passwords';
-
-const prisma = new PrismaClient();
+import { prisma } from "@/lib/prisma";
+import { jsonError, requireRole, requireSchoolAccess } from "@/lib/api-guard";
 
 function getNextAdmissionNumber(lastAdmissionNumber: string): string {
   if (!lastAdmissionNumber) return '001';
@@ -24,16 +22,16 @@ export async function GET(
 ) {
   try {
     const { schoolCode } = params;
+
+    const { session, schoolContext } = await requireSchoolAccess(schoolCode);
+    requireRole(session, ["super_admin", "school_admin", "teacher", "bursar"]);
+
     const { searchParams } = new URL(request.url);
     
     const gradeId = searchParams.get("gradeId");
     const classId = searchParams.get("classId");
     const search = searchParams.get("search");
     const role = searchParams.get("role");
-
-    // Initialize school context
-    const schoolManager = withSchoolContext(schoolCode);
-    const schoolContext = await schoolManager.initialize();
 
     // Build where clause with school-specific filtering
     const whereClause: any = {
@@ -145,15 +143,15 @@ export async function GET(
     return NextResponse.json(students);
   } catch (error) {
     console.error("Error fetching students:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch students" },
-      { status: 500 }
-    );
+    return jsonError(error);
   }
 }
 
 export async function POST(req: NextRequest, { params }: { params: { schoolCode: string } }) {
   try {
+    const { session, schoolContext } = await requireSchoolAccess(params.schoolCode);
+    requireRole(session, ["super_admin", "school_admin"]);
+
     const data = await req.json();
     const {
       name, email, phone, admissionNumber, dateOfBirth, dateAdmitted,
@@ -165,26 +163,50 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
       return NextResponse.json({ error: 'Missing required fields: name, email, and classId are required.' }, { status: 400 });
     }
 
-    const school = await prisma.school.findUnique({ where: { code: params.schoolCode } });
-    if (!school) {
-      return NextResponse.json({ error: 'School not found' }, { status: 404 });
+    const emailTaken = await prisma.user.findUnique({ where: { email: email.trim() } });
+    if (emailTaken) {
+      return NextResponse.json(
+        { error: 'This email is already registered. Each student must use a unique email.' },
+        { status: 409 }
+      );
     }
 
     // Admission number logic - use school-specific settings
     let finalAdmissionNumber = admissionNumber;
     if (!finalAdmissionNumber) {
-      if (school.admissionNumberAutoIncrement && school.lastAdmissionNumber) {
+      const settings = await prisma.school.findUnique({
+        where: { id: schoolContext.schoolId },
+        select: {
+          admissionNumberAutoIncrement: true,
+          lastAdmissionNumber: true,
+        },
+      });
+
+      if (settings?.admissionNumberAutoIncrement && settings.lastAdmissionNumber) {
         // Use the school's last admission number and increment it
-        finalAdmissionNumber = getNextAdmissionNumber(school.lastAdmissionNumber);
+        finalAdmissionNumber = getNextAdmissionNumber(settings.lastAdmissionNumber);
       } else {
         // Fallback to default
         finalAdmissionNumber = 'ADM001';
       }
     }
 
+    const admissionTaken = await prisma.student.findFirst({
+      where: {
+        schoolId: schoolContext.schoolId,
+        admissionNumber: finalAdmissionNumber,
+      },
+    });
+    if (admissionTaken) {
+      return NextResponse.json(
+        { error: `Admission number "${finalAdmissionNumber}" is already in use for this school.` },
+        { status: 409 }
+      );
+    }
+
     // Fetch current academic year and term
     const currentYear = await prisma.academicYear.findFirst({
-      where: { schoolId: school.id, isCurrent: true },
+      where: { schoolId: schoolContext.schoolId, isCurrent: true },
     });
     let currentTerm = null;
     if (currentYear) {
@@ -200,7 +222,7 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
         where: {
           phone: parentPhone,
           role: 'parent',
-          schoolId: school.id,
+          schoolId: schoolContext.schoolId,
         },
       });
       const hashedParentPassword = await hashDefaultPasswordByRole('parent');
@@ -213,7 +235,7 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
             role: 'parent',
             password: hashedParentPassword,
             isActive: true,
-            schoolId: school.id,
+            schoolId: schoolContext.schoolId,
           },
         });
       } else {
@@ -234,14 +256,14 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
         password: hashedPassword,
         role: 'student',
         isActive: true,
-        schoolId: school.id,
+        schoolId: schoolContext.schoolId,
       },
     });
 
     const student = await prisma.student.create({
       data: {
         userId: studentUser.id,
-        schoolId: school.id,
+        schoolId: schoolContext.schoolId,
         classId,
         admissionNumber: finalAdmissionNumber,
         dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
@@ -273,7 +295,7 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
     // Update school's lastAdmissionNumber after student creation
     if (finalAdmissionNumber) {
       await prisma.school.update({
-        where: { id: school.id },
+        where: { id: schoolContext.schoolId },
         data: { lastAdmissionNumber: finalAdmissionNumber },
       });
     }
@@ -291,9 +313,20 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
       } : null,
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to create student:', error);
-    return NextResponse.json({ error: error.message || 'Failed to create student' }, { status: 500 });
+    const code =
+      error && typeof error === 'object' && 'code' in error
+        ? (error as { code: string }).code
+        : '';
+    if (code === 'P2002') {
+      return NextResponse.json(
+        { error: 'Duplicate value: email or admission number must be unique.' },
+        { status: 409 }
+      );
+    }
+    const message = error instanceof Error ? error.message : 'Failed to create student';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 

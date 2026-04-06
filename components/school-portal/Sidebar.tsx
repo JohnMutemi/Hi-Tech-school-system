@@ -21,7 +21,7 @@ const NAV_ITEMS = [
   { id: "students", label: "Students", icon: GraduationCap },
   { id: "subjects", label: "Subjects & Classes", icon: BookOpen },
   { id: "fees", label: "Fee Management", icon: DollarSign },
-  { id: "promotions", label: "Promotions", icon: ArrowRight },
+  { id: "promotions", label: "Learner progression", icon: ArrowRight },
   { id: "alumni", label: "Alumni", icon: Crown },
   { id: "academic-calendar", label: "Academic Calendar", icon: Calendar },
   { id: "settings", label: "Settings", icon: Settings },

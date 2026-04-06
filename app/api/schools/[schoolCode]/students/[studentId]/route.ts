@@ -1,15 +1,18 @@
 import { NextRequest, NextResponse } from "next/server"
-import { PrismaClient } from "@prisma/client"
-
-const prisma = new PrismaClient()
+import { prisma } from "@/lib/prisma"
+import { jsonError, requireRole, requireSchoolAccess } from "@/lib/api-guard"
 
 export async function GET(request: NextRequest, { params }: { params: { schoolCode: string, studentId: string } }) {
   try {
     const { schoolCode, studentId } = params
+
+    const { session, schoolContext } = await requireSchoolAccess(schoolCode)
+    requireRole(session, ["super_admin", "school_admin", "teacher", "bursar"])
+
     const student = await prisma.student.findFirst({
       where: {
         id: studentId,
-        school: { code: schoolCode },
+        schoolId: schoolContext.schoolId,
       },
       include: {
         user: true,
@@ -22,6 +25,6 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     }
     return NextResponse.json(student)
   } catch (error) {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return jsonError(error)
   }
 } 

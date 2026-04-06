@@ -27,6 +27,19 @@ interface AcademicYear {
   isCurrent: boolean;
 }
 
+interface AnnualSummary {
+  academicYearLabel?: string;
+  totalFeesAssessed?: number;
+  totalPaymentsRecorded?: number;
+  ledgerYearNet?: number;
+  arrearsFromPriorYears?: number;
+  totalAccountOutstanding?: number;
+  overpaymentCredit?: number;
+  amountDueNow?: number;
+  carryForwardNote?: string;
+  termBreakdown?: Array<{ term: string; assessed: number; paid: number; balance: number }>;
+}
+
 interface FeeStatementData {
   student: {
     name: string;
@@ -36,6 +49,7 @@ interface FeeStatementData {
     parentName?: string;
   };
   academicYear: string;
+  annualSummary?: AnnualSummary | null;
   statement: Array<{
     no: number;
     ref: string;
@@ -213,16 +227,19 @@ export function FeesStatementDownload({
   };
 
   return (
-    <Card className="w-full max-w-4xl mx-auto">
+    <Card className="w-full max-w-4xl mx-auto border-slate-200/90 shadow-sm bg-gradient-to-b from-white to-slate-50/30">
       <CardHeader>
-        <CardTitle className="flex items-center gap-3">
-          <FileText className="w-6 h-6 text-blue-600" />
-          Fee Statement Download
+        <CardTitle className="flex items-center gap-3 text-slate-800">
+          <FileText className="w-6 h-6 text-teal-700" />
+          Annual fee statement
         </CardTitle>
+        <p className="text-sm text-slate-600 font-normal mt-1">
+          Full-year fees, payments, overpayments, and balance for carry-forward and progression planning.
+        </p>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Student Information */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-slate-50/80 rounded-xl border border-slate-100">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <User className="w-4 h-4 text-gray-600" />
@@ -300,13 +317,13 @@ export function FeesStatementDownload({
                 </CardContent>
               </Card>
               
-              <Card className="bg-amber-50 border-amber-200 sm:col-span-2 lg:col-span-1">
+              <Card className="bg-amber-50/90 border-amber-200/80 sm:col-span-2 lg:col-span-1">
                 <CardContent className="p-3 sm:p-4 min-h-[100px] flex flex-col justify-center">
                   <div className="flex items-center gap-2 mb-2">
-                    <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600 flex-shrink-0" />
-                    <span className="text-xs sm:text-sm font-medium text-amber-700 truncate">Outstanding</span>
+                    <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-amber-700 flex-shrink-0" />
+                    <span className="text-xs sm:text-sm font-medium text-amber-800 truncate">Statement balance</span>
                   </div>
-                  <div className="text-lg sm:text-xl font-bold text-amber-900 truncate mb-2">
+                  <div className="text-lg sm:text-xl font-bold text-amber-950 truncate mb-2">
                     {formatCurrency(statementData.summary?.finalBalance || 0)}
                   </div>
                   <Badge className={`text-xs ${getBalanceStatus(statementData.summary?.finalBalance || 0).color} max-w-fit`}>
@@ -315,6 +332,57 @@ export function FeesStatementDownload({
                 </CardContent>
               </Card>
             </div>
+
+            {statementData.annualSummary && (
+              <div className="rounded-xl border border-emerald-100 bg-[#f4faf8] p-4 sm:p-5 text-slate-700">
+                <h3 className="text-sm font-semibold text-emerald-950 mb-3">
+                  Consolidated year view (aligned with balances)
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                  <div className="flex justify-between gap-2 border-b border-emerald-100/80 pb-1">
+                    <span className="text-slate-600">Fees assessed</span>
+                    <span className="font-medium tabular-nums">
+                      {formatCurrency(Number(statementData.annualSummary.totalFeesAssessed ?? 0))}
+                    </span>
+                  </div>
+                  <div className="flex justify-between gap-2 border-b border-emerald-100/80 pb-1">
+                    <span className="text-slate-600">Payments</span>
+                    <span className="font-medium tabular-nums text-emerald-800">
+                      {formatCurrency(Number(statementData.annualSummary.totalPaymentsRecorded ?? 0))}
+                    </span>
+                  </div>
+                  <div className="flex justify-between gap-2 border-b border-emerald-100/80 pb-1">
+                    <span className="text-slate-600">Year ledger net</span>
+                    <span className="font-medium tabular-nums">
+                      {formatCurrency(Number(statementData.annualSummary.ledgerYearNet ?? 0))}
+                    </span>
+                  </div>
+                  <div className="flex justify-between gap-2 border-b border-emerald-100/80 pb-1">
+                    <span className="text-slate-600">Prior arrears</span>
+                    <span className="font-medium tabular-nums">
+                      {formatCurrency(Number(statementData.annualSummary.arrearsFromPriorYears ?? 0))}
+                    </span>
+                  </div>
+                  <div className="flex justify-between gap-2 border-b border-emerald-100/80 pb-1">
+                    <span className="text-slate-600">Total outstanding</span>
+                    <span className="font-medium tabular-nums text-amber-900">
+                      {formatCurrency(Number(statementData.annualSummary.totalAccountOutstanding ?? 0))}
+                    </span>
+                  </div>
+                  <div className="flex justify-between gap-2 border-b border-emerald-100/80 pb-1">
+                    <span className="text-slate-600">Credit / overpayment</span>
+                    <span className="font-medium tabular-nums text-teal-800">
+                      {formatCurrency(Number(statementData.annualSummary.overpaymentCredit ?? 0))}
+                    </span>
+                  </div>
+                </div>
+                {statementData.annualSummary.carryForwardNote ? (
+                  <p className="mt-4 text-xs sm:text-sm leading-relaxed text-slate-600 border-t border-emerald-100/70 pt-3">
+                    {statementData.annualSummary.carryForwardNote}
+                  </p>
+                ) : null}
+              </div>
+            )}
 
             {/* Statement Preview */}
             <Card>
@@ -471,7 +539,7 @@ export function FeesStatementDownload({
           <Button
             onClick={handleDownloadPDF}
             disabled={loading || !statementData || !selectedAcademicYear}
-            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 px-8 py-3"
+            className="bg-gradient-to-r from-teal-700 to-emerald-800 hover:from-teal-800 hover:to-emerald-900 text-white shadow-md hover:shadow-lg transition-all duration-200 px-8 py-3"
           >
             {loading ? (
               <div className="flex items-center gap-2">
@@ -481,21 +549,20 @@ export function FeesStatementDownload({
             ) : (
               <div className="flex items-center gap-2">
                 <Download className="w-5 h-5" />
-                Download Fee Statement (PDF)
+                Download annual statement (PDF)
               </div>
             )}
           </Button>
         </div>
 
         {/* Info Note */}
-        <div className="text-center text-sm text-gray-600 bg-blue-50 p-4 rounded-lg">
+        <div className="text-center text-sm text-slate-600 bg-slate-50/90 border border-slate-100 p-4 rounded-xl">
           <div className="flex items-center justify-center gap-2 mb-2">
-            <AlertCircle className="w-4 h-4 text-blue-600" />
-            <span className="font-medium text-blue-800">Important Information</span>
+            <AlertCircle className="w-4 h-4 text-teal-700" />
+            <span className="font-medium text-slate-800">About this statement</span>
           </div>
-          <p>
-            This fee statement includes all charges and payments for the selected academic year. 
-            The PDF will contain a complete breakdown of all transactions and current balance.
+          <p className="leading-relaxed">
+            Includes term charges, payments, carry-forward lines, and a year summary for planning the next academic year.
           </p>
         </div>
       </CardContent>

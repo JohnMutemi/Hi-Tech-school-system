@@ -28,6 +28,8 @@ interface PaymentHubProps {
   initialSelectedTerm?: string;
   initialAmount?: number;
   initialAcademicYear?: string;
+  /** Shown on receipt and sent as receivedBy (e.g. "Bursar Office" for bursar) */
+  paymentRecordedBy?: string;
 }
 
 interface ReceiptData {
@@ -87,8 +89,9 @@ interface BalanceData {
 
 
 
-export default function PaymentHub({ studentId, schoolCode, onPaymentComplete, initialSelectedTerm, initialAmount, initialAcademicYear }: PaymentHubProps) {
+export default function PaymentHub({ studentId, schoolCode, onPaymentComplete, initialSelectedTerm, initialAmount, initialAcademicYear, paymentRecordedBy = "Parent Portal" }: PaymentHubProps) {
   const { toast } = useToast();
+  const schoolPath = encodeURIComponent(schoolCode);
   const [isLoading, setIsLoading] = useState(false);
   const [balanceData, setBalanceData] = useState<BalanceData | null>(null);
   const [showReceipt, setShowReceipt] = useState(false);
@@ -102,10 +105,10 @@ export default function PaymentHub({ studentId, schoolCode, onPaymentComplete, i
     isProcessing: false,
   });
 
-  // Fetch initial data
+  // Fetch initial data (academic year + optional term for bursar filters)
   useEffect(() => {
     fetchBalanceData();
-  }, [studentId, schoolCode]);
+  }, [studentId, schoolCode, initialAcademicYear, initialSelectedTerm]);
 
   // Apply initial selections from parent
   useEffect(() => {
@@ -123,11 +126,21 @@ export default function PaymentHub({ studentId, schoolCode, onPaymentComplete, i
   const fetchBalanceData = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/schools/${schoolCode}/students/${studentId}/fees`);
+      const qs = new URLSearchParams();
+      if (initialAcademicYear && String(initialAcademicYear).trim()) {
+        qs.set("academicYear", String(initialAcademicYear).trim());
+      }
+      if (initialSelectedTerm && String(initialSelectedTerm).trim()) {
+        qs.set("term", String(initialSelectedTerm).trim());
+      }
+      const q = qs.toString() ? `?${qs.toString()}` : "";
+      const response = await fetch(
+        `/api/schools/${schoolPath}/students/${studentId}/fees${q}`
+      );
       if (response.ok) {
         const data = await response.json();
 
-        // Normalize API response into BalanceData shape
+        // Normalize API response into BalanceData shape (align with parent FeesManagement)
         const termOrder: Record<string, number> = { 'Term 1': 1, 'Term 2': 2, 'Term 3': 3 };
         const termBalances = Array.isArray(data) ? data : (data?.termBalances || []);
         const sorted = [...termBalances].sort((a, b) => (termOrder[a.term]||0) - (termOrder[b.term]||0));
@@ -143,13 +156,21 @@ export default function PaymentHub({ studentId, schoolCode, onPaymentComplete, i
           nextTermBalance: Number(next?.balance || 0),
           carryForwardAmount: Number(current?.carryForward || 0),
           overpaymentAmount: 0,
-          termBalances: sorted.map((t:any)=>({
-            term: t.term,
-            balance: Number(t.balance || 0),
-            totalAmount: Number(t.totalAmount || t.amount || 0),
-            paidAmount: Math.max(0, Number(t.totalAmount || t.amount || 0) - Number(t.balance || 0)),
-            outstanding: Number(t.balance || 0),
-          })),
+          termBalances: sorted.map((t:any)=>{
+            const totalAmount = Number(t.totalAmount || t.amount || 0);
+            const outstanding = Number(t.balance || t.outstanding || 0);
+            const paidAmount =
+              t.paidAmount !== undefined && t.paidAmount !== null
+                ? Number(t.paidAmount)
+                : Math.max(0, totalAmount - outstanding);
+            return {
+              term: t.term,
+              balance: outstanding,
+              totalAmount,
+              paidAmount,
+              outstanding,
+            };
+          }),
         };
         setBalanceData(normalized);
       }
@@ -244,10 +265,10 @@ export default function PaymentHub({ studentId, schoolCode, onPaymentComplete, i
         academicYear: initialAcademicYear || new Date().getFullYear().toString(),
         description: `School fees payment for ${paymentState.selectedTerm || balanceData?.currentTerm || "Term 1"} ${initialAcademicYear || new Date().getFullYear().toString()}`,
         referenceNumber: transactionId || `PAY-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        receivedBy: 'Parent Portal',
+        receivedBy: paymentRecordedBy,
       };
 
-      const response = await fetch(`/api/schools/${schoolCode}/payments`, {
+      const response = await fetch(`/api/schools/${schoolPath}/payments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(paymentData),
@@ -270,7 +291,7 @@ export default function PaymentHub({ studentId, schoolCode, onPaymentComplete, i
           phoneNumber: responseData.payment?.phoneNumber || paymentState.phoneNumber,
           status: "completed",
           issuedAt: new Date(),
-          issuedBy: "Parent Portal",
+          issuedBy: paymentRecordedBy,
           schoolName: responseData.payment?.schoolName || "",
           studentName: responseData.payment?.studentName || "",
           admissionNumber: responseData.payment?.admissionNumber || "",

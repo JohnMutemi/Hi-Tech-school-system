@@ -1,8 +1,27 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import { withSchoolContext } from '@/lib/school-context';
 
-const prisma = new PrismaClient();
+async function assertTeacherFreeForClass(
+  schoolId: string,
+  teacherId: string | null | undefined,
+  excludeClassId?: string | null
+) {
+  if (!teacherId) return;
+  const other = await prisma.class.findFirst({
+    where: {
+      schoolId,
+      teacherId,
+      ...(excludeClassId ? { id: { not: excludeClassId } } : {}),
+    },
+    select: { id: true, name: true },
+  });
+  if (other) {
+    throw Object.assign(new Error("This teacher is already assigned as class teacher to another class."), {
+      status: 409,
+    });
+  }
+}
 
 // GET: List all classes for a school
 export async function GET(request: NextRequest, { params }: { params: { schoolCode: string } }) {
@@ -13,7 +32,7 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     const { searchParams } = new URL(request.url);
     const gradeId = searchParams.get('gradeId');
     
-    const whereClause: any = schoolManager.getSchoolWhereClause();
+    const whereClause: Record<string, unknown> = schoolManager.getSchoolWhereClause();
     if (gradeId) whereClause.gradeId = gradeId;
     
     const classes = await prisma.class.findMany({ 
@@ -47,11 +66,10 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       }
     });
 
-    // Add student count to each class
     const classesWithCount = classes.map(cls => ({
       ...cls,
       currentStudents: cls.students.length,
-      students: undefined // Remove the actual students array for cleaner response
+      students: undefined
     }));
     return NextResponse.json(classesWithCount);
   } catch (error) {
@@ -66,21 +84,35 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
     const schoolContext = await schoolManager.initialize();
     
     const body = await request.json();
-    const { name, teacherId, gradeId } = body;
+    const { name, teacherId, gradeId, shortCode } = body;
     if (!name || !gradeId) {
       return NextResponse.json({ error: "Missing required fields: name and gradeId are required" }, { status: 400 });
     }
+
+    const codeTrim = typeof shortCode === "string" ? shortCode.trim() : "";
+    if (codeTrim) {
+      const dupCode = await prisma.class.findFirst({
+        where: {
+          schoolId: schoolContext.schoolId,
+          shortCode: { equals: codeTrim, mode: "insensitive" },
+        },
+      });
+      if (dupCode) {
+        return NextResponse.json({ error: "Short code already used by another class in this school." }, { status: 409 });
+      }
+    }
+
+    try {
+      await assertTeacherFreeForClass(schoolContext.schoolId, teacherId, null);
+    } catch (e: unknown) {
+      const err = e as { status?: number; message?: string };
+      if (err.status === 409) {
+        return NextResponse.json({ error: err.message }, { status: 409 });
+      }
+      throw e;
+    }
     
-    const data: any = {
-      name,
-      gradeId,
-      schoolId: schoolContext.schoolId, // Use school context
-      isActive: true,
-    };
-    if (teacherId) data.teacherId = teacherId;
-    
-    // Prevent duplicate ALUMNI class creation
-    if (name && name.trim().toLowerCase() === "alumni") {
+    if (name && String(name).trim().toLowerCase() === "alumni") {
       const existingAlumni = await prisma.class.findFirst({
         where: {
           schoolId: schoolContext.schoolId,
@@ -93,7 +125,14 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
     }
     
     const newClass = await prisma.class.create({
-      data,
+      data: {
+        name: String(name).trim(),
+        gradeId,
+        schoolId: schoolContext.schoolId,
+        isActive: true,
+        ...(teacherId ? { teacherId: String(teacherId) } : {}),
+        ...(codeTrim ? { shortCode: codeTrim } : {}),
+      },
       include: {
         teacher: {
           select: {
@@ -123,7 +162,6 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
       }
     });
     
-    // Add student count and clean up response
     const classWithCount = {
       ...newClass,
       currentStudents: newClass.students.length,
@@ -131,8 +169,15 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
     };
     
     return NextResponse.json(classWithCount, { status: 201 });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error creating class:", error);
+    const code = error && typeof error === "object" && "code" in error ? (error as { code: string }).code : "";
+    if (code === "P2002") {
+      return NextResponse.json(
+        { error: "A class with this name or short code already exists in this school." },
+        { status: 409 }
+      );
+    }
     return NextResponse.json({ error: "Failed to create class" }, { status: 500 });
   }
 }
@@ -141,26 +186,59 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
 export async function PUT(request: NextRequest, { params }: { params: { schoolCode: string } }) {
   try {
     const schoolManager = withSchoolContext(params.schoolCode);
-    await schoolManager.initialize();
+    const schoolContext = await schoolManager.initialize();
     
     const body = await request.json();
-    const { id, name, teacherId, gradeId } = body;
+    const { id, name, teacherId, gradeId, shortCode } = body;
     if (!id) {
       return NextResponse.json({ error: "Class ID is required" }, { status: 400 });
     }
     
-    // Validate that the class belongs to this school
     const isValidClass = await schoolManager.validateSchoolOwnership(id, prisma.class);
     if (!isValidClass) {
       return NextResponse.json({ error: "Class not found or access denied" }, { status: 404 });
     }
+
+    const codeTrim =
+      typeof shortCode === "string" ? shortCode.trim() : "";
+    const shortCodeProvided = shortCode !== undefined;
+    if (codeTrim) {
+      const dupCode = await prisma.class.findFirst({
+        where: {
+          schoolId: schoolContext.schoolId,
+          shortCode: { equals: codeTrim, mode: "insensitive" },
+          id: { not: id },
+        },
+      });
+      if (dupCode) {
+        return NextResponse.json({ error: "Short code already used by another class in this school." }, { status: 409 });
+      }
+    }
+
+    try {
+      await assertTeacherFreeForClass(schoolContext.schoolId, teacherId, id);
+    } catch (e: unknown) {
+      const err = e as { status?: number; message?: string };
+      if (err.status === 409) {
+        return NextResponse.json({ error: err.message }, { status: 409 });
+      }
+      throw e;
+    }
+
+    const shortCodeUpdate =
+      !shortCodeProvided
+        ? {}
+        : codeTrim
+          ? { shortCode: codeTrim }
+          : { shortCode: null };
     
     const updatedClass = await prisma.class.update({
       where: { id },
       data: {
-        name,
-        teacherId: teacherId || null,
-        gradeId: gradeId,
+        name: name != null ? String(name).trim() : undefined,
+        teacherId: teacherId === undefined ? undefined : teacherId || null,
+        gradeId: gradeId || undefined,
+        ...shortCodeUpdate,
         isActive: true,
       },
       include: {
@@ -181,8 +259,15 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
       }
     });
     return NextResponse.json(updatedClass);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error updating class:", error);
+    const code = error && typeof error === "object" && "code" in error ? (error as { code: string }).code : "";
+    if (code === "P2002") {
+      return NextResponse.json(
+        { error: "A class with this name or short code already exists in this school." },
+        { status: 409 }
+      );
+    }
     return NextResponse.json({ error: "Failed to update class" }, { status: 500 });
   }
 }
@@ -198,7 +283,6 @@ export async function DELETE(request: NextRequest, { params }: { params: { schoo
       return NextResponse.json({ error: "Class ID is required" }, { status: 400 });
     }
     
-    // Validate that the class belongs to this school
     const isValidClass = await schoolManager.validateSchoolOwnership(id, prisma.class);
     if (!isValidClass) {
       return NextResponse.json({ error: "Class not found or access denied" }, { status: 404 });
@@ -209,4 +293,4 @@ export async function DELETE(request: NextRequest, { params }: { params: { schoo
   } catch (error) {
     return NextResponse.json({ error: "Failed to delete class" }, { status: 500 });
   }
-} 
+}

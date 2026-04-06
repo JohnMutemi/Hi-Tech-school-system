@@ -1,12 +1,14 @@
-import { PrismaClient } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
-
-const prisma = new PrismaClient();
+import { prisma } from "@/lib/prisma";
+import { jsonError, requireRole, requireSchoolAccess } from "@/lib/api-guard";
 
 // POST: Process a new payment
 export async function POST(request: NextRequest, { params }: { params: { schoolCode: string } }) {
   try {
     const schoolCode = params.schoolCode.toLowerCase();
+    const { session, schoolContext } = await requireSchoolAccess(schoolCode);
+    requireRole(session, ["super_admin", "school_admin", "bursar", "parent", "student"]);
+
     const body = await request.json();
     
     console.log('Payment API called with:', { schoolCode, body });
@@ -31,18 +33,17 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
       }, { status: 400 });
     }
 
-    // Fetch the school first
-    const school = await prisma.school.findUnique({ where: { code: schoolCode } });
-    if (!school) {
-      return NextResponse.json({ error: 'School not found' }, { status: 404 });
-    }
-    const schoolName = school.name;
+    const schoolName =
+      (await prisma.school.findUnique({
+        where: { id: schoolContext.schoolId },
+        select: { name: true },
+      }))?.name ?? "School";
 
     // Fetch the student
     const student = await prisma.student.findFirst({
       where: {
         id: studentId,
-        schoolId: school.id,
+        schoolId: schoolContext.schoolId,
         isActive: true
       },
       include: {
@@ -58,7 +59,7 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
     // Find or create academic year and term based on names
     let academicYearRecord = await prisma.academicYear.findFirst({
       where: {
-        schoolId: school.id,
+        schoolId: schoolContext.schoolId,
         name: academicYear
       }
     });
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
       
       academicYearRecord = await prisma.academicYear.create({
         data: {
-          schoolId: school.id,
+          schoolId: schoolContext.schoolId,
           name: academicYear,
           startDate: new Date(year, 0, 1), // January 1st of the year
           endDate: new Date(year, 11, 31), // December 31st of the year
@@ -278,13 +279,16 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
   } catch (error: any) {
     console.error('Error processing payment:', error);
     console.error('Error stack:', error.stack);
-    return NextResponse.json({ error: 'Failed to process payment' }, { status: 500 });
+    return jsonError(error);
   }
 }
 
 // GET: Fetch payments for a student
 export async function GET(request: NextRequest, { params }: { params: { schoolCode: string } }) {
   try {
+    const { session, schoolContext } = await requireSchoolAccess(params.schoolCode);
+    requireRole(session, ["super_admin", "school_admin", "bursar", "parent", "student"]);
+
     const { searchParams } = new URL(request.url);
     const studentId = searchParams.get('studentId');
 
@@ -292,11 +296,19 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       return NextResponse.json({ error: 'studentId is required' }, { status: 400 });
     }
 
-    const school = await prisma.school.findUnique({ where: { code: params.schoolCode } });
-    if (!school) {
-      return NextResponse.json({ error: 'School not found' }, { status: 404 });
+    const schoolName =
+      (await prisma.school.findUnique({
+        where: { id: schoolContext.schoolId },
+        select: { name: true },
+      }))?.name ?? "School";
+
+    const student = await prisma.student.findFirst({
+      where: { id: studentId, schoolId: schoolContext.schoolId, isActive: true },
+      select: { id: true },
+    });
+    if (!student) {
+      return NextResponse.json({ error: "Student not found" }, { status: 404 });
     }
-    const schoolName = school.name;
 
     const payments = await prisma.payment.findMany({
       where: { studentId },
@@ -335,6 +347,6 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
     console.error("Failed to fetch payments:", errorMessage);
-    return NextResponse.json({ error: 'Failed to fetch payments', details: errorMessage }, { status: 500 });
+    return jsonError(error);
   }
 }

@@ -39,6 +39,7 @@ import { useToast } from '@/hooks/use-toast';
 import PaymentHub from '@/components/payment/PaymentHub';
 import { PaymentHistoryModal } from './PaymentHistoryModal';
 import { BursarSidebar } from './BursarSidebar';
+import { portalGlassPanelLight } from '@/components/layout/portal-glass-styles';
 
 interface Student {
   id: string;
@@ -109,7 +110,7 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
   const [selectedGrade, setSelectedGrade] = useState<string>('all');
   const [selectedClass, setSelectedClass] = useState<string>('all');
   const [academicYear, setAcademicYear] = useState(new Date().getFullYear().toString());
-  const [term, setTerm] = useState('Term 1');
+  const [term, setTerm] = useState<string>('all');
   
   // Payment Hub state
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
@@ -204,9 +205,11 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
       setLoading(true);
       const params = new URLSearchParams({
         academicYear,
-        term,
       });
-      
+      if (term && term !== 'all') {
+        params.set('term', term);
+      }
+
       if (selectedGrade && selectedGrade !== 'all') params.append('gradeId', selectedGrade);
       if (selectedClass && selectedClass !== 'all') params.append('classId', selectedClass);
 
@@ -286,7 +289,7 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `bursar-fee-report-${schoolCode}-${academicYear}-${term}.csv`;
+      a.download = `bursar-fee-report-${schoolCode}-${academicYear}-${term === 'all' ? 'all-terms' : term}.csv`;
       a.click();
       window.URL.revokeObjectURL(url);
 
@@ -710,6 +713,7 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="all">All terms</SelectItem>
                           <SelectItem value="Term 1">Term 1</SelectItem>
                           <SelectItem value="Term 2">Term 2</SelectItem>
                           <SelectItem value="Term 3">Term 3</SelectItem>
@@ -722,6 +726,7 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
                           setSearchTerm('');
                           setSelectedGrade('all');
                           setSelectedClass('all');
+                          setTerm('all');
                         }}
                         variant="outline"
                         className="w-full border-blue-200 hover:bg-blue-50 hover:border-blue-300 text-blue-700"
@@ -917,8 +922,10 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
           </div>
         </div>
 
-        <div className="p-6 pb-20 lg:pb-6 bg-gradient-to-br from-slate-50/50 via-blue-50/20 to-slate-50/50 min-h-[calc(100vh-8rem)]">
-          {renderTabContent()}
+        <div
+          className={`p-6 pb-20 lg:pb-6 min-h-[calc(100vh-8rem)] bg-gradient-to-br from-slate-50/50 via-blue-50/30 to-indigo-50/40`}
+        >
+          <div className={`${portalGlassPanelLight} p-6 min-h-[320px]`}>{renderTabContent()}</div>
         </div>
       </div>
 
@@ -945,6 +952,8 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
                 schoolCode={schoolCode}
                 onPaymentComplete={handlePaymentComplete}
                 initialAcademicYear={academicYear}
+                initialSelectedTerm={term !== 'all' ? term : undefined}
+                paymentRecordedBy="Bursar Office"
               />
             </div>
           )}

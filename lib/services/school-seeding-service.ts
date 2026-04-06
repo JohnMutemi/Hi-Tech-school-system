@@ -43,13 +43,8 @@ export class SchoolSeedingService {
       const classes = await this.seedClasses(grades);
       seedingResults.classes = classes.length;
 
-      // 5. Create default fee structures for each grade and term
-      const feeStructures = await this.seedFeeStructures(grades, academicYears[0], terms.slice(0, 3));
-      console.log(`✅ Created ${feeStructures.length} fee structures`);
-
-      // 6. Seed sample students (2 per grade)
-      const students = await this.seedSampleStudents(classes, academicYears[0], terms.slice(0, 3));
-      seedingResults.students = students.length;
+      // Fee structures and sample students/parents are intentionally not seeded:
+      // each school configures fees and enrolls learners through the admin UI.
 
       console.log(`✅ Seeding completed for school: ${this.schoolCode}`, seedingResults);
       return seedingResults;

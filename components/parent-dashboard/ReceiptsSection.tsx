@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { EnhancedReceipt } from "@/components/ui/enhanced-receipt";
 import { useToast } from "@/hooks/use-toast";
+import { FeesStatementDownload } from "@/components/fees-statement/FeesStatementDownload";
 
 interface ReceiptsSectionProps {
   receipts: any[];
@@ -311,6 +312,29 @@ export default function ReceiptsSection({
           </div>
         </CardContent>
       </Card>
+
+      {selectedStudent !== "all" ? (() => {
+        const st = students.find((s) => s.id === selectedStudent);
+        if (!st) return null;
+        return (
+          <FeesStatementDownload
+            schoolCode={schoolCode}
+            studentId={st.id}
+            studentName={st.name || st.fullName || "Student"}
+            admissionNumber={st.admissionNumber || "N/A"}
+            gradeName={st.gradeName || "N/A"}
+            className={st.className || "N/A"}
+            parentName={st.parentName}
+          />
+        );
+      })() : (
+        <Card className="border-slate-200/80 bg-slate-50/40">
+          <CardContent className="py-6 text-center text-sm text-slate-600">
+            <FileText className="w-8 h-8 mx-auto mb-2 text-slate-400" />
+            <p>Select a student in the filter above to view and download their annual fee statement (PDF) next to receipts.</p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Receipts Table */}
       <Card>

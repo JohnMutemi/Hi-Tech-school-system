@@ -3,9 +3,15 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Users, User, GraduationCap, Calendar, Mail, Phone, MapPin } from "lucide-react";
 
 export default function ChildrenSection(props: any) {
-  const { students = [], schoolCode = "" } = props;
+  const { students = [], schoolCode = "", currentAcademicYear } = props;
   const [selectedId, setSelectedId] = useState(students[0]?.id || "");
   const selectedStudent = students.find((child: any) => child.id === selectedId) || students[0];
+  const parentYearLabel =
+    typeof currentAcademicYear === "object" && currentAcademicYear?.name != null
+      ? String(currentAcademicYear.name)
+      : typeof currentAcademicYear === "string"
+        ? currentAcademicYear
+        : "";
 
   return (
     <div className="h-full flex flex-col space-y-6">
@@ -77,7 +83,10 @@ export default function ChildrenSection(props: any) {
                           <div className="flex justify-between items-center">
                             <span className="text-slate-300 font-medium">Academic Year:</span>
                             <span className="text-white font-semibold">
-                              {selectedStudent.academicYear || new Date().getFullYear()}
+                              {selectedStudent.academicYear ||
+                                selectedStudent.currentAcademicYearName ||
+                                parentYearLabel ||
+                                new Date().getFullYear()}
                             </span>
                           </div>
                         </div>

@@ -1,6 +1,69 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
+import { jsonError, requireRole, requireSchoolAccess } from "@/lib/api-guard";
+
+function normalizeFeeBreakdown(breakdown: unknown): Record<string, number> {
+  if (breakdown == null) return {};
+  if (Array.isArray(breakdown)) {
+    const out: Record<string, number> = {};
+    for (const row of breakdown) {
+      if (row && typeof row === "object" && "name" in row) {
+        const name = String((row as { name: string }).name).trim();
+        const raw = (row as { value?: unknown }).value;
+        if (name) out[name] = typeof raw === "number" ? raw : Number(raw) || 0;
+      }
+    }
+    return out;
+  }
+  if (typeof breakdown === "object") {
+    const out: Record<string, number> = {};
+    for (const [k, v] of Object.entries(breakdown as Record<string, unknown>)) {
+      out[k] = typeof v === "number" ? v : Number(v) || 0;
+    }
+    return out;
+  }
+  return {};
+}
+
+function mapTermlyToResponse(feeStructure: {
+  id: string;
+  gradeId: string;
+  term: string;
+  year: number;
+  totalAmount: { toString: () => string };
+  dueDate: Date | null;
+  breakdown: unknown;
+  academicYearId: string | null;
+  termId: string | null;
+  isActive: boolean;
+  isReleased: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  grade?: { name: string } | null;
+  academicYear?: { name: string } | null;
+  termRef?: { name: string } | null;
+}) {
+  return {
+    id: feeStructure.id,
+    gradeId: feeStructure.gradeId,
+    gradeName: feeStructure.grade?.name,
+    term: feeStructure.term,
+    year: feeStructure.year,
+    amount: parseFloat(feeStructure.totalAmount.toString()),
+    totalAmount: parseFloat(feeStructure.totalAmount.toString()),
+    dueDate: feeStructure.dueDate?.toISOString().split("T")[0] || "",
+    breakdown: feeStructure.breakdown as Record<string, number>,
+    academicYear: feeStructure.academicYear?.name || feeStructure.year.toString(),
+    academicYearId: feeStructure.academicYearId,
+    termId: feeStructure.termId,
+    termName: feeStructure.termRef?.name,
+    isActive: feeStructure.isActive,
+    isReleased: feeStructure.isReleased,
+    createdAt: feeStructure.createdAt.toISOString(),
+    updatedAt: feeStructure.updatedAt.toISOString(),
+  };
+}
 
 export async function GET(
   request: NextRequest,
@@ -8,23 +71,17 @@ export async function GET(
 ) {
   try {
     const { schoolCode } = params;
+    const { session, schoolContext } = await requireSchoolAccess(schoolCode);
+    requireRole(session, ["super_admin", "school_admin", "bursar", "teacher"]);
+
     const { searchParams } = new URL(request.url);
     const gradeId = searchParams.get("gradeId"); 
     const academicYear = searchParams.get("academicYear");
     const academicYearId = searchParams.get("academicYearId");
     const termId = searchParams.get("termId");
 
-    // Find the school first
-    const school = await prisma.school.findUnique({
-      where: { code: schoolCode },
-    });
-
-    if (!school) {
-      return NextResponse.json(
-        { error: "School not found" },
-        { status: 404 }
-      );
-    }
+    const school = await prisma.school.findUnique({ where: { id: schoolContext.schoolId } });
+    if (!school) return NextResponse.json({ error: "School not found" }, { status: 404 });
 
     // If no filters provided, return all fee structures for the school
     if (!gradeId && !academicYear && !academicYearId) {
@@ -170,10 +227,7 @@ export async function GET(
     });
   } catch (error) {
     console.error("Error fetching fee structure:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch fee structure" },
-      { status: 500 }
-    );
+    return jsonError(error);
   }
 }
 
@@ -183,22 +237,16 @@ export async function POST(
 ) {
   try {
     const { schoolCode } = params;
+    const { session, schoolContext } = await requireSchoolAccess(schoolCode);
+    requireRole(session, ["super_admin", "school_admin", "bursar"]);
+
     const body = await request.json();
 
     console.log("Creating fee structure for school:", schoolCode);
     console.log("Fee structure data:", body);
 
-    // Find the school first
-    const school = await prisma.school.findUnique({
-      where: { code: schoolCode },
-    });
-
-    if (!school) {
-      return NextResponse.json(
-        { error: "School not found" },
-        { status: 404 }
-      );
-    }
+    const school = await prisma.school.findUnique({ where: { id: schoolContext.schoolId } });
+    if (!school) return NextResponse.json({ error: "School not found" }, { status: 404 });
 
     // Validate required fields
     const { gradeId, term, totalAmount, breakdown, academicYearId, termId, dueDate } = body;
@@ -336,7 +384,7 @@ export async function POST(
         term: termName,
         year: academicYear.startDate.getFullYear(),
         totalAmount: totalAmount,
-        breakdown: breakdown || {},
+        breakdown: normalizeFeeBreakdown(breakdown),
         isActive: true,
         dueDate: dueDate ? new Date(dueDate) : null,
         isReleased: false,
@@ -414,9 +462,179 @@ export async function POST(
 
   } catch (error) {
     console.error("Error creating fee structure:", error);
-    return NextResponse.json(
-      { error: "Failed to create fee structure" },
-      { status: 500 }
-    );
+    return jsonError(error);
+  }
+}
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { schoolCode: string } }
+) {
+  try {
+    const { schoolCode } = params;
+    const { session, schoolContext } = await requireSchoolAccess(schoolCode);
+    requireRole(session, ["super_admin", "school_admin", "bursar"]);
+
+    const body = await request.json();
+    const {
+      id,
+      totalAmount,
+      breakdown,
+      dueDate,
+      isActive,
+      isReleased,
+      gradeId,
+      termId,
+      academicYearId,
+    } = body;
+
+    if (!id) {
+      return NextResponse.json({ error: "Fee structure id is required" }, { status: 400 });
+    }
+
+    const existing = await prisma.termlyFeeStructure.findFirst({
+      where: { id, schoolId: schoolContext.schoolId },
+    });
+    if (!existing) {
+      return NextResponse.json({ error: "Fee structure not found" }, { status: 404 });
+    }
+
+    const nextGradeId = gradeId ?? existing.gradeId;
+    const nextAcademicYearId = academicYearId ?? existing.academicYearId;
+    const nextTermId = termId ?? existing.termId;
+
+    if (!nextAcademicYearId || !nextTermId) {
+      return NextResponse.json(
+        { error: "academicYearId and termId are required on the record; set them when updating." },
+        { status: 400 }
+      );
+    }
+
+    const academicYear = await prisma.academicYear.findFirst({
+      where: { id: nextAcademicYearId, schoolId: schoolContext.schoolId },
+    });
+    if (!academicYear) {
+      return NextResponse.json({ error: "Academic year not found" }, { status: 404 });
+    }
+
+    const termRecord = await prisma.term.findFirst({
+      where: { id: nextTermId, academicYearId: nextAcademicYearId },
+    });
+    if (!termRecord) {
+      return NextResponse.json({ error: "Term not found for this academic year" }, { status: 404 });
+    }
+
+    const termName = termRecord.name;
+
+    const duplicate = await prisma.termlyFeeStructure.findFirst({
+      where: {
+        schoolId: schoolContext.schoolId,
+        gradeId: nextGradeId,
+        academicYearId: nextAcademicYearId,
+        term: termName,
+        isActive: true,
+        id: { not: id },
+      },
+    });
+    if (duplicate) {
+      return NextResponse.json(
+        { error: "Another fee structure already exists for this grade, term, and academic year." },
+        { status: 409 }
+      );
+    }
+
+    const bd = breakdown !== undefined ? normalizeFeeBreakdown(breakdown) : undefined;
+    const performerId = session.id;
+
+    const updated = await prisma.termlyFeeStructure.update({
+      where: { id },
+      data: {
+        ...(totalAmount !== undefined && totalAmount !== null
+          ? { totalAmount: Number(totalAmount) }
+          : {}),
+        ...(bd ? { breakdown: bd } : {}),
+        ...(dueDate !== undefined
+          ? { dueDate: dueDate ? new Date(dueDate) : null }
+          : {}),
+        ...(typeof isActive === "boolean" ? { isActive } : {}),
+        ...(typeof isReleased === "boolean" ? { isReleased } : {}),
+        gradeId: nextGradeId,
+        academicYearId: nextAcademicYearId,
+        termId: nextTermId,
+        term: termName,
+        year: academicYear.startDate.getFullYear(),
+      },
+      include: {
+        grade: { select: { name: true } },
+        academicYear: { select: { name: true } },
+        termRef: { select: { name: true } },
+      },
+    });
+
+    await prisma.feeStructureLog.create({
+      data: {
+        feeStructureId: updated.id,
+        action: "UPDATED",
+        performedBy: performerId,
+        details: {
+          totalAmount: updated.totalAmount.toString(),
+          breakdown: updated.breakdown,
+        },
+      },
+    });
+
+    const response = mapTermlyToResponse(updated);
+
+    return NextResponse.json({
+      success: true,
+      message: "Fee structure updated successfully",
+      feeStructure: response,
+    });
+  } catch (error) {
+    console.error("Error updating fee structure:", error);
+    return jsonError(error);
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { schoolCode: string } }
+) {
+  try {
+    const { schoolCode } = params;
+    const { session, schoolContext } = await requireSchoolAccess(schoolCode);
+    requireRole(session, ["super_admin", "school_admin", "bursar"]);
+
+    const body = await request.json().catch(() => ({}));
+    const id = body?.id as string | undefined;
+    if (!id) {
+      return NextResponse.json({ error: "Fee structure id is required" }, { status: 400 });
+    }
+
+    const existing = await prisma.termlyFeeStructure.findFirst({
+      where: { id, schoolId: schoolContext.schoolId },
+    });
+    if (!existing) {
+      return NextResponse.json({ error: "Fee structure not found" }, { status: 404 });
+    }
+
+    await prisma.termlyFeeStructure.update({
+      where: { id },
+      data: { isActive: false },
+    });
+
+    await prisma.feeStructureLog.create({
+      data: {
+        feeStructureId: id,
+        action: "DEACTIVATED",
+        performedBy: session.id,
+        details: { reason: "User deleted / deactivated fee structure" },
+      },
+    });
+
+    return NextResponse.json({ success: true, message: "Fee structure removed" });
+  } catch (error) {
+    console.error("Error deleting fee structure:", error);
+    return jsonError(error);
   }
 } 

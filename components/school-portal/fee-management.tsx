@@ -314,9 +314,13 @@ export function FeeManagement({
       try {
         const res = await fetch(`/api/schools/${schoolCode}/academic-years`);
         if (!res.ok) throw new Error("Failed to fetch academic years");
-        const years = await res.json();
-        setAvailableYears(Array.isArray(years) ? years : (years.data && Array.isArray(years.data) ? years.data : []));
-        // Set default year if not editing
+        const raw = await res.json();
+        const years = Array.isArray(raw)
+          ? raw
+          : raw?.data && Array.isArray(raw.data)
+            ? raw.data
+            : [];
+        setAvailableYears(years);
         if (!editingFee && years.length > 0) {
           setAcademicYearId(years[0].id);
           setFormData((prev) => ({ ...prev, academicYearId: years[0].id }));
@@ -357,8 +361,13 @@ export function FeeManagement({
       try {
         const res = await fetch(`/api/schools/${schoolCode}/grades`);
         if (!res.ok) throw new Error("Failed to fetch grades");
-        const grades = await res.json();
-        setAvailableGrades(Array.isArray(grades) ? grades : []);
+        const raw = await res.json();
+        const grades = Array.isArray(raw)
+          ? raw
+          : raw?.data && Array.isArray(raw.data)
+            ? raw.data
+            : [];
+        setAvailableGrades(grades);
       } catch {
         setAvailableGrades([]);
       }
@@ -370,7 +379,7 @@ export function FeeManagement({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const total = calculateTotal();
-    const feeData = {
+    const feePayload = {
       ...formData,
       totalAmount: total,
       academicYearId: formData.academicYearId || academicYearId,
@@ -382,10 +391,13 @@ export function FeeManagement({
     };
 
     try {
+      const isEdit = Boolean(editingFee?.id);
       const response = await fetch(`/api/schools/${schoolCode}/fee-structure`, {
-        method: "POST",
+        method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(feeData),
+        body: JSON.stringify(
+          isEdit ? { id: editingFee!.id, ...feePayload } : feePayload
+        ),
       });
 
       if (response.ok) {
@@ -394,7 +406,7 @@ export function FeeManagement({
 
         toast({
           title: "Success!",
-          description: editingFee
+          description: isEdit
             ? "Fee structure updated successfully!"
             : "Fee structure created successfully!",
         });
@@ -407,10 +419,8 @@ export function FeeManagement({
         });
         setBreakdown([{ name: "", value: "" }]);
 
-        // Refresh the fee structures list
         await fetchFeeStructures();
 
-        // Trigger a custom event to notify other components
         window.dispatchEvent(
           new CustomEvent("feeStructureUpdated", {
             detail: { schoolCode, feeStructure: result.feeStructure },
@@ -433,6 +443,36 @@ export function FeeManagement({
           error instanceof Error
             ? error.message
             : "Failed to save fee structure",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteFee = async (fee: FeeStructure) => {
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(
+        `Remove fee structure for ${fee.gradeName || "this grade"} — ${fee.term || ""}? This deactivates it for new charges.`
+      )
+    ) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/schools/${schoolCode}/fee-structure`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: fee.id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to remove fee structure");
+      }
+      toast({ title: "Removed", description: "Fee structure deactivated." });
+      await fetchFeeStructures();
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "Failed to remove",
         variant: "destructive",
       });
     }
@@ -769,6 +809,8 @@ export function FeeManagement({
                           <Button
                             variant="outline"
                             size="sm"
+                            type="button"
+                            onClick={() => handleDeleteFee(fee)}
                             className="hover:bg-red-50 hover:border-red-300 hover:text-red-700 transition-colors duration-200"
                           >
                             <Trash2 className="w-4 h-4" />

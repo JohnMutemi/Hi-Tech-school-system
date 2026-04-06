@@ -57,6 +57,13 @@ export async function GET(
       }
     });
 
+    const currentAcademicYearRecord = await prisma.academicYear.findFirst({
+      where: { schoolId: school.id, isCurrent: true },
+      orderBy: { startDate: "desc" },
+    });
+    const currentAcademicYearName =
+      currentAcademicYearRecord?.name ?? new Date().getFullYear().toString();
+
     console.log('Found parent and students:', { 
       parentId: parent.id, 
       parentName: parent.name, 
@@ -64,11 +71,18 @@ export async function GET(
     });
 
     return NextResponse.json({
+      schoolName: school.name,
+      schoolCode: school.code,
+      colorTheme: school.colorTheme ?? null,
+      currentAcademicYearId: currentAcademicYearRecord?.id ?? null,
+      currentAcademicYearName,
       parent: {
         id: parent.id,
         name: parent.name,
         phone: parent.phone,
         email: parent.email,
+        schoolName: school.name,
+        school: { name: school.name, code: school.code },
       },
       students: students.map(student => ({
         id: student.id,
@@ -82,7 +96,8 @@ export async function GET(
         classId: student.classId,
         gradeId: student.class?.gradeId,
         gradeName: student.class?.grade?.name || 'Not Assigned',
-        academicYear: student.class?.academicYear || 'Not Assigned',
+        academicYear: currentAcademicYearName,
+        currentAcademicYearName,
         dateOfBirth: student.dateOfBirth,
         dateAdmitted: student.dateAdmitted,
         parentName: student.parentName,

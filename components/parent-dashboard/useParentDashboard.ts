@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/use-toast";
 
@@ -43,6 +43,7 @@ export function useParentDashboard(schoolCode: string, parentId?: string) {
   const [payments, setPayments] = useState<any[]>([]);
   const [loadingPayments, setLoadingPayments] = useState(false);
   const [paymentsError, setPaymentsError] = useState("");
+  const [schoolColorTheme, setSchoolColorTheme] = useState<string | null>(null);
 
   // Fetch parent and children
   useEffect(() => {
@@ -51,11 +52,33 @@ export function useParentDashboard(schoolCode: string, parentId?: string) {
       try {
         // Get base URL for deployed environment
         const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin;
-        const res = await fetch(`${baseUrl}/api/schools/${schoolCode}/parents/${parentId}`);
+        const res = await fetch(
+          `${baseUrl}/api/schools/${encodeURIComponent(schoolCode)}/parents/${parentId}`
+        );
         if (res.ok) {
           const data = await res.json();
-          setParent(data.parent);
-          setStudents(data.students);
+          const mergedParent = data.parent
+            ? {
+                ...data.parent,
+                schoolName: data.schoolName ?? data.parent.schoolName,
+                school: data.parent.school ?? { name: data.schoolName },
+                currentAcademicYearName: data.currentAcademicYearName,
+                currentAcademicYearId: data.currentAcademicYearId,
+              }
+            : null;
+          setParent(mergedParent);
+          setStudents(data.students ?? []);
+          setSchoolColorTheme(
+            typeof data.colorTheme === "string" && data.colorTheme.trim()
+              ? data.colorTheme.trim()
+              : null
+          );
+          if (data.currentAcademicYearName) {
+            setCurrentAcademicYear({
+              name: data.currentAcademicYearName,
+              id: data.currentAcademicYearId,
+            });
+          }
         }
       } catch (e) {
         // Optionally handle error
@@ -64,38 +87,39 @@ export function useParentDashboard(schoolCode: string, parentId?: string) {
     fetchParentAndChildren();
   }, [schoolCode, parentId]);
 
-  // Fetch all receipts for all children
-  useEffect(() => {
-    async function fetchAllReceipts() {
-      if (!students || students.length === 0) {
-        setReceipts([]);
-        return;
-      }
-      setLoadingReceipts(true);
-      setReceiptsError("");
-      try {
-        const allReceipts: any[] = [];
-        // Get base URL for deployed environment
-        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin;
-        
-        for (const student of students) {
-          const res = await fetch(`${baseUrl}/api/schools/${schoolCode}/students/${student.id}/receipts`);
-          if (res.ok) {
-            const data = await res.json();
-            if (Array.isArray(data)) {
-              allReceipts.push(...data);
-            }
+  const fetchAllReceipts = useCallback(async () => {
+    if (!students || students.length === 0) {
+      setReceipts([]);
+      return;
+    }
+    setLoadingReceipts(true);
+    setReceiptsError("");
+    try {
+      const allReceipts: any[] = [];
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin;
+
+      for (const student of students) {
+        const res = await fetch(
+          `${baseUrl}/api/schools/${encodeURIComponent(schoolCode)}/students/${student.id}/receipts`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            allReceipts.push(...data);
           }
         }
-        setReceipts(allReceipts);
-      } catch (e) {
-        setReceiptsError("Failed to fetch receipts");
-        setReceipts([]);
       }
-      setLoadingReceipts(false);
+      setReceipts(allReceipts);
+    } catch (e) {
+      setReceiptsError("Failed to fetch receipts");
+      setReceipts([]);
     }
-    fetchAllReceipts();
+    setLoadingReceipts(false);
   }, [schoolCode, students]);
+
+  useEffect(() => {
+    fetchAllReceipts();
+  }, [fetchAllReceipts]);
 
   // Fetch payments for a given student
   const refreshPayments = async (studentId: string) => {
@@ -108,7 +132,9 @@ export function useParentDashboard(schoolCode: string, parentId?: string) {
     try {
       // Get base URL for deployed environment
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin;
-      const res = await fetch(`${baseUrl}/api/schools/${schoolCode}/students/${studentId}/payments`);
+      const res = await fetch(
+        `${baseUrl}/api/schools/${encodeURIComponent(schoolCode)}/students/${studentId}/payments`
+      );
       if (!res.ok) throw new Error("Failed to fetch payments");
       const data = await res.json();
       setPayments(Array.isArray(data.payments) ? data.payments : data);
@@ -150,7 +176,9 @@ export function useParentDashboard(schoolCode: string, parentId?: string) {
     try {
       // Get base URL for deployed environment
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin;
-      await fetch(`${baseUrl}/api/schools/${schoolCode}/parents/logout`, { method: "POST" });
+      await fetch(`${baseUrl}/api/schools/${encodeURIComponent(schoolCode)}/parents/logout`, {
+        method: "POST",
+      });
       router.push(`/schools/${schoolCode}/parent/login`);
     } catch (error) {
       router.push(`/schools/${schoolCode}/parent/login`);
@@ -231,6 +259,7 @@ export function useParentDashboard(schoolCode: string, parentId?: string) {
     payments,
     loadingPayments,
     paymentsError,
+    schoolColorTheme,
     refreshPayments,
     fetchAllReceipts,
     handleAvatarChange,

@@ -31,7 +31,7 @@ export async function createSchoolClient(schoolData: any) {
       schoolCode,
       name,
       logoUrl: logoUrl || "",
-      colorTheme: colorTheme || "#3b82f6",
+      colorTheme: colorTheme || "#d97706",
       portalUrl: `/schools/${schoolCode}`,
       description: description || "",
       adminEmail: email,

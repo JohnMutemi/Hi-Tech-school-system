@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "seed:superadmin": "npx prisma db seed",
+    "check:db-sync": "prisma generate && tsx prisma/check-db-sync.ts",
     "audit:school-isolation": "tsx scripts/audit-school-isolation.ts",
     "test:school-isolation": "tsx scripts/test-school-isolation.ts",
     "cleanup:grades": "node scripts/cleanup-grades.js"

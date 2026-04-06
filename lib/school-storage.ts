@@ -78,6 +78,7 @@ export type SchoolClass = {
   id: string;
   name: string;
   level: string;
+  shortCode?: string;
   classTeacherId?: string;
   capacity?: number;
   academicYearId?: string;

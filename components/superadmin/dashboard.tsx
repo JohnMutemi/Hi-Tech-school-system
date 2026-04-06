@@ -62,28 +62,28 @@ export function SuperAdminDashboard() {
     .slice(0, 5)
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="space-y-8">
       {/* Welcome Section */}
       <div className="mb-8">
-        <h2 className="text-3xl font-bold text-blue-700 mb-2">Welcome back, Super Admin!</h2>
-        <p className="text-gray-600">Manage your educational platform and monitor all schools in the system.</p>
+        <h2 className="mb-2 text-3xl font-bold text-amber-900">Welcome back, Super Admin!</h2>
+        <p className="text-stone-600">Manage your educational platform and monitor all schools in the system.</p>
       </div>
       {/* Quick Actions */}
       <div className="mb-8">
         <div className="flex flex-wrap gap-4">
-          <Button asChild className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+          <Button asChild className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700">
             <Link href="/superadmin/schools/add">
               <Plus className="w-4 h-4 mr-2" />
               Add New School
             </Link>
           </Button>
-          <Button asChild variant="outline">
+          <Button asChild variant="outline" className="border-amber-200 hover:bg-amber-50">
             <Link href="/superadmin/schools">
               <School className="w-4 h-4 mr-2" />
               Manage Schools
             </Link>
           </Button>
-          <Button asChild variant="outline">
+          <Button asChild variant="outline" className="border-amber-200 hover:bg-amber-50">
             <Link href="/superadmin/analytics">
               <TrendingUp className="w-4 h-4 mr-2" />
               View Analytics
@@ -93,37 +93,13 @@ export function SuperAdminDashboard() {
       </div>
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <Card className="border-l-4 border-l-blue-500">
+        <Card className="border-l-4 border-l-amber-500">
           <CardContent className="p-6">
             <div className="flex items-center space-x-2">
-              <School className="w-8 h-8 text-blue-500" />
+              <School className="h-8 w-8 text-amber-600" />
               <div>
                 <p className="text-2xl font-bold">{stats.totalSchools}</p>
-                <p className="text-sm text-gray-600">Total Schools</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="border-l-4 border-l-green-500">
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-2">
-              <Users className="w-8 h-8 text-green-500" />
-              <div>
-                <p className="text-2xl font-bold">{stats.totalStudents}</p>
-                <p className="text-sm text-gray-600">Total Students</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="border-l-4 border-l-purple-500">
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-2">
-              <GraduationCap className="w-8 h-8 text-purple-500" />
-              <div>
-                <p className="text-2xl font-bold">{stats.totalTeachers}</p>
-                <p className="text-sm text-gray-600">Total Teachers</p>
+                <p className="text-sm text-stone-600">Total Schools</p>
               </div>
             </div>
           </CardContent>
@@ -132,10 +108,34 @@ export function SuperAdminDashboard() {
         <Card className="border-l-4 border-l-orange-500">
           <CardContent className="p-6">
             <div className="flex items-center space-x-2">
-              <Activity className="w-8 h-8 text-orange-500" />
+              <Users className="h-8 w-8 text-orange-600" />
+              <div>
+                <p className="text-2xl font-bold">{stats.totalStudents}</p>
+                <p className="text-sm text-stone-600">Total Students</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="border-l-4 border-l-amber-700">
+          <CardContent className="p-6">
+            <div className="flex items-center space-x-2">
+              <GraduationCap className="h-8 w-8 text-amber-800" />
+              <div>
+                <p className="text-2xl font-bold">{stats.totalTeachers}</p>
+                <p className="text-sm text-stone-600">Total Teachers</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="border-l-4 border-l-yellow-500">
+          <CardContent className="p-6">
+            <div className="flex items-center space-x-2">
+              <Activity className="h-8 w-8 text-yellow-600" />
               <div>
                 <p className="text-2xl font-bold">{stats.recentSchools}</p>
-                <p className="text-sm text-gray-600">New This Month</p>
+                <p className="text-sm text-stone-600">New This Month</p>
               </div>
             </div>
           </CardContent>
@@ -156,21 +156,21 @@ export function SuperAdminDashboard() {
           <CardContent>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">System Status</span>
-                <Badge variant="default" className="bg-green-100 text-green-800">
+                <span className="text-sm text-stone-600">System Status</span>
+                <Badge variant="default" className="border-amber-200 bg-amber-100 text-amber-900">
                   {stats.platformHealth}
                 </Badge>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Active Schools</span>
+                <span className="text-sm text-stone-600">Active Schools</span>
                 <span className="font-medium">{stats.activeSchools}/{stats.totalSchools}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Storage Usage</span>
+                <span className="text-sm text-stone-600">Storage Usage</span>
                 <span className="font-medium">~{Math.round((stats.totalSchools * 2.5) * 10) / 10}MB</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Last Updated</span>
+                <span className="text-sm text-stone-600">Last Updated</span>
                 <span className="font-medium">{new Date().toLocaleTimeString()}</span>
               </div>
             </div>
@@ -189,26 +189,26 @@ export function SuperAdminDashboard() {
           <CardContent>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Avg Students per School</span>
+                <span className="text-sm text-stone-600">Avg Students per School</span>
                 <span className="font-medium">
                   {stats.totalSchools > 0 ? Math.round(stats.totalStudents / stats.totalSchools) : 0}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Avg Teachers per School</span>
+                <span className="text-sm text-stone-600">Avg Teachers per School</span>
                 <span className="font-medium">
                   {stats.totalSchools > 0 ? Math.round(stats.totalTeachers / stats.totalSchools) : 0}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Growth Rate (30 days)</span>
-                <span className="font-medium text-green-600">
+                <span className="text-sm text-stone-600">Growth Rate (30 days)</span>
+                <span className="font-medium text-amber-700">
                   +{stats.recentSchools} schools
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Platform Uptime</span>
-                <span className="font-medium text-green-600">99.9%</span>
+                <span className="text-sm text-stone-600">Platform Uptime</span>
+                <span className="font-medium text-amber-700">99.9%</span>
               </div>
             </div>
           </CardContent>
@@ -223,7 +223,7 @@ export function SuperAdminDashboard() {
               <CardTitle>Recently Added Schools</CardTitle>
               <CardDescription>Latest schools that have joined the platform</CardDescription>
             </div>
-            <Button asChild variant="outline">
+            <Button asChild variant="outline" className="border-amber-200 hover:bg-amber-50">
               <Link href="/superadmin/schools">
                 View All Schools
               </Link>
@@ -233,8 +233,8 @@ export function SuperAdminDashboard() {
         <CardContent>
           {recentSchools.length === 0 ? (
             <div className="text-center py-8">
-              <School className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">No schools have been added yet.</p>
+              <School className="mx-auto mb-4 h-12 w-12 text-amber-300" />
+              <p className="text-stone-600">No schools have been added yet.</p>
               <Button asChild className="mt-4">
                 <Link href="/superadmin/schools/add">
                   <Plus className="w-4 h-4 mr-2" />
@@ -280,12 +280,12 @@ export function SuperAdminDashboard() {
                           )}
                           <div>
                             <p className="font-medium">{school.name}</p>
-                            <p className="text-sm text-gray-500">{school.profile?.address}</p>
+                            <p className="text-sm text-stone-500">{school.profile?.address}</p>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded">
+                        <span className="rounded bg-amber-50 px-2 py-1 font-mono text-sm text-amber-900">
                           {school.schoolCode}
                         </span>
                       </TableCell>
@@ -294,7 +294,7 @@ export function SuperAdminDashboard() {
                           <p className="text-sm font-medium">
                             {school.adminFirstName} {school.adminLastName}
                           </p>
-                          <p className="text-xs text-gray-500">{school.adminEmail}</p>
+                          <p className="text-xs text-stone-500">{school.adminEmail}</p>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -311,7 +311,7 @@ export function SuperAdminDashboard() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm text-gray-600">
+                        <span className="text-sm text-stone-600">
                           {new Date(school.createdAt).toLocaleDateString()}
                         </span>
                       </TableCell>

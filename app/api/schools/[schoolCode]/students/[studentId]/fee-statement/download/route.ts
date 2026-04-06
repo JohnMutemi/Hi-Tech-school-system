@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
-
-const prisma = new PrismaClient();
+import { prisma } from '@/lib/prisma';
 
 // GET: Direct download of fee statement PDF for a student
 export async function GET(request: NextRequest, { params }: { params: { schoolCode: string; studentId: string } }) {
@@ -19,10 +17,13 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
 
     // Get the fee statement data directly
     const { GET: getFeeStatement } = await import('../route');
-    const feeStatementRequest = new NextRequest(
-      `${process.env.NEXT_PUBLIC_BASE_URL || 'https://yoursite.com'}/api/schools/${schoolCode}/students/${studentId}/fee-statement${academicYearId ? `?academicYearId=${academicYearId}` : ''}`,
-      { method: 'GET' }
-    );
+    const feeStatementUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://yoursite.com'}/api/schools/${schoolCode}/students/${studentId}/fee-statement${academicYearId ? `?academicYearId=${academicYearId}` : ''}`;
+    const feeStatementRequest = new NextRequest(feeStatementUrl, {
+      method: 'GET',
+      headers: {
+        cookie: request.headers.get('cookie') || '',
+      },
+    });
     
     const feeStatementResponse = await getFeeStatement(feeStatementRequest, { params: { schoolCode, studentId } });
     
@@ -36,9 +37,9 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     const statementData = await feeStatementResponse.json();
 
     // Get school details
-    const school = await prisma.school.findUnique({ 
-      where: { code: decodedSchoolCode },
-      select: { name: true, code: true }
+    const school = await prisma.school.findFirst({
+      where: { code: { equals: decodedSchoolCode, mode: 'insensitive' } },
+      select: { name: true, code: true },
     });
 
     if (!school) {
@@ -58,8 +59,10 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     pdf.setFont('helvetica', 'bold');
     pdf.text(school.name, 105, 20, { align: 'center' });
     
-    pdf.setFontSize(16);
-    pdf.text('FEE STATEMENT', 105, 30, { align: 'center' });
+    pdf.setFontSize(14);
+    pdf.setTextColor(80, 105, 100);
+    pdf.text('Annual fee statement', 105, 30, { align: 'center' });
+    pdf.setTextColor(0, 0, 0);
     
     // Student Information
     pdf.setFontSize(12);
@@ -83,9 +86,72 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       yPosition += 7;
     });
 
+    yPosition += 6;
+    const ann = statementData.annualSummary as Record<string, unknown> | null | undefined;
+    if (ann) {
+      const boxTop = yPosition - 2;
+      pdf.setFillColor(244, 249, 247);
+      pdf.rect(14, boxTop, 182, 38, 'F');
+      pdf.setDrawColor(180, 205, 198);
+      pdf.setLineWidth(0.2);
+      pdf.rect(14, boxTop, 182, 38, 'S');
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(55, 90, 82);
+      pdf.text('Year overview (payments, balance & carry-forward)', 18, yPosition + 4);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(8.5);
+      pdf.setTextColor(55, 70, 68);
+      const col1 = 18;
+      const col2 = 105;
+      let rowY = yPosition + 11;
+      const line = (a: string, b: string, x1: number, x2: number) => {
+        pdf.text(a, x1, rowY);
+        pdf.text(b, x2, rowY);
+        rowY += 5;
+      };
+      line(
+        `Fees assessed`,
+        `KES ${Number(ann.totalFeesAssessed || 0).toLocaleString()}`,
+        col1,
+        col2
+      );
+      line(
+        `Payments`,
+        `KES ${Number(ann.totalPaymentsRecorded || 0).toLocaleString()}`,
+        col1,
+        col2
+      );
+      line(
+        `Year ledger net`,
+        `KES ${Number(ann.ledgerYearNet || 0).toLocaleString()}`,
+        col1,
+        col2
+      );
+      line(
+        `Total outstanding (incl. arrears)`,
+        `KES ${Number(ann.totalAccountOutstanding || 0).toLocaleString()}`,
+        col1,
+        col2
+      );
+      line(
+        `Credit / overpayment`,
+        `KES ${Number(ann.overpaymentCredit || 0).toLocaleString()}`,
+        col1,
+        col2
+      );
+      pdf.setFontSize(7.5);
+      pdf.setTextColor(90, 105, 102);
+      const note = String(ann.carryForwardNote || '');
+      const splitNote = pdf.splitTextToSize(note, 175);
+      pdf.text(splitNote, 18, rowY + 2);
+      yPosition = boxTop + 42;
+      pdf.setTextColor(0, 0, 0);
+    }
+
     // Fee Statement Table with improved layout
-    yPosition += 10;
-    
+    yPosition += 8;
+
     const tableColumns = ['No.', 'Ref', 'Date', 'Description', 'Debit (KES)', 'Credit (KES)', 'Balance (KES)'];
     const tableRows = (statementData.statement || []).map((item: any, index: number) => {
       // Handle special row types
@@ -148,7 +214,7 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       startY: yPosition,
       theme: 'striped',
       headStyles: {
-        fillColor: [41, 128, 185],
+        fillColor: [95, 130, 125],
         textColor: 255,
         fontStyle: 'bold'
       },

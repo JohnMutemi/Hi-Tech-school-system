@@ -10,11 +10,11 @@ const prisma = new PrismaClient();
 export async function GET(req: NextRequest, { params }: { params: { schoolCode: string } }) {
   try {
     const schoolManager = withSchoolContext(params.schoolCode);
-    await schoolManager.initialize();
+    const schoolContext = await schoolManager.initialize();
     
     const teachers = await schoolManager.getTeachers();
 
-    const transformedTeachers = teachers.map(user => ({
+    let transformedTeachers = teachers.map(user => ({
       id: user.id,
       name: user.name,
       email: user.email,
@@ -24,6 +24,23 @@ export async function GET(req: NextRequest, { params }: { params: { schoolCode: 
       dateJoined: user.teacherProfile?.dateJoined,
       status: user.isActive ? 'active' : 'inactive'
     }));
+
+    const { searchParams } = new URL(req.url);
+    if (searchParams.get('eligibleClassTeacher') === '1') {
+      const excludeClassId = searchParams.get('excludeClassId') || undefined;
+      const occupied = await prisma.class.findMany({
+        where: {
+          schoolId: schoolContext.schoolId,
+          teacherId: { not: null },
+          ...(excludeClassId ? { id: { not: excludeClassId } } : {}),
+        },
+        select: { teacherId: true },
+      });
+      const busyIds = new Set(
+        occupied.map((c) => c.teacherId).filter((id): id is string => Boolean(id))
+      );
+      transformedTeachers = transformedTeachers.filter((t) => !busyIds.has(t.id));
+    }
 
     return NextResponse.json(transformedTeachers);
   } catch (error) {
@@ -71,8 +88,15 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
     });
 
     return NextResponse.json(newTeacher, { status: 201 });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error in POST /teachers:", error);
+    const code = error && typeof error === "object" && "code" in error ? (error as { code: string }).code : "";
+    if (code === "P2002") {
+      return NextResponse.json(
+        { error: "A user with this email already exists. Use a different email." },
+        { status: 409 }
+      );
+    }
     return NextResponse.json({ error: "Failed to create teacher" }, { status: 500 });
   }
 }

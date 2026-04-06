@@ -56,17 +56,15 @@ export function SuperAdminLogin() {
   return (
     <Card className="w-full max-w-md p-4 sm:p-6 md:p-8 shadow-2xl rounded-xl bg-white flex flex-col justify-center">
       <CardHeader className="text-center p-4 sm:p-6">
-        <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-amber-100 to-orange-100 sm:h-20 sm:w-20">
           <div className="relative">
-            {/* Main logo container */}
-            <div className="w-10 h-10 sm:w-14 sm:h-14 bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-lg transform rotate-3">
-              <div className="bg-white rounded-md w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center transform -rotate-3">
-                <div className="text-blue-600 font-bold text-base sm:text-lg">📚</div>
+            <div className="flex h-10 w-10 rotate-3 transform items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 via-orange-500 to-amber-700 shadow-lg sm:h-14 sm:w-14">
+              <div className="flex h-6 w-6 -rotate-3 transform items-center justify-center rounded-md bg-white sm:h-8 sm:w-8">
+                <div className="text-base font-bold text-amber-700 sm:text-lg">📚</div>
               </div>
             </div>
-            {/* Tech indicator */}
-            <div className="absolute -top-1 -right-1 w-3 h-3 sm:w-4 sm:h-4 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full flex items-center justify-center">
-              <div className="w-1 h-1 sm:w-1.5 sm:h-1.5 bg-white rounded-full animate-pulse"></div>
+            <div className="absolute -right-1 -top-1 flex h-3 w-3 items-center justify-center rounded-full bg-gradient-to-r from-amber-400 to-orange-500 sm:h-4 sm:w-4">
+              <div className="h-1 w-1 animate-pulse rounded-full bg-white sm:h-1.5 sm:w-1.5"></div>
             </div>
           </div>
         </div>
@@ -74,7 +72,7 @@ export function SuperAdminLogin() {
         <CardDescription className="text-sm sm:text-base">Secure access to system administration</CardDescription>
       </CardHeader>
       <CardContent className="p-4 sm:p-6">
-        {error && <p className="text-red-500 text-center mb-4">{error}</p>}
+        {error && <p className="mb-4 text-center text-orange-700">{error}</p>}
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
             <Label htmlFor="email">Email Address</Label>
@@ -105,14 +103,14 @@ export function SuperAdminLogin() {
 
           <Button
             type="submit"
-            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-base sm:text-lg py-4 sm:py-6"
+            className="w-full bg-gradient-to-r from-amber-600 to-orange-600 py-4 text-base hover:from-amber-700 hover:to-orange-700 sm:py-6 sm:text-lg"
             disabled={isLoading}
           >
             {isLoading ? "Authenticating..." : "Sign In"}
           </Button>
         </form>
 
-        <div className="mt-6 text-center text-xs sm:text-sm text-gray-600">
+        <div className="mt-6 text-center text-xs text-stone-600 sm:text-sm">
           <p>Protected system access only</p>
         </div>
       </CardContent>

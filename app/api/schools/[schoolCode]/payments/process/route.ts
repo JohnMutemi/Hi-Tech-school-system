@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
 import { academicYearTransitionService } from "@/lib/services/academic-year-transition-service";
-
-const prisma = new PrismaClient();
+import { prisma } from "@/lib/prisma";
+import { jsonError, requireRole, requireSchoolAccess } from "@/lib/api-guard";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { schoolCode: string } }
 ) {
   try {
+    const { session, schoolContext } = await requireSchoolAccess(params.schoolCode);
+    requireRole(session, ["super_admin", "school_admin", "bursar", "parent", "student"]);
+
     const {
       studentId,
       amount,
@@ -29,21 +31,16 @@ export async function POST(
       );
     }
 
-    // Get school
     const school = await prisma.school.findUnique({
-      where: { code: params.schoolCode },
+      where: { id: schoolContext.schoolId },
     });
-
     if (!school) {
-      return NextResponse.json(
-        { error: "School not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "School not found" }, { status: 404 });
     }
 
     // Get student
-    const student = await prisma.student.findUnique({
-      where: { id: studentId },
+    const student = await prisma.student.findFirst({
+      where: { id: studentId, schoolId: schoolContext.schoolId },
       include: {
         school: true,
         class: {
@@ -63,7 +60,7 @@ export async function POST(
     // Get or create academic year
     let academicYearRecord = await prisma.academicYear.findFirst({
       where: {
-        schoolId: school.id,
+        schoolId: schoolContext.schoolId,
         name: academicYear
       }
     });
@@ -79,7 +76,7 @@ export async function POST(
       
       academicYearRecord = await prisma.academicYear.create({
         data: {
-          schoolId: school.id,
+          schoolId: schoolContext.schoolId,
           name: academicYear,
           startDate: new Date(year, 0, 1),
           endDate: new Date(year, 11, 31),
@@ -210,10 +207,7 @@ export async function POST(
 
   } catch (error) {
     console.error("Payment processing error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return jsonError(error);
   }
 }
 

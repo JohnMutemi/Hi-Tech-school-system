@@ -1,7 +1,7 @@
-import { PrismaClient } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
-
-const prisma = new PrismaClient();
+import { prisma } from '@/lib/prisma';
+import { computeStudentFeesSnapshot } from '@/lib/services/student-fees-snapshot';
+import { assertStudentFeeAccess, resolvePortalFeeAuth } from '@/lib/portal-fee-auth';
 
 // GET: Professional fee statement for a student
 export async function GET(request: NextRequest, { params }: { params: { schoolCode: string; studentId: string } }) {
@@ -12,9 +12,17 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     const academicYearId = searchParams.get('academicYearId');
 
     // Find the school
-    const school = await prisma.school.findUnique({ where: { code: decodedSchoolCode } });
+    const school = await prisma.school.findFirst({
+      where: { code: { equals: decodedSchoolCode, mode: 'insensitive' } },
+    });
     if (!school) {
       return NextResponse.json({ error: 'School not found' }, { status: 404 });
+    }
+
+    const auth = await resolvePortalFeeAuth(request, schoolCode);
+    const gate = await assertStudentFeeAccess(auth, school.id, studentId);
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.message }, { status: gate.status });
     }
 
     // Find the student
@@ -453,6 +461,60 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       }
     });
 
+    let annualSummary: Record<string, unknown> | null = null;
+    if (targetAcademicYearId && student.class?.gradeId) {
+      const fullForSnap = await prisma.student.findFirst({
+        where: { id: studentId, schoolId: school.id },
+        include: { user: true, class: { include: { grade: true } } },
+      });
+      if (fullForSnap?.class?.gradeId) {
+        const snap = await computeStudentFeesSnapshot(
+          prisma,
+          school,
+          fullForSnap,
+          targetAcademicYearId,
+          { persistYearEndCarryForward: false }
+        );
+        if (!('error' in snap)) {
+          const yName = academicYear?.name || '';
+          const yNum = parseInt(yName, 10);
+          let recordedClosing: number | null = null;
+          if (!Number.isNaN(yNum)) {
+            const yb = await prisma.studentYearlyBalance.findFirst({
+              where: { studentId, academicYear: yNum },
+              orderBy: { updatedAt: 'desc' },
+            });
+            recordedClosing = yb?.closingBalance ?? null;
+          }
+          const ledgerNet = snap.academicYearOutstanding;
+          const totalOwed = snap.outstanding;
+          annualSummary = {
+            academicYearLabel: yName,
+            totalFeesAssessed: snap.totalFeeRequired,
+            totalPaymentsRecorded: snap.totalPaid,
+            ledgerYearNet: ledgerNet,
+            arrearsFromPriorYears: snap.arrears,
+            totalAccountOutstanding: totalOwed,
+            overpaymentCredit: ledgerNet < 0 ? Math.abs(ledgerNet) : 0,
+            amountDueNow: totalOwed > 0 ? totalOwed : 0,
+            recordedYearClosingBalance: recordedClosing,
+            carryForwardNote:
+              ledgerNet < 0
+                ? `A credit of KES ${Math.abs(ledgerNet).toLocaleString()} appears within this academic year; year-end carry-forward is subject to school policy.`
+                : totalOwed > 0
+                  ? `Total position is KES ${totalOwed.toLocaleString()} including any prior arrears—useful for progression and next-year planning.`
+                  : `No outstanding balance in this consolidated view.`,
+            termBreakdown: snap.termBalances.map((t) => ({
+              term: t.term,
+              assessed: Number(t.totalAmount),
+              paid: t.paidAmount,
+              balance: t.balance,
+            })),
+          };
+        }
+      }
+    }
+
     // Return structured data with term-specific balances
     return NextResponse.json({
       student: {
@@ -465,6 +527,7 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       academicYear: academicYear?.name || 'Academic Year',
       statement: allRows,
       termBalances: Array.from(termBalances.values()),
+      annualSummary,
       summary: {
         totalDebit,
         totalCredit,

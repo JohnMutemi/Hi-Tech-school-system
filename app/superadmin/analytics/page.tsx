@@ -107,10 +107,10 @@ export default function AnalyticsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex min-h-[40vh] items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading analytics...</p>
+          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-2 border-amber-600 border-t-transparent" />
+          <p className="text-muted-foreground">Loading analytics…</p>
         </div>
       </div>
     )
@@ -121,9 +121,8 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="space-y-6">
+      <div className="mx-auto max-w-7xl">
         {/* Header with Navigation and Refresh Button */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <div className="flex items-center gap-4">
@@ -131,25 +130,25 @@ export default function AnalyticsPage() {
               variant="outline"
               size="sm"
               onClick={() => router.back()}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 border-amber-200 hover:bg-amber-50"
             >
               <ArrowLeft className="w-4 h-4" />
               Back
             </Button>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">System Analytics</h1>
-              <p className="text-gray-600">Comprehensive overview of platform performance and school statistics</p>
+              <h1 className="text-2xl font-bold text-stone-900">System Analytics</h1>
+              <p className="text-stone-600">Comprehensive overview of platform performance and school statistics</p>
             </div>
           </div>
           <Button 
             onClick={loadAnalytics} 
             disabled={isLoading}
             variant="outline"
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 border-amber-200 text-amber-900 hover:bg-amber-50"
           >
             <div className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`}>
               {isLoading ? (
-                <div className="w-4 h-4 border-2 border-gray-300 border-t-blue-600 rounded-full"></div>
+                <div className="h-4 w-4 rounded-full border-2 border-amber-200 border-t-amber-600" />
               ) : (
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -162,57 +161,26 @@ export default function AnalyticsPage() {
 
         {/* Key Metrics */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
-          <Card className="border-l-4 border-l-blue-500">
+          <Card className="border-l-4 border-l-amber-500">
             <CardContent className="p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs md:text-sm text-gray-600">Total Schools</p>
-                  <p className="text-xl md:text-2xl font-bold">{analytics.totalSchools}</p>
+                  <p className="text-xs text-stone-600 md:text-sm">Total Schools</p>
+                  <p className="text-xl font-bold md:text-2xl">{analytics.totalSchools}</p>
                 </div>
-                <School className="w-6 h-6 md:w-8 md:h-8 text-blue-500" />
+                <School className="h-6 w-6 text-amber-600 md:h-8 md:w-8" />
               </div>
-              <div className="flex items-center mt-2">
+              <div className="mt-2 flex items-center">
                 {analytics.growthRate >= 0 ? (
-                  <TrendingUp className="w-3 h-3 md:w-4 md:h-4 text-green-500 mr-1" />
+                  <TrendingUp className="mr-1 h-3 w-3 text-amber-600 md:h-4 md:w-4" />
                 ) : (
-                  <TrendingDown className="w-3 h-3 md:w-4 md:h-4 text-red-500 mr-1" />
+                  <TrendingDown className="mr-1 h-3 w-3 text-orange-700 md:h-4 md:w-4" />
                 )}
-                <span className={`text-xs md:text-sm ${analytics.growthRate >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {analytics.growthRate >= 0 ? '+' : ''}{analytics.growthRate.toFixed(1)}%
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-l-4 border-l-green-500">
-            <CardContent className="p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs md:text-sm text-gray-600">Total Students</p>
-                  <p className="text-xl md:text-2xl font-bold">{analytics.totalStudents}</p>
-                </div>
-                <Users className="w-6 h-6 md:w-8 md:h-8 text-green-500" />
-              </div>
-              <div className="mt-2">
-                <span className="text-xs md:text-sm text-gray-600">
-                  Avg: {analytics.avgStudentsPerSchool} per school
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-l-4 border-l-purple-500">
-            <CardContent className="p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs md:text-sm text-gray-600">Total Teachers</p>
-                  <p className="text-xl md:text-2xl font-bold">{analytics.totalTeachers}</p>
-                </div>
-                <GraduationCap className="w-6 h-6 md:w-8 md:h-8 text-purple-500" />
-              </div>
-              <div className="mt-2">
-                <span className="text-xs md:text-sm text-gray-600">
-                  Avg: {analytics.avgTeachersPerSchool} per school
+                <span
+                  className={`text-xs md:text-sm ${analytics.growthRate >= 0 ? "text-amber-700" : "text-orange-800"}`}
+                >
+                  {analytics.growthRate >= 0 ? "+" : ""}
+                  {analytics.growthRate.toFixed(1)}%
                 </span>
               </div>
             </CardContent>
@@ -222,13 +190,47 @@ export default function AnalyticsPage() {
             <CardContent className="p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs md:text-sm text-gray-600">New Schools</p>
-                  <p className="text-xl md:text-2xl font-bold">{analytics.recentSchools}</p>
+                  <p className="text-xs text-stone-600 md:text-sm">Total Students</p>
+                  <p className="text-xl font-bold md:text-2xl">{analytics.totalStudents}</p>
                 </div>
-                <Calendar className="w-6 h-6 md:w-8 md:h-8 text-orange-500" />
+                <Users className="h-6 w-6 text-orange-600 md:h-8 md:w-8" />
               </div>
               <div className="mt-2">
-                <span className="text-xs md:text-sm text-gray-600">Last 30 days</span>
+                <span className="text-xs text-stone-600 md:text-sm">
+                  Avg: {analytics.avgStudentsPerSchool} per school
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-l-4 border-l-amber-700">
+            <CardContent className="p-4 md:p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-stone-600 md:text-sm">Total Teachers</p>
+                  <p className="text-xl font-bold md:text-2xl">{analytics.totalTeachers}</p>
+                </div>
+                <GraduationCap className="h-6 w-6 text-amber-800 md:h-8 md:w-8" />
+              </div>
+              <div className="mt-2">
+                <span className="text-xs text-stone-600 md:text-sm">
+                  Avg: {analytics.avgTeachersPerSchool} per school
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-l-4 border-l-yellow-500">
+            <CardContent className="p-4 md:p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-stone-600 md:text-sm">New Schools</p>
+                  <p className="text-xl font-bold md:text-2xl">{analytics.recentSchools}</p>
+                </div>
+                <Calendar className="h-6 w-6 text-yellow-600 md:h-8 md:w-8" />
+              </div>
+              <div className="mt-2">
+                <span className="text-xs text-stone-600 md:text-sm">Last 30 days</span>
               </div>
             </CardContent>
           </Card>
@@ -249,7 +251,7 @@ export default function AnalyticsPage() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                    <div className="h-3 w-3 rounded-full bg-amber-500" />
                     <span className="text-sm">Active Schools</span>
                   </div>
                   <div className="flex items-center space-x-2">
@@ -261,7 +263,7 @@ export default function AnalyticsPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                    <div className="h-3 w-3 rounded-full bg-orange-400" />
                     <span className="text-sm">Setup Required</span>
                   </div>
                   <div className="flex items-center space-x-2">
@@ -273,7 +275,7 @@ export default function AnalyticsPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                    <div className="h-3 w-3 rounded-full bg-orange-900/80" />
                     <span className="text-sm">Suspended</span>
                   </div>
                   <div className="flex items-center space-x-2">
@@ -300,7 +302,7 @@ export default function AnalyticsPage() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-600">Platform Uptime</span>
-                  <Badge variant="default" className="bg-green-100 text-green-800">
+                  <Badge variant="default" className="border-amber-200 bg-amber-100 text-amber-900">
                     99.9%
                   </Badge>
                 </div>
@@ -329,15 +331,18 @@ export default function AnalyticsPage() {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                <p className="text-gray-600">Loading schools...</p>
+              <div className="py-8 text-center">
+                <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-amber-600 border-t-transparent" />
+                <p className="text-stone-600">Loading schools…</p>
               </div>
             ) : !Array.isArray(schools) || schools.length === 0 ? (
-              <div className="text-center py-8">
-                <School className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600">No schools have been added yet.</p>
-                <Button asChild className="mt-4">
+              <div className="py-8 text-center">
+                <School className="mx-auto mb-4 h-12 w-12 text-amber-300" />
+                <p className="text-stone-600">No schools have been added yet.</p>
+                <Button
+                  asChild
+                  className="mt-4 border-0 bg-gradient-to-r from-amber-600 to-orange-600 text-white hover:from-amber-700 hover:to-orange-700"
+                >
                   <Link href="/superadmin/schools/add">
                     Add First School
                   </Link>
@@ -410,9 +415,10 @@ export default function AnalyticsPage() {
                           </span>
                         </TableCell>
                         <TableCell>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-amber-200 hover:bg-amber-50"
                             onClick={() => window.open(school.portalUrl, "_blank")}
                           >
                             View Portal

@@ -22,7 +22,7 @@ export default function TeacherPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+    <div className="flex min-h-screen bg-gradient-to-br from-blue-50/90 via-white/80 to-indigo-50/90 backdrop-blur-sm">
       <TeacherSidebar
         activeTab={activeTab}
         onTabChange={setActiveTab}

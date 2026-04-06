@@ -206,10 +206,13 @@ export function BulkImport({
       const formData = new FormData()
       formData.append('file', file)
 
-      const response = await fetch(`/api/schools/${schoolCode}/${entityType}/import`, {
-        method: 'POST',
-        body: formData,
-      })
+      const response = await fetch(
+        `/api/schools/${encodeURIComponent(schoolCode)}/${entityType}/import`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      )
 
       const result = await response.json()
 
@@ -389,35 +392,35 @@ export function BulkImport({
                     <div className="flex items-center gap-2">
                       <CheckCircle className="w-4 h-4 text-green-600" />
                       <span className="text-sm font-medium text-green-800">
-                        Created: {result.created.length}
+                        Created: {result.created?.length ?? 0}
                       </span>
                     </div>
                   </div>
                   
-                  {result.errors.length > 0 && (
+                  {(result.errors?.length ?? 0) > 0 && (
                     <div className="p-3 bg-red-50 rounded-lg">
                       <div className="flex items-center gap-2">
                         <XCircle className="w-4 h-4 text-red-600" />
                         <span className="text-sm font-medium text-red-800">
-                          Errors: {result.errors.length}
+                          Errors: {result.errors?.length ?? 0}
                         </span>
                       </div>
                     </div>
                   )}
                 </div>
 
-                {result.errors.length > 0 && (
+                {(result.errors?.length ?? 0) > 0 && (
                   <div className="max-h-32 overflow-auto">
                     <h5 className="text-sm font-medium text-red-800 mb-2">Errors:</h5>
                     <div className="space-y-1">
-                      {result.errors.slice(0, 5).map((error: any, index: number) => (
+                      {(result.errors ?? []).slice(0, 5).map((error: any, index: number) => (
                         <div key={index} className="text-xs text-red-700">
                           {error[entityType.slice(0, -1)] || 'Unknown'}: {error.error}
                         </div>
                       ))}
-                      {result.errors.length > 5 && (
+                      {(result.errors?.length ?? 0) > 5 && (
                         <div className="text-xs text-red-600">
-                          ... and {result.errors.length - 5} more errors
+                          ... and {(result.errors?.length ?? 0) - 5} more errors
                         </div>
                       )}
                     </div>

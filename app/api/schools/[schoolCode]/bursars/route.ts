@@ -1,17 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
+import { prisma } from '@/lib/prisma';
 import { hashDefaultPasswordByRole } from '@/lib/utils/default-passwords';
 
-const prisma = new PrismaClient();
+function isDbUnavailable(error: unknown): boolean {
+  const code = typeof error === 'object' && error && 'code' in error ? String((error as { code?: string }).code) : '';
+  const msg = error instanceof Error ? error.message : String(error);
+  return (
+    code === 'P1001' ||
+    /Can't reach database server|connection (refused|timed out)|ECONNREFUSED/i.test(msg)
+  );
+}
 
 // GET: Get all bursars for a school
 export async function GET(request: NextRequest, { params }: { params: { schoolCode: string } }) {
   try {
-    const school = await prisma.school.findUnique({ 
-      where: { code: params.schoolCode.toLowerCase() } 
+    const school = await prisma.school.findFirst({
+      where: { code: { equals: params.schoolCode, mode: 'insensitive' } },
     });
-    
+
     if (!school) {
       return NextResponse.json({ error: 'School not found' }, { status: 404 });
     }
@@ -20,7 +26,7 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       where: {
         role: 'bursar',
         schoolId: school.id,
-        isActive: true
+        isActive: true,
       },
       select: {
         id: true,
@@ -30,13 +36,22 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
         role: true,
         isActive: true,
         createdAt: true,
-        updatedAt: true
-      }
+        updatedAt: true,
+      },
     });
 
     return NextResponse.json(bursars);
   } catch (error) {
     console.error('Error fetching bursars:', error);
+    if (isDbUnavailable(error)) {
+      return NextResponse.json(
+        {
+          error:
+            'Database is temporarily unreachable. If you use Neon, wake the project or check your network, then try again.',
+        },
+        { status: 503 }
+      );
+    }
     return NextResponse.json({ error: 'Failed to fetch bursars' }, { status: 500 });
   }
 }
@@ -44,28 +59,27 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
 // POST: Create a new bursar
 export async function POST(request: NextRequest, { params }: { params: { schoolCode: string } }) {
   try {
-    const school = await prisma.school.findUnique({ 
-      where: { code: params.schoolCode.toLowerCase() } 
+    const school = await prisma.school.findFirst({
+      where: { code: { equals: params.schoolCode, mode: 'insensitive' } },
     });
-    
+
     if (!school) {
       return NextResponse.json({ error: 'School not found' }, { status: 404 });
     }
 
     const body = await request.json();
-    const { name, email, phone, tempPassword } = body;
+    const { name, email, phone } = body;
 
     if (!name || !email) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Check if bursar already exists
     const existingBursar = await prisma.user.findFirst({
       where: {
         email: email,
         role: 'bursar',
-        schoolId: school.id
-      }
+        schoolId: school.id,
+      },
     });
 
     if (existingBursar) {
@@ -92,16 +106,28 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
         role: true,
         isActive: true,
         createdAt: true,
-        updatedAt: true
-      }
+        updatedAt: true,
+      },
     });
 
-    return NextResponse.json({
-      ...newBursar,
-      tempPassword: 'bursar123' // Return the default password for display to admin
-    }, { status: 201 });
+    return NextResponse.json(
+      {
+        ...newBursar,
+        tempPassword: 'bursar123',
+      },
+      { status: 201 }
+    );
   } catch (error) {
     console.error('Error creating bursar:', error);
+    if (isDbUnavailable(error)) {
+      return NextResponse.json(
+        {
+          error:
+            'Database is temporarily unreachable. If you use Neon, wake the project or check your network, then try again.',
+        },
+        { status: 503 }
+      );
+    }
     return NextResponse.json({ error: 'Failed to create bursar' }, { status: 500 });
   }
 }
@@ -109,10 +135,10 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
 // PUT: Update a bursar
 export async function PUT(request: NextRequest, { params }: { params: { schoolCode: string } }) {
   try {
-    const school = await prisma.school.findUnique({ 
-      where: { code: params.schoolCode.toLowerCase() } 
+    const school = await prisma.school.findFirst({
+      where: { code: { equals: params.schoolCode, mode: 'insensitive' } },
     });
-    
+
     if (!school) {
       return NextResponse.json({ error: 'School not found' }, { status: 404 });
     }
@@ -124,13 +150,12 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
       return NextResponse.json({ error: 'Bursar ID is required' }, { status: 400 });
     }
 
-    // Verify the bursar belongs to this school
     const existingBursar = await prisma.user.findFirst({
       where: {
         id: id,
         role: 'bursar',
-        schoolId: school.id
-      }
+        schoolId: school.id,
+      },
     });
 
     if (!existingBursar) {
@@ -152,13 +177,22 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
         role: true,
         isActive: true,
         createdAt: true,
-        updatedAt: true
-      }
+        updatedAt: true,
+      },
     });
 
     return NextResponse.json(updatedBursar);
   } catch (error) {
     console.error('Error updating bursar:', error);
+    if (isDbUnavailable(error)) {
+      return NextResponse.json(
+        {
+          error:
+            'Database is temporarily unreachable. If you use Neon, wake the project or check your network, then try again.',
+        },
+        { status: 503 }
+      );
+    }
     return NextResponse.json({ error: 'Failed to update bursar' }, { status: 500 });
   }
 }
@@ -166,10 +200,10 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
 // DELETE: Delete a bursar
 export async function DELETE(request: NextRequest, { params }: { params: { schoolCode: string } }) {
   try {
-    const school = await prisma.school.findUnique({ 
-      where: { code: params.schoolCode.toLowerCase() } 
+    const school = await prisma.school.findFirst({
+      where: { code: { equals: params.schoolCode, mode: 'insensitive' } },
     });
-    
+
     if (!school) {
       return NextResponse.json({ error: 'School not found' }, { status: 404 });
     }
@@ -179,13 +213,12 @@ export async function DELETE(request: NextRequest, { params }: { params: { schoo
       return NextResponse.json({ error: 'Bursar ID is required' }, { status: 400 });
     }
 
-    // Verify the bursar belongs to this school
     const bursar = await prisma.user.findFirst({
       where: {
         id: id,
         role: 'bursar',
-        schoolId: school.id
-      }
+        schoolId: school.id,
+      },
     });
 
     if (!bursar) {
@@ -197,6 +230,15 @@ export async function DELETE(request: NextRequest, { params }: { params: { schoo
     return NextResponse.json({ message: 'Bursar deleted successfully' });
   } catch (error) {
     console.error('Error deleting bursar:', error);
+    if (isDbUnavailable(error)) {
+      return NextResponse.json(
+        {
+          error:
+            'Database is temporarily unreachable. If you use Neon, wake the project or check your network, then try again.',
+        },
+        { status: 503 }
+      );
+    }
     return NextResponse.json({ error: 'Failed to delete bursar' }, { status: 500 });
   }
-} 
+}

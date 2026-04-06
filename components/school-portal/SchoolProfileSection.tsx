@@ -1,16 +1,27 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, School, Edit, CheckCircle } from "lucide-react";
+import { ArrowLeft, School, Edit, CheckCircle, Upload, Trash2 } from "lucide-react";
 import type { SchoolProfile } from "@/lib/school-storage";
+import { isAcceptableSchoolLogoFile, SCHOOL_LOGO_ACCEPT } from "@/lib/utils/school-logo-file";
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error ?? new Error("Failed to read file"));
+    reader.readAsDataURL(file);
+  });
+}
 
 interface SchoolProfileSectionProps {
   schoolCode: string;
   colorTheme: string;
-  toast: any;
+  toast: (args: { title: string; description?: string; variant?: "destructive" }) => void;
+  onBrandingUpdated?: () => void | Promise<void>;
 }
 
 const defaultProfile: SchoolProfile = {
@@ -25,12 +36,23 @@ const defaultProfile: SchoolProfile = {
   type: "primary",
 };
 
-export default function SchoolProfileSection({ schoolCode, colorTheme, toast }: SchoolProfileSectionProps) {
+export default function SchoolProfileSection({
+  schoolCode,
+  colorTheme,
+  toast,
+  onBrandingUpdated,
+}: SchoolProfileSectionProps) {
   const [schoolProfile, setSchoolProfile] = useState<SchoolProfile>(defaultProfile);
   const [profileSaved, setProfileSaved] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [brandingColor, setBrandingColor] = useState(colorTheme);
+  const [displayedLogoUrl, setDisplayedLogoUrl] = useState<string>("");
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string>("");
+  const [logoRemoved, setLogoRemoved] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch profile on mount
   useEffect(() => {
@@ -46,6 +68,12 @@ export default function SchoolProfileSection({ schoolCode, colorTheme, toast }: 
             setSchoolProfile(defaultProfile);
             setProfileSaved(false);
           }
+          const theme = data.colorTheme || colorTheme || "#d97706";
+          setBrandingColor(/^#[0-9A-Fa-f]{6}$/.test(theme) ? theme : "#d97706");
+          setDisplayedLogoUrl(data.logoUrl || data.logo || "");
+          setLogoFile(null);
+          setLogoPreview("");
+          setLogoRemoved(false);
         }
       } catch (err) {
         setError("Failed to load school profile");
@@ -55,32 +83,93 @@ export default function SchoolProfileSection({ schoolCode, colorTheme, toast }: 
     // eslint-disable-next-line
   }, [schoolCode]);
 
+  useEffect(() => {
+    setBrandingColor((c) => (colorTheme && /^#[0-9A-Fa-f]{6}$/.test(colorTheme) ? colorTheme : c));
+  }, [colorTheme]);
+
   // Save or update profile
   const handleSave = async () => {
     setLoading(true);
     setError("");
     try {
-      // Validate required fields
       if (!schoolProfile.address || !schoolProfile.phone || !schoolProfile.email || !schoolProfile.principalName || !schoolProfile.establishedYear || !schoolProfile.type) {
         setError("Please fill in all required fields.");
         setLoading(false);
         return;
       }
+
+      const themeHex = /^#[0-9A-Fa-f]{6}$/.test(String(brandingColor).trim())
+        ? String(brandingColor).trim()
+        : "#d97706";
+
+      const payload: Record<string, unknown> = {
+        profile: schoolProfile,
+        colorTheme: themeHex,
+      };
+
+      if (logoFile) {
+        try {
+          payload.logoUrl = await readFileAsDataUrl(logoFile);
+        } catch {
+          setError("Could not read the logo file.");
+          setLoading(false);
+          return;
+        }
+      } else if (logoRemoved) {
+        payload.logoUrl = "";
+      }
+
       const res = await fetch(`/api/schools/${schoolCode}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profile: schoolProfile }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error("Failed to update school profile");
+      const updated = await res.json();
       setProfileSaved(true);
       setIsEditingProfile(false);
+      setDisplayedLogoUrl(updated.logoUrl || updated.logo || "");
+      setBrandingColor(updated.colorTheme || brandingColor);
+      setLogoFile(null);
+      setLogoPreview("");
+      setLogoRemoved(false);
       toast({ title: "Success!", description: "School profile saved successfully!" });
-    } catch (err: any) {
-      setError(err.message || "Failed to save profile");
-      toast({ title: "Error", description: err.message || "Failed to save profile.", variant: "destructive" });
+      await onBrandingUpdated?.();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to save profile";
+      setError(message);
+      toast({ title: "Error", description: message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleLogoPick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Logo must be 5MB or less.", variant: "destructive" });
+      return;
+    }
+    if (!isAcceptableSchoolLogoFile(file)) {
+      toast({
+        title: "Invalid file",
+        description: "Use a PNG, JPG, GIF, or WebP image.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setLogoFile(file);
+    setLogoRemoved(false);
+    const url = URL.createObjectURL(file);
+    setLogoPreview(url);
+  };
+
+  const clearPendingLogo = () => {
+    if (logoPreview) URL.revokeObjectURL(logoPreview);
+    setLogoFile(null);
+    setLogoPreview("");
+    if (logoInputRef.current) logoInputRef.current.value = "";
   };
 
   return (
@@ -107,12 +196,27 @@ export default function SchoolProfileSection({ schoolCode, colorTheme, toast }: 
             </Button>
           )}
           {profileSaved && isEditingProfile && (
-            <Button 
-              onClick={() => setIsEditingProfile(false)} 
+            <Button
+              onClick={async () => {
+                clearPendingLogo();
+                setLogoRemoved(false);
+                setIsEditingProfile(false);
+                try {
+                  const res = await fetch(`/api/schools/${schoolCode}`);
+                  if (res.ok) {
+                    const data = await res.json();
+                    const t = data.colorTheme || colorTheme || "#d97706";
+                    setBrandingColor(/^#[0-9A-Fa-f]{6}$/.test(t) ? t : "#d97706");
+                    setDisplayedLogoUrl(data.logoUrl || data.logo || "");
+                  }
+                } catch {
+                  /* keep current display */
+                }
+              }}
               variant="outline"
-              className="border-2 hover:bg-gray-50 transition-all duration-300"
+              className="border-2 transition-all duration-300 hover:bg-gray-50"
             >
-              <ArrowLeft className="w-4 h-4 mr-2" />
+              <ArrowLeft className="mr-2 h-4 w-4" />
               Cancel Edit
             </Button>
           )}
@@ -127,7 +231,42 @@ export default function SchoolProfileSection({ schoolCode, colorTheme, toast }: 
       </CardHeader>
       <CardContent className="px-8 pb-8">
         {profileSaved && !isEditingProfile ? (
-          <div className="grid md:grid-cols-2 gap-8">
+          <div className="space-y-8">
+            <div className="flex flex-wrap items-center gap-8 rounded-xl border border-gray-200 bg-white/60 p-6 shadow-sm">
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold text-gray-700">School logo</Label>
+                {displayedLogoUrl ? (
+                  <img
+                    src={displayedLogoUrl}
+                    alt="School logo"
+                    className="h-20 w-20 rounded-xl border-2 object-contain"
+                    style={{ borderColor: brandingColor }}
+                  />
+                ) : (
+                  <div
+                    className="flex h-20 w-20 items-center justify-center rounded-xl border-2 border-dashed text-xs text-gray-500"
+                    style={{ borderColor: brandingColor }}
+                  >
+                    No logo
+                  </div>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold text-gray-700">Portal theme color</Label>
+                <div className="flex items-center gap-3">
+                  <span
+                    className="h-12 w-12 rounded-lg border-2 border-gray-200 shadow-inner"
+                    style={{ backgroundColor: brandingColor }}
+                  />
+                  <span className="font-mono text-sm text-gray-800">{brandingColor}</span>
+                </div>
+                <p className="max-w-md text-xs text-gray-500">
+                  This color is used across your school portal. Edit the profile to change the logo or theme.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-8">
             <div className="space-y-6">
               <div>
                 <h4 className="font-bold text-gray-900 mb-6 flex items-center gap-3 text-lg">
@@ -200,6 +339,7 @@ export default function SchoolProfileSection({ schoolCode, colorTheme, toast }: 
               )}
             </div>
           </div>
+          </div>
         ) : (
           <form
             onSubmit={async (e) => {
@@ -208,6 +348,76 @@ export default function SchoolProfileSection({ schoolCode, colorTheme, toast }: 
             }}
             className="space-y-6"
           >
+            <div className="space-y-4 rounded-xl border border-gray-200 bg-white/50 p-6">
+              <h4 className="font-bold text-gray-900 text-lg">Logo & theme</h4>
+              <p className="text-sm text-gray-600">
+                Upload a logo (PNG recommended) and set the accent color for your school portal (buttons, borders,
+                highlights).
+              </p>
+              <div className="flex flex-wrap items-start gap-6">
+                <div className="space-y-2">
+                  <Label>Theme color</Label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={/^#[0-9A-Fa-f]{6}$/.test(brandingColor) ? brandingColor : "#d97706"}
+                      onChange={(e) => setBrandingColor(e.target.value)}
+                      className="h-10 w-14 cursor-pointer rounded border"
+                      aria-label="Theme color"
+                    />
+                    <Input
+                      value={brandingColor}
+                      onChange={(e) => setBrandingColor(e.target.value)}
+                      className="w-36 font-mono text-sm"
+                      placeholder="#d97706"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>School logo</Label>
+                  <input
+                    ref={logoInputRef}
+                    type="file"
+                    accept={SCHOOL_LOGO_ACCEPT}
+                    className="hidden"
+                    onChange={handleLogoPick}
+                  />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => logoInputRef.current?.click()}>
+                      <Upload className="mr-2 h-4 w-4" />
+                      {logoFile || displayedLogoUrl ? "Replace logo" : "Upload logo"}
+                    </Button>
+                    {(logoFile || displayedLogoUrl) && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-600 hover:text-red-700"
+                        onClick={() => {
+                          clearPendingLogo();
+                          setLogoRemoved(true);
+                        }}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Remove logo
+                      </Button>
+                    )}
+                  </div>
+                  {logoRemoved && !logoFile && (
+                    <p className="text-xs text-amber-700">Logo will be removed when you save.</p>
+                  )}
+                  {(logoPreview || (displayedLogoUrl && !logoRemoved)) && (
+                    <img
+                      src={logoPreview || displayedLogoUrl}
+                      alt="Logo preview"
+                      className="mt-2 h-20 w-20 rounded-lg border object-contain"
+                      style={{ borderColor: brandingColor }}
+                    />
+                  )}
+                </div>
+              </div>
+            </div>
+
             <div className="grid md:grid-cols-2 gap-6">
               <div className="space-y-4">
                 <Label htmlFor="address" className="text-base font-semibold text-gray-700">School Address *</Label>

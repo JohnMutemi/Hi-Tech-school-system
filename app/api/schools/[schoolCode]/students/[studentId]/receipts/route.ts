@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { prisma } from "@/lib/prisma";
+import { assertStudentFeeAccess, resolvePortalFeeAuth } from "@/lib/portal-fee-auth";
 
 export async function GET(request: NextRequest, { params }: { params: { schoolCode: string, studentId: string } }) {
   try {
@@ -14,12 +13,18 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     const student = await prisma.student.findFirst({
       where: {
         id: studentId,
-        school: { code: schoolCode },
+        school: { code: { equals: schoolCode, mode: "insensitive" } },
       },
       include: { school: true },
     });
     if (!student) {
       return NextResponse.json({ error: "Student not found" }, { status: 404 });
+    }
+
+    const auth = await resolvePortalFeeAuth(request, schoolCode);
+    const gate = await assertStudentFeeAccess(auth, student.schoolId, studentId);
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.message }, { status: gate.status });
     }
 
     // Build where clause for filtering

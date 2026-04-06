@@ -20,6 +20,7 @@ export const schools = pgTable("schools", {
   phone: text("phone").notNull(),
   email: text("email").notNull(),
   logo: text("logo"),
+  colorTheme: text("colorTheme"),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

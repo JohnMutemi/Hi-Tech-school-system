@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import { SMSService } from "@/lib/services/sms-service";
 import { EmailService } from "@/lib/services/email-service";
-
-const prisma = new PrismaClient();
+import { jsonError, requireRole, requireSchoolAccess } from "@/lib/api-guard";
 
 export async function POST(
   request: NextRequest,
@@ -11,6 +10,9 @@ export async function POST(
 ) {
   try {
     const { schoolCode } = params;
+    const { session, schoolContext } = await requireSchoolAccess(schoolCode);
+    requireRole(session, ["super_admin", "school_admin", "bursar"]);
+
     const body = await request.json();
     
     const {
@@ -40,9 +42,8 @@ export async function POST(
       );
     }
 
-    // Find the school
     const school = await prisma.school.findUnique({
-      where: { code: schoolCode },
+      where: { id: schoolContext.schoolId },
     });
     if (!school) {
       return NextResponse.json({ error: "School not found" }, { status: 404 });
@@ -196,10 +197,7 @@ export async function POST(
 
   } catch (error) {
     console.error("Manual payment error:", error);
-    return NextResponse.json(
-      { error: "Failed to record manual payment" },
-      { status: 500 }
-    );
+    return jsonError(error);
   }
 }
 

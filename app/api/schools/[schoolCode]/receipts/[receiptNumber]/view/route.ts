@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { prisma } from "@/lib/prisma"
+import { jsonError } from "@/lib/api-guard"
+import { assertStudentFeeAccess, resolvePortalFeeAuth } from '@/lib/portal-fee-auth'
 
 // GET - View receipt by receipt number (exactly like bursar dashboard modal)
 export async function GET(
@@ -11,9 +11,8 @@ export async function GET(
   try {
     const { schoolCode, receiptNumber } = params
 
-    // Find the school
-    const school = await prisma.school.findUnique({
-      where: { code: schoolCode }
+    const school = await prisma.school.findFirst({
+      where: { code: { equals: schoolCode, mode: 'insensitive' } },
     })
 
     if (!school) {
@@ -52,6 +51,12 @@ export async function GET(
         { error: 'Receipt not found' },
         { status: 404 }
       )
+    }
+
+    const auth = await resolvePortalFeeAuth(request, schoolCode)
+    const access = await assertStudentFeeAccess(auth, school.id, receipt.studentId)
+    if (!access.ok) {
+      return NextResponse.json({ error: access.message }, { status: access.status })
     }
 
     // Prepare receipt data
@@ -589,9 +594,6 @@ This is a computer-generated receipt.
 
   } catch (error) {
     console.error('Error viewing receipt:', error)
-    return NextResponse.json(
-      { error: 'Failed to view receipt' },
-      { status: 500 }
-    )
+    return jsonError(error)
   }
 }

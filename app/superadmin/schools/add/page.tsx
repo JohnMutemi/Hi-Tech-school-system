@@ -12,10 +12,10 @@ export default function AddSchoolPage() {
   if (user === undefined) {
     // Still loading user info
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex min-h-[40vh] items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-2 border-amber-600 border-t-transparent" />
+          <p className="text-muted-foreground">Loading…</p>
         </div>
       </div>
     )
@@ -29,10 +29,8 @@ export default function AddSchoolPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <AddSchoolForm />
-      </div>
+    <div className="mx-auto max-w-4xl">
+      <AddSchoolForm />
     </div>
   )
 }

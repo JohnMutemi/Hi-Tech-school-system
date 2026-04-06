@@ -1,9 +1,42 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { formatSyncReport, getReplicationSyncReport } from './db-sync-check';
 
 const prisma = new PrismaClient();
 
 async function main() {
+  if (process.env.SEED_SKIP_SYNC_CHECK !== '1') {
+    const syncReport = await getReplicationSyncReport(prisma);
+    console.log(formatSyncReport(syncReport));
+    console.log('');
+
+    if (syncReport.inRecovery && process.env.SEED_ALLOW_STANDBY !== '1') {
+      console.error(
+        'Refusing to seed: database reports pg_is_in_recovery() = true (standby / read replica). ' +
+          'Point DATABASE_URL at the primary writer, or set SEED_ALLOW_STANDBY=1 if you accept the risk.'
+      );
+      process.exit(1);
+    }
+
+    if (syncReport.primaryReplicasCatchingUp) {
+      console.warn(
+        'Warning: some replicas are not in steady streaming state. If you need a fully caught-up fleet, wait before seeding production.'
+      );
+      console.log('');
+    }
+  } else {
+    console.log('[DB sync / replication] skipped (SEED_SKIP_SYNC_CHECK=1)\n');
+  }
+
+  const existingAdmin = await prisma.user.findUnique({
+    where: { email: 'admin@hitechsms.co.ke' },
+  });
+  if (existingAdmin) {
+    console.log(
+      'Existing seed data detected (super admin present). Sync status above reflects the current connection.\n'
+    );
+  }
+
   const hashedPassword = await bcrypt.hash('admin123', 10);
 
   await prisma.user.upsert({

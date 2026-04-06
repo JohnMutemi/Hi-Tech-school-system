@@ -12,9 +12,16 @@ interface FeesManagementProps {
   schoolCode: string;
   selectedId: string;
   setSelectedId: (id: string) => void;
+  schoolCurrentAcademicYear?: string;
 }
 
-export default function EnhancedFeesManagement({ students, schoolCode, selectedId, setSelectedId }: FeesManagementProps) {
+export default function EnhancedFeesManagement({
+  students,
+  schoolCode,
+  selectedId,
+  setSelectedId,
+  schoolCurrentAcademicYear,
+}: FeesManagementProps) {
   const selectedStudent = students.find((child: any) => child.id === selectedId) || students[0];
   const [showPaymentHub, setShowPaymentHub] = useState(false);
   const [termlyFees, setTermlyFees] = useState<any[]>([]);
@@ -31,22 +38,27 @@ export default function EnhancedFeesManagement({ students, schoolCode, selectedI
     if (selectedStudent) {
       fetchOverviewFeeData();
     }
-  }, [selectedStudent, schoolCode]);
+  }, [selectedStudent, schoolCode, schoolCurrentAcademicYear]);
 
   const fetchOverviewFeeData = async () => {
     try {
       setLoadingFees(true);
       setFeesError("");
-      const response = await fetch(`/api/schools/${schoolCode}/students/${selectedStudent.id}/fees`);
+      const response = await fetch(
+        `/api/schools/${encodeURIComponent(schoolCode)}/students/${selectedStudent.id}/fees`
+      );
       if (!response.ok) throw new Error("Failed to fetch fees");
       const data = await response.json();
       setFeeSummary(data);
 
-      // Determine academic year label
       const yearFromBalances = Array.isArray(data)
         ? (data[0]?.year ? String(data[0].year) : "")
         : (data?.termBalances?.[0]?.year ? String(data.termBalances[0].year) : "");
-      setCurrentAcademicYear(yearFromBalances || new Date().getFullYear().toString());
+      const yearLabel =
+        (schoolCurrentAcademicYear && String(schoolCurrentAcademicYear).trim()) ||
+        yearFromBalances ||
+        new Date().getFullYear().toString();
+      setCurrentAcademicYear(yearLabel);
 
       // Calculate current term balance (initial balance - payments)
       const balancesArray = Array.isArray(data) ? data : (data?.termBalances || []);

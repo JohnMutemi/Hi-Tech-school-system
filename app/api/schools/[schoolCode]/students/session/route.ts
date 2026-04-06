@@ -19,9 +19,26 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     if (payload.role !== "student" || payload.schoolCode !== params.schoolCode) {
       return NextResponse.json({ error: "Invalid session" }, { status: 401 })
     }
-    // Optionally fetch student info
-    const student = await prisma.student.findUnique({ where: { id: payload.studentId } })
-    return NextResponse.json({ studentId: payload.studentId, schoolCode: payload.schoolCode, student })
+    const student = await prisma.student.findUnique({
+      where: { id: payload.studentId },
+      include: {
+        user: { select: { name: true, email: true } },
+        class: { include: { grade: { select: { name: true } } } },
+      },
+    })
+    if (!student) {
+      return NextResponse.json({ error: "Student not found" }, { status: 404 })
+    }
+    return NextResponse.json({
+      studentId: payload.studentId,
+      schoolCode: payload.schoolCode,
+      student: {
+        ...student,
+        name: student.user?.name,
+        className: student.class?.name,
+        gradeName: student.class?.grade?.name,
+      },
+    })
   } catch (error) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }

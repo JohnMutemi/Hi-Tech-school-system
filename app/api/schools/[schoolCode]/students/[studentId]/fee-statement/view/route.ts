@@ -16,10 +16,11 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     
     // Import and call the fee statement logic directly
     const { GET: getFeeStatement } = await import('../route');
-    const feeStatementRequest = new NextRequest(
-      `${process.env.NEXT_PUBLIC_BASE_URL || 'https://yoursite.com'}/api/schools/${schoolCode}/students/${studentId}/fee-statement${academicYearId ? `?academicYearId=${academicYearId}` : ''}`,
-      { method: 'GET' }
-    );
+    const feeStatementUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://yoursite.com'}/api/schools/${schoolCode}/students/${studentId}/fee-statement${academicYearId ? `?academicYearId=${academicYearId}` : ''}`;
+    const feeStatementRequest = new NextRequest(feeStatementUrl, {
+      method: 'GET',
+      headers: { cookie: request.headers.get('cookie') || '' },
+    });
     
     const feeStatementResponse = await getFeeStatement(feeStatementRequest, { params: { schoolCode, studentId } });
     

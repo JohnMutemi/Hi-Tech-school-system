@@ -158,7 +158,7 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast, 
   const [classError, setClassError] = useState<string>("");
   const [gradeError, setGradeError] = useState<string>("");
 
-  const [teachers, setTeachers] = useState<any[]>([]);
+  const [eligibleTeachers, setEligibleTeachers] = useState<any[]>([]);
 
   // Fetch subjects, classes, and grades from backend
   useEffect(() => {
@@ -195,18 +195,24 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast, 
 
 
 
-  // Fetch teachers from backend
+  // Teachers eligible to be class teacher (one class per teacher; exclude current class when editing)
   useEffect(() => {
-    async function fetchTeachers() {
+    if (!showClassModal || !schoolCode) return;
+    async function fetchEligible() {
       try {
-        const res = await fetch(`/api/schools/${schoolCode}/teachers`);
-        if (res.ok) setTeachers(await res.json());
-      } catch (error) {
-        toast && toast({ title: "Error", description: "Could not load teachers.", variant: "destructive" });
+        const q = new URLSearchParams({ eligibleClassTeacher: "1" });
+        if (newClass.id) q.set("excludeClassId", newClass.id as string);
+        const res = await fetch(`/api/schools/${schoolCode}/teachers?${q.toString()}`);
+        if (res.ok) setEligibleTeachers(await res.json());
+        else setEligibleTeachers([]);
+      } catch {
+        setEligibleTeachers([]);
+        toast &&
+          toast({ title: "Error", description: "Could not load teachers.", variant: "destructive" });
       }
     }
-    if (schoolCode) fetchTeachers();
-  }, [schoolCode, toast]);
+    fetchEligible();
+  }, [showClassModal, schoolCode, newClass.id, toast]);
 
   // Subject CRUD
   const handleAddSubject = () => {
@@ -253,7 +259,10 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast, 
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(subjectForm),
         });
-        if (!res.ok) throw new Error("Failed to update subject");
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || "Failed to update subject");
+        }
         newSubject = await res.json();
         setSubjects(subjects.map((s) => (s.id === newSubject.id ? newSubject : s)));
         toast({ title: "Success!", description: "Subject updated successfully!" });
@@ -263,7 +272,10 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast, 
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(subjectForm),
         });
-        if (!res.ok) throw new Error("Failed to create subject");
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || "Failed to create subject");
+        }
         newSubject = await res.json();
         setSubjects([...subjects, newSubject]);
         toast({ title: "Success!", description: "Subject added successfully!" });
@@ -281,11 +293,13 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast, 
 
   // Class CRUD
   const handleAddClass = () => {
+    const soleGradeId = grades.length === 1 ? grades[0].id : "";
     setNewClass({
       name: "",
+      shortCode: "",
       level: "",
       classTeacherId: "",
-      gradeId: "",
+      gradeId: soleGradeId,
     });
     setShowClassModal(true);
     setClassError("");
@@ -310,30 +324,62 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast, 
   const handleSaveClass = async (e: React.FormEvent) => {
     e.preventDefault();
     setClassError("");
-    if (!newClass.name || !newClass.gradeId) {
-      setClassError("Please fill in all required fields.");
+    const gradeId =
+      newClass.gradeId ||
+      (grades.length === 1 ? grades[0].id : "");
+    if (!newClass.name?.trim()) {
+      setClassError("Class name is required.");
+      return;
+    }
+    if (!newClass.shortCode?.trim()) {
+      setClassError("Short code is required.");
+      return;
+    }
+    if (!gradeId) {
+      setClassError("Select a grade (or add exactly one grade to default it).");
+      return;
+    }
+    if (isSetupMode && !newClass.classTeacherId) {
+      setClassError("Class teacher is required.");
       return;
     }
     try {
-      const apiData = {
-        name: newClass.name,
-        gradeId: newClass.gradeId,
+      const base = {
+        name: newClass.name.trim(),
+        gradeId,
+        shortCode: newClass.shortCode.trim(),
       };
+      const isEdit = Boolean(newClass.id);
+      const bodyPayload = isEdit
+        ? {
+            id: newClass.id,
+            ...base,
+            teacherId: newClass.classTeacherId || null,
+          }
+        : {
+            ...base,
+            ...(newClass.classTeacherId ? { teacherId: newClass.classTeacherId } : {}),
+          };
+
       const res = await fetch(`/api/schools/${schoolCode}/classes`, {
-        method: "POST",
+        method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(apiData),
+        body: JSON.stringify(bodyPayload),
       });
-      if (!res.ok) throw new Error("Failed to create class");
-      // Fetch the latest class list after adding
+      const errBody = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(errBody.error || (isEdit ? "Failed to update class" : "Failed to create class"));
       const cRes = await fetch(`/api/schools/${schoolCode}/classes`);
       if (cRes.ok) setClasses(await cRes.json());
       setShowClassModal(false);
       setNewClass({});
-      toast({ title: "Success!", description: "Class added successfully!" });
-    } catch (err: any) {
-      setClassError(err.message || "Failed to create class.");
-      toast({ title: "Error", description: err.message || "Failed to create class.", variant: "destructive" });
+      toast({
+        title: "Success!",
+        description: isEdit ? "Class updated successfully!" : "Class added successfully!",
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to save class.";
+      setClassError(msg);
+      toast({ title: "Error", description: msg, variant: "destructive" });
     }
   };
 
@@ -735,7 +781,9 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast, 
                           Class
                         </div>
                       </TableHead>
+                      <TableHead className="font-semibold text-gray-700 py-4">Code</TableHead>
                       <TableHead className="font-semibold text-gray-700 py-4">Grade</TableHead>
+                      <TableHead className="font-semibold text-gray-700 py-4">Class teacher</TableHead>
                       <TableHead className="font-semibold text-gray-700 py-4">Enrolled</TableHead>
                       <TableHead className="font-semibold text-gray-700 py-4 px-6">Actions</TableHead>
                     </TableRow>
@@ -758,9 +806,17 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast, 
                           </div>
                         </TableCell>
                         <TableCell className="py-4">
+                          <span className="font-mono text-sm text-gray-700">
+                            {cls.shortCode || "—"}
+                          </span>
+                        </TableCell>
+                        <TableCell className="py-4">
                           <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
                             {cls.grade?.name || 'N/A'}
                           </span>
+                        </TableCell>
+                        <TableCell className="py-4 text-sm text-gray-700">
+                          {cls.teacher?.name || "—"}
                         </TableCell>
                         <TableCell className="py-4">
                           <span className="text-gray-700">{cls.currentStudents || 0}</span>
@@ -771,7 +827,12 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast, 
                               size="sm" 
                               variant="ghost" 
                               onClick={() => {
-                                setNewClass(cls);
+                                setNewClass({
+                                  ...cls,
+                                  gradeId: cls.grade?.id || cls.gradeId || "",
+                                  classTeacherId: cls.teacher?.id || (cls as any).teacherId || "",
+                                  shortCode: cls.shortCode || "",
+                                });
                                 setShowClassModal(true);
                                 setClassError("");
                               }}
@@ -816,52 +877,90 @@ export default function SubjectsClassesSection({ schoolCode, colorTheme, toast, 
           <DialogContent>
             <DialogHeader>
                 <DialogTitle>{newClass && newClass.id ? "Edit Class" : "Add New Class"}</DialogTitle>
-              <DialogDescription>Fill in all required fields for the class.</DialogDescription>
+              <DialogDescription>
+                {isSetupMode
+                  ? "Class name, short code, and class teacher. Each teacher may lead only one class."
+                  : "Name, short code, grade, and optional class teacher (one class per teacher)."}
+              </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSaveClass} className="space-y-4">
               <div className="space-y-2">
-                <Label>Class Name *</Label>
-                <Input value={newClass.name || ""} onChange={e => setNewClass({ ...newClass, name: e.target.value })} required />
+                <Label>Class name *</Label>
+                <Input
+                  value={newClass.name || ""}
+                  onChange={(e) => setNewClass({ ...newClass, name: e.target.value })}
+                  placeholder="e.g. Grade 5 Blue"
+                  required
+                />
               </div>
               <div className="space-y-2">
-                <Label>Grade *</Label>
-                <Select value={newClass.gradeId || ""} onValueChange={value => setNewClass({ ...newClass, gradeId: value })} required>
+                <Label>Short code *</Label>
+                <Input
+                  value={newClass.shortCode || ""}
+                  onChange={(e) => setNewClass({ ...newClass, shortCode: e.target.value })}
+                  placeholder="e.g. G5B"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Class teacher {isSetupMode ? "*" : ""}</Label>
+                <Select
+                  value={
+                    newClass.classTeacherId
+                      ? newClass.classTeacherId
+                      : !isSetupMode
+                        ? "__none__"
+                        : undefined
+                  }
+                  onValueChange={(value) =>
+                    setNewClass({ ...newClass, classTeacherId: value === "__none__" ? "" : value })
+                  }
+                >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select grade" />
+                    <SelectValue placeholder={isSetupMode ? "Select teacher" : "Optional — assign later"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {(() => {
-                      console.log('Grades in dropdown:', grades);
-                      console.log('Grades length:', grades?.length);
-                      return (grades || []).filter(grade => grade && grade.id && grade.name && grade.id.trim() !== '').map(grade => {
-                        console.log('Rendering grade:', grade);
-                        return (
-                          <SelectItem key={grade.id} value={grade.id}>{grade.name}</SelectItem>
-                        );
-                      });
-                    })()}
+                    {!isSetupMode && (
+                      <SelectItem value="__none__">None</SelectItem>
+                    )}
+                    {eligibleTeachers.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
+                {eligibleTeachers.length === 0 && (
+                  <p className="text-xs text-amber-700">
+                    No unassigned teachers available. Add a teacher or remove them from another class first.
+                  </p>
+                )}
               </div>
-              {!isSetupMode && (
+              {(grades.length > 1 || !isSetupMode) && (
                 <div className="space-y-2">
-                  <Label>Level *</Label>
-                  <Select value={newClass.level || ""} onValueChange={value => setNewClass({ ...newClass, level: value })} required>
+                  <Label>Grade *</Label>
+                  <Select
+                    value={newClass.gradeId || ""}
+                    onValueChange={(value) => setNewClass({ ...newClass, gradeId: value })}
+                    required
+                  >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select level" />
+                      <SelectValue placeholder="Select grade" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Primary">Primary</SelectItem>
-                      <SelectItem value="Secondary">Secondary</SelectItem>
-                      <SelectItem value="College">College</SelectItem>
+                      {(grades || [])
+                        .filter((grade) => grade?.id && grade?.name)
+                        .map((grade) => (
+                          <SelectItem key={grade.id} value={grade.id}>
+                            {grade.name}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>
               )}
-              
 
-
-              {classError && <div className="text-red-600">{classError}</div>}
+              {classError && <div className="text-red-600 text-sm">{classError}</div>}
               <div className="flex justify-end space-x-4">
                 <Button type="button" variant="outline" onClick={() => setShowClassModal(false)}>Cancel</Button>
                   <Button type="submit" style={{ backgroundColor: colorTheme }}>{newClass && newClass.id ? "Update Class" : "Add Class"}</Button>

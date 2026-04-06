@@ -2,104 +2,160 @@
 
 import { useUser, mutate } from "@/hooks/use-user"
 import { useRouter, usePathname } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo, type CSSProperties } from "react"
 import Link from "next/link"
-import { LogOut, LayoutDashboard, School, TrendingUp, Settings, Menu, User, Bell, Search } from "lucide-react"
+import {
+  LogOut,
+  LayoutDashboard,
+  School,
+  TrendingUp,
+  Settings,
+  Menu,
+  User,
+  Bell,
+  Search,
+  Plus,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
+import { getAllSchools } from "@/lib/school-storage"
+import { getSuperAdminTheme } from "@/lib/superadmin-accent-themes"
+const SIDEBAR_W = "lg:w-72 lg:min-w-[18rem]"
 
 export default function SuperAdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
-  const pathname = usePathname();
+  const pathname = usePathname()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  
-  // Only enable user fetching if not on login page
-  const isLoginPage = pathname === '/superadmin/login'
+  const [schoolCount, setSchoolCount] = useState<number | null>(null)
+  const t = getSuperAdminTheme("amber")
+
+  const isLoginPage = pathname === "/superadmin/login"
   const { user } = useUser({ enabled: !isLoginPage })
 
   useEffect(() => {
-    if (!isLoginPage && user && (!user.isLoggedIn || user.role !== 'super_admin')) {
-      router.replace('/superadmin/login')
+    if (!isLoginPage && user && (!user.isLoggedIn || user.role !== "super_admin")) {
+      router.replace("/superadmin/login")
     }
   }, [user, router, isLoginPage])
 
-  // Page transition effect
+  useEffect(() => {
+    if (isLoginPage) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const schools = await getAllSchools()
+        if (!cancelled) setSchoolCount(Array.isArray(schools) ? schools.length : 0)
+      } catch {
+        if (!cancelled) setSchoolCount(null)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [isLoginPage, pathname])
+
   useEffect(() => {
     setIsLoading(true)
-    const timer = setTimeout(() => setIsLoading(false), 300)
+    const timer = setTimeout(() => setIsLoading(false), 200)
     return () => clearTimeout(timer)
   }, [pathname])
 
-  // If on login page, just render children without any layout
+  const navigationItems = useMemo(
+    () => [
+      { href: "/superadmin", icon: LayoutDashboard, label: "Dashboard", badge: null as string | null },
+      {
+        href: "/superadmin/schools",
+        icon: School,
+        label: "Schools",
+        badge: schoolCount != null ? String(schoolCount) : null,
+      },
+      { href: "/superadmin/analytics", icon: TrendingUp, label: "Analytics", badge: null },
+      { href: "/superadmin/settings", icon: Settings, label: "Settings", badge: null },
+    ],
+    [schoolCount]
+  )
+
+  const pageTitle = useMemo(() => {
+    const match = navigationItems.find(
+      (item) => pathname === item.href || (item.href !== "/superadmin" && pathname.startsWith(item.href))
+    )
+    return match?.label ?? "Super Admin"
+  }, [pathname, navigationItems])
+
+  const handleLogout = async () => {
+    await fetch("/api/superadmin/logout", { method: "POST" })
+    await mutate("/api/superadmin/user")
+    router.push("/superadmin/login")
+  }
+
   if (isLoginPage) {
     return <>{children}</>
   }
 
-  if (!user || (user && (!user.isLoggedIn || user.role !== 'super_admin'))) {
-    // Don't render the sidebar or children
+  if (!user || (user && (!user.isLoggedIn || user.role !== "super_admin"))) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+      <div
+        className={`flex min-h-dvh items-center justify-center bg-gradient-to-br ${t.pageBg}`}
+        style={
+          {
+            ["--sa-scroll-from" as string]: t.scrollbarFrom,
+            ["--sa-scroll-to" as string]: t.scrollbarTo,
+        } as CSSProperties
+      }
+    >
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <div
+            className={`mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-2 border-t-transparent ${t.spinner}`}
+          />
+          <p className="text-muted-foreground">Loading…</p>
         </div>
       </div>
     )
   }
 
-  const navigationItems = [
-    { href: "/superadmin", icon: LayoutDashboard, label: "Dashboard", badge: null },
-    { href: "/superadmin/schools", icon: School, label: "Schools", badge: "12" },
-    { href: "/superadmin/analytics", icon: TrendingUp, label: "Analytics", badge: null },
-    { href: "/superadmin/settings", icon: Settings, label: "Settings", badge: null },
-  ]
-
-  const handleLogout = async () => {
-    await fetch('/api/superadmin/logout', { method: 'POST' })
-    await mutate('/api/superadmin/user')
-    router.push('/superadmin/login')
-  }
-
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-red-50 via-slate-50 to-red-100 relative overflow-hidden">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-red-400/20 to-red-600/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-slate-400/20 to-red-400/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-r from-red-300/10 to-slate-300/10 rounded-full blur-3xl animate-pulse delay-500"></div>
-      </div>
-
-              {/* Desktop Sidebar */}
-        <aside className="w-72 bg-white/80 backdrop-blur-xl shadow-2xl hidden lg:flex flex-col h-screen fixed left-0 top-0 z-30 border-r border-white/20">
-        <div className="h-24 flex items-center justify-center border-b border-red-200/20 bg-gradient-to-r from-red-600 to-red-700 shadow-lg">
+    <div
+      className={`flex min-h-dvh bg-gradient-to-br ${t.pageBg}`}
+      style={
+        {
+          ["--sa-scroll-from" as string]: t.scrollbarFrom,
+          ["--sa-scroll-to" as string]: t.scrollbarTo,
+        } as CSSProperties
+      }
+    >
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 hidden ${SIDEBAR_W} flex-col border-r border-amber-200/40 bg-amber-50/50 shadow-sm backdrop-blur-md lg:flex`}
+      >
+        <div
+          className={`flex h-16 shrink-0 items-center justify-center border-b border-white/20 bg-gradient-to-r ${t.brandGradient} px-4`}
+        >
           <div className="text-center">
-            <span className="font-bold text-2xl text-white tracking-tight">Hi-Tech SMS</span>
-            <p className="text-red-100 text-sm mt-1">Super Admin Portal</p>
+            <span className="text-lg font-bold tracking-tight text-white">Hi-Tech SMS</span>
+            <p className={`text-xs ${t.brandSubtle}`}>Super Admin</p>
           </div>
         </div>
-        
-        <nav className="flex-1 py-8 space-y-3 overflow-y-auto custom-scrollbar px-4">
+
+        <nav className="custom-scrollbar flex-1 space-y-1 overflow-y-auto px-3 py-4">
           {navigationItems.map((item) => {
             const Icon = item.icon
-            const isActive = pathname === item.href || (item.href !== "/superadmin" && pathname.startsWith(item.href))
+            const isActive =
+              pathname === item.href || (item.href !== "/superadmin" && pathname.startsWith(item.href))
             return (
-              <Link 
+              <Link
                 key={item.href}
-                href={item.href} 
-                                className={`group flex items-center gap-4 px-6 py-4 rounded-2xl font-medium transition-all duration-300 transform hover:scale-105 ${
-                  isActive
-                    ? "bg-gradient-to-r from-red-600 to-red-700 text-white shadow-lg shadow-red-500/25 border border-red-500/20"
-                    : "text-gray-700 hover:bg-red-50/60 hover:text-red-700 hover:shadow-md"
-                }`} 
+                href={item.href}
+                className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
+                  isActive ? t.navActive : t.navInactive
+                }`}
                 aria-current={isActive ? "page" : undefined}
               >
-                <Icon className={`w-6 h-6 transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`} /> 
-                <span className="flex-1">{item.label}</span>
-                {item.badge && (
-                  <Badge variant="secondary" className="ml-auto bg-white/20 text-white border-0">
+                <Icon className="h-5 w-5 shrink-0" />
+                <span className="flex-1 truncate">{item.label}</span>
+                {item.badge != null && item.badge !== "" && (
+                  <Badge variant="secondary" className="shrink-0 border-0 bg-white/20 text-xs text-white">
                     {item.badge}
                   </Badge>
                 )}
@@ -107,169 +163,140 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
             )
           })}
         </nav>
-        
-        <div className="mt-auto mb-8 px-4">
-          <div className="mb-4 p-4 bg-gradient-to-r from-red-50 to-slate-50 rounded-2xl border border-red-200/50">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-red-600 to-red-700 rounded-full flex items-center justify-center shadow-sm border border-red-500/20">
-                <User className="w-5 h-5 text-white" />
+
+        <div className="shrink-0 border-t border-amber-200/40 p-3">
+          <div className="mb-3 rounded-xl border border-amber-200/50 bg-amber-50/80 p-3">
+            <div className="flex items-center gap-2">
+              <div
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white ${t.userOrb}`}
+              >
+                <User className="h-4 w-4" />
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-gray-900 truncate">{user?.name || 'Admin'}</p>
-                <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">{user?.name || "Admin"}</p>
+                <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
               </div>
             </div>
           </div>
-          
           <button
+            type="button"
             onClick={handleLogout}
-            className="flex items-center gap-3 w-full px-6 py-4 rounded-2xl text-red-600 hover:bg-red-50 font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-md justify-center group"
+            className={`flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-medium transition-colors ${t.logout}`}
           >
-            <LogOut className="w-5 h-5 group-hover:rotate-12 transition-transform duration-300" /> 
+            <LogOut className="h-4 w-4" />
             Logout
           </button>
         </div>
       </aside>
 
-              {/* Main Content Area */}
-        <div className="flex-1 flex flex-col min-h-screen relative lg:ml-72">
-        {/* Mobile Header */}
-        <header className="lg:hidden bg-white/90 backdrop-blur-xl shadow-lg border-b border-white/20 fixed top-0 left-0 right-0 z-20">
-          <div className="flex items-center justify-between px-4 py-4">
-            <div className="flex items-center gap-3">
-              <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-                <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" className="lg:hidden hover:bg-red-50 h-12 w-12 rounded-2xl transition-all duration-300 hover:scale-105">
-                    <Menu className="h-6 w-6" />
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="left" className="w-80 p-0 bg-white/95 backdrop-blur-xl">
-                  <SheetHeader className="p-6 border-b bg-gradient-to-r from-red-600 to-red-700 text-white">
-                    <SheetTitle className="text-left text-white font-bold text-xl">Hi-Tech SMS</SheetTitle>
-                    <p className="text-red-100 text-sm mt-2">Super Admin Portal</p>
-                  </SheetHeader>
-                  <nav className="flex-1 py-6 space-y-3 px-4">
-                    {navigationItems.map((item) => {
-                      const Icon = item.icon
-                      const isActive = pathname === item.href || (item.href !== "/superadmin" && pathname.startsWith(item.href))
-                      return (
-                        <Link 
-                          key={item.href}
-                          href={item.href} 
-                          onClick={() => setIsMobileMenuOpen(false)}
-                                                    className={`flex items-center gap-4 px-6 py-4 rounded-2xl font-medium transition-all duration-300 transform hover:scale-105 ${
-                            isActive
-                              ? "bg-gradient-to-r from-red-600 to-red-700 text-white shadow-lg"
-                              : "text-gray-700 hover:bg-red-50 hover:text-red-700 hover:shadow-md"
-                          }`} 
-                          aria-current={isActive ? "page" : undefined}
-                        >
-                          <Icon className="w-6 h-6" /> 
-                          <span className="flex-1">{item.label}</span>
-                          {item.badge && (
-                            <Badge variant="secondary" className="ml-auto bg-white/20 text-white border-0">
-                              {item.badge}
-                            </Badge>
-                          )}
-                        </Link>
-                      )
-                    })}
-                  </nav>
-                  <div className="mt-auto p-6 border-t border-white/20">
-                                                             <div className="mb-4 p-4 bg-gradient-to-r from-red-50 to-slate-50 rounded-2xl">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-red-600 to-red-700 rounded-full flex items-center justify-center">
-                           <User className="w-5 h-5 text-white" />
-                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-gray-900 truncate">{user?.name || 'Admin'}</p>
-                          <p className="text-xs text-gray-500 truncate">{user?.email}</p>
-                        </div>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => {
-                        handleLogout()
-                        setIsMobileMenuOpen(false)
-                      }}
-                      className="flex items-center gap-3 w-full px-6 py-4 rounded-2xl text-red-600 hover:bg-red-50 font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-md justify-center"
-                    >
-                      <LogOut className="w-5 h-5" /> Logout
-                    </button>
-                  </div>
-                </SheetContent>
-              </Sheet>
-              
-              <div className="flex flex-col">
-                <span className="font-bold text-xl text-gray-900">Hi-Tech SMS</span>
-                <span className="text-xs text-gray-500">
-                  {navigationItems.find(item => 
-                    pathname === item.href || (item.href !== "/superadmin" && pathname.startsWith(item.href))
-                  )?.label || 'Super Admin'}
-                </span>
-              </div>
+      <div className="flex min-h-dvh min-w-0 flex-1 flex-col lg:pl-72">
+        <header className="sticky top-0 z-30 shrink-0 border-b border-amber-200/50 bg-amber-50/40 shadow-sm backdrop-blur-md">
+          <div className="flex h-14 items-center gap-3 px-4 sm:px-6 lg:h-16 lg:px-8">
+            <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="text-amber-900 hover:bg-amber-100/80 lg:hidden" aria-label="Open menu">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-[min(100%,20rem)] border-amber-200/50 bg-amber-50/40 p-0">
+                <SheetHeader
+                  className={`border-b bg-gradient-to-r ${t.brandGradient} p-4 text-left text-white`}
+                >
+                  <SheetTitle className="text-white">Hi-Tech SMS</SheetTitle>
+                  <p className={`text-xs ${t.brandSubtle}`}>Super Admin Portal</p>
+                </SheetHeader>
+                <nav className="flex flex-col gap-1 p-3">
+                  {navigationItems.map((item) => {
+                    const Icon = item.icon
+                    const isActive =
+                      pathname === item.href ||
+                      (item.href !== "/superadmin" && pathname.startsWith(item.href))
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium ${
+                          isActive ? t.sheetNavActive : "text-foreground hover:bg-amber-100/80"
+                        }`}
+                      >
+                        <Icon className="h-5 w-5" />
+                        {item.label}
+                        {item.badge != null && item.badge !== "" && (
+                          <Badge className="ml-auto" variant="secondary">
+                            {item.badge}
+                          </Badge>
+                        )}
+                      </Link>
+                    )
+                  })}
+                </nav>
+              </SheetContent>
+            </Sheet>
+
+            <div className="min-w-0 flex-1 lg:hidden">
+              <p className="truncate text-xs text-muted-foreground">Hi-Tech SMS</p>
+              <h1 className="truncate text-base font-semibold leading-tight">{pageTitle}</h1>
             </div>
-            
-            <div className="flex items-center gap-3">
-              {/* Search Bar */}
-              <div className="hidden sm:flex items-center gap-2 bg-white/60 backdrop-blur-sm px-4 py-2 rounded-2xl border border-white/20">
-                <Search className="w-4 h-4 text-gray-400" />
-                <Input 
-                  placeholder="Search..." 
-                  className="border-0 bg-transparent p-0 h-auto text-sm w-32 focus:ring-0"
+
+            <div className="hidden min-w-0 flex-1 items-center gap-4 lg:flex">
+              <h1 className="truncate text-lg font-semibold tracking-tight">{pageTitle}</h1>
+              <div className="relative mx-4 hidden max-w-md flex-1 xl:block">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search…"
+                  className="h-9 pl-9"
+                  readOnly
+                  aria-readonly
                 />
               </div>
-              
-              {/* Notifications */}
-              <Button variant="ghost" size="icon" className="relative h-10 w-10 rounded-2xl hover:bg-red-50 transition-all duration-300 hover:scale-105">
-                <Bell className="w-5 h-5" />
-                <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
-                  3
-                </Badge>
+            </div>
+
+            <div className="flex shrink-0 items-center gap-2">
+              <Button variant="ghost" size="icon" className="relative hidden sm:inline-flex text-amber-800 hover:bg-amber-100/80" aria-label="Notifications">
+                <Bell className="h-5 w-5" />
+                <span className={`absolute right-1 top-1 h-2 w-2 rounded-full ${t.notifyDot}`} />
               </Button>
-              
-              {/* User Avatar */}
-              <div className="hidden sm:flex items-center gap-2 text-sm text-gray-600 bg-white/60 backdrop-blur-sm px-4 py-2 rounded-2xl border border-white/20">
-                <div className="w-8 h-8 bg-gradient-to-br from-red-600 to-red-700 rounded-full flex items-center justify-center">
-                  <User className="w-4 h-4 text-white" />
-                </div>
-                <span className="font-medium">{user?.name || 'Admin'}</span>
-              </div>
+              <Button
+                asChild
+                size="sm"
+                className="hidden sm:inline-flex border-0 bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-sm hover:from-amber-700 hover:to-orange-700"
+              >
+                <Link href="/superadmin/schools/add">
+                  <Plus className="mr-1 h-4 w-4" />
+                  Add school
+                </Link>
+              </Button>
             </div>
           </div>
         </header>
 
-        {/* Main Content with Page Transitions */}
-        <main className={`flex-1 p-4 sm:p-6 lg:p-8 space-y-6 max-w-none mx-auto w-full pb-24 lg:pb-8 transition-all duration-500 pt-20 lg:pt-8 lg:ml-0 overflow-y-auto ${
-          isLoading ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0'
-        }`}>
-          {children}
+        <main
+          className={`min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8 lg:py-8 ${
+            isLoading ? "opacity-60" : "opacity-100"
+          } transition-opacity duration-200 backdrop-blur-[2px]`}
+        >
+          <div className="mx-auto w-full max-w-[1600px] rounded-2xl border border-amber-200/40 bg-white/35 p-4 shadow-lg backdrop-blur-md sm:p-6 lg:p-8">
+            {children}
+          </div>
         </main>
 
-        {/* Mobile Bottom Navigation */}
-        <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-white/20 shadow-2xl z-20">
-          <div className="flex justify-around p-2">
+        <nav className="shrink-0 border-t border-amber-200/50 bg-amber-50/50 backdrop-blur-md lg:hidden">
+          <div className="flex justify-around py-1">
             {navigationItems.map((item) => {
               const Icon = item.icon
-              const isActive = pathname === item.href || (item.href !== "/superadmin" && pathname.startsWith(item.href))
+              const isActive =
+                pathname === item.href || (item.href !== "/superadmin" && pathname.startsWith(item.href))
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                                    className={`flex flex-col items-center py-3 px-2 min-w-0 flex-1 transition-all duration-300 transform hover:scale-110 ${
-                    isActive
-                      ? "text-red-600 bg-gradient-to-r from-red-50 to-red-100/50 rounded-2xl shadow-md"
-                      : "text-gray-600 hover:text-red-600 hover:bg-red-50/50 rounded-2xl"
+                  className={`flex min-w-0 flex-1 flex-col items-center py-2 text-[10px] font-medium ${
+                    isActive ? t.mobileTabActive : "text-muted-foreground"
                   }`}
-                  aria-current={isActive ? "page" : undefined}
                 >
-                  <Icon className={`w-6 h-6 mb-1 transition-transform duration-300 ${isActive ? 'scale-110' : ''}`} />
-                  <span className="text-xs font-medium truncate">{item.label}</span>
-                  {item.badge && (
-                    <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
-                      {item.badge}
-                    </Badge>
-                  )}
+                  <Icon className="mb-0.5 h-5 w-5 shrink-0" />
+                  <span className="truncate px-1">{item.label}</span>
                 </Link>
               )
             })}
@@ -277,55 +304,15 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
         </nav>
       </div>
 
-      {/* Custom CSS for enhanced animations */}
       <style jsx global>{`
-        html {
-          scroll-behavior: smooth;
-        }
-        
         .custom-scrollbar::-webkit-scrollbar {
           width: 6px;
         }
-        
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        
-                .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: linear-gradient(to bottom, #dc2626, #b91c1c);
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: linear-gradient(to bottom, var(--sa-scroll-from), var(--sa-scroll-to));
           border-radius: 3px;
-        }
-
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: linear-gradient(to bottom, #b91c1c, #991b1b);
-        }
-        
-        @keyframes float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-10px); }
-        }
-        
-        .animate-float {
-          animation: float 3s ease-in-out infinite;
-        }
-        
-        @keyframes shimmer {
-          0% { background-position: -200px 0; }
-          100% { background-position: calc(200px + 100%) 0; }
-        }
-        
-        .animate-shimmer {
-          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
-          background-size: 200px 100%;
-          animation: shimmer 2s infinite;
-        }
-        
-        /* Ensure sticky elements work properly */
-        .sticky {
-          position: -webkit-sticky;
-          position: sticky;
         }
       `}</style>
     </div>
   )
-} 
+}

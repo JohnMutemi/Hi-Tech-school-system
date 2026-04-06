@@ -106,7 +106,7 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
   const [selectedAcademicYear, setSelectedAcademicYear] = useState<string>("");
   const [criteria, setCriteria] = useState<PromotionCriteria>({
     name: "Default Criteria",
-    description: "Standard promotion criteria",
+    description: "Standard learner progression criteria",
     minGrade: 50,
     maxFeeBalance: 16000,
     maxDisciplinaryCases: 0,
@@ -143,32 +143,40 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
     return yearNum > currentYearNum ? "Upcoming Year" : "Previous Year";
   };
 
-  // Step 1: Load academic years and criteria
+  // Step 1: Load academic years first so criteria can bind to the current year id
   useEffect(() => {
-    loadAcademicYears();
-    loadSavedCriteria();
-    loadPromotionHistory();
+    void (async () => {
+      const defaultYearId = await loadAcademicYears();
+      await loadSavedCriteria(defaultYearId);
+      loadPromotionHistory();
+    })();
   }, []);
 
-  const loadAcademicYears = async () => {
+  const loadAcademicYears = async (): Promise<string | null> => {
     try {
       const response = await fetch(`/api/schools/${schoolCode}/academic-years`);
       if (response.ok) {
         const data = await response.json();
-        setAcademicYears(data.data || []);
-        // Auto-select current academic year
-        const currentYear = data.data?.find((year: AcademicYear) => year.isCurrent);
+        const list: AcademicYear[] = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.data)
+            ? data.data
+            : [];
+        setAcademicYears(list);
+        const currentYear = list.find((year: AcademicYear) => year.isCurrent) ?? list[0];
         if (currentYear) {
           setSelectedAcademicYear(currentYear.id);
-          setCriteria(prev => ({ ...prev, academicYearId: currentYear.id }));
+          setCriteria((prev) => ({ ...prev, academicYearId: currentYear.id }));
+          return currentYear.id;
         }
       }
     } catch (error) {
       console.error("Error loading academic years:", error);
     }
+    return null;
   };
 
-  const loadSavedCriteria = async () => {
+  const loadSavedCriteria = async (preferredAcademicYearId?: string | null) => {
     try {
       const response = await fetch(`/api/schools/${schoolCode}/promotions/bulk/config`);
       if (response.ok) {
@@ -176,15 +184,16 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
         if (data.data) {
           setSavedCriteria([data.data]);
           setSelectedCriteria(data.data.id);
-          setCriteria({
+          setCriteria((prev) => ({
             name: data.data.name || "Default Criteria",
-            description: data.data.description || "Standard promotion criteria",
+            description: data.data.description || "Standard progression criteria",
             minGrade: data.data.minGrade || 50,
             maxFeeBalance: data.data.maxFeeBalance || 16000,
             maxDisciplinaryCases: data.data.maxDisciplinaryCases || 0,
-            academicYearId: selectedAcademicYear,
-            isActive: data.data.isActive || true
-          });
+            academicYearId:
+              preferredAcademicYearId || prev.academicYearId || selectedAcademicYear,
+            isActive: data.data.isActive || true,
+          }));
         }
       }
     } catch (error) {
@@ -197,7 +206,8 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
       const response = await fetch(`/api/schools/${schoolCode}/promotions/history`);
       if (response.ok) {
         const data = await response.json();
-        setPromotionHistory(data.data || []);
+        const list = Array.isArray(data) ? data : data.data || [];
+        setPromotionHistory(list);
       }
     } catch (error) {
       console.error("Error loading promotion history:", error);
@@ -233,7 +243,7 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
       if (response.ok) {
         toast({
           title: "Success",
-          description: "Promotion criteria saved successfully",
+          description: "Progression criteria saved successfully",
         });
         await loadSavedCriteria();
         setCurrentStep(3);
@@ -418,7 +428,7 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
     if (selectedStudents.length === 0) {
       toast({
         title: "Error",
-        description: "Please select at least one student for promotion",
+        description: "Please select at least one learner to progress",
         variant: "destructive"
       });
       return;
@@ -446,20 +456,20 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
         await loadPromotionHistory();
         toast({
           title: "Success",
-          description: `Promotion completed! ${data.data.summary.promoted} students promoted, ${data.data.summary.excluded} excluded`,
+          description: `Progression completed! ${data.data.summary.promoted} learners progressed, ${data.data.summary.excluded} excluded`,
         });
       } else {
         const errorText = await response.text();
         toast({
           title: "Error",
-          description: `Failed to execute promotion: ${errorText}`,
+          description: `Failed to run progression: ${errorText}`,
           variant: "destructive"
         });
       }
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to execute promotion",
+        description: "Failed to run learner progression",
         variant: "destructive"
       });
     } finally {
@@ -513,17 +523,17 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
       case 1: return "Academic Year & Criteria";
       case 2: return "Configure Criteria";
       case 3: return "Review Eligibility";
-      case 4: return "Execute Promotion";
+      case 4: return "Run progression";
       default: return "";
     }
   };
 
   const getStepDescription = (step: number) => {
     switch (step) {
-      case 1: return "Select academic year and manage promotion criteria";
-      case 2: return "Create and configure promotion criteria";
-      case 3: return "Review student eligibility and select candidates";
-      case 4: return "Execute the promotion process";
+      case 1: return "Select academic year and manage progression criteria";
+      case 2: return "Create and configure progression criteria";
+      case 3: return "Review learner eligibility and select candidates";
+      case 4: return "Run the learner progression process";
       default: return "";
     }
   };
@@ -535,10 +545,10 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <CheckCircle className="h-6 w-6 text-green-600" />
-            Bulk Promotion System
+            Learner progression
           </CardTitle>
           <CardDescription>
-            Comprehensive 4-step promotion workflow for advancing students to the next academic year
+            Four-step workflow to advance learners to the next academic year using your criteria
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -585,7 +595,7 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
             <Tabs defaultValue="academic-year" className="w-full">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="academic-year">Academic Year</TabsTrigger>
-                <TabsTrigger value="criteria">Promotion Criteria</TabsTrigger>
+                <TabsTrigger value="criteria">Progression criteria</TabsTrigger>
               </TabsList>
               
               <TabsContent value="academic-year" className="space-y-4">
@@ -712,7 +722,7 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Settings className="h-5 w-5" />
-              Step 2: Configure Promotion Criteria
+              Step 2: Configure progression criteria
             </CardTitle>
             <CardDescription>
               {getStepDescription(2)}
@@ -785,7 +795,7 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
               <div className="text-sm text-blue-700">
                 Students must have: <strong>Grade ≥ {criteria.minGrade}%</strong>, 
                 <strong>Fee Balance ≤ ${criteria.maxFeeBalance.toLocaleString()}</strong>, and 
-                <strong>Disciplinary Cases ≤ {criteria.maxDisciplinaryCases}</strong> to be eligible for promotion.
+                <strong>Disciplinary Cases ≤ {criteria.maxDisciplinaryCases}</strong> to be eligible for progression.
               </div>
             </div>
 
@@ -959,13 +969,13 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
         </Card>
       )}
 
-      {/* Step 4: Execute Promotion */}
+      {/* Step 4: Run progression */}
       {currentStep === 4 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Play className="h-5 w-5" />
-              Step 4: Execute Promotion
+              Step 4: Run progression
             </CardTitle>
             <CardDescription>
               {getStepDescription(4)}
@@ -978,14 +988,14 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
                 <span className="font-semibold text-blue-800">Ready to Promote</span>
               </div>
               <div className="text-sm text-blue-700">
-                {selectedStudents.length} students selected for promotion to the next academic year.
+                {selectedStudents.length} learners selected for progression to the next academic year.
                 This action cannot be undone.
               </div>
             </div>
 
             {promotionResult && (
               <div className="border rounded-lg p-4">
-                <h4 className="font-semibold mb-2">Promotion Results</h4>
+                <h4 className="font-semibold mb-2">Progression results</h4>
                 <div className="grid grid-cols-3 gap-4 text-sm">
                   <div>
                     <div className="text-gray-600">Total Students</div>
@@ -1025,7 +1035,7 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
                   disabled={loading || selectedStudents.length === 0}
                   className="flex items-center gap-2"
                 >
-                  Execute Promotion
+                  Run progression
                   <Play className="h-4 w-4" />
                 </Button>
               </div>
@@ -1042,7 +1052,7 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
               {editingCriteria ? "Edit Criteria" : "Create New Criteria"}
             </DialogTitle>
             <DialogDescription>
-              Configure promotion criteria settings
+              Configure progression criteria settings
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -1115,7 +1125,7 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
                   } else {
                     createNewCriteria({
                       name: "New Criteria",
-                      description: "New promotion criteria",
+                      description: "New progression criteria",
                       minGrade: 50,
                       maxFeeBalance: 16000,
                       maxDisciplinaryCases: 0,
@@ -1136,9 +1146,9 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
       <Dialog open={showHistoryModal} onOpenChange={setShowHistoryModal}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Promotion History</DialogTitle>
+            <DialogTitle>Progression history</DialogTitle>
             <DialogDescription>
-              View recent promotion activities
+              View recent progression activity
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -1175,7 +1185,7 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
               </div>
             ) : (
               <div className="text-center py-8 text-gray-500">
-                No promotion history found.
+                No progression history found.
               </div>
             )}
           </div>

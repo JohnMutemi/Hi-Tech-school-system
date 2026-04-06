@@ -43,7 +43,8 @@ export async function GET() {
       schoolCode: school.code,
       name: school.name,
       logo: school.logo,
-      colorTheme: "#3b82f6", // Default theme
+      logoUrl: school.logo ?? "",
+      colorTheme: school.colorTheme || "#d97706",
       portalUrl: `/schools/${school.code}`,
       description: "",
       adminEmail: school.users.find((u: any) => u.role === 'admin')?.email || school.email,
@@ -114,7 +115,9 @@ export async function POST(request: NextRequest) {
       adminLastName,
       description,
       colorTheme,
-      status
+      status,
+      logoUrl,
+      logo,
     } = body;
 
     // Validate required fields
@@ -137,7 +140,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create school
+    const logoData =
+      typeof logoUrl === 'string' && logoUrl.length > 0
+        ? logoUrl
+        : typeof logo === 'string' && logo.length > 0
+          ? logo
+          : null;
+
+    const themeHex =
+      typeof colorTheme === 'string' && /^#[0-9A-Fa-f]{6}$/.test(colorTheme.trim())
+        ? colorTheme.trim()
+        : '#d97706';
+
+    // Create school (logo: data URL or URL string; colorTheme: hex)
     const school = await prisma.school.create({
       data: {
         name,
@@ -145,6 +160,8 @@ export async function POST(request: NextRequest) {
         address,
         phone,
         email,
+        logo: logoData,
+        colorTheme: themeHex,
         isActive: status !== 'suspended'
       }
     });
@@ -186,7 +203,8 @@ export async function POST(request: NextRequest) {
       schoolCode: school.code,
       name: school.name,
       logo: school.logo,
-      colorTheme: colorTheme || "#3b82f6",
+      logoUrl: school.logo ?? "",
+      colorTheme: school.colorTheme || themeHex,
       portalUrl: `/schools/${school.code}`,
       description: description || "",
       adminEmail: adminUser.email,

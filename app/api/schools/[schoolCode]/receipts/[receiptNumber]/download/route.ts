@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
 import { generateEnhancedReceiptPDF } from '@/lib/utils/enhanced-receipt-generator'
-
-const prisma = new PrismaClient()
+import { prisma } from "@/lib/prisma"
+import { jsonError } from "@/lib/api-guard"
+import { assertStudentFeeAccess, resolvePortalFeeAuth } from '@/lib/portal-fee-auth'
 
 // GET - Download receipt by receipt number
 export async function GET(
@@ -11,20 +11,16 @@ export async function GET(
 ) {
   try {
     const { schoolCode, receiptNumber } = params
+
     const { searchParams } = new URL(request.url)
     const size = searchParams.get('size') || 'A4' // Default to A4
 
-    // Find the school
-    const school = await prisma.school.findUnique({
-      where: { code: schoolCode }
+    const school = await prisma.school.findFirst({
+      where: { code: { equals: schoolCode, mode: 'insensitive' } },
     })
+    if (!school) return NextResponse.json({ error: "School not found" }, { status: 404 })
 
-    if (!school) {
-      return NextResponse.json(
-        { error: 'School not found' },
-        { status: 404 }
-      )
-    }
+    const auth = await resolvePortalFeeAuth(request, schoolCode)
 
     // Find the receipt
     const receipt = await prisma.receipt.findFirst({
@@ -55,6 +51,11 @@ export async function GET(
         { error: 'Receipt not found' },
         { status: 404 }
       )
+    }
+
+    const access = await assertStudentFeeAccess(auth, school.id, receipt.studentId)
+    if (!access.ok) {
+      return NextResponse.json({ error: access.message }, { status: access.status })
     }
 
     // Prepare receipt data for PDF generation
@@ -104,9 +105,6 @@ export async function GET(
 
   } catch (error) {
     console.error('Error downloading receipt:', error)
-    return NextResponse.json(
-      { error: 'Failed to download receipt' },
-      { status: 500 }
-    )
+    return jsonError(error)
   }
 }

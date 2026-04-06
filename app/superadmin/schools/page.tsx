@@ -91,30 +91,28 @@ export default function SchoolsManagementPage() {
     })
   }
 
-  if (!user || (user && (!user.isLoggedIn || user.role !== 'super_admin'))) {
+  if (!user || (user && (!user.isLoggedIn || user.role !== "super_admin"))) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex min-h-[40vh] items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-2 border-amber-600 border-t-transparent" />
+          <p className="text-muted-foreground">Loading…</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="mx-auto max-w-7xl space-y-8">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center space-x-2">
-                <School className="w-8 h-8 text-blue-500" />
+                <School className="h-8 w-8 text-amber-600" />
                 <div>
                   <p className="text-2xl font-bold">{schools.length}</p>
-                  <p className="text-sm text-gray-600">Total Schools</p>
+                  <p className="text-sm text-stone-600">Total Schools</p>
                 </div>
               </div>
             </CardContent>
@@ -122,12 +120,12 @@ export default function SchoolsManagementPage() {
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center space-x-2">
-                <Users className="w-8 h-8 text-green-500" />
+                <Users className="h-8 w-8 text-orange-600" />
                 <div>
                   <p className="text-2xl font-bold">
                     {schools.reduce((sum, school) => sum + (school.students?.length || 0), 0)}
                   </p>
-                  <p className="text-sm text-gray-600">Total Students</p>
+                  <p className="text-sm text-stone-600">Total Students</p>
                 </div>
               </div>
             </CardContent>
@@ -135,12 +133,12 @@ export default function SchoolsManagementPage() {
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center space-x-2">
-                <GraduationCap className="w-8 h-8 text-purple-500" />
+                <GraduationCap className="h-8 w-8 text-amber-800" />
                 <div>
                   <p className="text-2xl font-bold">
                     {schools.reduce((sum, school) => sum + (school.teachers?.length || 0), 0)}
                   </p>
-                  <p className="text-sm text-gray-600">Total Teachers</p>
+                  <p className="text-sm text-stone-600">Total Teachers</p>
                 </div>
               </div>
             </CardContent>
@@ -148,10 +146,10 @@ export default function SchoolsManagementPage() {
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center space-x-2">
-                <Calendar className="w-8 h-8 text-orange-500" />
+                <Calendar className="h-8 w-8 text-yellow-600" />
                 <div>
                   <p className="text-2xl font-bold">{schools.filter((school) => school.status === "active").length}</p>
-                  <p className="text-sm text-gray-600">Active Schools</p>
+                  <p className="text-sm text-stone-600">Active Schools</p>
                 </div>
               </div>
             </CardContent>
@@ -168,7 +166,7 @@ export default function SchoolsManagementPage() {
               </div>
               <div className="flex items-center space-x-4">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-amber-600/50" />
                   <Input
                     placeholder="Search schools..."
                     value={searchTerm}
@@ -176,7 +174,7 @@ export default function SchoolsManagementPage() {
                     className="pl-10 w-64"
                   />
                 </div>
-                <Button onClick={loadSchools} variant="outline">
+                <Button onClick={loadSchools} variant="outline" className="border-amber-200 hover:bg-amber-50">
                   Refresh
                 </Button>
               </div>
@@ -184,13 +182,16 @@ export default function SchoolsManagementPage() {
           </CardHeader>
           <CardContent>
             {filteredSchools.length === 0 ? (
-              <div className="text-center py-8">
-                <School className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600">
+              <div className="py-8 text-center">
+                <School className="mx-auto mb-4 h-12 w-12 text-amber-300" />
+                <p className="text-stone-600">
                   {searchTerm ? "No schools found matching your search." : "No schools have been added yet."}
                 </p>
                 {!searchTerm && (
-                  <Button asChild className="mt-4">
+                  <Button
+                    asChild
+                    className="mt-4 border-0 bg-gradient-to-r from-amber-600 to-orange-600 text-white hover:from-amber-700 hover:to-orange-700"
+                  >
                     <Link href="/superadmin/schools/add">
                       <Plus className="w-4 h-4 mr-2" />
                       Add First School
@@ -268,7 +269,11 @@ export default function SchoolsManagementPage() {
                         <TableCell>
                           <Badge
                             variant={school.status === "active" ? "default" : "destructive"}
-                            className={school.status === "active" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}
+                            className={
+                              school.status === "active"
+                                ? "border-amber-200 bg-amber-100 text-amber-900"
+                                : "border-orange-300 bg-orange-100 text-orange-950"
+                            }
                           >
                             {school.status}
                           </Badge>
@@ -298,7 +303,6 @@ export default function SchoolsManagementPage() {
             )}
           </CardContent>
         </Card>
-      </div>
     </div>
   )
 }

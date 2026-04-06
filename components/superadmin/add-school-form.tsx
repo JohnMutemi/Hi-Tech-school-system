@@ -28,6 +28,7 @@ import { saveSchool, getSchool, getAllSchools } from "@/lib/school-storage"
 import { generateSchoolCode, generateTempPassword } from "@/lib/utils/school-generator"
 import { SchoolCreationSuccess } from "./school-creation-success"
 import { createSchoolClient } from "@/lib/actions/school-actions"
+import { isAcceptableSchoolLogoFile, SCHOOL_LOGO_ACCEPT } from "@/lib/utils/school-logo-file"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 
@@ -44,7 +45,7 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
     phone: "",
     email: "",
     code: "",
-    colorTheme: "#3b82f6",
+    colorTheme: "#d97706",
     description: "",
     website: "",
     principalName: "",
@@ -93,8 +94,8 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
         return
       }
       
-      if (!file.type.startsWith("image/")) {
-        setError("Please select a valid image file")
+      if (!isAcceptableSchoolLogoFile(file)) {
+        setError("Please select a PNG, JPG, GIF, or WebP image")
         return
       }
 
@@ -114,6 +115,15 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
     setSchoolData({ ...schoolData, colorTheme: e.target.value })
   }
 
+  function readFileAsDataUrl(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = () => reject(reader.error ?? new Error("Failed to read file"))
+      reader.readAsDataURL(file)
+    })
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
@@ -130,19 +140,15 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
         return
       }
 
-      // Handle logo upload if provided
       let logoUrl = ""
       if (logoFile) {
         try {
-          // Create a data URL for the logo
-          const reader = new FileReader()
-          reader.onload = (e) => {
-            logoUrl = e.target?.result as string
-          }
-          reader.readAsDataURL(logoFile)
+          logoUrl = await readFileAsDataUrl(logoFile)
         } catch (error) {
           console.error("Error processing logo:", error)
-          // Continue without logo if there's an error
+          setError("Could not read the logo file. Try a smaller image or a different format.")
+          setIsSubmitting(false)
+          return
         }
       }
 
@@ -183,7 +189,7 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
           phone: "",
           email: "",
           code: "",
-          colorTheme: "#3b82f6",
+          colorTheme: "#d97706",
           description: "",
           website: "",
           principalName: "",
@@ -218,17 +224,17 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
 
   return (
     <>
-      <Card className="w-full max-w-4xl mx-auto rounded-xl shadow-lg border border-gray-200 bg-white">
-        <CardHeader className="pb-3 px-4 md:px-6">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-2">
-            <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-blue-100 flex-shrink-0">
-              <School className="w-5 h-5 text-blue-600" />
-          </div>
+      <Card className="mx-auto w-full max-w-4xl rounded-xl border border-amber-200/60 bg-card shadow-lg">
+        <CardHeader className="px-4 pb-3 md:px-6">
+          <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-amber-100">
+              <School className="h-5 w-5 text-amber-700" />
+            </div>
             <div className="min-w-0 flex-1">
-              <CardTitle className="text-lg sm:text-xl font-bold text-gray-900 truncate">
+              <CardTitle className="truncate text-lg font-bold text-stone-900 sm:text-xl">
             Add New School
           </CardTitle>
-              <CardDescription className="text-xs sm:text-sm text-gray-600">
+              <CardDescription className="text-xs text-stone-600 sm:text-sm">
                 Register a new school to the platform
           </CardDescription>
             </div>
@@ -238,23 +244,35 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
         <CardContent className="p-3 md:p-6">
           <form onSubmit={handleSubmit} className="space-y-3 md:space-y-4">
             <Tabs defaultValue="basic" className="w-full">
-              <TabsList className="grid w-full grid-cols-4 mb-3 md:mb-4 h-10 md:h-9">
-                <TabsTrigger value="basic" className="flex items-center justify-center gap-1 md:gap-2 text-xs px-2 md:px-3">
+              <TabsList className="mb-3 grid h-10 w-full grid-cols-4 bg-amber-100/50 p-1 md:mb-4 md:h-9">
+                <TabsTrigger
+                  value="basic"
+                  className="flex items-center justify-center gap-1 px-2 text-xs data-[state=active]:bg-amber-600 data-[state=active]:text-white md:gap-2 md:px-3"
+                >
                   <Building2 className="h-3 w-3 flex-shrink-0" />
                   <span className="hidden sm:inline">Basic</span>
                   <span className="sm:hidden">Info</span>
                 </TabsTrigger>
-                <TabsTrigger value="contact" className="flex items-center justify-center gap-1 md:gap-2 text-xs px-2 md:px-3">
+                <TabsTrigger
+                  value="contact"
+                  className="flex items-center justify-center gap-1 px-2 text-xs data-[state=active]:bg-amber-600 data-[state=active]:text-white md:gap-2 md:px-3"
+                >
                   <Contact className="h-3 w-3 flex-shrink-0" />
                   <span className="hidden sm:inline">Contact</span>
                   <span className="sm:hidden">Info</span>
                 </TabsTrigger>
-                <TabsTrigger value="details" className="flex items-center justify-center gap-1 md:gap-2 text-xs px-2 md:px-3">
+                <TabsTrigger
+                  value="details"
+                  className="flex items-center justify-center gap-1 px-2 text-xs data-[state=active]:bg-amber-600 data-[state=active]:text-white md:gap-2 md:px-3"
+                >
                   <Settings className="h-3 w-3 flex-shrink-0" />
                   <span className="hidden sm:inline">Details</span>
                   <span className="sm:hidden">Info</span>
                 </TabsTrigger>
-                <TabsTrigger value="branding" className="flex items-center justify-center gap-1 md:gap-2 text-xs px-2 md:px-3">
+                <TabsTrigger
+                  value="branding"
+                  className="flex items-center justify-center gap-1 px-2 text-xs data-[state=active]:bg-amber-600 data-[state=active]:text-white md:gap-2 md:px-3"
+                >
                   <Image className="h-3 w-3 flex-shrink-0" />
                   <span className="hidden sm:inline">Branding</span>
                   <span className="sm:hidden">Info</span>
@@ -265,7 +283,7 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
               <TabsContent value="basic" className="space-y-3 md:space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                   <div className="space-y-1.5 md:space-y-2">
-                    <Label htmlFor="name" className="text-xs md:text-sm font-medium text-gray-700">
+                    <Label htmlFor="name" className="text-xs font-medium text-stone-700 md:text-sm">
                       School Name *
                     </Label>
               <Input
@@ -278,7 +296,7 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
               />
             </div>
                   <div className="space-y-1.5 md:space-y-2">
-                    <Label htmlFor="code" className="text-xs md:text-sm font-medium text-gray-700">
+                    <Label htmlFor="code" className="text-xs md:text-sm font-medium text-stone-700">
                       School Code
                     </Label>
               <Input
@@ -293,7 +311,7 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
                 </div>
                 
                 <div className="space-y-1.5 md:space-y-2">
-                  <Label htmlFor="description" className="text-xs md:text-sm font-medium text-gray-700">
+                  <Label htmlFor="description" className="text-xs md:text-sm font-medium text-stone-700">
                     Description
                   </Label>
               <Textarea
@@ -312,7 +330,7 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
               <TabsContent value="contact" className="space-y-3 md:space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                   <div className="space-y-1.5 md:space-y-2">
-                    <Label htmlFor="email" className="text-xs md:text-sm font-medium text-gray-700">
+                    <Label htmlFor="email" className="text-xs md:text-sm font-medium text-stone-700">
                       Admin Email *
                     </Label>
               <Input
@@ -326,7 +344,7 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
               />
             </div>
                   <div className="space-y-1.5 md:space-y-2">
-                    <Label htmlFor="phone" className="text-xs md:text-sm font-medium text-gray-700">
+                    <Label htmlFor="phone" className="text-xs md:text-sm font-medium text-stone-700">
                       Phone Number *
                     </Label>
               <Input
@@ -342,7 +360,7 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
                 </div>
                 
                 <div className="space-y-1.5 md:space-y-2">
-                  <Label htmlFor="address" className="text-xs md:text-sm font-medium text-gray-700">
+                  <Label htmlFor="address" className="text-xs md:text-sm font-medium text-stone-700">
                     Address *
                   </Label>
               <Textarea
@@ -357,7 +375,7 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
             </div>
                 
                 <div className="space-y-1.5 md:space-y-2">
-                  <Label htmlFor="website" className="text-xs md:text-sm font-medium text-gray-700">
+                  <Label htmlFor="website" className="text-xs md:text-sm font-medium text-stone-700">
                     Website
                   </Label>
               <Input
@@ -376,7 +394,7 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
               <TabsContent value="details" className="space-y-3 md:space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                   <div className="space-y-1.5 md:space-y-2">
-                    <Label htmlFor="principalName" className="text-xs md:text-sm font-medium text-gray-700">
+                    <Label htmlFor="principalName" className="text-xs md:text-sm font-medium text-stone-700">
                       Principal Name
                     </Label>
               <Input
@@ -388,7 +406,7 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
               />
             </div>
                   <div className="space-y-1.5 md:space-y-2">
-                    <Label htmlFor="establishedYear" className="text-xs md:text-sm font-medium text-gray-700">
+                    <Label htmlFor="establishedYear" className="text-xs md:text-sm font-medium text-stone-700">
                       Established Year
                     </Label>
               <Input
@@ -405,7 +423,7 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
                 </div>
                 
                 <div className="space-y-1.5 md:space-y-2">
-                  <Label htmlFor="motto" className="text-xs md:text-sm font-medium text-gray-700">
+                  <Label htmlFor="motto" className="text-xs md:text-sm font-medium text-stone-700">
                     School Motto
                   </Label>
               <Input
@@ -423,7 +441,7 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
               <TabsContent value="branding" className="space-y-3 md:space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                   <div className="space-y-1.5 md:space-y-2">
-                    <Label htmlFor="colorTheme" className="text-xs md:text-sm font-medium text-gray-700">
+                    <Label htmlFor="colorTheme" className="text-xs md:text-sm font-medium text-stone-700">
                       Color Theme
                     </Label>
                     <div className="flex items-center gap-2">
@@ -444,10 +462,10 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
               </div>
                   
                   <div className="space-y-1.5 md:space-y-2">
-                    <Label className="text-xs md:text-sm font-medium text-gray-700">
+                    <Label className="text-xs md:text-sm font-medium text-stone-700">
                       School Logo
                     </Label>
-                    <div className="border border-dashed border-gray-300 rounded-lg p-2 md:p-3 text-center hover:border-gray-400 transition-colors">
+                    <div className="rounded-lg border border-dashed border-amber-200 p-2 text-center transition-colors hover:border-amber-400 md:p-3">
                 {logoPreview ? (
                         <div className="flex items-center gap-2 md:gap-3">
                     <img
@@ -456,7 +474,7 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
                             className="w-8 h-8 object-contain rounded flex-shrink-0"
                     />
                           <div className="flex-1 text-left min-w-0">
-                            <p className="text-xs text-gray-600 truncate">{logoFile?.name}</p>
+                            <p className="text-xs text-stone-600 truncate">{logoFile?.name}</p>
                       <Button
                         type="button"
                         variant="outline"
@@ -474,10 +492,10 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
                   </div>
                 ) : (
                         <div className="space-y-2">
-                          <Upload className="w-6 h-6 mx-auto text-gray-400" />
+                          <Upload className="mx-auto h-6 w-6 text-amber-400" />
                     <div>
-                            <p className="text-xs text-gray-600">Click to upload logo</p>
-                      <p className="text-xs text-gray-500">PNG, JPG up to 5MB</p>
+                            <p className="text-xs text-stone-600">Click to upload logo</p>
+                      <p className="text-xs text-stone-500">PNG, JPG, GIF, or WebP — up to 5MB</p>
                     </div>
                     <Button
                       type="button"
@@ -493,7 +511,7 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*"
+                  accept={SCHOOL_LOGO_ACCEPT}
                   onChange={handleLogoChange}
                   className="hidden"
                 />
@@ -502,12 +520,12 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
                 </div>
                 
                 <div className="space-y-1.5 md:space-y-2">
-                  <Label className="text-xs md:text-sm font-medium text-gray-700">
+                  <Label className="text-xs md:text-sm font-medium text-stone-700">
                     Generated Portal URL
                   </Label>
-                  <div className="bg-gray-50 rounded-lg p-2 md:p-3 space-y-2">
+                  <div className="space-y-2 rounded-lg border border-amber-100 bg-amber-50/80 p-2 md:p-3">
                 <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-gray-600">Portal URL:</span>
+                      <span className="text-xs font-medium text-stone-600">Portal URL:</span>
                   <Button
                     type="button"
                     variant="outline"
@@ -541,21 +559,21 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
             </Tabs>
 
             {/* Submit Button */}
-            <div className="pt-3 md:pt-4 border-t">
+            <div className="border-t border-amber-100 pt-3 md:pt-4">
             <Button
               type="submit"
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 md:py-3 rounded-lg text-sm md:text-base"
+                className="w-full rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 py-2.5 text-sm font-medium text-white hover:from-amber-700 hover:to-orange-700 md:py-3 md:text-base"
               disabled={isSubmitting}
             >
                 {isSubmitting ? 'Creating School...' : 'Create School'}
             </Button>
               {error && (
-                <div className="mt-2 p-2 md:p-3 bg-red-50 border border-red-200 rounded text-red-600 text-xs md:text-sm">
+                <div className="mt-2 rounded border border-orange-300 bg-orange-50 p-2 text-xs text-orange-900 md:p-3 md:text-sm">
                   {error}
                 </div>
               )}
               {success && (
-                <div className="mt-2 p-2 md:p-3 bg-green-50 border border-green-200 rounded text-green-600 text-xs md:text-sm">
+                <div className="mt-2 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900 md:p-3 md:text-sm">
                   {success}
                 </div>
               )}

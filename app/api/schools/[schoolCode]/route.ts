@@ -79,12 +79,15 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     }
 
     // Transform data to match SchoolData interface
+    const theme = schoolData.colorTheme || "#d97706";
+
     const transformedSchool = {
       id: schoolData.id,
       schoolCode: schoolData.code,
       name: schoolData.name,
       logo: schoolData.logo,
-      colorTheme: "#3b82f6", // Default theme
+      logoUrl: schoolData.logo ?? "",
+      colorTheme: theme,
       portalUrl: `/schools/${schoolData.code}`,
       description: "",
       adminEmail: schoolData.users.find(u => u.role === 'admin')?.email || schoolData.email,
@@ -160,7 +163,9 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
       description,
       colorTheme,
       status,
-      profile
+      profile,
+      logo,
+      logoUrl,
     } = body;
 
     // Find the school
@@ -182,17 +187,33 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
       return NextResponse.json({ error: 'School not found' }, { status: 404 });
     }
 
-    // Update school
-    const updatedSchool = await prisma.school.update({
-      where: { code: schoolCode },
+    const nextLogo =
+      logoUrl !== undefined
+        ? logoUrl || null
+        : logo !== undefined
+          ? logo || null
+          : undefined;
+
+    const nextColorTheme =
+      colorTheme !== undefined && /^#[0-9A-Fa-f]{6}$/.test(String(colorTheme).trim())
+        ? String(colorTheme).trim()
+        : undefined;
+
+    // Update school (use id — code in URL may differ in casing from DB)
+    await prisma.school.update({
+      where: { id: school.id },
       data: {
         name: name || school.name,
         address: address || school.address,
         phone: phone || school.phone,
         email: email || school.email,
-        isActive: status !== 'suspended',
-        ...(body.lastAdmissionNumber !== undefined && { lastAdmissionNumber: body.lastAdmissionNumber })
-      }
+        isActive: status !== "suspended",
+        ...(body.lastAdmissionNumber !== undefined && {
+          lastAdmissionNumber: body.lastAdmissionNumber,
+        }),
+        ...(nextLogo !== undefined && { logo: nextLogo }),
+        ...(nextColorTheme !== undefined && { colorTheme: nextColorTheme }),
+      },
     });
 
     // Update admin user if provided
@@ -237,7 +258,8 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
       schoolCode: result.code,
       name: result.name,
       logo: result.logo,
-      colorTheme: colorTheme || "#3b82f6",
+      logoUrl: result.logo ?? "",
+      colorTheme: result.colorTheme || "#d97706",
       portalUrl: `/schools/${result.code}`,
       description: description || "",
       adminEmail: result.users.find(u => u.role === 'admin')?.email || result.email,

@@ -11,6 +11,12 @@ import { Badge } from "@/components/ui/badge";
 import { useRef, useState ,useEffect} from "react";
 import { CheckCircle, XCircle } from "lucide-react";
 import { BulkImport } from "@/components/ui/bulk-import";
+import { cn } from "@/lib/utils";
+
+const setupFormCardClass =
+  "border border-slate-200/80 shadow-lg bg-white/85 backdrop-blur-md rounded-2xl overflow-hidden";
+const setupFormFieldClass =
+  "rounded-xl border-slate-200 bg-white/90 focus-visible:ring-2 focus-visible:ring-offset-0";
 
 function ImportResultSummary({ result, onClose }: { result: { created?: any[]; errors?: any[] } | null, onClose?: () => void }) {
   if (!result) return null;
@@ -199,7 +205,10 @@ export default function StaffSection({ schoolCode, colorTheme, toast }: any) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...teacherData, tempPassword }),
       });
-      if (!response.ok) throw new Error("Failed to create teacher");
+      if (!response.ok) {
+        const errBody = await response.json().catch(() => ({}));
+        throw new Error(errBody.error || "Failed to create teacher");
+      }
       const newTeacher = await response.json();
       setTeachers([...teachers, newTeacher]);
       setNewTeacher({});
@@ -258,7 +267,10 @@ export default function StaffSection({ schoolCode, colorTheme, toast }: any) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...bursarData, tempPassword }),
       });
-      if (!response.ok) throw new Error("Failed to create bursar");
+      if (!response.ok) {
+        const errBody = await response.json().catch(() => ({}));
+        throw new Error(errBody.error || "Failed to create bursar");
+      }
       const newBursar = await response.json();
       setBursars([...bursars, newBursar]);
       setNewBursar({});
@@ -317,62 +329,62 @@ export default function StaffSection({ schoolCode, colorTheme, toast }: any) {
       }
     };
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
+      <Card className={setupFormCardClass}>
+        <CardHeader className="bg-gradient-to-r from-slate-50/90 to-white/80 border-b border-slate-100/80">
+          <CardTitle className="flex items-center justify-between text-slate-900">
             {teacher ? "Edit Teacher" : "Add New Teacher"}
-            <Button variant="outline" onClick={onCancel}>
+            <Button variant="outline" onClick={onCancel} className="rounded-xl border-slate-200">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to List
             </Button>
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+        <CardContent className="pt-6">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Full Name *</Label>
-                <Input value={formData.name || ""} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="Teacher Name" required />
+                <Label className="text-slate-700 font-medium">Full Name *</Label>
+                <Input className={setupFormFieldClass} value={formData.name || ""} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="Teacher Name" required />
               </div>
               <div className="space-y-2">
-                <Label>Email Address *</Label>
-                <Input type="email" value={formData.email || ""} onChange={e => setFormData({ ...formData, email: e.target.value })} placeholder="teacher@school.edu" required />
+                <Label className="text-slate-700 font-medium">Email Address *</Label>
+                <Input className={setupFormFieldClass} type="email" value={formData.email || ""} onChange={e => setFormData({ ...formData, email: e.target.value })} placeholder="teacher@school.edu" required />
               </div>
             </div>
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Phone Number</Label>
-                <Input value={formData.phone || ""} onChange={e => setFormData({ ...formData, phone: e.target.value })} placeholder="+254 700 000 000" />
+                <Label className="text-slate-700 font-medium">Phone Number</Label>
+                <Input className={setupFormFieldClass} value={formData.phone || ""} onChange={e => setFormData({ ...formData, phone: e.target.value })} placeholder="+254 700 000 000" />
               </div>
               <div className="space-y-2">
-                <Label>Employee ID</Label>
-                <Input value={formData.employeeId || ""} onChange={e => setFormData({ ...formData, employeeId: e.target.value })} placeholder="e.g., T001" />
-              </div>
-            </div>
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Qualification</Label>
-                <Input value={formData.qualification || ""} onChange={e => setFormData({ ...formData, qualification: e.target.value })} placeholder="e.g., Bachelor of Education" />
-              </div>
-              <div className="space-y-2">
-                <Label>Date Joined</Label>
-                <Input type="date" value={formData.dateJoined || ""} onChange={e => setFormData({ ...formData, dateJoined: e.target.value })} />
+                <Label className="text-slate-700 font-medium">Employee ID</Label>
+                <Input className={setupFormFieldClass} value={formData.employeeId || ""} onChange={e => setFormData({ ...formData, employeeId: e.target.value })} placeholder="e.g., T001" />
               </div>
             </div>
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Assigned Class</Label>
-                <Input value={formData.assignedClass || ""} onChange={e => setFormData({ ...formData, assignedClass: e.target.value })} placeholder="e.g., Class 1A" />
+                <Label className="text-slate-700 font-medium">Qualification</Label>
+                <Input className={setupFormFieldClass} value={formData.qualification || ""} onChange={e => setFormData({ ...formData, qualification: e.target.value })} placeholder="e.g., Bachelor of Education" />
               </div>
               <div className="space-y-2">
-                <Label>Academic Year</Label>
-                <Input value={formData.academicYear || ""} onChange={e => setFormData({ ...formData, academicYear: e.target.value })} placeholder="e.g., 2024" />
+                <Label className="text-slate-700 font-medium">Date Joined</Label>
+                <Input className={setupFormFieldClass} type="date" value={formData.dateJoined || ""} onChange={e => setFormData({ ...formData, dateJoined: e.target.value })} />
+              </div>
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-slate-700 font-medium">Assigned Class</Label>
+                <Input className={setupFormFieldClass} value={formData.assignedClass || ""} onChange={e => setFormData({ ...formData, assignedClass: e.target.value })} placeholder="e.g., Class 1A" />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-slate-700 font-medium">Academic Year</Label>
+                <Input className={setupFormFieldClass} value={formData.academicYear || ""} onChange={e => setFormData({ ...formData, academicYear: e.target.value })} placeholder="e.g., 2024" />
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Status</Label>
+              <Label className="text-slate-700 font-medium">Status</Label>
               <Select value={formData.status || "active"} onValueChange={value => setFormData({ ...formData, status: value })}>
-                <SelectTrigger>
+                <SelectTrigger className={cn(setupFormFieldClass, "h-11")}>
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -383,9 +395,9 @@ export default function StaffSection({ schoolCode, colorTheme, toast }: any) {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex justify-end space-x-4">
-              <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
-              <Button type="submit" style={{ backgroundColor: colorTheme }}> {teacher ? "Update Teacher" : "Add Teacher"} </Button>
+            <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
+              <Button type="button" variant="outline" onClick={onCancel} className="rounded-xl border-slate-200">Cancel</Button>
+              <Button type="submit" className="rounded-xl text-white shadow-md" style={{ backgroundColor: colorTheme }}> {teacher ? "Update Teacher" : "Add Teacher"} </Button>
             </div>
           </form>
         </CardContent>
@@ -404,35 +416,35 @@ export default function StaffSection({ schoolCode, colorTheme, toast }: any) {
       }
     };
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
+      <Card className={setupFormCardClass}>
+        <CardHeader className="bg-gradient-to-r from-slate-50/90 to-white/80 border-b border-slate-100/80">
+          <CardTitle className="flex items-center justify-between text-slate-900">
             {bursar ? "Edit Bursar" : "Add New Bursar"}
-            <Button variant="outline" onClick={onCancel}>
+            <Button variant="outline" onClick={onCancel} className="rounded-xl border-slate-200">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to List
             </Button>
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+        <CardContent className="pt-6">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Full Name *</Label>
-                <Input value={formData.name || ""} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="Bursar Name" required />
+                <Label className="text-slate-700 font-medium">Full Name *</Label>
+                <Input className={setupFormFieldClass} value={formData.name || ""} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="Bursar Name" required />
               </div>
               <div className="space-y-2">
-                <Label>Email Address *</Label>
-                <Input type="email" value={formData.email || ""} onChange={e => setFormData({ ...formData, email: e.target.value })} placeholder="bursar@school.edu" required />
+                <Label className="text-slate-700 font-medium">Email Address *</Label>
+                <Input className={setupFormFieldClass} type="email" value={formData.email || ""} onChange={e => setFormData({ ...formData, email: e.target.value })} placeholder="bursar@school.edu" required />
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Phone Number</Label>
-              <Input value={formData.phone || ""} onChange={e => setFormData({ ...formData, phone: e.target.value })} placeholder="+254 700 000 000" />
+              <Label className="text-slate-700 font-medium">Phone Number</Label>
+              <Input className={setupFormFieldClass} value={formData.phone || ""} onChange={e => setFormData({ ...formData, phone: e.target.value })} placeholder="+254 700 000 000" />
             </div>
-            <div className="flex justify-end space-x-4">
-              <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
-              <Button type="submit" style={{ backgroundColor: colorTheme }}> {bursar ? "Update Bursar" : "Add Bursar"} </Button>
+            <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
+              <Button type="button" variant="outline" onClick={onCancel} className="rounded-xl border-slate-200">Cancel</Button>
+              <Button type="submit" className="rounded-xl text-white shadow-md" style={{ backgroundColor: colorTheme }}> {bursar ? "Update Bursar" : "Add Bursar"} </Button>
             </div>
           </form>
         </CardContent>

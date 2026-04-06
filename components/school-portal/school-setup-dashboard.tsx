@@ -98,6 +98,7 @@ import StaffSection from "./StaffSection";
 import StudentsSection from "./StudentsSection";
 import SubjectsClassesSection from "./SubjectsClassesSection";
 import PromotionsSection from "./PromotionsSection";
+import { portalGlassPanelLight } from "@/components/layout/portal-glass-styles";
 import AlumniSection from "./AlumniSection";
 
 interface SchoolSetupDashboardProps {
@@ -116,6 +117,18 @@ interface SetupStep {
 }
 
 type ViewMode = "list" | "form" | "view";
+
+function feeStructureListLength(payload: unknown): number {
+  if (Array.isArray(payload)) return payload.length;
+  if (
+    payload &&
+    typeof payload === "object" &&
+    Array.isArray((payload as { data?: unknown[] }).data)
+  ) {
+    return (payload as { data: unknown[] }).data.length;
+  }
+  return 0;
+}
 
 // Add this utility at the top (or import if shared)
 function getNextAdmissionNumber(lastAdmissionNumber: string): string {
@@ -286,12 +299,11 @@ export function SchoolSetupDashboard({
         );
         if (res.ok) {
           const data = await res.json();
-          // setFeeStructures(data); // Fee structures are now managed by FeeManagement
-          // Update fee management step completion status
+          const n = feeStructureListLength(data);
           setSetupSteps((prev) =>
             prev.map((step) =>
               step.id === "fees"
-                ? { ...step, completed: data.length > 0 }
+                ? { ...step, completed: n > 0 }
                 : step
             )
           );
@@ -313,7 +325,7 @@ export function SchoolSetupDashboard({
         const res = await fetch(`/api/schools/${schoolData.schoolCode}/fee-structure`);
         if (res.ok) {
           const data = await res.json();
-          setFeeStructureCount(Array.isArray(data) ? data.length : 0);
+          setFeeStructureCount(feeStructureListLength(data));
         }
       } catch (error) {
         setFeeStructureCount(0);
@@ -632,43 +644,51 @@ export function SchoolSetupDashboard({
 
               {/* Enhanced Tab Content with consistent styling */}
               <TabsContent value="profile" className="space-y-8">
-                <div className="bg-gradient-to-br from-blue-50/90 to-cyan-50/90 backdrop-blur-lg rounded-3xl shadow-xl border border-white/20 p-8">
-                  <SchoolProfileSection schoolCode={schoolData.schoolCode} colorTheme={schoolData.colorTheme} toast={toast} />
+                <div className={`${portalGlassPanelLight} p-8`}>
+                  <SchoolProfileSection
+                    schoolCode={schoolData.schoolCode}
+                    colorTheme={schoolData.colorTheme}
+                    toast={toast}
+                    onBrandingUpdated={async () => {
+                      const refreshed = await getSchool(schoolData.schoolCode);
+                      if (refreshed) setSchoolData(refreshed);
+                    }}
+                  />
                 </div>
               </TabsContent>
 
               <TabsContent value="staff" className="space-y-8">
-                <div className="bg-gradient-to-br from-emerald-50/90 to-teal-50/90 backdrop-blur-lg rounded-3xl shadow-xl border border-white/20 p-8">
+                <div className={`${portalGlassPanelLight} p-8`}>
                   <StaffSection schoolCode={schoolData.schoolCode} colorTheme={schoolData.colorTheme} toast={toast} />
                 </div>
               </TabsContent>
 
               <TabsContent value="students" className="space-y-8">
-                <div className="bg-gradient-to-br from-purple-50/90 to-indigo-50/90 backdrop-blur-lg rounded-3xl shadow-xl border border-white/20 p-8">
+                <div className={`${portalGlassPanelLight} p-8`}>
                   <StudentsSection schoolCode={schoolData.schoolCode} colorTheme={schoolData.colorTheme} toast={toast} />
                 </div>
               </TabsContent>
 
               <TabsContent value="subjects" className="space-y-8">
-                <div className="bg-gradient-to-br from-orange-50/90 to-red-50/90 backdrop-blur-lg rounded-3xl shadow-xl border border-white/20 p-8">
+                <div className={`${portalGlassPanelLight} p-8`}>
                   <SubjectsClassesSection schoolCode={schoolData.schoolCode} colorTheme={schoolData.colorTheme} toast={toast} />
                 </div>
               </TabsContent>
 
               <TabsContent value="promotions" className="space-y-8">
-                <div className="bg-gradient-to-br from-blue-50/90 to-blue-100/90 backdrop-blur-lg rounded-3xl shadow-xl border border-white/20 p-8">
+                <div className={`${portalGlassPanelLight} p-8`}>
                   <PromotionsSection schoolCode={schoolData.schoolCode} />
                 </div>
               </TabsContent>
 
               <TabsContent value="alumni" className="space-y-8">
-                <div className="bg-gradient-to-br from-purple-50/90 to-purple-100/90 backdrop-blur-lg rounded-3xl shadow-xl border border-white/20 p-8">
+                <div className={`${portalGlassPanelLight} p-8`}>
                   <AlumniSection schoolCode={schoolData.schoolCode} />
                 </div>
               </TabsContent>
 
               <TabsContent value="fees" className="space-y-8">
-                <div className="bg-gradient-to-br from-green-50/90 to-emerald-50/90 backdrop-blur-lg rounded-3xl shadow-xl border border-white/20 p-8">
+                <div className={`${portalGlassPanelLight} p-8`}>
                   <FeeManagement
                     schoolCode={schoolData.schoolCode}
                     colorTheme={schoolData.colorTheme}
@@ -685,7 +705,7 @@ export function SchoolSetupDashboard({
                           const res = await fetch(`/api/schools/${schoolData.schoolCode}/fee-structure`);
                           if (res.ok) {
                             const data = await res.json();
-                            setFeeStructureCount(Array.isArray(data) ? data.length : 0);
+                            setFeeStructureCount(feeStructureListLength(data));
                           }
                         } catch (error) {
                           setFeeStructureCount(0);
@@ -697,16 +717,16 @@ export function SchoolSetupDashboard({
               </TabsContent>
 
               <TabsContent value="academic-calendar" className="space-y-8">
-                <div className="bg-gradient-to-br from-cyan-50/90 to-blue-50/90 backdrop-blur-lg rounded-3xl shadow-xl border border-white/20 p-8">
+                <div className={`${portalGlassPanelLight} p-8`}>
                   <AcademicCalendarCrud schoolCode={schoolData.schoolCode} />
                 </div>
               </TabsContent>
 
               <TabsContent value="settings" className="space-y-8">
-                <div className="bg-gradient-to-br from-gray-50/90 to-slate-50/90 backdrop-blur-lg rounded-3xl shadow-xl border border-white/20 p-8">
+                <div className={`${portalGlassPanelLight} p-8`}>
                   <AdmissionNumberSettings schoolCode={schoolData.schoolCode} />
                 </div>
-                <div className="bg-gradient-to-br from-blue-50/90 to-indigo-50/90 backdrop-blur-lg rounded-3xl shadow-xl border border-white/20 p-8">
+                <div className={`${portalGlassPanelLight} p-8`}>
                   <EmailNotificationSettings schoolCode={schoolData.schoolCode} colorTheme={schoolData.colorTheme} />
                 </div>
               </TabsContent>

@@ -269,31 +269,35 @@ export default function StudentsSection({ schoolCode, colorTheme, toast }: Stude
     }
   };
 
-  // Handle import success
+  // Handle import success — always refetch list (created-only check missed updates-only imports)
   const handleImportSuccess = (result: any) => {
     setImportResult(result);
-    if (result.created?.length > 0) {
-      // Refresh students list by refetching
-      const refreshStudents = async () => {
-        try {
-          const res = await fetch(`/api/schools/${schoolCode}/students`);
-          if (res.ok) {
-            const updatedStudents = await res.json();
-            setStudents(updatedStudents);
-            
-            // Show success toast instead of credentials modal
-            toast && toast({ 
-              title: "Import Successful", 
-              description: `${result.created.length} students imported successfully. Use the eye icon to view their credentials.`, 
-              variant: "default" 
-            });
-          }
-        } catch (error) {
-          toast && toast({ title: "Error", description: "Could not refresh students.", variant: "destructive" });
+    const created = Array.isArray(result?.created) ? result.created.length : 0;
+    const updated = Array.isArray(result?.updated) ? result.updated.length : 0;
+    const refreshStudents = async () => {
+      try {
+        const enc = encodeURIComponent(schoolCode);
+        const res = await fetch(`/api/schools/${enc}/students`);
+        if (res.ok) {
+          const updatedStudents = await res.json();
+          setStudents(updatedStudents);
+          const parts: string[] = [];
+          if (created) parts.push(`${created} created`);
+          if (updated) parts.push(`${updated} updated`);
+          toast?.({
+            title: "Import successful",
+            description:
+              parts.length > 0
+                ? `${parts.join(", ")}. Student list refreshed.`
+                : "Student list refreshed.",
+            variant: "default",
+          });
         }
-      };
-      refreshStudents();
-    }
+      } catch {
+        toast?.({ title: "Error", description: "Could not refresh students.", variant: "destructive" });
+      }
+    };
+    void refreshStudents();
   };
 
   return (

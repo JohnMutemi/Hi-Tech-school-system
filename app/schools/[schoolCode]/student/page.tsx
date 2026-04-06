@@ -68,6 +68,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { StudentSidebar } from "@/components/student-dashboard/StudentSidebar";
+import { FeesStatementDownload } from "@/components/fees-statement/FeesStatementDownload";
 
 export default function StudentDashboardPage({
   params,
@@ -83,6 +84,10 @@ export default function StudentDashboardPage({
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordMsg, setPasswordMsg] = useState("");
+  const [feePayload, setFeePayload] = useState<any>(null);
+  const [financeLoading, setFinanceLoading] = useState(false);
+  const [receiptsList, setReceiptsList] = useState<any[]>([]);
+  const [receiptsLoading, setReceiptsLoading] = useState(false);
 
   useEffect(() => {
     async function fetchStudentData() {
@@ -102,6 +107,52 @@ export default function StudentDashboardPage({
     }
     fetchStudentData();
   }, [params.schoolCode, router]);
+
+  useEffect(() => {
+    if (!student?.id || activeTab !== "finance") return;
+    let cancelled = false;
+    (async () => {
+      setFinanceLoading(true);
+      try {
+        const res = await fetch(
+          `/api/schools/${encodeURIComponent(params.schoolCode)}/students/${student.id}/fees`,
+          { credentials: "include" }
+        );
+        if (res.ok && !cancelled) {
+          setFeePayload(await res.json());
+        }
+      } finally {
+        if (!cancelled) setFinanceLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [student?.id, activeTab, params.schoolCode]);
+
+  useEffect(() => {
+    if (!student?.id || activeTab !== "receipts") return;
+    let cancelled = false;
+    (async () => {
+      setReceiptsLoading(true);
+      try {
+        const res = await fetch(
+          `/api/schools/${encodeURIComponent(params.schoolCode)}/students/${student.id}/receipts`,
+          { credentials: "include" }
+        );
+        if (res.ok && !cancelled) {
+          setReceiptsList(await res.json());
+        } else if (!cancelled) {
+          setReceiptsList([]);
+        }
+      } finally {
+        if (!cancelled) setReceiptsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [student?.id, activeTab, params.schoolCode]);
 
   const handleLogout = async () => {
     try {
@@ -404,133 +455,213 @@ export default function StudentDashboardPage({
     </div>
   );
 
-  const renderFinance = () => (
-    <div className="space-y-6">
-      {/* Fee Summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <DollarSign className="w-5 h-5" />
-            Fee Summary
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
-            <div className="p-3 sm:p-4 bg-green-50 rounded-lg border border-green-200 min-h-[80px] flex flex-col justify-center">
-              <div className="flex items-center justify-between">
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs sm:text-sm font-medium text-green-600 truncate">Total Fees</p>
-                  <p className="text-lg sm:text-2xl font-bold text-green-800 truncate">KES 60K</p>
-                </div>
-                <div className="flex-shrink-0 ml-2">
-                  <DollarSign className="w-6 h-6 sm:w-8 sm:h-8 text-green-600" />
-                </div>
-              </div>
-            </div>
-            <div className="p-3 sm:p-4 bg-blue-50 rounded-lg border border-blue-200 min-h-[80px] flex flex-col justify-center">
-              <div className="flex items-center justify-between">
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs sm:text-sm font-medium text-blue-600 truncate">Paid</p>
-                  <p className="text-lg sm:text-2xl font-bold text-blue-800 truncate">KES 45K</p>
-                </div>
-                <div className="flex-shrink-0 ml-2">
-                  <CheckCircle className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" />
-                </div>
-              </div>
-            </div>
-            <div className="p-3 sm:p-4 bg-orange-50 rounded-lg border border-orange-200 min-h-[80px] flex flex-col justify-center">
-              <div className="flex items-center justify-between">
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs sm:text-sm font-medium text-orange-600 truncate">Outstanding</p>
-                  <p className="text-lg sm:text-2xl font-bold text-orange-800 truncate">KES 15K</p>
-                </div>
-                <div className="flex-shrink-0 ml-2">
-                  <AlertCircle className="w-6 h-6 sm:w-8 sm:h-8 text-orange-600" />
-                </div>
-              </div>
-            </div>
-            <div className="p-3 sm:p-4 bg-purple-50 rounded-lg border border-purple-200 min-h-[80px] flex flex-col justify-center">
-              <div className="flex items-center justify-between">
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs sm:text-sm font-medium text-purple-600 truncate">Due Date</p>
-                  <p className="text-sm sm:text-lg font-bold text-purple-800 truncate">15th Dec</p>
-                </div>
-                <div className="flex-shrink-0 ml-2">
-                  <Calendar className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600" />
-                </div>
-              </div>
-            </div>
-          </div>
+  const renderFinance = () => {
+    const fmt = (n: number) => `KES ${Math.round(Number(n) || 0).toLocaleString()}`;
+    const terms = feePayload?.termBalances ?? [];
+    const assessed = terms.reduce((s: number, t: any) => s + Number(t.totalAmount ?? 0), 0);
+    const paidSum = terms.reduce((s: number, t: any) => s + Number(t.paidAmount ?? 0), 0);
+    const outstanding = Number(feePayload?.outstanding ?? 0);
+    const arrears = Number(feePayload?.arrears ?? 0);
 
-          {/* Fee Breakdown */}
-          <div className="space-y-3">
-            <h3 className="font-semibold text-gray-900 mb-3">Fee Breakdown</h3>
-            {[
-              { term: "Term 1", amount: 20000, paid: 20000, status: "Paid" },
-              { term: "Term 2", amount: 20000, paid: 15000, status: "Partial" },
-              { term: "Term 3", amount: 20000, paid: 10000, status: "Pending" },
-            ].map((term, index) => (
-              <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div>
-                  <span className="font-medium text-gray-900">{term.term}</span>
-                  <p className="text-sm text-gray-600">KES {term.amount.toLocaleString()}</p>
-                </div>
-                <div className="text-right">
-                  <span className="font-medium text-gray-900">KES {term.paid.toLocaleString()}</span>
-                  <Badge className={`ml-2 ${
-                    term.status === "Paid" ? "bg-green-100 text-green-800" :
-                    term.status === "Partial" ? "bg-orange-100 text-orange-800" :
-                    "bg-red-100 text-red-800"
-                  }`}>
-                    {term.status}
-                  </Badge>
-                </div>
+    return (
+      <div className="space-y-6">
+        <Card className="border-slate-200/80 bg-white">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-slate-800">
+              <DollarSign className="w-5 h-5 text-teal-700" />
+              Fees & payments
+            </CardTitle>
+            <CardDescription className="text-slate-600">
+              Balances match the school records for the current academic year view.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {financeLoading ? (
+              <div className="flex items-center justify-center py-16 text-slate-500">
+                <RefreshCw className="w-6 h-6 animate-spin mr-2" />
+                Loading fee summary…
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-
-  const renderReceipts = () => (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Receipt className="w-5 h-5" />
-            Payment Receipts
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {[
-              { id: "R001", date: "2024-01-15", amount: 20000, term: "Term 1", status: "Paid" },
-              { id: "R002", date: "2024-04-20", amount: 15000, term: "Term 2", status: "Paid" },
-              { id: "R003", date: "2024-07-10", amount: 10000, term: "Term 2", status: "Paid" },
-            ].map((receipt, index) => (
-              <div key={index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                <div className="flex items-center gap-3">
-                  <Receipt className="w-5 h-5 text-blue-600" />
-                  <div>
-                    <p className="font-medium text-gray-900">Receipt #{receipt.id}</p>
-                    <p className="text-sm text-gray-600">{receipt.term} • {receipt.date}</p>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+                  <div className="p-3 sm:p-4 rounded-xl border border-emerald-100 bg-[#f4faf8] min-h-[80px] flex flex-col justify-center">
+                    <p className="text-xs sm:text-sm font-medium text-emerald-800 truncate">Assessed (year)</p>
+                    <p className="text-lg sm:text-2xl font-bold text-emerald-950 truncate">{fmt(assessed)}</p>
+                  </div>
+                  <div className="p-3 sm:p-4 rounded-xl border border-teal-100 bg-teal-50/50 min-h-[80px] flex flex-col justify-center">
+                    <p className="text-xs sm:text-sm font-medium text-teal-800 truncate">Paid</p>
+                    <p className="text-lg sm:text-2xl font-bold text-teal-950 truncate">{fmt(paidSum)}</p>
+                  </div>
+                  <div className="p-3 sm:p-4 rounded-xl border border-amber-100 bg-amber-50/60 min-h-[80px] flex flex-col justify-center">
+                    <p className="text-xs sm:text-sm font-medium text-amber-900 truncate">Total outstanding</p>
+                    <p className="text-lg sm:text-2xl font-bold text-amber-950 truncate">{fmt(outstanding)}</p>
+                  </div>
+                  <div className="p-3 sm:p-4 rounded-xl border border-slate-200 bg-slate-50/80 min-h-[80px] flex flex-col justify-center">
+                    <p className="text-xs sm:text-sm font-medium text-slate-600 truncate">Prior arrears</p>
+                    <p className="text-lg sm:text-2xl font-bold text-slate-900 truncate">{fmt(arrears)}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="font-semibold text-gray-900">KES {receipt.amount.toLocaleString()}</span>
-                  <Button size="sm" variant="outline">
-                    <Download className="w-4 h-4 mr-2" />
-                    Download
-                  </Button>
+
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-slate-900 mb-1">Payment history</h3>
+                  <p className="text-sm text-slate-600 mb-3">
+                    Recent payments recorded against your account (newest first in the list below).
+                  </p>
+                  {(feePayload?.paymentHistory?.length ?? 0) === 0 ? (
+                    <p className="text-sm text-slate-500 py-4">No payments recorded yet for this view.</p>
+                  ) : (
+                    <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                      {[...(feePayload.paymentHistory as any[])].reverse().map((p: any) => (
+                        <div
+                          key={p.id}
+                          className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-lg border border-slate-100 bg-slate-50/50"
+                        >
+                          <div>
+                            <p className="font-medium text-slate-900">{fmt(p.amount)}</p>
+                            <p className="text-xs text-slate-600">
+                              {p.paymentDate ? new Date(p.paymentDate).toLocaleDateString("en-GB") : "—"}
+                              {p.receiptNumber ? ` · ${p.receiptNumber}` : ""}
+                            </p>
+                          </div>
+                          <Badge variant="outline" className="text-slate-700 border-slate-200">
+                            {p.paymentMethod || "Payment"}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
+
+                <div className="space-y-3 mt-8">
+                  <h3 className="font-semibold text-slate-900 mb-3">Term breakdown</h3>
+                  {terms.length === 0 ? (
+                    <p className="text-sm text-slate-500">No term fee rows for this period.</p>
+                  ) : (
+                    terms.map((t: any, index: number) => {
+                      const bal = Number(t.balance ?? 0);
+                      const status =
+                        bal <= 0 ? "Settled" : bal < Number(t.totalAmount ?? 0) ? "Partial" : "Due";
+                      return (
+                        <div
+                          key={`${t.term}-${index}`}
+                          className="flex items-center justify-between p-3 rounded-lg border border-slate-100 bg-white"
+                        >
+                          <div>
+                            <span className="font-medium text-slate-900">{t.term}</span>
+                            <p className="text-sm text-slate-600">
+                              Assessed {fmt(Number(t.totalAmount ?? 0))}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <span className="font-medium text-slate-900">{fmt(Number(t.paidAmount ?? 0))} paid</span>
+                            <Badge
+                              className={`ml-2 ${
+                                status === "Settled"
+                                  ? "bg-emerald-100 text-emerald-900"
+                                  : status === "Partial"
+                                    ? "bg-amber-100 text-amber-900"
+                                    : "bg-red-100 text-red-900"
+                              }`}
+                            >
+                              {status}
+                            </Badge>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        {student?.id ? (
+          <FeesStatementDownload
+            schoolCode={params.schoolCode}
+            studentId={student.id}
+            studentName={student.name || "Student"}
+            admissionNumber={student.admissionNumber || "N/A"}
+            gradeName={student.gradeName || "N/A"}
+            className={student.className || "N/A"}
+          />
+        ) : null}
+      </div>
+    );
+  };
+
+  const renderReceipts = () => {
+    const code = encodeURIComponent(params.schoolCode);
+    return (
+      <div className="space-y-6">
+        <Card className="border-slate-200/80">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-slate-800">
+              <Receipt className="w-5 h-5 text-teal-700" />
+              Payment receipts
+            </CardTitle>
+            <CardDescription className="text-slate-600">
+              View a receipt in the browser or download a PDF (same formats as the bursar office).
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {receiptsLoading ? (
+              <div className="flex items-center justify-center py-16 text-slate-500">
+                <RefreshCw className="w-6 h-6 animate-spin mr-2" />
+                Loading receipts…
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
+            ) : receiptsList.length === 0 ? (
+              <p className="text-sm text-slate-500 py-8 text-center">No receipts found yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {receiptsList.map((r: any) => {
+                  const rn = encodeURIComponent(r.receiptNumber || "");
+                  const viewUrl = `/api/schools/${code}/receipts/${rn}/view`;
+                  const dlA4 = `/api/schools/${code}/receipts/${rn}/download?size=A4`;
+                  return (
+                    <div
+                      key={r.id || r.receiptNumber}
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border border-slate-100 rounded-xl bg-slate-50/30 hover:bg-slate-50/60 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Receipt className="w-5 h-5 text-teal-700 flex-shrink-0" />
+                        <div>
+                          <p className="font-medium text-slate-900">{r.receiptNumber || "Receipt"}</p>
+                          <p className="text-sm text-slate-600">
+                            {r.term || "—"} ·{" "}
+                            {r.paymentDate
+                              ? new Date(r.paymentDate).toLocaleDateString("en-GB")
+                              : "—"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-semibold text-slate-900 mr-2">
+                          KES {Number(r.amount ?? 0).toLocaleString()}
+                        </span>
+                        <Button size="sm" variant="outline" asChild className="border-slate-200">
+                          <a href={viewUrl} target="_blank" rel="noopener noreferrer">
+                            <Eye className="w-4 h-4 mr-1" />
+                            View
+                          </a>
+                        </Button>
+                        <Button size="sm" variant="outline" asChild className="border-slate-200">
+                          <a href={dlA4} target="_blank" rel="noopener noreferrer">
+                            <Download className="w-4 h-4 mr-1" />
+                            PDF
+                          </a>
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  };
 
   const renderAttendance = () => (
     <div className="space-y-6">
@@ -804,7 +935,7 @@ export default function StudentDashboardPage({
   };
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-green-50 via-white to-emerald-50">
+    <div className="flex min-h-screen bg-gradient-to-br from-green-50/90 via-white/80 to-emerald-50/90 backdrop-blur-sm">
       <StudentSidebar
         activeTab={activeTab}
         onTabChange={setActiveTab}
