@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from "@/lib/prisma";
 import { jsonError, requireRole, requireSchoolAccess } from "@/lib/api-guard";
+import { computeStudentFeesSnapshot } from "@/lib/services/student-fees-snapshot";
 
 // POST: Process a new payment
 export async function POST(request: NextRequest, { params }: { params: { schoolCode: string } }) {
@@ -33,11 +34,13 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
       }, { status: 400 });
     }
 
-    const schoolName =
-      (await prisma.school.findUnique({
-        where: { id: schoolContext.schoolId },
-        select: { name: true },
-      }))?.name ?? "School";
+    const schoolRecord = await prisma.school.findUnique({
+      where: { id: schoolContext.schoolId },
+    });
+    if (!schoolRecord) {
+      return NextResponse.json({ error: "School not found" }, { status: 404 });
+    }
+    const schoolName = schoolRecord?.name ?? "School";
 
     // Fetch the student
     const student = await prisma.student.findFirst({
@@ -101,74 +104,18 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
     // Generate reference number if not provided
     const finalReferenceNumber = referenceNumber || `PAY-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-    // --- NEW LOGIC: Fetch balances for the payment's academic year ---
-    // Get all termly fee structures for this student/grade for the payment's academic year
-    const feeStructures = await prisma.termlyFeeStructure.findMany({
-      where: {
-        gradeId: student.class?.gradeId,
-        isActive: true,
-        academicYearId: academicYearRecord.id, // Use payment's academic year
-        NOT: [ { termId: null } ]
-      }
-    });
-    // Get all payments for this student for the academic year
-    const payments = await prisma.payment.findMany({
-      where: {
-        studentId: student.id,
-        academicYearId: academicYearRecord.id
-      },
-      orderBy: { paymentDate: 'asc' }
-    });
-    // Build transactions: charges (debit), payments (credit)
-    let transactions = [];
-    for (const fs of feeStructures) {
-      transactions.push({
-        ref: fs.id,
-        description: `INVOICE - ${fs.term || ''} ${fs.year || ''}`,
-        debit: Number(fs.totalAmount),
-        credit: 0,
-        date: fs.createdAt,
-        type: 'invoice',
-        termId: fs.termId,
-        academicYearId: fs.academicYearId,
-        term: fs.term,
-        year: fs.year
-      });
-    }
-    for (const p of payments) {
-      transactions.push({
-        ref: p.receiptNumber || p.referenceNumber || p.id,
-        description: p.description || 'PAYMENT',
-        debit: 0,
-        credit: Number(p.amount),
-        date: p.paymentDate,
-        type: 'payment',
-        termId: p.termId,
-        academicYearId: p.academicYearId,
-        term: undefined,
-        year: undefined
-      });
-    }
-    transactions = transactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    // Calculate running balance
-    let runningBalance = 0;
-    transactions = transactions.map((txn) => {
-      runningBalance += (txn.debit || 0) - (txn.credit || 0);
-      return {
-        ...txn,
-        balance: runningBalance
-      };
-    });
-    const academicYearOutstandingBefore = transactions.length > 0 ? transactions[transactions.length - 1].balance : 0;
-    // --- Find the term fee structure for the payment ---
-    const targetTermFee = feeStructures.find(fs => fs.term === term);
-    // Calculate term balance before
-    let termOutstandingBefore = 0;
-    if (targetTermFee) {
-      const charges = transactions.filter(txn => txn.termId === targetTermFee.termId && txn.type === 'invoice').reduce((sum, txn) => sum + (txn.debit || 0), 0);
-      const paymentsForTerm = transactions.filter(txn => txn.termId === targetTermFee.termId && txn.type === 'payment').reduce((sum, txn) => sum + (txn.credit || 0), 0);
-      termOutstandingBefore = charges - paymentsForTerm;
-    }
+    // Align payment balances to the same carry-forward engine used by parent/bursar views.
+    const snapshotBefore = await computeStudentFeesSnapshot(
+      prisma as any,
+      schoolRecord as any,
+      student as any,
+      academicYearRecord.id,
+      { persistYearEndCarryForward: false }
+    );
+    const safeBefore = "error" in snapshotBefore ? null : snapshotBefore;
+    const termRowBefore = safeBefore?.termBalances.find((t) => t.termId === termRecord.id);
+    const academicYearOutstandingBefore = safeBefore?.academicYearOutstanding ?? 0;
+    const termOutstandingBefore = termRowBefore?.balance ?? 0;
     // --- Apply the payment ---
     // (We just record the payment; the /fees endpoint will recalculate balances in real time)
     // Create the payment
@@ -186,38 +133,19 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
         termId: termRecord.id,
       }
     });
-    // --- Recalculate balances after payment ---
-    // Add this payment to the transactions and recalc
-    transactions.push({
-      ref: payment.receiptNumber || payment.referenceNumber || payment.id,
-      description: payment.description || 'PAYMENT',
-      debit: 0,
-      credit: Number(payment.amount),
-      date: payment.paymentDate,
-      type: 'payment',
-      termId: payment.termId,
-      academicYearId: payment.academicYearId,
-      term: term,
-      year: academicYear,
-      balance: 0 // will be recalculated below
-    });
-    transactions = transactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    runningBalance = 0;
-    transactions = transactions.map((txn) => {
-      runningBalance += (txn.debit || 0) - (txn.credit || 0);
-      return {
-        ...txn,
-        balance: runningBalance
-      };
-    });
-    const academicYearOutstandingAfter = transactions.length > 0 ? transactions[transactions.length - 1].balance : 0;
-    // Calculate term balance after
-    let termOutstandingAfter = 0;
-    if (targetTermFee) {
-      const charges = transactions.filter(txn => txn.termId === targetTermFee.termId && txn.type === 'invoice').reduce((sum, txn) => sum + (txn.debit || 0), 0);
-      const paymentsForTerm = transactions.filter(txn => txn.termId === targetTermFee.termId && txn.type === 'payment').reduce((sum, txn) => sum + (txn.credit || 0), 0);
-      termOutstandingAfter = charges - paymentsForTerm;
-    }
+    // Recompute after payment and persist end-of-year carry-forward for next year balances.
+    const snapshotAfter = await computeStudentFeesSnapshot(
+      prisma as any,
+      schoolRecord as any,
+      student as any,
+      academicYearRecord.id,
+      { persistYearEndCarryForward: true }
+    );
+    const safeAfter = "error" in snapshotAfter ? null : snapshotAfter;
+    const termRowAfter = safeAfter?.termBalances.find((t) => t.termId === payment.termId);
+    const academicYearOutstandingAfter = safeAfter?.academicYearOutstanding ?? Math.max(0, academicYearOutstandingBefore - Number(payment.amount));
+    const termOutstandingAfter = termRowAfter?.balance ?? Math.max(0, termOutstandingBefore - Number(payment.amount));
+    const carryForward = Math.max(0, Number(payment.amount) - Math.max(0, termOutstandingBefore));
     // --- Create receipt with correct balances and term/year ---
     const receipt = await prisma.receipt.create({
       data: {
@@ -230,6 +158,7 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
         academicYearOutstandingAfter,
         termOutstandingBefore,
         termOutstandingAfter,
+        carryForward,
         academicYearId: payment.academicYearId,
         termId: payment.termId,
         paymentMethod: payment.paymentMethod,
@@ -237,15 +166,16 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
       }
     });
 
+    let emailNotificationSent = false;
     // Send email notification if parent email exists
     try {
       const { EmailService } = await import('@/lib/services/email-service');
       const emailService = new EmailService();
-      await emailService.sendPaymentNotificationForPayment(
+      emailNotificationSent = await emailService.sendPaymentNotificationForPayment(
         payment.id,
         schoolCode
       );
-      console.log('Email notification sent for payment:', payment.id);
+      console.log('Email notification status for payment:', payment.id, emailNotificationSent);
     } catch (emailError) {
       console.error('Email notification failed:', emailError);
       // Don't fail the payment if email fails
@@ -272,8 +202,11 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
         academicYearOutstandingAfter,
         termOutstandingBefore,
         termOutstandingAfter,
+        carryForward,
+        emailNotificationSent,
       },
       receipt,
+      emailNotificationSent,
     }, { status: 201 });
 
   } catch (error: any) {

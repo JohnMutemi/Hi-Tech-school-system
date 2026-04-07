@@ -307,7 +307,9 @@ export default function PaymentHub({ studentId, schoolCode, onPaymentComplete, i
         
         toast({
           title: "Payment Successful",
-          description: `Payment of KES ${paymentState.paymentAmount.toLocaleString()} processed successfully`,
+          description: responseData.emailNotificationSent
+            ? `Payment of KES ${paymentState.paymentAmount.toLocaleString()} processed and receipt email sent.`
+            : `Payment of KES ${paymentState.paymentAmount.toLocaleString()} processed. Receipt is available for download.`,
         });
 
         // Reset form

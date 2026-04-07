@@ -317,13 +317,13 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 flex items-center justify-center">
         <div className="text-center">
           <div className="relative">
-            <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+            <div className="w-16 h-16 bg-gradient-to-r from-amber-600 to-orange-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
               <RefreshCw className="w-8 h-8 text-white animate-spin" />
             </div>
-            <div className="absolute inset-0 w-16 h-16 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl mx-auto opacity-20 animate-pulse"></div>
+            <div className="absolute inset-0 w-16 h-16 bg-gradient-to-r from-amber-600 to-orange-600 rounded-2xl mx-auto opacity-20 animate-pulse"></div>
           </div>
           <h2 className="text-xl font-semibold text-gray-800 mb-2">Loading Bursar Dashboard</h2>
           <p className="text-gray-600">Preparing financial management interface...</p>
@@ -338,16 +338,16 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
         return (
           <div className="space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card className="bg-gradient-to-br from-blue-50 to-white border-blue-200/50 hover:shadow-xl hover:shadow-blue-100/50 transition-all duration-300 backdrop-blur-sm">
+              <Card className="bg-gradient-to-br from-amber-50 to-white border-amber-200/50 hover:shadow-xl hover:shadow-amber-100/50 transition-all duration-300 backdrop-blur-sm">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                  <CardTitle className="text-sm font-semibold text-blue-800">Total Students</CardTitle>
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg border border-blue-500/20">
+                  <CardTitle className="text-sm font-semibold text-amber-800">Total Students</CardTitle>
+                  <div className="w-12 h-12 bg-gradient-to-br from-amber-600 to-orange-700 rounded-xl flex items-center justify-center shadow-lg border border-amber-500/20">
                     <Users className="h-6 w-6 text-white" />
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-blue-900 mb-1">{summary.totalStudents}</div>
-                  <p className="text-xs text-blue-600 font-medium">Enrolled students</p>
+                  <div className="text-3xl font-bold text-amber-900 mb-1">{summary.totalStudents}</div>
+                  <p className="text-xs text-amber-700 font-medium">Enrolled students</p>
                 </CardContent>
               </Card>
               
@@ -503,15 +503,15 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
 
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:shadow-lg transition-all duration-300 cursor-pointer" onClick={exportToExcel}>
+              <Card className="bg-gradient-to-br from-amber-50 to-orange-100 border-amber-200 hover:shadow-lg transition-all duration-300 cursor-pointer" onClick={exportToExcel}>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-3 text-blue-700">
+                  <CardTitle className="flex items-center gap-3 text-amber-700">
                     <Download className="w-5 h-5" />
                     Student Fee Report
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-blue-600 text-sm">Complete student fee summary with balances and payment history</p>
+                  <p className="text-amber-700 text-sm">Complete student fee summary with balances and payment history</p>
                 </CardContent>
               </Card>
 
@@ -555,12 +555,12 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
               <Card className="bg-white shadow-sm border-gray-200">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-3">
-                    <TrendingUp className="w-5 h-5 text-blue-600" />
+                    <TrendingUp className="w-5 h-5 text-amber-700" />
                     Collection Rate
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-blue-600 mb-2">
+                  <div className="text-3xl font-bold text-amber-700 mb-2">
                     {summary.totalStudents > 0 ? Math.round((summary.fullyPaid / summary.totalStudents) * 100) : 0}%
                   </div>
                   <p className="text-gray-600 text-sm">Students with complete fee payment</p>
@@ -593,13 +593,13 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
           <div className="space-y-8">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-2xl font-bold text-blue-900">Student Fee Management</h2>
-                <p className="text-blue-700/70">Manage student fee payments and balances</p>
+                <h2 className="text-2xl font-bold text-amber-900">Student Fee Management</h2>
+                <p className="text-amber-700/80">Manage student fee payments and balances</p>
               </div>
               <div className="flex items-center space-x-3">
                 <Button 
                   onClick={exportToExcel} 
-                  className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transition-all duration-200 border border-blue-500/20"
+                  className="bg-gradient-to-r from-amber-600 to-orange-700 hover:from-amber-700 hover:to-orange-800 text-white shadow-lg hover:shadow-xl transition-all duration-200 border border-amber-500/20"
                 >
                   <Download className="w-4 h-4 mr-2" />
                   Export Report
@@ -607,7 +607,7 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
                 <Button 
                   onClick={fetchStudents}
                   variant="outline"
-                  className="border-blue-200 hover:bg-blue-50 hover:border-blue-300 text-blue-700 shadow-sm"
+                  className="border-amber-200 hover:bg-amber-50 hover:border-amber-300 text-amber-700 shadow-sm"
                 >
                   <RefreshCw className="w-4 h-4 mr-2" />
                   Refresh
@@ -616,10 +616,10 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
             </div>
 
             {/* Enhanced Filters Section */}
-            <Card className="bg-gradient-to-r from-white to-blue-50/30 shadow-sm border-blue-100 hover:shadow-lg hover:shadow-blue-100/50 transition-all duration-300 backdrop-blur-sm">
+            <Card className="bg-gradient-to-r from-white to-amber-50/30 shadow-sm border-amber-100 hover:shadow-lg hover:shadow-amber-100/50 transition-all duration-300 backdrop-blur-sm">
               <CardHeader className="border-b border-gray-100 pb-4">
-                <CardTitle className="flex items-center gap-3 text-blue-900">
-                  <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg flex items-center justify-center border border-blue-500/20 shadow-sm">
+                <CardTitle className="flex items-center gap-3 text-amber-900">
+                  <div className="w-8 h-8 bg-gradient-to-r from-amber-600 to-orange-700 rounded-lg flex items-center justify-center border border-amber-500/20 shadow-sm">
                     <Filter className="w-4 h-4 text-white" />
                   </div>
                   Advanced Filters
@@ -637,7 +637,7 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
                       placeholder="Name, admission number, or parent..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="mt-1 border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
+                      className="mt-1 border-gray-300 focus:border-amber-500 focus:ring-amber-500"
                     />
                   </div>
                   
@@ -647,7 +647,7 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
                       Grade
                     </Label>
                     <Select value={selectedGrade} onValueChange={setSelectedGrade}>
-                      <SelectTrigger className="mt-1 border-gray-300 focus:border-indigo-500">
+                      <SelectTrigger className="mt-1 border-gray-300 focus:border-amber-500">
                         <SelectValue placeholder="All Grades" />
                       </SelectTrigger>
                       <SelectContent>
@@ -667,7 +667,7 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
                       Class
                     </Label>
                     <Select value={selectedClass} onValueChange={setSelectedClass}>
-                      <SelectTrigger className="mt-1 border-gray-300 focus:border-indigo-500">
+                      <SelectTrigger className="mt-1 border-gray-300 focus:border-amber-500">
                         <SelectValue placeholder="All Classes" />
                       </SelectTrigger>
                       <SelectContent>
@@ -689,7 +689,7 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
                       Academic Year
                     </Label>
                     <Select value={academicYear} onValueChange={setAcademicYear}>
-                      <SelectTrigger className="mt-1 border-gray-300 focus:border-indigo-500">
+                      <SelectTrigger className="mt-1 border-gray-300 focus:border-amber-500">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -709,7 +709,7 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
                         Term
                       </Label>
                       <Select value={term} onValueChange={setTerm}>
-                        <SelectTrigger className="mt-1 border-gray-300 focus:border-indigo-500">
+                        <SelectTrigger className="mt-1 border-gray-300 focus:border-amber-500">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -729,14 +729,14 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
                           setTerm('all');
                         }}
                         variant="outline"
-                        className="w-full border-blue-200 hover:bg-blue-50 hover:border-blue-300 text-blue-700"
+                        className="w-full border-amber-200 hover:bg-amber-50 hover:border-amber-300 text-amber-700"
                       >
                         Clear Filters
                       </Button>
                     </div>
                     <div className="flex items-end">
-                      <div className="text-sm text-blue-600 bg-blue-50/50 px-3 py-2 rounded-lg w-full border border-blue-100">
-                        Showing <span className="font-semibold text-blue-900">{filteredStudents.length}</span> of {students.length} students
+                      <div className="text-sm text-amber-700 bg-amber-50/50 px-3 py-2 rounded-lg w-full border border-amber-100">
+                        Showing <span className="font-semibold text-amber-900">{filteredStudents.length}</span> of {students.length} students
                       </div>
                     </div>
                   </div>
@@ -745,15 +745,15 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
             </Card>
 
             {/* Students Table */}
-            <Card className="bg-gradient-to-br from-white to-blue-50/30 shadow-lg border-blue-100/50 overflow-hidden backdrop-blur-sm">
-              <CardHeader className="border-b border-blue-100/50 bg-gradient-to-r from-blue-50/50 to-blue-100/30">
+            <Card className="bg-gradient-to-br from-white to-amber-50/30 shadow-lg border-amber-100/50 overflow-hidden backdrop-blur-sm">
+              <CardHeader className="border-b border-amber-100/50 bg-gradient-to-r from-amber-50/50 to-amber-100/30">
                 <CardTitle className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg flex items-center justify-center border border-blue-500/20 shadow-sm">
+                    <div className="w-8 h-8 bg-gradient-to-r from-amber-600 to-orange-700 rounded-lg flex items-center justify-center border border-amber-500/20 shadow-sm">
                       <Users className="w-4 h-4 text-white" />
                     </div>
-                    <span className="text-blue-900 font-semibold">Student Fee Management</span>
-                    <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200">
+                    <span className="text-amber-900 font-semibold">Student Fee Management</span>
+                    <Badge variant="secondary" className="bg-amber-100 text-amber-700 border-amber-200">
                       {filteredStudents.length} students
                     </Badge>
                   </div>
@@ -763,23 +763,23 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
-                      <TableRow className="bg-gradient-to-r from-blue-50 to-blue-100/50 border-b border-blue-200">
-                        <TableHead className="font-semibold text-blue-800 py-4">Student Information</TableHead>
-                        <TableHead className="font-semibold text-blue-800">Grade & Class</TableHead>
-                        <TableHead className="font-semibold text-blue-800">Parent Contact</TableHead>
-                        <TableHead className="font-semibold text-blue-800 text-right">Fee Required</TableHead>
-                        <TableHead className="font-semibold text-blue-800 text-right">Amount Paid</TableHead>
-                        <TableHead className="font-semibold text-blue-800 text-right">Outstanding</TableHead>
-                        <TableHead className="font-semibold text-blue-800 text-center">Status</TableHead>
-                        <TableHead className="font-semibold text-blue-800 text-center">Actions</TableHead>
+                      <TableRow className="bg-gradient-to-r from-amber-50 to-amber-100/50 border-b border-amber-200">
+                        <TableHead className="font-semibold text-amber-800 py-4">Student Information</TableHead>
+                        <TableHead className="font-semibold text-amber-800">Grade & Class</TableHead>
+                        <TableHead className="font-semibold text-amber-800">Parent Contact</TableHead>
+                        <TableHead className="font-semibold text-amber-800 text-right">Fee Required</TableHead>
+                        <TableHead className="font-semibold text-amber-800 text-right">Amount Paid</TableHead>
+                        <TableHead className="font-semibold text-amber-800 text-right">Outstanding</TableHead>
+                        <TableHead className="font-semibold text-amber-800 text-center">Status</TableHead>
+                        <TableHead className="font-semibold text-amber-800 text-center">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredStudents.map((student) => (
-                        <TableRow key={student.id} className="hover:bg-blue-50/30 transition-colors duration-200 border-b border-blue-100/50">
+                        <TableRow key={student.id} className="hover:bg-amber-50/30 transition-colors duration-200 border-b border-amber-100/50">
                           <TableCell className="py-4">
                             <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-blue-700 rounded-full flex items-center justify-center text-white font-semibold text-sm shadow-sm border border-blue-500/20">
+                              <div className="w-10 h-10 bg-gradient-to-r from-amber-600 to-orange-700 rounded-full flex items-center justify-center text-white font-semibold text-sm shadow-sm border border-amber-500/20">
                                 {student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                               </div>
                               <div>
@@ -831,7 +831,7 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
                                   setSelectedStudent(student);
                                   setShowPaymentHub(true);
                                 }}
-                                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-sm hover:shadow-md transition-all duration-200"
+                                className="bg-gradient-to-r from-amber-600 to-orange-700 hover:from-amber-700 hover:to-orange-800 text-white shadow-sm hover:shadow-md transition-all duration-200"
                               >
                                 <CreditCard className="w-3 h-3 mr-1" />
                                 Record Payment
@@ -843,7 +843,7 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
                                   setHistoryStudent(student);
                                   setShowPaymentHistory(true);
                                 }}
-                                className="border-blue-200 hover:bg-blue-50 hover:border-blue-300 text-blue-600 shadow-sm"
+                                className="border-amber-200 hover:bg-amber-50 hover:border-amber-300 text-amber-700 shadow-sm"
                               >
                                 <History className="w-3 h-3" />
                               </Button>
@@ -872,7 +872,7 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50">
       {/* Sidebar Navigation */}
             <BursarSidebar
         activeTab={activeTab}
@@ -887,17 +887,17 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
       {/* Main Content */}
       <div className="lg:ml-80">
         {/* Enhanced Top Header - Sticky */}
-        <div className="sticky-header bg-gradient-to-r from-white/95 to-blue-50/80 border-b border-blue-100/50 px-6 py-6 shadow-lg backdrop-blur-md supports-[backdrop-filter]:bg-white/80">
+        <div className="sticky-header bg-gradient-to-r from-white/95 to-amber-50/80 border-b border-amber-100/50 px-6 py-6 shadow-lg backdrop-blur-md supports-[backdrop-filter]:bg-white/80">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-900 to-blue-700 bg-clip-text text-transparent">
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-amber-900 to-orange-700 bg-clip-text text-transparent">
                 {activeTab === 'dashboard' && 'Financial Dashboard'}
                 {activeTab === 'students' && 'Student Fee Management'}
                 {activeTab === 'outstanding' && 'Outstanding Fees'}
                 {activeTab === 'reports' && 'Financial Reports'}
                 {activeTab === 'analytics' && 'Payment Analytics'}
               </h1>
-              <p className="text-blue-600/80 text-sm mt-2 font-medium">
+              <p className="text-amber-700/80 text-sm mt-2 font-medium">
                 {schoolInfo?.name || 'Financial Management System'}
               </p>
             </div>
@@ -905,8 +905,8 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
             {/* Current Tab Indicator */}
             <div className="hidden md:flex items-center space-x-4">
               <div className="text-right">
-                <p className="text-sm font-medium text-blue-700">Current Session</p>
-                <p className="text-xs text-blue-500">
+                <p className="text-sm font-medium text-amber-700">Current Session</p>
+                <p className="text-xs text-amber-600">
                   {new Date().toLocaleDateString('en-US', { 
                     weekday: 'long', 
                     year: 'numeric', 
@@ -915,7 +915,7 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
                   })}
                 </p>
               </div>
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg border border-blue-500/20">
+              <div className="w-12 h-12 bg-gradient-to-br from-amber-600 to-orange-700 rounded-xl flex items-center justify-center shadow-lg border border-amber-500/20">
                 <School className="w-6 h-6 text-white" />
               </div>
             </div>
@@ -923,7 +923,7 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
         </div>
 
         <div
-          className={`p-6 pb-20 lg:pb-6 min-h-[calc(100vh-8rem)] bg-gradient-to-br from-slate-50/50 via-blue-50/30 to-indigo-50/40`}
+          className={`p-6 pb-20 lg:pb-6 min-h-[calc(100vh-8rem)] bg-gradient-to-br from-amber-50/50 via-orange-50/30 to-yellow-50/40`}
         >
           <div className={`${portalGlassPanelLight} p-6 min-h-[320px]`}>{renderTabContent()}</div>
         </div>

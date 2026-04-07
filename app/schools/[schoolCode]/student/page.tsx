@@ -109,7 +109,7 @@ export default function StudentDashboardPage({
   }, [params.schoolCode, router]);
 
   useEffect(() => {
-    if (!student?.id || activeTab !== "finance") return;
+    if (!student?.id) return;
     let cancelled = false;
     (async () => {
       setFinanceLoading(true);
@@ -128,7 +128,7 @@ export default function StudentDashboardPage({
     return () => {
       cancelled = true;
     };
-  }, [student?.id, activeTab, params.schoolCode]);
+  }, [student?.id, params.schoolCode]);
 
   useEffect(() => {
     if (!student?.id || activeTab !== "receipts") return;
@@ -206,7 +206,17 @@ export default function StudentDashboardPage({
     );
   }
 
-  const renderOverview = () => (
+  const renderOverview = () => {
+    const assessed = (feePayload?.termBalances ?? []).reduce(
+      (s: number, t: any) => s + Number(t.totalAmount ?? 0),
+      0
+    );
+    const paid = (feePayload?.termBalances ?? []).reduce(
+      (s: number, t: any) => s + Number(t.paidAmount ?? 0),
+      0
+    );
+    const outstanding = Number(feePayload?.outstanding ?? 0);
+    return (
     <div className="space-y-6">
       {/* Student Profile Card */}
       <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
@@ -279,7 +289,7 @@ export default function StudentDashboardPage({
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-green-600">Fees Paid</p>
-                <p className="text-2xl font-bold text-green-800">KES 45K</p>
+                <p className="text-2xl font-bold text-green-800">KES {Math.round(paid).toLocaleString()}</p>
               </div>
               <DollarSign className="w-8 h-8 text-green-600" />
             </div>
@@ -291,13 +301,24 @@ export default function StudentDashboardPage({
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-orange-600">Outstanding</p>
-                <p className="text-2xl font-bold text-orange-800">KES 15K</p>
+                <p className="text-2xl font-bold text-orange-800">KES {Math.round(outstanding).toLocaleString()}</p>
               </div>
               <AlertCircle className="w-8 h-8 text-orange-600" />
             </div>
           </CardContent>
         </Card>
       </div>
+      <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-blue-600">Assessed (Year)</p>
+              <p className="text-2xl font-bold text-blue-800">KES {Math.round(assessed).toLocaleString()}</p>
+            </div>
+            <Receipt className="w-8 h-8 text-blue-600" />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Recent Activities */}
       <Card>
@@ -328,6 +349,7 @@ export default function StudentDashboardPage({
       </Card>
     </div>
   );
+  };
 
   const renderClass = () => (
     <div className="space-y-6">

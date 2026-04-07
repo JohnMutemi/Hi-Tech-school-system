@@ -152,9 +152,9 @@ export async function POST(
       };
     }
     
-    const appliedToCurrent = carryForwardDetails.appliedToCurrent;
-    const carryForwardApplied = carryForwardDetails.overpayment;
-    const academicYearOutstandingAfter = carryForwardDetails.newAcademicYearBalance;
+    const appliedToCurrent = carryForwardDetails.appliedToCurrent ?? 0;
+    const carryForwardApplied = carryForwardDetails.overpayment ?? carryForwardDetails.carryForwardAmount ?? 0;
+    const academicYearOutstandingAfter = carryForwardDetails.newAcademicYearBalance ?? Math.max(0, balanceData.academicYearOutstandingBefore - amount);
 
     const receipt = await prisma.receipt.create({
       data: {
@@ -196,7 +196,7 @@ export async function POST(
       studentName: student.name || student.user?.name || "Student",
       currency: "KES",
       paymentBreakdown: balanceData.paymentBreakdown,
-      currentTermBalance: newNextTermBalance,
+      currentTermBalance: carryForwardDetails.newTermBalance ?? Math.max(0, balanceData.currentTermBalance - appliedToCurrent),
       carryForward: carryForwardApplied,
       balance: academicYearOutstandingAfter,
       academicYearOutstandingAfter: academicYearOutstandingAfter,
