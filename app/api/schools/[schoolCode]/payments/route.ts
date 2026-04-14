@@ -158,7 +158,6 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
         academicYearOutstandingAfter,
         termOutstandingBefore,
         termOutstandingAfter,
-        carryForward,
         academicYearId: payment.academicYearId,
         termId: payment.termId,
         paymentMethod: payment.paymentMethod,
@@ -173,7 +172,7 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
       const emailService = new EmailService();
       emailNotificationSent = await emailService.sendPaymentNotificationForPayment(
         payment.id,
-        schoolCode
+        schoolRecord.code
       );
       console.log('Email notification status for payment:', payment.id, emailNotificationSent);
     } catch (emailError) {

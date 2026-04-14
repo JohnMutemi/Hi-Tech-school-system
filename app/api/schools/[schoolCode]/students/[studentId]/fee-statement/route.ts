@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { computeStudentFeesSnapshot } from '@/lib/services/student-fees-snapshot';
 import { assertStudentFeeAccess, resolvePortalFeeAuth } from '@/lib/portal-fee-auth';
+import { verifyEmailDownloadToken } from '@/lib/email-download-token';
 
 // GET: Professional fee statement for a student
 export async function GET(request: NextRequest, { params }: { params: { schoolCode: string; studentId: string } }) {
@@ -19,10 +20,19 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       return NextResponse.json({ error: 'School not found' }, { status: 404 });
     }
 
-    const auth = await resolvePortalFeeAuth(request, schoolCode);
-    const gate = await assertStudentFeeAccess(auth, school.id, studentId);
-    if (!gate.ok) {
-      return NextResponse.json({ error: gate.message }, { status: gate.status });
+    const token = searchParams.get('token');
+    const tokenPayload = verifyEmailDownloadToken(token);
+    const tokenAuthorized =
+      tokenPayload &&
+      tokenPayload.schoolCode === school.code.toLowerCase() &&
+      tokenPayload.studentId === studentId;
+
+    if (!tokenAuthorized) {
+      const auth = await resolvePortalFeeAuth(request, schoolCode);
+      const gate = await assertStudentFeeAccess(auth, school.id, studentId);
+      if (!gate.ok) {
+        return NextResponse.json({ error: gate.message }, { status: gate.status });
+      }
     }
 
     // Find the student

@@ -16,6 +16,10 @@ function getNextAdmissionNumber(lastAdmissionNumber: string): string {
   return lastAdmissionNumber + '1';
 }
 
+function normalizeName(value?: string | null): string {
+  return (value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { schoolCode: string } }
@@ -217,21 +221,62 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
 
     let parentUser = null;
     let parentTempPassword = 'parent123';
-    if (parentPhone) {
-      parentUser = await prisma.user.findFirst({
-        where: {
-          phone: parentPhone,
-          role: 'parent',
-          schoolId: schoolContext.schoolId,
-        },
-      });
+    if (parentPhone || parentEmail) {
+      const trimmedParentPhone = parentPhone?.trim() || null;
+      const trimmedParentEmail = parentEmail?.trim().toLowerCase() || null;
+      const normalizedParentName = normalizeName(parentName);
+
+      const [parentByPhone, parentByEmail] = await Promise.all([
+        trimmedParentPhone
+          ? prisma.user.findFirst({
+              where: {
+                role: 'parent',
+                schoolId: schoolContext.schoolId,
+                phone: trimmedParentPhone,
+              },
+            })
+          : Promise.resolve(null),
+        trimmedParentEmail
+          ? prisma.user.findFirst({
+              where: {
+                role: 'parent',
+                schoolId: schoolContext.schoolId,
+                email: trimmedParentEmail,
+              },
+            })
+          : Promise.resolve(null),
+      ]);
+
+      if (parentByPhone && parentByEmail && parentByPhone.id !== parentByEmail.id) {
+        return NextResponse.json(
+          { error: 'Parent email and phone belong to different parent records. Please use matching parent details.' },
+          { status: 409 }
+        );
+      }
+
+      parentUser = parentByEmail || parentByPhone;
+
+      // If the email exists globally but belongs to a non-parent account, block parent linkage.
+      if (!parentUser && trimmedParentEmail) {
+        const anyUserWithEmail = await prisma.user.findUnique({
+          where: { email: trimmedParentEmail },
+          select: { id: true, role: true, schoolId: true },
+        });
+        if (anyUserWithEmail && anyUserWithEmail.role !== 'parent') {
+          return NextResponse.json(
+            { error: 'Parent email belongs to another non-parent account. Use a different parent email.' },
+            { status: 409 }
+          );
+        }
+      }
+
       const hashedParentPassword = await hashDefaultPasswordByRole('parent');
       if (!parentUser) {
         parentUser = await prisma.user.create({
           data: {
             name: parentName || `Parent of ${name}`,
-            email: parentEmail || `${parentPhone}@parent.local`,
-            phone: parentPhone,
+            email: trimmedParentEmail || `${trimmedParentPhone || Date.now()}@parent.local`,
+            phone: trimmedParentPhone,
             role: 'parent',
             password: hashedParentPassword,
             isActive: true,
@@ -239,10 +284,28 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
           },
         });
       } else {
-        await prisma.user.update({
-          where: { id: parentUser.id },
-          data: { password: hashedParentPassword },
-        });
+        const existingName = normalizeName(parentUser.name);
+        const existingEmail = (parentUser.email || '').trim().toLowerCase();
+        const existingPhone = (parentUser.phone || '').trim();
+
+        if (normalizedParentName && existingName && normalizedParentName !== existingName) {
+          return NextResponse.json(
+            { error: 'Parent name does not match existing parent record for the provided email/phone.' },
+            { status: 409 }
+          );
+        }
+        if (trimmedParentEmail && existingEmail && trimmedParentEmail !== existingEmail) {
+          return NextResponse.json(
+            { error: 'Parent email does not match existing parent record.' },
+            { status: 409 }
+          );
+        }
+        if (trimmedParentPhone && existingPhone && trimmedParentPhone !== existingPhone) {
+          return NextResponse.json(
+            { error: 'Parent phone does not match existing parent record.' },
+            { status: 409 }
+          );
+        }
       }
     }
 
@@ -251,7 +314,7 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
     const studentUser = await prisma.user.create({
       data: {
         name,
-        email,
+        email: email.trim(),
         phone,
         password: hashedPassword,
         role: 'student',
@@ -270,7 +333,7 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
         dateAdmitted: dateAdmitted ? new Date(dateAdmitted) : new Date(),
         parentName,
         parentPhone,
-        parentEmail,
+        parentEmail: parentEmail?.trim() || null,
         address,
         gender,
         parentId: parentUser?.id,
@@ -348,21 +411,126 @@ export async function PUT(req: NextRequest, { params }: { params: { schoolCode: 
 
     const student = await prisma.student.findUnique({
       where: { id: studentId },
+      select: { id: true, userId: true, schoolId: true, parentId: true },
     });
 
     if (!student) {
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
 
+    const trimmedEmail = email?.trim();
+    if (trimmedEmail) {
+      const existingUser = await prisma.user.findUnique({
+        where: { email: trimmedEmail },
+        select: { id: true },
+      });
+      if (existingUser && existingUser.id !== student.userId) {
+        return NextResponse.json(
+          { error: 'This email is already registered. Each student must use a unique email.' },
+          { status: 409 }
+        );
+      }
+    }
+
     await prisma.user.update({
       where: { id: student.userId },
       data: {
         name: name,
-        email: email,
+        email: trimmedEmail,
         phone: phone,
         isActive: isActive,
       },
     });
+
+    let resolvedParentId = parentId ?? student.parentId ?? undefined;
+    if (parentPhone || parentEmail || parentName) {
+      const trimmedParentPhone = parentPhone?.trim() || null;
+      const trimmedParentEmail = parentEmail?.trim().toLowerCase() || null;
+      const normalizedParentName = normalizeName(parentName);
+
+      const [parentByPhone, parentByEmail] = await Promise.all([
+        trimmedParentPhone
+          ? prisma.user.findFirst({
+              where: {
+                role: 'parent',
+                schoolId: student.schoolId,
+                phone: trimmedParentPhone,
+              },
+            })
+          : Promise.resolve(null),
+        trimmedParentEmail
+          ? prisma.user.findFirst({
+              where: {
+                role: 'parent',
+                schoolId: student.schoolId,
+                email: trimmedParentEmail,
+              },
+            })
+          : Promise.resolve(null),
+      ]);
+
+      if (parentByPhone && parentByEmail && parentByPhone.id !== parentByEmail.id) {
+        return NextResponse.json(
+          { error: 'Parent email and phone belong to different parent records. Please use matching parent details.' },
+          { status: 409 }
+        );
+      }
+
+      let parentUser = parentByEmail || parentByPhone;
+
+      if (!parentUser && trimmedParentEmail) {
+        const anyUserWithEmail = await prisma.user.findUnique({
+          where: { email: trimmedParentEmail },
+          select: { id: true, role: true },
+        });
+        if (anyUserWithEmail && anyUserWithEmail.role !== 'parent') {
+          return NextResponse.json(
+            { error: 'Parent email belongs to another non-parent account. Use a different parent email.' },
+            { status: 409 }
+          );
+        }
+      }
+
+      if (!parentUser) {
+        const hashedParentPassword = await hashDefaultPasswordByRole('parent');
+        parentUser = await prisma.user.create({
+          data: {
+            name: parentName || `Parent of ${name || 'Student'}`,
+            email: trimmedParentEmail || `${trimmedParentPhone || Date.now()}@parent.local`,
+            phone: trimmedParentPhone,
+            role: 'parent',
+            password: hashedParentPassword,
+            isActive: true,
+            schoolId: student.schoolId,
+          },
+        });
+      } else {
+        const existingName = normalizeName(parentUser.name);
+        const existingEmail = (parentUser.email || '').trim().toLowerCase();
+        const existingPhone = (parentUser.phone || '').trim();
+
+        if (normalizedParentName && existingName && normalizedParentName !== existingName) {
+          return NextResponse.json(
+            { error: 'Parent name does not match existing parent record for the provided email/phone.' },
+            { status: 409 }
+          );
+        }
+        if (trimmedParentEmail && existingEmail && trimmedParentEmail !== existingEmail) {
+          return NextResponse.json(
+            { error: 'Parent email does not match existing parent record.' },
+            { status: 409 }
+          );
+        }
+        if (trimmedParentPhone && existingPhone && trimmedParentPhone !== existingPhone) {
+          return NextResponse.json(
+            { error: 'Parent phone does not match existing parent record.' },
+            { status: 409 }
+          );
+        }
+      }
+
+      resolvedParentId = parentUser.id;
+    }
 
     const updatedStudent = await prisma.student.update({
       where: { id: studentId },
@@ -372,10 +540,10 @@ export async function PUT(req: NextRequest, { params }: { params: { schoolCode: 
         dateAdmitted: dateAdmitted ? new Date(dateAdmitted) : undefined,
         parentName,
         parentPhone,
-        parentEmail,
+        parentEmail: parentEmail?.trim() || null,
         address,
         gender,
-        parentId,
+        parentId: resolvedParentId,
         classId,
         status,
         avatarUrl,

@@ -8,6 +8,7 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     const decodedSchoolCode = decodeURIComponent(schoolCode);
     const { searchParams } = new URL(request.url);
     const academicYearId = searchParams.get('academicYearId');
+    const token = searchParams.get('token');
 
     console.log('🔍 Direct download requested for fee statement:', {
       schoolCode: decodedSchoolCode,
@@ -17,7 +18,10 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
 
     // Get the fee statement data directly
     const { GET: getFeeStatement } = await import('../route');
-    const feeStatementUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://yoursite.com'}/api/schools/${schoolCode}/students/${studentId}/fee-statement${academicYearId ? `?academicYearId=${academicYearId}` : ''}`;
+    const passthrough = new URLSearchParams();
+    if (academicYearId) passthrough.set('academicYearId', academicYearId);
+    if (token) passthrough.set('token', token);
+    const feeStatementUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://yoursite.com'}/api/schools/${schoolCode}/students/${studentId}/fee-statement${passthrough.toString() ? `?${passthrough.toString()}` : ''}`;
     const feeStatementRequest = new NextRequest(feeStatementUrl, {
       method: 'GET',
       headers: {
@@ -28,10 +32,12 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     const feeStatementResponse = await getFeeStatement(feeStatementRequest, { params: { schoolCode, studentId } });
     
     if (!feeStatementResponse.ok) {
+      const details = await feeStatementResponse.text();
       console.error('❌ Fee statement generation failed for direct download');
       return NextResponse.json({ 
-        error: 'Failed to generate fee statement data'
-      }, { status: 400 });
+        error: 'Failed to generate fee statement data',
+        details
+      }, { status: feeStatementResponse.status });
     }
 
     const statementData = await feeStatementResponse.json();

@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import { computeStudentFeesSnapshot } from '@/lib/services/student-fees-snapshot'
+import { createEmailDownloadToken } from '@/lib/email-download-token'
 
 const prisma = new PrismaClient()
 
@@ -49,8 +50,83 @@ interface PaymentNotificationData {
 export class EmailService {
   private config: EmailConfig | null = null
 
+  private isEmailConfigUsable(config: EmailConfig | null): boolean {
+    if (!config || !config.fromEmail) return false
+
+    if (config.provider === 'sendgrid') {
+      return Boolean(config.configuration?.apiKey)
+    }
+
+    if (config.provider === 'smtp' || config.provider === 'gmail') {
+      return Boolean(
+        config.configuration?.host &&
+          config.configuration?.username &&
+          config.configuration?.password
+      )
+    }
+
+    if (config.provider === 'aws_ses') {
+      return Boolean(
+        config.configuration?.accessKeyId &&
+          config.configuration?.secretAccessKey &&
+          config.configuration?.region
+      )
+    }
+
+    return false
+  }
+
+  private buildDefaultEmailConfigFromEnv(): EmailConfig | null {
+    const provider = (process.env.EMAIL_PROVIDER || 'smtp').toLowerCase()
+    const fromEmail = process.env.EMAIL_FROM_EMAIL || process.env.SMTP_USER || ''
+    const fromName = process.env.EMAIL_FROM_NAME || 'School Administration'
+
+    if (!fromEmail) {
+      return null
+    }
+
+    if (provider === 'sendgrid') {
+      const apiKey = process.env.SENDGRID_API_KEY || ''
+      if (!apiKey) return null
+      return {
+        provider: 'sendgrid',
+        configuration: { apiKey },
+        fromEmail,
+        fromName,
+      }
+    }
+
+    const host = process.env.SMTP_HOST || (provider === 'gmail' ? 'smtp.gmail.com' : '')
+    const username = process.env.SMTP_USER || fromEmail
+    const password = process.env.SMTP_PASS || ''
+    const port = Number(process.env.SMTP_PORT || (provider === 'gmail' ? '587' : '587'))
+    const secure = (process.env.SMTP_SECURE || 'false').toLowerCase() === 'true'
+
+    if (!host || !username || !password) {
+      return null
+    }
+
+    return {
+      provider: provider === 'gmail' ? 'gmail' : 'smtp',
+      configuration: {
+        host,
+        port,
+        secure,
+        username,
+        password,
+      },
+      fromEmail,
+      fromName,
+    }
+  }
+
   // Helper function to generate receipt download URL (same as bursar dashboard)
-  private generateReceiptDownloadUrl(schoolCode: string, receiptNumber: string, size: string = 'A4'): string {
+  private generateReceiptDownloadUrl(
+    schoolCode: string,
+    studentId: string,
+    receiptNumber: string,
+    size: string = 'A4'
+  ): string {
     let baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
     baseUrl = baseUrl.replace(/\/$/, '')
     
@@ -59,8 +135,10 @@ export class EmailService {
       baseUrl = baseUrl.replace('http://', 'https://')
     }
     
-    // Use the exact same endpoint as bursar dashboard
-    const url = `${baseUrl}/api/schools/${schoolCode}/receipts/${receiptNumber}/download?size=${size}`
+    const token = createEmailDownloadToken({ schoolCode, studentId, receiptNumber })
+    const tokenParam = token ? `&token=${encodeURIComponent(token)}` : ''
+    // Use the exact same endpoint as bursar dashboard, with signed token for email access
+    const url = `${baseUrl}/api/schools/${schoolCode}/receipts/${receiptNumber}/download?size=${size}${tokenParam}`
     console.log('🔍 Receipt Download URL (Bursar Format):', {
       baseUrl,
       receiptNumber,
@@ -71,15 +149,15 @@ export class EmailService {
   }
 
   // Helper function to generate multiple receipt download URLs for different sizes
-  private generateReceiptDownloadUrls(schoolCode: string, receiptNumber: string): {
+  private generateReceiptDownloadUrls(schoolCode: string, studentId: string, receiptNumber: string): {
     receiptDownloadUrlA3: string;
     receiptDownloadUrlA4: string;
     receiptDownloadUrlA5: string;
   } {
     return {
-      receiptDownloadUrlA3: this.generateReceiptDownloadUrl(schoolCode, receiptNumber, 'A3'),
-      receiptDownloadUrlA4: this.generateReceiptDownloadUrl(schoolCode, receiptNumber, 'A4'),
-      receiptDownloadUrlA5: this.generateReceiptDownloadUrl(schoolCode, receiptNumber, 'A5')
+      receiptDownloadUrlA3: this.generateReceiptDownloadUrl(schoolCode, studentId, receiptNumber, 'A3'),
+      receiptDownloadUrlA4: this.generateReceiptDownloadUrl(schoolCode, studentId, receiptNumber, 'A4'),
+      receiptDownloadUrlA5: this.generateReceiptDownloadUrl(schoolCode, studentId, receiptNumber, 'A5')
     }
   }
 
@@ -93,9 +171,12 @@ export class EmailService {
       baseUrl = baseUrl.replace('http://', 'https://')
     }
     
-    // Use the direct download endpoint
-    const yearParam = academicYearId ? `?academicYearId=${academicYearId}` : ''
-    const url = `${baseUrl}/api/schools/${schoolCode}/students/${studentId}/fee-statement/download${yearParam}`
+    const token = createEmailDownloadToken({ schoolCode, studentId })
+    const params = new URLSearchParams()
+    if (academicYearId) params.set('academicYearId', academicYearId)
+    if (token) params.set('token', token)
+    const qs = params.toString()
+    const url = `${baseUrl}/api/schools/${schoolCode}/students/${studentId}/fee-statement/download${qs ? `?${qs}` : ''}`
     console.log('🔍 Fee Statement Direct Download URL:', {
       baseUrl,
       studentId,
@@ -107,13 +188,61 @@ export class EmailService {
 
   async initializeForSchool(schoolId: string): Promise<boolean> {
     try {
-      const emailConfig = await (prisma as any).emailNotificationConfig.findUnique({
+      let emailConfig = await (prisma as any).emailNotificationConfig.findUnique({
         where: { schoolId },
         include: { school: true }
       })
+      const envConfig = this.buildDefaultEmailConfigFromEnv()
 
-      if (!emailConfig || !emailConfig.isEnabled) {
-        return false
+      if (!emailConfig) {
+        if (!envConfig) {
+          console.log('Email default config not available from env for school:', schoolId)
+          return false
+        }
+
+        emailConfig = await (prisma as any).emailNotificationConfig.create({
+          data: {
+            schoolId,
+            isEnabled: true,
+            emailProvider: envConfig.provider,
+            configuration: envConfig.configuration,
+            fromEmail: envConfig.fromEmail,
+            fromName: envConfig.fromName,
+            paymentConfirmationEnabled: true,
+            receiptAttachmentEnabled: true,
+          },
+          include: { school: true },
+        })
+      } else {
+        const dbConfig: EmailConfig = {
+          provider: emailConfig.emailProvider as any,
+          configuration: emailConfig.configuration,
+          fromEmail: emailConfig.fromEmail,
+          fromName: emailConfig.fromName,
+        }
+        const dbUsable = this.isEmailConfigUsable(dbConfig)
+
+        // Auto-heal stale/invalid DB configs using env variables.
+        if (!dbUsable && envConfig) {
+          emailConfig = await (prisma as any).emailNotificationConfig.update({
+            where: { schoolId },
+            data: {
+              isEnabled: true,
+              emailProvider: envConfig.provider,
+              configuration: envConfig.configuration,
+              fromEmail: envConfig.fromEmail,
+              fromName: envConfig.fromName,
+              paymentConfirmationEnabled: true,
+            },
+            include: { school: true },
+          })
+        } else if (!emailConfig.isEnabled) {
+          emailConfig = await (prisma as any).emailNotificationConfig.update({
+            where: { schoolId },
+            data: { isEnabled: true, paymentConfirmationEnabled: true },
+            include: { school: true },
+          })
+        }
       }
 
       this.config = {
@@ -121,6 +250,12 @@ export class EmailService {
         configuration: emailConfig.configuration,
         fromEmail: emailConfig.fromEmail,
         fromName: emailConfig.fromName
+      }
+
+      if (!this.isEmailConfigUsable(this.config)) {
+        console.log('Email configuration still invalid after initialization for school:', schoolId)
+        this.config = null
+        return false
       }
 
       return true
@@ -164,7 +299,7 @@ export class EmailService {
       }
 
       const emailContent = this.generatePaymentConfirmationEmail(paymentData)
-      
+
       let success = false
       switch (this.config.provider) {
         case 'sendgrid':
@@ -184,11 +319,17 @@ export class EmailService {
 
       // Log the notification attempt
       await this.logNotificationAttempt(paymentId, recipientEmail, 'payment_confirmation', success)
-      
+
       return success
     } catch (error) {
       console.error('Error sending payment confirmation:', error)
-      await this.logNotificationAttempt(paymentId, recipientEmail, 'payment_confirmation', false, error instanceof Error ? error.message : 'Unknown error')
+      await this.logNotificationAttempt(
+        paymentId,
+        recipientEmail,
+        'payment_confirmation',
+        false,
+        error instanceof Error ? error.message : 'Unknown error'
+      )
       return false
     }
   }
@@ -299,8 +440,8 @@ export class EmailService {
         academicYearOutstandingBefore,
         academicYearOutstandingAfter,
         carryForward: 0,
-        ...this.generateReceiptDownloadUrls(schoolCode, payment.receiptNumber),
-        receiptDownloadUrl: this.generateReceiptDownloadUrl(schoolCode, payment.receiptNumber, 'A4'),
+        ...this.generateReceiptDownloadUrls(schoolCode, payment.studentId, payment.receiptNumber),
+        receiptDownloadUrl: this.generateReceiptDownloadUrl(schoolCode, payment.studentId, payment.receiptNumber, 'A4'),
       }
 
       // Send the notification
@@ -994,30 +1135,38 @@ ${data.schoolName}
     if (!this.config) return false
 
     try {
-      // This would integrate with SendGrid API
-      // For now, we'll simulate success
-      console.log('Sending email via SendGrid to:', recipientEmail)
-      console.log('Subject:', emailContent.subject)
-      
-      // In production, you would use SendGrid's Node.js library:
-      /*
-      const sgMail = require('@sendgrid/mail')
-      sgMail.setApiKey(this.config.configuration.apiKey)
-      
-      const msg = {
-        to: recipientEmail,
-        from: {
-          email: this.config.fromEmail,
-          name: this.config.fromName
-        },
-        subject: emailContent.subject,
-        text: emailContent.text,
-        html: emailContent.html,
+      const apiKey = this.config.configuration?.apiKey
+      if (!apiKey) {
+        console.error('SendGrid API key missing')
+        return false
       }
-      
-      await sgMail.send(msg)
-      */
-      
+
+      const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          personalizations: [{ to: [{ email: recipientEmail }] }],
+          from: {
+            email: this.config.fromEmail,
+            name: this.config.fromName,
+          },
+          subject: emailContent.subject,
+          content: [
+            { type: 'text/plain', value: emailContent.text },
+            { type: 'text/html', value: emailContent.html },
+          ],
+        }),
+      })
+
+      if (!response.ok) {
+        const errBody = await response.text()
+        console.error('SendGrid API error:', response.status, errBody)
+        return false
+      }
+
       return true
     } catch (error) {
       console.error('SendGrid email error:', error)

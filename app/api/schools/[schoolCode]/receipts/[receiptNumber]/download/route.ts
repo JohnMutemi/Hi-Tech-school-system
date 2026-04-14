@@ -3,6 +3,7 @@ import { generateEnhancedReceiptPDF } from '@/lib/utils/enhanced-receipt-generat
 import { prisma } from "@/lib/prisma"
 import { jsonError } from "@/lib/api-guard"
 import { assertStudentFeeAccess, resolvePortalFeeAuth } from '@/lib/portal-fee-auth'
+import { verifyEmailDownloadToken } from '@/lib/email-download-token'
 
 // GET - Download receipt by receipt number
 export async function GET(
@@ -20,6 +21,8 @@ export async function GET(
     })
     if (!school) return NextResponse.json({ error: "School not found" }, { status: 404 })
 
+    const token = searchParams.get('token')
+    const tokenPayload = verifyEmailDownloadToken(token)
     const auth = await resolvePortalFeeAuth(request, schoolCode)
 
     // Find the receipt
@@ -53,9 +56,17 @@ export async function GET(
       )
     }
 
-    const access = await assertStudentFeeAccess(auth, school.id, receipt.studentId)
-    if (!access.ok) {
-      return NextResponse.json({ error: access.message }, { status: access.status })
+    const tokenAuthorized =
+      tokenPayload &&
+      tokenPayload.schoolCode === school.code.toLowerCase() &&
+      tokenPayload.studentId === receipt.studentId &&
+      tokenPayload.receiptNumber === receipt.receiptNumber
+
+    if (!tokenAuthorized) {
+      const access = await assertStudentFeeAccess(auth, school.id, receipt.studentId)
+      if (!access.ok) {
+        return NextResponse.json({ error: access.message }, { status: access.status })
+      }
     }
 
     // Prepare receipt data for PDF generation
