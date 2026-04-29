@@ -180,6 +180,7 @@ export async function POST(request: NextRequest) {
         name: `${adminFirstName} ${adminLastName}`,
         email: adminEmail,
         password: hashedPassword,
+        mustChangePassword: true,
         role: 'admin',
         schoolId: school.id,
         isActive: true

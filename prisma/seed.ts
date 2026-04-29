@@ -52,6 +52,24 @@ async function main() {
   });
   console.log('Seeded platform-level super admin.');
 
+  await prisma.platformTerms.upsert({
+    where: { version: "v1.0" },
+    update: {
+      isActive: true,
+      title: "Platform Terms and Conditions",
+      content:
+        "By accessing this platform, school administrators agree to comply with all platform terms, data protection obligations, acceptable-use policy, and applicable laws. Any misuse, fraud, or violation may result in account suspension or termination by the platform superadmin.",
+    },
+    create: {
+      version: "v1.0",
+      title: "Platform Terms and Conditions",
+      content:
+        "By accessing this platform, school administrators agree to comply with all platform terms, data protection obligations, acceptable-use policy, and applicable laws. Any misuse, fraud, or violation may result in account suspension or termination by the platform superadmin.",
+      isActive: true,
+    },
+  });
+  console.log('Seeded default platform terms and conditions.');
+
   // Clean up existing classes and grades for all schools
   console.log('🗑️ Cleaning up existing classes and grades...');
 

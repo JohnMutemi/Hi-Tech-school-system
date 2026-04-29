@@ -16,7 +16,10 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     } catch (err) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 })
     }
-    if (payload.role !== "admin" || payload.schoolCode !== params.schoolCode) {
+    if (
+      payload.role !== "admin" ||
+      String(payload.schoolCode).toLowerCase() !== params.schoolCode.toLowerCase()
+    ) {
       return NextResponse.json({ error: "Invalid session" }, { status: 401 })
     }
     // Optionally fetch admin info
@@ -24,7 +27,32 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     if (!admin) {
       return NextResponse.json({ error: "Admin not found" }, { status: 404 })
     }
-    return NextResponse.json({ adminId: admin.id, schoolCode: payload.schoolCode, admin })
+    const school = await prisma.school.findUnique({ where: { id: admin.schoolId || "" } })
+    if (!school || !school.isActive) {
+      return NextResponse.json({ error: "School account is suspended." }, { status: 403 })
+    }
+
+    const activeTerms = await prisma.platformTerms.findFirst({
+      where: { isActive: true },
+      orderBy: { effectiveAt: "desc" },
+    })
+    let requiresTermsAcceptance = false
+    if (activeTerms) {
+      const accepted = await prisma.schoolTermsAcceptance.findFirst({
+        where: { schoolId: school.id, termsId: activeTerms.id },
+      })
+      requiresTermsAcceptance = !accepted
+    }
+
+    return NextResponse.json({
+      adminId: admin.id,
+      schoolCode: String(payload.schoolCode).toLowerCase(),
+      admin,
+      requiresTermsAcceptance,
+      activeTerms: activeTerms
+        ? { id: activeTerms.id, version: activeTerms.version, title: activeTerms.title, content: activeTerms.content }
+        : null,
+    })
   } catch (error) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }

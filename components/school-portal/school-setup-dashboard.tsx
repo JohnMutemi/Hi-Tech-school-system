@@ -92,6 +92,7 @@ import { FeeManagement } from "./fee-management";
 import { AcademicCalendarCrud } from "./AcademicCalendarCrud";
 import AdmissionNumberSettings from "./AdmissionNumberSettings";
 import EmailNotificationSettings from "./EmailNotificationSettings";
+import BackupRestoreSettings from "./BackupRestoreSettings";
 import { Sidebar } from "./Sidebar";
 import SchoolProfileSection from "./SchoolProfileSection";
 import StaffSection from "./StaffSection";
@@ -728,6 +729,9 @@ export function SchoolSetupDashboard({
                 </div>
                 <div className={`${portalGlassPanelLight} p-8`}>
                   <EmailNotificationSettings schoolCode={schoolData.schoolCode} colorTheme={schoolData.colorTheme} />
+                </div>
+                <div className={`${portalGlassPanelLight} p-8`}>
+                  <BackupRestoreSettings schoolCode={schoolData.schoolCode} toast={toast} />
                 </div>
               </TabsContent>
             </Tabs>

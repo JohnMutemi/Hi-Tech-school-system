@@ -11,10 +11,13 @@
     "check:db-sync": "prisma generate && tsx prisma/check-db-sync.ts",
     "audit:school-isolation": "tsx scripts/audit-school-isolation.ts",
     "test:school-isolation": "tsx scripts/test-school-isolation.ts",
-    "cleanup:grades": "node scripts/cleanup-grades.js"
+    "cleanup:grades": "node scripts/cleanup-grades.js",
+    "backup:run-scheduled": "tsx scripts/run-scheduled-backups.ts",
+    "test:backup-system": "tsx scripts/test-school-backup.ts"
   },
   "dependencies": {
     "@aws-sdk/client-rds-data": "latest",
+    "@aws-sdk/client-s3": "^3.1038.0",
     "@cloudflare/workers-types": "latest",
     "@electric-sql/pglite": "latest",
     "@hookform/resolvers": "^3.9.1",

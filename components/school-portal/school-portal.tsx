@@ -28,6 +28,7 @@ interface SchoolPortalProps {
 }
 
 export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
+  const router = useRouter();
   const [schoolData, setSchoolData] = useState<SchoolData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
@@ -37,6 +38,9 @@ export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
   });
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loginError, setLoginError] = useState("");
+  const [infoMessage, setInfoMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [forgotSubmitting, setForgotSubmitting] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
   const searchParams = useSearchParams();
   const [students, setStudents] = useState([]);
@@ -105,7 +109,12 @@ export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
       try {
         const res = await fetch(`/api/schools/${schoolCode}/admin/session`);
         if (res.ok) {
+          const data = await res.json();
           setIsLoggedIn(true);
+          if (data.requiresTermsAcceptance) {
+            router.replace(`/schools/${schoolCode}/terms`);
+            return;
+          }
         } else {
           setIsLoggedIn(false);
         }
@@ -116,11 +125,13 @@ export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
       }
     }
     checkSession();
-  }, [schoolCode]);
+  }, [router, schoolCode]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError("");
+    setInfoMessage("");
+    setIsSubmitting(true);
     try {
       const res = await fetch(`/api/schools/${schoolCode}/auth`, {
         method: "POST",
@@ -131,7 +142,12 @@ export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
         }),
       });
       const data = await res.json();
-      if (res.ok && data.success) {
+      if (res.ok && data.success && data.requiresTwoFactor) {
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem(`admin_2fa_token_${schoolCode}`, data.twoFactorToken);
+        }
+        router.push(`/schools/${schoolCode}/verify-otp`);
+      } else if (res.ok && data.success) {
         setIsLoggedIn(true);
         // No need to set localStorage, session is now cookie-based
         // Optionally, fetch school data from API after login
@@ -140,14 +156,48 @@ export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
           const school = await schoolRes.json();
           setSchoolData(school);
         }
+      } else if (res.ok && data.requiresPasswordChange) {
+        setInfoMessage(
+          data.message ||
+            "First login detected. Check your email for a password reset link."
+        );
       } else {
         setLoginError(
           data.error ||
             "Invalid email or password. Please check your credentials."
         );
       }
-    } catch (error) {
+    } catch {
       setLoginError("Login failed. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!loginData.email) {
+      setLoginError("Enter your admin email first.");
+      return;
+    }
+    setForgotSubmitting(true);
+    setLoginError("");
+    setInfoMessage("");
+    try {
+      const res = await fetch(`/api/schools/${schoolCode}/admin/forgot-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: loginData.email }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setInfoMessage(data.message || "Reset link sent if account exists.");
+      } else {
+        setLoginError(data.error || "Could not send reset link.");
+      }
+    } catch {
+      setLoginError("Could not send reset link.");
+    } finally {
+      setForgotSubmitting(false);
     }
   };
 
@@ -178,8 +228,8 @@ export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
               School Not Found
             </h2>
             <p className="text-gray-600">
-              The school with code "{schoolCode ? schoolCode.toUpperCase() : ""}
-              " could not be found or may have been deactivated.
+              The school with code &quot;{schoolCode ? schoolCode.toUpperCase() : ""}
+              &quot; could not be found or may have been deactivated.
             </p>
             <Button
               className="mt-4"
@@ -331,17 +381,32 @@ export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
                   <p className="text-sm text-red-600">{loginError}</p>
                 </div>
               )}
+              {infoMessage && (
+                <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                  <p className="text-sm text-blue-700">{infoMessage}</p>
+                </div>
+              )}
 
               <Button
                 type="submit"
                 className="w-full text-lg py-6"
+                disabled={isSubmitting}
                 style={{
                   backgroundColor: schoolData.colorTheme,
                   color: "#ffffff",
                 }}
               >
                 <User className="w-4 h-4 mr-2" />
-                Sign In to {schoolData.name}
+                {`Sign In to ${schoolData.name}`}
+              </Button>
+              <Button
+                type="button"
+                variant="link"
+                className="w-full text-sm"
+                onClick={handleForgotPassword}
+                disabled={forgotSubmitting}
+              >
+                Forgot password?
               </Button>
             </form>
 

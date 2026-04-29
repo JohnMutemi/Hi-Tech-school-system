@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { School, Plus, Search, Eye, Edit, Trash2, Users, GraduationCap, Calendar, LogIn, Copy } from "lucide-react"
+import { School, Plus, Search, Edit, Trash2, Users, GraduationCap, Calendar, LogIn, Copy, Power } from "lucide-react"
 import Link from "next/link"
 import { useUser } from "@/hooks/use-user"
 import { useRouter } from "next/navigation"
@@ -89,6 +89,53 @@ export default function SchoolsManagementPage() {
       title: "URL Copied",
       description: `Portal URL for ${school.name} copied to clipboard`,
     })
+  }
+
+  const handleToggleSchoolStatus = async (school: any) => {
+    try {
+      const nextStatus = school.status === "active" ? "suspended" : "active"
+      const res = await fetch(`/api/schools/${school.schoolCode}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: nextStatus }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Failed to update school status")
+      toast({
+        title: "School status updated",
+        description: `${school.name} is now ${nextStatus}.`,
+      })
+      loadSchools()
+    } catch (error) {
+      toast({
+        title: "Update failed",
+        description: error instanceof Error ? error.message : "Could not update school status.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeleteSchool = async (school: any) => {
+    const confirmed = window.confirm(
+      `Delete ${school.name}? This removes the school and related records. This action cannot be undone.`
+    )
+    if (!confirmed) return
+    try {
+      const res = await fetch(`/api/schools/${school.schoolCode}`, { method: "DELETE" })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Failed to delete school")
+      toast({
+        title: "School deleted",
+        description: `${school.name} has been removed.`,
+      })
+      loadSchools()
+    } catch (error) {
+      toast({
+        title: "Delete failed",
+        description: error instanceof Error ? error.message : "Could not delete school.",
+        variant: "destructive",
+      })
+    }
   }
 
   if (!user || (user && (!user.isLoggedIn || user.role !== "super_admin"))) {
@@ -287,10 +334,13 @@ export default function SchoolsManagementPage() {
                             <Button variant="ghost" size="icon" onClick={() => copyPortalUrl(school)}>
                               <Copy className="w-4 h-4" />
                             </Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleToggleSchoolStatus(school)}>
+                              <Power className="w-4 h-4" />
+                            </Button>
                             <Button variant="ghost" size="icon" disabled>
                               <Edit className="w-4 h-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" disabled>
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteSchool(school)}>
                               <Trash2 className="w-4 h-4" />
                             </Button>
                           </div>
