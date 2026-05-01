@@ -69,6 +69,7 @@ import {
 } from "lucide-react";
 import { StudentSidebar } from "@/components/student-dashboard/StudentSidebar";
 import { FeesStatementDownload } from "@/components/fees-statement/FeesStatementDownload";
+import { getSchoolThemeTokens, hexToRgba } from "@/lib/utils/school-theme";
 
 export default function StudentDashboardPage({
   params,
@@ -89,6 +90,8 @@ export default function StudentDashboardPage({
   const [receiptsList, setReceiptsList] = useState<any[]>([]);
   const [receiptsLoading, setReceiptsLoading] = useState(false);
   const [gradePayload, setGradePayload] = useState<any>(null);
+  const [dashboardData, setDashboardData] = useState<any>(null);
+  const theme = getSchoolThemeTokens(schoolData?.colorTheme || "#10b981");
 
   useEffect(() => {
     async function fetchStudentData() {
@@ -115,6 +118,35 @@ export default function StudentDashboardPage({
     }
     fetchStudentData();
   }, [params.schoolCode, router]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/schools/${encodeURIComponent(params.schoolCode)}/students/dashboard`,
+          { credentials: "include" }
+        );
+        if (!res.ok || cancelled) return;
+        const payload = await res.json();
+        const data = payload?.data ?? null;
+        if (cancelled) return;
+        setDashboardData(data);
+        if (data?.school?.colorTheme) {
+          setSchoolData((prev: any) => ({
+            ...(prev || {}),
+            colorTheme: data.school.colorTheme,
+            name: data.school.name || prev?.name,
+          }));
+        }
+      } catch {
+        if (!cancelled) setDashboardData(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [params.schoolCode]);
 
   useEffect(() => {
     if (!student?.id) return;
@@ -295,7 +327,11 @@ export default function StudentDashboardPage({
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-blue-600">Attendance</p>
-                <p className="text-2xl font-bold text-blue-800">95%</p>
+                <p className="text-2xl font-bold text-blue-800">
+                  {dashboardData?.attendance?.attendanceRate != null
+                    ? `${dashboardData.attendance.attendanceRate}%`
+                    : "N/A"}
+                </p>
               </div>
               <Calendar className="w-8 h-8 text-blue-600" />
             </div>
@@ -307,7 +343,12 @@ export default function StudentDashboardPage({
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-purple-600">Average Grade</p>
-                <p className="text-2xl font-bold text-purple-800">B+</p>
+                <p className="text-2xl font-bold text-purple-800">
+                  {gradePayload?.summary?.averageLetterGrade ||
+                    (dashboardData?.academics?.averageScore != null
+                      ? `${Math.round(Number(dashboardData.academics.averageScore))}%`
+                      : "N/A")}
+                </p>
               </div>
               <FileText className="w-8 h-8 text-purple-600" />
             </div>
@@ -360,20 +401,21 @@ export default function StudentDashboardPage({
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {[
-              { icon: FileText, text: "Math test submitted", time: "2 hours ago", color: "text-blue-600" },
-              { icon: Calendar, text: "Attendance marked", time: "1 day ago", color: "text-green-600" },
-              { icon: DollarSign, text: "Fee payment received", time: "3 days ago", color: "text-purple-600" },
-              { icon: Bell, text: "New assignment posted", time: "1 week ago", color: "text-orange-600" },
-            ].map((activity, index) => (
-              <div key={index} className="flex items-center gap-3 p-3 rounded-lg bg-gray-50">
-                <activity.icon className={`w-5 h-5 ${activity.color}`} />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">{activity.text}</p>
-                  <p className="text-xs text-gray-500">{activity.time}</p>
+            {(dashboardData?.recentActivities || []).length > 0 ? (
+              (dashboardData.recentActivities as any[]).map((activity: any) => (
+                <div key={activity.id} className="flex items-center gap-3 p-3 rounded-lg bg-gray-50">
+                  <Activity className="w-5 h-5 text-blue-600" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-900">{activity.text}</p>
+                    <p className="text-xs text-gray-500">
+                      {activity.date ? new Date(activity.date).toLocaleString("en-GB") : "—"}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="text-sm text-gray-500">No recent activity yet.</p>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -399,25 +441,33 @@ export default function StudentDashboardPage({
               </div>
               <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
                 <span className="font-medium text-green-700">Class Teacher</span>
-                <span className="text-green-900 font-semibold">Mrs. Johnson</span>
+                <span className="text-green-900 font-semibold">
+                  {dashboardData?.student?.classTeacherName || "N/A"}
+                </span>
               </div>
               <div className="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
                 <span className="font-medium text-purple-700">Total Students</span>
-                <span className="text-purple-900 font-semibold">32</span>
+                <span className="text-purple-900 font-semibold">
+                  {dashboardData?.student?.classStudentCount ?? "N/A"}
+                </span>
               </div>
             </div>
             <div className="space-y-3">
               <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg">
                 <span className="font-medium text-orange-700">Academic Year</span>
-                <span className="text-orange-900 font-semibold">2024</span>
+                <span className="text-orange-900 font-semibold">
+                  {gradePayload?.summary?.academicYear || "N/A"}
+                </span>
               </div>
               <div className="flex justify-between items-center p-3 bg-indigo-50 rounded-lg">
                 <span className="font-medium text-indigo-700">Current Term</span>
-                <span className="text-indigo-900 font-semibold">Term 2</span>
+                <span className="text-indigo-900 font-semibold">
+                  {gradePayload?.summary?.term || "N/A"}
+                </span>
               </div>
               <div className="flex justify-between items-center p-3 bg-teal-50 rounded-lg">
                 <span className="font-medium text-teal-700">Class Position</span>
-                <span className="text-teal-900 font-semibold">5th</span>
+                <span className="text-teal-900 font-semibold">N/A</span>
               </div>
             </div>
           </div>
@@ -434,22 +484,21 @@ export default function StudentDashboardPage({
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[
-              { name: "Mathematics", teacher: "Mr. Smith", grade: "A", color: "bg-blue-100 text-blue-800" },
-              { name: "English", teacher: "Mrs. Davis", grade: "B+", color: "bg-green-100 text-green-800" },
-              { name: "Science", teacher: "Mr. Wilson", grade: "A-", color: "bg-purple-100 text-purple-800" },
-              { name: "History", teacher: "Ms. Brown", grade: "B", color: "bg-orange-100 text-orange-800" },
-              { name: "Geography", teacher: "Mr. Taylor", grade: "A", color: "bg-indigo-100 text-indigo-800" },
-              { name: "Art", teacher: "Mrs. Garcia", grade: "A+", color: "bg-pink-100 text-pink-800" },
-            ].map((subject, index) => (
-              <div key={index} className="p-4 border rounded-lg hover:shadow-md transition-shadow">
+            {(dashboardData?.academics?.subjects || []).length > 0 ? (
+              (dashboardData.academics.subjects as any[]).map((subject: any) => (
+              <div key={subject.name} className="p-4 border rounded-lg hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-semibold text-gray-900">{subject.name}</h3>
-                  <Badge className={subject.color}>{subject.grade}</Badge>
+                  <Badge className="bg-blue-100 text-blue-800">
+                    {subject.latestGrade || "N/A"}
+                  </Badge>
                 </div>
-                <p className="text-sm text-gray-600">Teacher: {subject.teacher}</p>
+                <p className="text-sm text-gray-600">Teacher: {subject.teacherName || "N/A"}</p>
               </div>
-            ))}
+            ))
+            ) : (
+              <p className="text-sm text-gray-500">No subject records found yet.</p>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -730,25 +779,35 @@ export default function StudentDashboardPage({
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div className="p-4 bg-green-50 rounded-lg border border-green-200">
               <div className="text-center">
-                <p className="text-2xl font-bold text-green-800">95%</p>
+                <p className="text-2xl font-bold text-green-800">
+                  {dashboardData?.attendance?.attendanceRate != null
+                    ? `${dashboardData.attendance.attendanceRate}%`
+                    : "N/A"}
+                </p>
                 <p className="text-sm text-green-600">Attendance Rate</p>
               </div>
             </div>
             <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
               <div className="text-center">
-                <p className="text-2xl font-bold text-blue-800">180</p>
+                <p className="text-2xl font-bold text-blue-800">
+                  {dashboardData?.attendance?.daysPresent ?? "N/A"}
+                </p>
                 <p className="text-sm text-blue-600">Days Present</p>
               </div>
             </div>
             <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
               <div className="text-center">
-                <p className="text-2xl font-bold text-orange-800">8</p>
+                <p className="text-2xl font-bold text-orange-800">
+                  {dashboardData?.attendance?.daysAbsent ?? "N/A"}
+                </p>
                 <p className="text-sm text-orange-600">Days Absent</p>
               </div>
             </div>
             <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
               <div className="text-center">
-                <p className="text-2xl font-bold text-purple-800">2</p>
+                <p className="text-2xl font-bold text-purple-800">
+                  {dashboardData?.attendance?.lateArrivals ?? "N/A"}
+                </p>
                 <p className="text-sm text-purple-600">Late Arrivals</p>
               </div>
             </div>
@@ -757,41 +816,9 @@ export default function StudentDashboardPage({
           {/* Monthly Attendance */}
           <div className="space-y-3">
             <h3 className="font-semibold text-gray-900">This Month</h3>
-            <div className="grid grid-cols-7 gap-2">
-              {Array.from({ length: 30 }, (_, i) => {
-                const day = i + 1;
-                const isPresent = Math.random() > 0.1;
-                const isLate = Math.random() > 0.9;
-                return (
-                  <div
-                    key={day}
-                    className={`aspect-square rounded-lg flex items-center justify-center text-xs font-medium ${
-                      isPresent
-                        ? isLate
-                          ? "bg-orange-100 text-orange-800"
-                          : "bg-green-100 text-green-800"
-                        : "bg-red-100 text-red-800"
-                    }`}
-                  >
-                    {day}
-                  </div>
-                );
-              })}
-            </div>
-            <div className="flex items-center gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-green-500 rounded"></div>
-                <span>Present</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-orange-500 rounded"></div>
-                <span>Late</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-red-500 rounded"></div>
-                <span>Absent</span>
-              </div>
-            </div>
+            <p className="text-sm text-gray-500">
+              Daily attendance timeline will appear once attendance records are enabled for this school.
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -809,47 +836,26 @@ export default function StudentDashboardPage({
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {[
-              {
-                title: "New Assignment Posted",
-                message: "Mathematics assignment due next week",
-                time: "2 hours ago",
-                type: "assignment",
-                color: "bg-blue-100 text-blue-800"
-              },
-              {
-                title: "Fee Payment Reminder",
-                message: "Term 2 fees due in 5 days",
-                time: "1 day ago",
-                type: "payment",
-                color: "bg-orange-100 text-orange-800"
-              },
-              {
-                title: "Parent Meeting",
-                message: "Scheduled for next Friday at 2 PM",
-                time: "3 days ago",
-                type: "meeting",
-                color: "bg-purple-100 text-purple-800"
-              },
-              {
-                title: "Exam Schedule",
-                message: "Mid-term exams start next month",
-                time: "1 week ago",
-                type: "exam",
-                color: "bg-green-100 text-green-800"
-              },
-            ].map((notification, index) => (
-              <div key={index} className="flex items-start gap-3 p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                <div className={`w-2 h-2 rounded-full mt-2 ${notification.color.replace('bg-', 'bg-').replace(' text-', '')}`}></div>
+            {(dashboardData?.notifications || []).length > 0 ? (
+              (dashboardData.notifications as any[]).map((notification: any) => (
+              <div key={notification.id} className="flex items-start gap-3 p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                <div className="w-2 h-2 rounded-full mt-2 bg-blue-500"></div>
                 <div className="flex-1">
                   <div className="flex items-center justify-between mb-1">
-                    <h3 className="font-medium text-gray-900">{notification.title}</h3>
-                    <span className="text-xs text-gray-500">{notification.time}</span>
+                    <h3 className="font-medium text-gray-900">{notification.title || "Notification"}</h3>
+                    <span className="text-xs text-gray-500">
+                      {notification.createdAt
+                        ? new Date(notification.createdAt).toLocaleString("en-GB")
+                        : "—"}
+                    </span>
                   </div>
-                  <p className="text-sm text-gray-600">{notification.message}</p>
+                  <p className="text-sm text-gray-600">{notification.message || "No details provided."}</p>
                 </div>
               </div>
-            ))}
+            ))
+            ) : (
+              <p className="text-sm text-gray-500">No notifications available at the moment.</p>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -989,7 +995,7 @@ export default function StudentDashboardPage({
   };
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-green-50/90 via-white/80 to-emerald-50/90 backdrop-blur-sm">
+    <div className="flex min-h-screen bg-gradient-to-br from-slate-100/90 via-white/85 to-slate-200/90 backdrop-blur-sm">
       <StudentSidebar
         activeTab={activeTab}
         onTabChange={setActiveTab}
@@ -1005,7 +1011,7 @@ export default function StudentDashboardPage({
           <div className="flex items-center justify-between px-4 py-4">
             <div className="flex items-center gap-3">
               <div className="flex flex-col">
-                <span className="font-bold text-lg text-green-700">Student Portal</span>
+                <span className="font-bold text-lg" style={{ color: theme.primaryDark }}>Student Portal</span>
                 <span className="text-xs text-gray-500">
                   {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
                 </span>
@@ -1042,10 +1048,14 @@ export default function StudentDashboardPage({
                   key={item.id}
                   onClick={() => setActiveTab(item.id)}
                   className={`flex flex-col items-center py-3 px-2 min-w-0 flex-1 transition-all duration-200 ${
-                    isActive 
-                      ? "text-green-600 bg-green-50" 
-                      : "text-gray-600 hover:text-green-600 hover:bg-green-50"
+                    isActive
+                      ? "text-gray-900"
+                      : "text-gray-600 hover:text-gray-900"
                   }`}
+                  style={{
+                    color: isActive ? theme.primary : undefined,
+                    backgroundColor: isActive ? hexToRgba(theme.primary, 0.12) : undefined,
+                  }}
                 >
                   <Icon className="w-6 h-6 mb-1" />
                   <span className="text-xs font-medium truncate">{item.label}</span>

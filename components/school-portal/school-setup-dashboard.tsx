@@ -100,7 +100,12 @@ import StaffSection from "./StaffSection";
 import StudentsSection from "./StudentsSection";
 import SubjectsClassesSection from "./SubjectsClassesSection";
 import PromotionsSection from "./PromotionsSection";
-import { portalGlassPanelLight } from "@/components/layout/portal-glass-styles";
+import {
+  portalGlassDepth1,
+  portalGlassDepth2,
+  portalGlassDepth3,
+  portalGlassPanelLight,
+} from "@/components/layout/portal-glass-styles";
 import AlumniSection from "./AlumniSection";
 
 interface SchoolSetupDashboardProps {
@@ -150,6 +155,7 @@ export function SchoolSetupDashboard({
 }: SchoolSetupDashboardProps) {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("overview");
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [timeRange, setTimeRange] = useState("this-year");
   const [schoolData, setSchoolData] = useState(initialSchoolData);
   const [viewMode, setViewMode] = useState<Record<string, ViewMode>>({
@@ -431,9 +437,16 @@ export function SchoolSetupDashboard({
 
   // The return statement must be inside the function
   return (
-    <div className="min-h-screen flex bg-gradient-to-br from-cyan-50 via-slate-50 to-cyan-100">
+    <div className="min-h-screen flex bg-gradient-to-br from-cyan-50/90 via-slate-50/90 to-cyan-100/90">
       {/* Enhanced Sidebar with modern look */}
-      <Sidebar activeTab={activeTab} onTabChange={setActiveTab} colorTheme={schoolData.colorTheme} onLogout={onLogout} schoolData={schoolData} />
+      <Sidebar
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        colorTheme={schoolData.colorTheme}
+        onLogout={onLogout}
+        schoolData={schoolData}
+        onCollapseChange={setIsSidebarCollapsed}
+      />
       
       {/* Main Content Area with enhanced styling */}
       <div className="flex-1 flex justify-center items-start relative">
@@ -443,44 +456,45 @@ export function SchoolSetupDashboard({
           <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-slate-400/20 to-cyan-400/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
         </div>
         
-        <main className="flex-1 flex justify-center items-start p-4 md:p-8 lg:pl-80 transition-all duration-300">
+        <main
+          className={`flex-1 flex justify-center items-start p-3 sm:p-4 md:p-6 ${
+            isSidebarCollapsed ? "lg:pl-28" : "lg:pl-80"
+          } transition-all duration-300`}
+        >
           <section
-            className="w-full max-w-7xl bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-6 md:p-12 mx-2 md:mx-8"
+            className="w-full max-w-7xl bg-white/65 backdrop-blur-2xl rounded-2xl sm:rounded-3xl shadow-2xl border border-white/40 p-4 sm:p-6 md:p-8 lg:p-10 mx-1 sm:mx-2 md:mx-4"
             style={{ minWidth: 0 }}
           >
             {/* Enhanced Header with glassmorphism */}
             <div
-              className="sticky top-0 z-20 bg-white/80 backdrop-blur-md shadow-lg border-b border-white/20 rounded-2xl mb-8 px-6 py-8 flex items-center justify-between"
+              className="sticky top-0 z-20 bg-white/70 backdrop-blur-xl shadow-lg border-b border-white/40 rounded-xl sm:rounded-2xl mb-6 px-4 sm:px-6 py-4 sm:py-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
               style={{ borderTopColor: schoolData.colorTheme, borderTopWidth: "4px" }}
             >
-              <div className="flex items-center space-x-6">
+              <div className="flex items-center gap-3 sm:gap-5">
                 {schoolData.logoUrl ? (
                   <div className="relative">
                     <img
                       src={schoolData.logoUrl || "/placeholder.svg"}
                       alt={`${schoolData.name} logo`}
-                      className="w-20 h-20 object-cover rounded-2xl border-2 shadow-xl"
+                      className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 object-cover rounded-xl sm:rounded-2xl border-2 shadow-xl"
                       style={{ borderColor: schoolData.colorTheme }}
                     />
                     <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-white/20 to-transparent"></div>
                   </div>
                 ) : (
                   <div
-                    className="w-20 h-20 rounded-2xl flex items-center justify-center border-2 shadow-xl relative overflow-hidden"
+                    className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-xl sm:rounded-2xl flex items-center justify-center border-2 shadow-xl relative overflow-hidden"
                     style={{
                       backgroundColor: schoolData.colorTheme + "20",
                       borderColor: schoolData.colorTheme,
                     }}
                   >
-                    <School
-                      className="w-10 h-10"
-                      style={{ color: schoolData.colorTheme }}
-                    />
+                    <School className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10" style={{ color: schoolData.colorTheme }} />
                     <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent"></div>
                   </div>
                 )}
                 <div className="space-y-2">
-                  <h1 className="text-4xl font-bold bg-gradient-to-r from-cyan-900 to-cyan-700 bg-clip-text text-transparent">
+                  <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-cyan-900 to-cyan-700 bg-clip-text text-transparent">
                     Welcome, {schoolData.adminFirstName} {schoolData.adminLastName}!
                   </h1>
                   <p className="text-cyan-600/80 font-medium">School Management Dashboard</p>
@@ -497,7 +511,7 @@ export function SchoolSetupDashboard({
             </div>
 
             {/* Enhanced Main Tab Content */}
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full transition-all duration-200">
               {/* Overview Tab with enhanced design */}
               <TabsContent value="overview" className="space-y-6">
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -518,8 +532,8 @@ export function SchoolSetupDashboard({
                   </Select>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  <Card className="border-emerald-100 bg-emerald-50/60">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-12 gap-4">
+                  <Card className={`xl:col-span-3 border-emerald-100 ${portalGlassDepth1}`}>
                     <CardContent className="p-5 space-y-3">
                       <div className="flex items-center justify-between">
                         <p className="text-sm font-medium text-slate-600">Total Students</p>
@@ -533,7 +547,7 @@ export function SchoolSetupDashboard({
                       </p>
                     </CardContent>
                   </Card>
-                  <Card className="border-blue-100 bg-blue-50/60">
+                  <Card className={`xl:col-span-3 border-blue-100 ${portalGlassDepth1}`}>
                     <CardContent className="p-5 space-y-3">
                       <div className="flex items-center justify-between">
                         <p className="text-sm font-medium text-slate-600">Fee Collection ({timeRange.replace("-", " ")})</p>
@@ -547,7 +561,7 @@ export function SchoolSetupDashboard({
                       </p>
                     </CardContent>
                   </Card>
-                  <Card className="border-cyan-100 bg-cyan-50/60">
+                  <Card className={`xl:col-span-3 border-cyan-100 ${portalGlassDepth1}`}>
                     <CardContent className="p-5 space-y-3">
                       <div className="flex items-center justify-between">
                         <p className="text-sm font-medium text-slate-600">Attendance Rate</p>
@@ -557,7 +571,7 @@ export function SchoolSetupDashboard({
                       <p className="text-xs font-semibold text-cyan-600">Healthy consistency across classes</p>
                     </CardContent>
                   </Card>
-                  <Card className="border-amber-100 bg-amber-50/60">
+                  <Card className={`xl:col-span-3 border-amber-100 ${portalGlassDepth1}`}>
                     <CardContent className="p-5 space-y-3">
                       <div className="flex items-center justify-between">
                         <p className="text-sm font-medium text-slate-600">Active Classes</p>
@@ -569,8 +583,8 @@ export function SchoolSetupDashboard({
                   </Card>
                 </div>
 
-                <div className="grid gap-6 xl:grid-cols-3">
-                  <Card className="xl:col-span-2">
+                <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+                  <Card className={`xl:col-span-8 ${portalGlassDepth2}`}>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base">Student Growth</CardTitle>
                       <CardDescription>Trend preview for enrollment performance.</CardDescription>
@@ -585,7 +599,7 @@ export function SchoolSetupDashboard({
                       </div>
                     </CardContent>
                   </Card>
-                  <Card>
+                  <Card className={`xl:col-span-4 ${portalGlassDepth2}`}>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base">Grade Distribution</CardTitle>
                       <CardDescription>Current spread across grade bands.</CardDescription>
@@ -601,8 +615,8 @@ export function SchoolSetupDashboard({
                   </Card>
                 </div>
 
-                <div className="grid gap-6 xl:grid-cols-3">
-                  <Card className="xl:col-span-2">
+                <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+                  <Card className={`xl:col-span-8 ${portalGlassDepth2}`}>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base">Subject Performance Overview</CardTitle>
                       <CardDescription>Average percentage by subject.</CardDescription>
@@ -621,7 +635,7 @@ export function SchoolSetupDashboard({
                     </CardContent>
                   </Card>
 
-                  <Card>
+                  <Card className={`xl:col-span-4 ${portalGlassDepth3}`}>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base">Setup Progress</CardTitle>
                       <CardDescription>{completedSteps}/{setupSteps.length} steps completed</CardDescription>
@@ -648,14 +662,14 @@ export function SchoolSetupDashboard({
                           </button>
                         ))}
                       </div>
-                      <Button className="w-full" onClick={() => setActiveTab("students")}>
+                      <Button className="w-full shadow-md hover:shadow-lg transition-shadow" onClick={() => setActiveTab("students")}>
                         Continue Setup
                       </Button>
                     </CardContent>
                   </Card>
                 </div>
 
-                <Card className="border-slate-100">
+                <Card className={`border-slate-100 ${portalGlassDepth2}`}>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-base">Class Capacity</CardTitle>
                     <CardDescription>Current occupancy by level and stream.</CardDescription>

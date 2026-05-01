@@ -71,9 +71,17 @@ interface SidebarProps {
   colorTheme?: string;
   onLogout?: () => void;
   schoolData?: any;
+  onCollapseChange?: (isCollapsed: boolean) => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, colorTheme, onLogout, schoolData }) => {
+export const Sidebar: React.FC<SidebarProps> = ({
+  activeTab,
+  onTabChange,
+  colorTheme,
+  onLogout,
+  schoolData,
+  onCollapseChange,
+}) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const theme = getSchoolThemeTokens(colorTheme);
@@ -81,6 +89,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, colorT
     () => NAV_SECTIONS.flatMap((section) => section.items),
     []
   );
+
+  React.useEffect(() => {
+    onCollapseChange?.(isCollapsed);
+  }, [isCollapsed, onCollapseChange]);
 
   return (
     <>
@@ -202,6 +214,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, colorT
               <p className="px-3 pb-1 text-[11px] font-semibold tracking-[0.2em] text-white/65">
                 QUICK ACTIONS
               </p>
+            )}
+            {isCollapsed && (
+              <div className="flex justify-center mb-2">
+                <button
+                  className="h-10 w-10 rounded-full flex items-center justify-center text-white shadow-lg transition-transform hover:scale-105"
+                  style={{ backgroundColor: hexToRgba(theme.primaryLight, 0.55) }}
+                  onClick={() => onTabChange("students")}
+                  title="Quick add student"
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
+              </div>
             )}
             <button
               className={`w-full flex items-center ${isCollapsed ? "justify-center" : "gap-3"} px-3 py-2.5 rounded-xl text-white/90 hover:text-white transition-colors`}

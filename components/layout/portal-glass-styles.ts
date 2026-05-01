@@ -16,6 +16,16 @@ export const portalGlassPanelLight =
 export const portalPageBackdropLight =
   "min-h-screen bg-gradient-to-br from-slate-100/90 via-white/80 to-slate-200/90";
 
+/** Layered glass depth tokens for modern dashboard composition */
+export const portalGlassDepth1 =
+  "backdrop-blur-sm bg-white/55 border border-white/50 rounded-xl shadow-md";
+
+export const portalGlassDepth2 =
+  "backdrop-blur-md bg-white/65 border border-white/55 rounded-2xl shadow-lg";
+
+export const portalGlassDepth3 =
+  "backdrop-blur-xl bg-white/75 border border-white/65 rounded-2xl shadow-2xl";
+
 /** Validates hex; returns fallback if invalid */
 export function portalAccentHex(
   hex: string | null | undefined,
