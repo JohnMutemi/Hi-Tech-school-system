@@ -88,6 +88,7 @@ export default function StudentDashboardPage({
   const [financeLoading, setFinanceLoading] = useState(false);
   const [receiptsList, setReceiptsList] = useState<any[]>([]);
   const [receiptsLoading, setReceiptsLoading] = useState(false);
+  const [gradePayload, setGradePayload] = useState<any>(null);
 
   useEffect(() => {
     async function fetchStudentData() {
@@ -160,6 +161,28 @@ export default function StudentDashboardPage({
       cancelled = true;
     };
   }, [student?.id, activeTab, params.schoolCode]);
+
+  useEffect(() => {
+    if (!student?.id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/schools/${encodeURIComponent(params.schoolCode)}/students/${student.id}/grading/results`,
+          { credentials: "include" }
+        );
+        if (res.ok && !cancelled) {
+          const data = await res.json();
+          setGradePayload(data.data || null);
+        }
+      } catch {
+        if (!cancelled) setGradePayload(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [student?.id, params.schoolCode]);
 
   const handleLogout = async () => {
     try {
@@ -444,25 +467,24 @@ export default function StudentDashboardPage({
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {[
-              { subject: "Mathematics", grade: "A", score: 85, color: "bg-blue-100 text-blue-800" },
-              { subject: "English", grade: "B+", score: 78, color: "bg-green-100 text-green-800" },
-              { subject: "Science", grade: "A-", score: 82, color: "bg-purple-100 text-purple-800" },
-              { subject: "History", grade: "B", score: 75, color: "bg-orange-100 text-orange-800" },
-              { subject: "Geography", grade: "A", score: 88, color: "bg-indigo-100 text-indigo-800" },
-              { subject: "Art", grade: "A+", score: 92, color: "bg-pink-100 text-pink-800" },
-            ].map((item, index) => (
-              <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                  <span className="font-medium text-gray-900">{item.subject}</span>
+            {(gradePayload?.results || []).length > 0 ? (
+              gradePayload.results.map((item: any) => (
+                <div key={item.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-3 h-3 rounded-full ${item.passStatus ? "bg-green-500" : "bg-red-500"}`}></div>
+                    <span className="font-medium text-gray-900">{item.subject?.name || "Subject"}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-gray-600">{Math.round(item.percentage)}%</span>
+                    <Badge className={item.passStatus ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
+                      {item.letterGrade}
+                    </Badge>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-gray-600">{item.score}%</span>
-                  <Badge className={item.color}>{item.grade}</Badge>
-                </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="text-sm text-gray-500">No published grading results yet.</p>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -477,7 +499,10 @@ export default function StudentDashboardPage({
         </CardHeader>
         <CardContent>
           <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
-            <p className="text-gray-500">Performance chart will be displayed here</p>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-gray-800">{gradePayload?.summary?.averageScore ?? 0}%</p>
+              <p className="text-gray-500 text-sm">Overall Average Score</p>
+            </div>
           </div>
         </CardContent>
       </Card>

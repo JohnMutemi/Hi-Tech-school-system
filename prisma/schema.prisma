@@ -45,6 +45,9 @@ model School {
   backups                      SchoolBackup[]
   restoreJobs                  SchoolRestoreJob[]   @relation("RestoreTargetSchool")
   termsAcceptances             SchoolTermsAcceptance[]
+  gradingCriteria              GradingCriteria[]
+  assessments                  Assessment[]
+  studentGradeResults          StudentGradeResult[]
 }
 
 model User {
@@ -86,6 +89,8 @@ model User {
   createdBackups             SchoolBackup[]       @relation("BackupCreatedBy")
   startedRestoreJobs         SchoolRestoreJob[]   @relation("RestoreCreatedBy")
   acceptedTerms             SchoolTermsAcceptance[] @relation("TermsAcceptedBy")
+  createdAssessments           Assessment[]            @relation("AssessmentCreator")
+  gradedResults                StudentGradeResult[]    @relation("ResultGradedBy")
 }
 
 model TeacherProfile {
@@ -121,6 +126,8 @@ model Class {
   school    School    @relation(fields: [schoolId], references: [id])
   teacher   User?     @relation("TeacherClasses", fields: [teacherId], references: [id])
   students  Student[]
+  assessments Assessment[]
+  studentGradeResults StudentGradeResult[]
 
   @@unique([schoolId, name])
 }
@@ -172,6 +179,8 @@ model Student {
   studentFees              StudentFee[]
   studentPromotionRequests StudentPromotionRequest[]
   yearlyBalances           StudentYearlyBalance[]
+  scores                   StudentScore[]
+  gradeResults             StudentGradeResult[]
 }
 
 model Payment {
@@ -554,9 +563,112 @@ model Subject {
   updatedAt   DateTime @updatedAt
   school      School   @relation(fields: [schoolId], references: [id])
   teacher     User?    @relation("TeacherSubjects", fields: [teacherId], references: [id])
+  assessments Assessment[]
+  gradeResults StudentGradeResult[]
 
   @@unique([schoolId, code])
   @@index([schoolId, name])
+}
+
+enum AssessmentType {
+  exam
+  test
+  assignment
+  quiz
+  practical
+}
+
+enum GradeResultStatus {
+  draft
+  published
+}
+
+model GradingCriteria {
+  id          String   @id @default(uuid())
+  schoolId    String
+  name        String
+  description String?
+  isActive    Boolean  @default(false)
+  passMark    Float    @default(50)
+  scaleBands  Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  school      School   @relation(fields: [schoolId], references: [id])
+
+  @@index([schoolId, isActive])
+}
+
+model Assessment {
+  id                 String         @id @default(uuid())
+  schoolId           String
+  classId            String
+  subjectId          String
+  createdByTeacherId String
+  title              String
+  assessmentType     AssessmentType @default(test)
+  term               String
+  academicYear       String
+  totalMarks         Float          @default(100)
+  weight             Float          @default(1)
+  dueDate            DateTime?
+  isPublished        Boolean        @default(false)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  school             School         @relation(fields: [schoolId], references: [id])
+  class              Class          @relation(fields: [classId], references: [id])
+  subject            Subject        @relation(fields: [subjectId], references: [id])
+  createdByTeacher   User           @relation("AssessmentCreator", fields: [createdByTeacherId], references: [id])
+  scores             StudentScore[]
+
+  @@index([schoolId, classId, subjectId, term])
+}
+
+model StudentScore {
+  id           String   @id @default(uuid())
+  assessmentId String
+  studentId    String
+  rawScore     Float
+  remarks      String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  assessment   Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  student      Student    @relation(fields: [studentId], references: [id])
+
+  @@unique([assessmentId, studentId])
+  @@index([studentId])
+}
+
+model StudentGradeResult {
+  id               String            @id @default(uuid())
+  schoolId         String
+  studentId        String
+  classId          String
+  subjectId        String
+  term             String
+  academicYear     String
+  percentage       Float
+  totalWeighted    Float             @default(0)
+  letterGrade      String
+  gradePoint       Float?
+  passStatus       Boolean           @default(true)
+  remarks          String?
+  status           GradeResultStatus @default(draft)
+  gradedByTeacherId String?
+  computedAt       DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  school           School            @relation(fields: [schoolId], references: [id])
+  student          Student           @relation(fields: [studentId], references: [id])
+  class            Class             @relation(fields: [classId], references: [id])
+  subject          Subject           @relation(fields: [subjectId], references: [id])
+  gradedByTeacher  User?             @relation("ResultGradedBy", fields: [gradedByTeacherId], references: [id])
+
+  @@unique([studentId, subjectId, term, academicYear])
+  @@index([schoolId, term, academicYear])
+  @@index([classId, subjectId])
 }
 
 model Alumni {

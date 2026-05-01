@@ -28,6 +28,7 @@ import {
   Bell,
   Menu,
   ArrowRight,
+  ClipboardCheck,
 } from "lucide-react";
 import { getSchoolThemeTokens, hexToRgba } from "@/lib/utils/school-theme";
 
@@ -78,6 +79,12 @@ const teacherNavItems = [
     label: "Notifications",
     icon: Bell,
     description: "View school announcements",
+  },
+  {
+    id: "grading",
+    label: "Grading",
+    icon: ClipboardCheck,
+    description: "Assessments, score entry and auto-grading",
   },
   {
     id: "settings",

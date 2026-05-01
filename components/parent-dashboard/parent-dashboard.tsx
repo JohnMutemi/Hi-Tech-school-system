@@ -60,7 +60,7 @@ export default function ParentDashboard({ schoolCode, parentId }: { schoolCode: 
           refreshReceipts={dashboard.fetchAllReceipts}
         />;
       case "performance":
-        return <PerformanceSection {...dashboard} />;
+        return <PerformanceSection {...dashboard} schoolCode={schoolCode} />;
       case "settings":
         return <SettingsSection {...dashboard} />;
       default:

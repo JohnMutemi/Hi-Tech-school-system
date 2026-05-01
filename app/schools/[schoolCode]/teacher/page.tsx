@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { TeacherSidebar } from "@/components/teacher-dashboard/TeacherSidebar";
+import TeacherGradingTab from "@/components/teacher-dashboard/TeacherGradingTab";
 import { useParams, useRouter } from "next/navigation";
 
 export default function TeacherPage() {
@@ -87,6 +88,14 @@ export default function TeacherPage() {
     );
   } else if (activeTab === "students") {
     content = <div className="p-8">Students are derived from assigned classes ({studentCount} total).</div>;
+  } else if (activeTab === "grading") {
+    content = (
+      <TeacherGradingTab
+        schoolCode={schoolCode || ""}
+        teacher={teacher}
+        assignedClasses={assignedClasses}
+      />
+    );
       } else {
     content = <div className="p-8">Coming soon...</div>;
   }
