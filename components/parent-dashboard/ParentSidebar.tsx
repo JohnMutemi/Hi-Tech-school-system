@@ -25,6 +25,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { getSchoolThemeTokens, hexToRgba } from "@/lib/utils/school-theme";
 
 const NAV_ITEMS = [
   { id: "overview", label: "Overview", icon: Sparkles },
@@ -59,19 +60,19 @@ export const ParentSidebar: React.FC<ParentSidebarProps> = ({
   avatarUrl
 }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-  // Enhanced green theme for parent dashboard
-  const isDark = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const sidebarBg = 'bg-gradient-to-b from-emerald-900 via-slate-800 to-emerald-800';
-  const sidebarBorder = 'border-emerald-700';
-  const sidebarShadow = 'shadow-lg shadow-emerald-900/50';
+  const theme = getSchoolThemeTokens(colorTheme);
 
   return (
     <>
       {/* Desktop Sidebar */}
       <nav
-        className={`hidden lg:flex fixed left-0 top-0 h-full w-64 z-30 ${sidebarBg} ${sidebarBorder} ${sidebarShadow} border-r flex-col py-6 px-4 transition-all duration-300`}
-        style={{ minHeight: '100vh' }}
+        className="hidden lg:flex fixed left-0 top-0 h-full w-64 z-30 border-r flex-col py-6 px-4 transition-all duration-300 shadow-lg"
+        style={{
+          minHeight: '100vh',
+          borderColor: hexToRgba(theme.primary, 0.3),
+          background: `linear-gradient(to bottom, ${theme.primaryDeeper}, ${theme.primaryDark})`,
+          boxShadow: `0 20px 45px ${hexToRgba(theme.primaryDeeper, 0.45)}`,
+        }}
       >
         <div className="flex flex-col h-full">
           {/* HT Logo at the far top left */}
@@ -111,10 +112,14 @@ export const ParentSidebar: React.FC<ParentSidebarProps> = ({
                 return (
                   <li key={item.id}>
                     <button
-                      className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg text-left transition-colors font-semibold text-slate-200 hover:underline hover:text-white ${
-                        isActive ? 'font-bold bg-indigo-700 text-white shadow-md' : 'font-medium'
+                      className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg text-left transition-colors font-semibold hover:underline ${
+                        isActive ? 'font-bold text-white shadow-md' : 'font-medium'
                       }`}
-                      style={isActive ? { boxShadow: '0 0 0 2px #6366f1' } : {}}
+                      style={{
+                        color: isActive ? "#ffffff" : hexToRgba("#ffffff", 0.84),
+                        backgroundColor: isActive ? hexToRgba(theme.primary, 0.3) : "transparent",
+                        boxShadow: isActive ? `0 0 0 1px ${hexToRgba("#ffffff", 0.24)}` : undefined,
+                      }}
                       onClick={() => onTabChange(item.id)}
                       aria-current={isActive ? "page" : undefined}
                     >
@@ -159,19 +164,29 @@ export const ParentSidebar: React.FC<ParentSidebarProps> = ({
       </nav>
 
       {/* Mobile Header */}
-      <header className="lg:hidden bg-slate-900 shadow-sm border-b border-slate-800 sticky top-0 z-20">
+      <header className="lg:hidden shadow-sm border-b border-slate-800 sticky top-0 z-20" style={{ backgroundColor: theme.primaryDeeper }}>
         <div className="flex items-center justify-between px-4 py-4">
           <div className="flex items-center gap-3">
             <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="hover:bg-emerald-800 h-12 w-12 rounded-xl text-white">
+                <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl text-white" style={{ backgroundColor: hexToRgba("#ffffff", 0.06) }}>
                   <Menu className="h-6 w-6" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-80 p-0 bg-gradient-to-b from-emerald-900 via-slate-800 to-emerald-800 text-white">
-                <SheetHeader className="p-6 border-b border-emerald-700 bg-gradient-to-r from-emerald-800 to-emerald-700 text-white">
+              <SheetContent
+                side="left"
+                className="w-80 p-0 text-white"
+                style={{ background: `linear-gradient(to bottom, ${theme.primaryDeeper}, ${theme.primaryDark})` }}
+              >
+                <SheetHeader
+                  className="p-6 border-b text-white"
+                  style={{
+                    borderColor: hexToRgba(theme.primary, 0.34),
+                    background: `linear-gradient(to right, ${theme.primaryDark}, ${theme.primary})`,
+                  }}
+                >
                   <SheetTitle className="text-left text-white font-bold text-xl">Parent Portal</SheetTitle>
-                  <p className="text-slate-300 text-sm mt-2">Hi-Tech SMS</p>
+                  <p className="text-sm mt-2" style={{ color: hexToRgba("#ffffff", 0.82) }}>Hi-Tech SMS</p>
                 </SheetHeader>
                 {/* Mobile Profile Section */}
                 {parent && (
@@ -222,8 +237,12 @@ export const ParentSidebar: React.FC<ParentSidebarProps> = ({
                         <li key={item.id}>
                           <button
                             className={`w-full flex items-center gap-4 px-6 py-4 rounded-xl text-left transition-colors font-medium mx-3 ${
-                              isActive ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/25' : 'text-slate-200 hover:bg-emerald-700 hover:text-white'
+                              isActive ? 'text-white shadow-md' : 'hover:text-white'
                             }`}
+                            style={{
+                              color: isActive ? "#ffffff" : hexToRgba("#ffffff", 0.82),
+                              backgroundColor: isActive ? hexToRgba(theme.primary, 0.3) : "transparent",
+                            }}
                             onClick={() => {
                               onTabChange(item.id);
                               setIsMobileMenuOpen(false);
@@ -296,9 +315,13 @@ export const ParentSidebar: React.FC<ParentSidebarProps> = ({
                 onClick={() => onTabChange(item.id)}
                 className={`flex flex-col items-center py-3 px-2 min-w-0 flex-1 mobile-nav-transition ${
                   isActive 
-                    ? "text-emerald-600 bg-emerald-50 nav-item-active" 
-                    : "text-gray-600 hover:text-emerald-600 hover:bg-emerald-50"
+                    ? "nav-item-active" 
+                    : "text-gray-600"
                 }`}
+                style={{
+                  color: isActive ? theme.primary : undefined,
+                  backgroundColor: isActive ? hexToRgba(theme.primary, 0.12) : undefined,
+                }}
                 aria-current={isActive ? "page" : undefined}
               >
                 <Icon className="w-6 h-6 mb-1" />

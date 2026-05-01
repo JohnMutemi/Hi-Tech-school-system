@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { SchoolLoginShell } from "@/components/auth/school-login-shell"
 
 export default function StudentLoginPage({ params }: { params: { schoolCode: string } }) {
   const { schoolCode } = params
@@ -56,49 +56,37 @@ export default function StudentLoginPage({ params }: { params: { schoolCode: str
   }
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center relative overflow-hidden">
-      {/* Background image */}
-      <img
-        src="/library-bg.jpg"
-        alt="Library background"
-        className="absolute inset-0 w-full h-full object-cover object-center"
-        draggable={false}
-      />
-      {/* Login card, centered with glassmorphism */}
-      <div className="relative z-10 flex items-center justify-center w-full min-h-screen">
-        <Card className="w-full max-w-sm p-2 sm:p-4 rounded-xl shadow-xl bg-white/80 backdrop-blur-md">
-          <CardHeader>
-            <CardTitle>Student Login</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleLogin} className="space-y-3">
-              <Input
-                placeholder="Admission Number"
-                value={admissionNumber}
-                onChange={(e) => setAdmissionNumber(e.target.value)}
-              />
-              <div className="text-center text-gray-400 text-xs">or</div>
-              <Input
-                type="email"
-                placeholder="Email (optional)"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-              <Input
-                type="password"
-                placeholder="Temporary Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-              {error && <div className="text-red-500 text-sm">{error}</div>}
-              <Button type="submit" className="w-full py-2 text-base" disabled={loading}>
-                {loading ? "Logging in..." : "Login"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+    <SchoolLoginShell
+      schoolCode={schoolCode}
+      heading="Welcome Back!"
+      subheading="Login to your school account"
+      adminLoginHref={`/schools/${schoolCode}`}
+    >
+      <form onSubmit={handleLogin} className="space-y-3">
+        <Input
+          placeholder="Admission Number"
+          value={admissionNumber}
+          onChange={(e) => setAdmissionNumber(e.target.value)}
+        />
+        <div className="text-center text-xs text-gray-400">or</div>
+        <Input
+          type="email"
+          placeholder="Email (optional)"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        <Input
+          type="password"
+          placeholder="Temporary Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+        {error && <div className="text-sm text-red-600">{error}</div>}
+        <Button type="submit" className="w-full py-2 text-base" disabled={loading}>
+          {loading ? "Logging in..." : "Login"}
+        </Button>
+      </form>
+    </SchoolLoginShell>
   )
 } 

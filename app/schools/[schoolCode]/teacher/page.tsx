@@ -12,17 +12,19 @@ export default function TeacherPage() {
   const [classes, setClasses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
+  const [schoolTheme, setSchoolTheme] = useState("#3b82f6");
 
   useEffect(() => {
     async function loadData() {
       if (!schoolCode) return;
       setLoading(true);
       try {
-        const [sessionRes, classesRes] = await Promise.all([
+        const [sessionRes, classesRes, schoolRes] = await Promise.all([
           fetch(`/api/schools/${encodeURIComponent(schoolCode)}/teachers/session`, {
             credentials: "include",
           }),
           fetch(`/api/schools/${encodeURIComponent(schoolCode)}/classes`),
+          fetch(`/api/schools/${encodeURIComponent(schoolCode)}`),
         ]);
 
         if (sessionRes.status === 401) {
@@ -35,6 +37,10 @@ export default function TeacherPage() {
           setTeacher(sessionData.teacher ?? null);
         }
         if (classesRes.ok) setClasses(await classesRes.json());
+        if (schoolRes.ok) {
+          const schoolData = await schoolRes.json();
+          if (schoolData?.colorTheme) setSchoolTheme(schoolData.colorTheme);
+        }
       } finally {
         setLoading(false);
       }
@@ -86,11 +92,11 @@ export default function TeacherPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-blue-50/90 via-white/80 to-indigo-50/90 backdrop-blur-sm">
+    <div className="flex min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 backdrop-blur-sm">
       <TeacherSidebar
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        colorTheme="#3b82f6"
+        colorTheme={schoolTheme}
         onLogout={async () => {
           if (!schoolCode) return;
           await fetch(`/api/schools/${encodeURIComponent(schoolCode)}/teachers/logout`, {

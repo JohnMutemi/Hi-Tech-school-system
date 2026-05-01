@@ -98,7 +98,14 @@ export default function StudentDashboardPage({
         }
         const data = await res.json();
         setStudent(data.student);
-        setSchoolData(data.schoolData);
+        if (data.schoolData) {
+          setSchoolData(data.schoolData);
+        } else {
+          const schoolRes = await fetch(`/api/schools/${encodeURIComponent(params.schoolCode)}`);
+          if (schoolRes.ok) {
+            setSchoolData(await schoolRes.json());
+          }
+        }
         setIsLoading(false);
       } catch (error) {
         console.error("Session fetch error:", error);
@@ -961,7 +968,7 @@ export default function StudentDashboardPage({
       <StudentSidebar
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        colorTheme="#10b981"
+        colorTheme={schoolData?.colorTheme || "#10b981"}
         onLogout={handleLogout}
         student={student}
       />

@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { getSchoolThemeTokens, hexToRgba } from "@/lib/utils/school-theme";
 
 const NAV_ITEMS = [
   { id: "overview", label: "Overview", icon: Sparkles },
@@ -37,21 +38,19 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, colorTheme, onLogout, schoolData }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-  // Use system color mode (light/dark)
-  const isDark = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const sidebarBg = isDark
-    ? 'bg-gradient-to-b from-cyan-950 via-cyan-900 to-slate-900'
-    : 'bg-gradient-to-b from-cyan-100 via-white to-cyan-200';
-  const sidebarBorder = isDark ? 'border-cyan-800' : 'border-cyan-200';
-  const sidebarShadow = isDark ? 'shadow-lg shadow-black/20' : 'shadow-lg shadow-cyan-200/40';
+  const theme = getSchoolThemeTokens(colorTheme);
 
   return (
     <>
       {/* Desktop Sidebar */}
       <nav
-        className={`hidden lg:flex fixed left-0 top-0 h-full w-64 z-30 ${sidebarBg} ${sidebarBorder} ${sidebarShadow} border-r flex-col py-6 px-4 transition-all duration-300`}
-        style={{ minHeight: '100vh' }}
+        className="hidden lg:flex fixed left-0 top-0 h-full w-64 z-30 border-r flex-col py-6 px-4 transition-all duration-300 shadow-lg"
+        style={{
+          minHeight: '100vh',
+          borderColor: hexToRgba(theme.primary, 0.3),
+          background: `linear-gradient(to bottom, ${theme.primaryDeeper}, ${theme.primaryDark})`,
+          boxShadow: `0 20px 45px ${hexToRgba(theme.primaryDeeper, 0.45)}`,
+        }}
       >
         <div className="flex flex-col h-full">
           {/* Logo section at the top */}
@@ -68,10 +67,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, colorT
           {schoolData && (
             <div className="mb-6 px-4">
               <div className="text-center">
-                <div className="font-bold text-gray-900 text-base">
+                <div className="font-bold text-white text-base">
                   {schoolData.name}
                 </div>
-                <div className="text-blue-700 font-semibold text-sm">
+                <div className="font-semibold text-sm" style={{ color: hexToRgba("#ffffff", 0.78) }}>
                   School Portal
                 </div>
               </div>
@@ -87,10 +86,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, colorT
                 return (
                   <li key={item.id}>
                     <button
-                      className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg text-left transition-colors font-semibold text-gray-700 dark:text-gray-200 hover:underline hover:text-blue-700 dark:hover:text-blue-400 ${
-                        isActive ? 'font-bold bg-blue-50 text-blue-700' : 'font-medium'
+                      className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg text-left transition-colors ${
+                        isActive ? 'font-bold' : 'font-medium'
                       }`}
-                      style={isActive && colorTheme ? { color: colorTheme } : {}}
+                      style={{
+                        color: isActive ? "#ffffff" : hexToRgba("#ffffff", 0.85),
+                        background: isActive ? hexToRgba(theme.primary, 0.32) : "transparent",
+                      }}
                       onClick={() => onTabChange(item.id)}
                       aria-current={isActive ? "page" : undefined}
                     >
@@ -135,19 +137,22 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, colorT
       </nav>
 
       {/* Mobile Header */}
-      <header className="lg:hidden bg-white shadow-sm border-b sticky top-0 z-20">
+      <header className="lg:hidden shadow-sm border-b sticky top-0 z-20 bg-white">
         <div className="flex items-center justify-between px-4 py-4">
           <div className="flex items-center gap-3">
             <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="hover:bg-cyan-50 h-10 w-10">
+                <Button variant="ghost" size="icon" className="h-10 w-10" style={{ color: theme.primaryDark }}>
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="w-80 p-0">
-                <SheetHeader className="p-6 border-b bg-gradient-to-r from-cyan-600 to-cyan-700 text-white">
+                <SheetHeader
+                  className="p-6 border-b text-white"
+                  style={{ background: `linear-gradient(to right, ${theme.primary}, ${theme.primaryDark})` }}
+                >
                   <SheetTitle className="text-left text-white font-bold text-lg">School Portal</SheetTitle>
-                  <p className="text-cyan-100 text-sm mt-1">Hi-Tech SMS</p>
+                  <p className="text-sm mt-1" style={{ color: hexToRgba("#ffffff", 0.82) }}>Hi-Tech SMS</p>
                 </SheetHeader>
                 
                 {/* Mobile School Info */}
@@ -157,7 +162,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, colorT
                       <div className="font-bold text-gray-900 text-base">
                         {schoolData.name}
                       </div>
-                      <div className="text-blue-700 font-semibold text-sm">
+                      <div className="font-semibold text-sm" style={{ color: theme.primary }}>
                         School Portal
                       </div>
                     </div>
@@ -174,8 +179,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, colorT
                         <li key={item.id}>
                           <button
                             className={`w-full flex items-center gap-4 px-6 py-4 rounded-lg text-left transition-colors font-medium mx-3 ${
-                              isActive ? 'bg-blue-100 text-blue-700 shadow-sm' : 'text-gray-700 hover:bg-blue-50 hover:text-blue-700'
+                              isActive ? 'shadow-sm' : ''
                             }`}
+                            style={{
+                              backgroundColor: isActive ? hexToRgba(theme.primary, 0.14) : undefined,
+                              color: isActive ? theme.primaryDark : undefined,
+                            }}
                             onClick={() => {
                               onTabChange(item.id);
                               setIsMobileMenuOpen(false);
@@ -221,7 +230,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, colorT
               </SheetContent>
             </Sheet>
             <div className="flex flex-col">
-              <span className="font-bold text-lg text-blue-700">School Portal</span>
+              <span className="font-bold text-lg" style={{ color: theme.primaryDark }}>School Portal</span>
               <span className="text-xs text-gray-500">
                 {NAV_ITEMS.find(item => item.id === activeTab)?.label || 'Overview'}
               </span>
@@ -247,11 +256,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, colorT
               <button
                 key={item.id}
                 onClick={() => onTabChange(item.id)}
-                className={`flex flex-col items-center py-3 px-2 min-w-0 flex-1 mobile-nav-transition ${
-                  isActive 
-                    ? "text-blue-600 bg-blue-50 nav-item-active" 
-                    : "text-gray-600 hover:text-blue-600 hover:bg-blue-50"
-                }`}
+                className={`flex flex-col items-center py-3 px-2 min-w-0 flex-1 mobile-nav-transition ${isActive ? "nav-item-active" : "text-gray-600"}`}
+                style={{
+                  color: isActive ? theme.primary : undefined,
+                  backgroundColor: isActive ? hexToRgba(theme.primary, 0.12) : undefined,
+                }}
                 aria-current={isActive ? "page" : undefined}
               >
                 <Icon className="w-5 h-5 mb-1" />

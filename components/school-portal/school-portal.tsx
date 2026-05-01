@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { School, User, Eye, EyeOff } from "lucide-react";
 import type { SchoolData } from "@/lib/school-storage";
 import { getSchool } from "@/lib/school-storage";
@@ -22,6 +21,14 @@ import { SchoolSetupDashboard } from "./school-setup-dashboard";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Select } from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
+import { SchoolLoginShell } from "@/components/auth/school-login-shell";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface SchoolPortalProps {
   schoolCode: string;
@@ -44,6 +51,12 @@ export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
   const [checkingSession, setCheckingSession] = useState(true);
   const searchParams = useSearchParams();
   const [students, setStudents] = useState([]);
+  const [activeQuickRole, setActiveQuickRole] = useState<null | "parent" | "student" | "teacher">(null);
+  const [quickSubmitting, setQuickSubmitting] = useState(false);
+  const [quickError, setQuickError] = useState("");
+  const [quickStudent, setQuickStudent] = useState({ admissionNumber: "", email: "", password: "" });
+  const [quickParent, setQuickParent] = useState({ phone: "", password: "" });
+  const [quickTeacher, setQuickTeacher] = useState({ email: "", password: "" });
 
   useEffect(() => {
     const autoEmail = searchParams.get("email") || "";
@@ -250,172 +263,268 @@ export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
   }
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center relative overflow-hidden">
-      {/* Background image */}
-      <img
-        src="/library-bg.jpg"
-        alt="Library background"
-        className="absolute inset-0 w-full h-full object-cover object-center"
-        draggable={false}
-      />
-      {/* Login card, centered with glassmorphism */}
-      <div className="relative z-10 flex items-center justify-center w-full min-h-screen p-2 sm:p-4">
-        <Card className="w-full max-w-md shadow-2xl rounded-2xl bg-white/80 backdrop-blur-md">
-          <CardHeader className="text-center p-6 bg-white rounded-t-2xl">
-            <div className="flex items-center justify-center mb-4">
-              {schoolData.logoUrl ? (
-                <img
-                  src={schoolData.logoUrl || "/placeholder.svg"}
-                  alt={`${schoolData.name} logo`}
-                  className="w-20 h-20 object-cover rounded-full border-4"
-                  style={{ borderColor: schoolData.colorTheme }}
-                />
+    <SchoolLoginShell
+      schoolCode={schoolCode}
+      heading={schoolData.name}
+      subheading={`Welcome to ${autoSchoolName || schoolData.name}`}
+      logoUrl={schoolData.logoUrl}
+      colorTheme={schoolData.colorTheme}
+    >
+      <form onSubmit={handleLogin} className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="schoolCode">School Code</Label>
+          <Input
+            id="schoolCode"
+            value={schoolCode}
+            readOnly
+            required
+            className="bg-gray-100"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="email">Email Address</Label>
+          <Input
+            id="email"
+            type="email"
+            value={loginData.email}
+            onChange={(e) =>
+              setLoginData({ ...loginData, email: e.target.value })
+            }
+            placeholder="Enter your email"
+            required
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="password">Password</Label>
+          <div className="relative">
+            <Input
+              id="password"
+              type={showPassword ? "text" : "password"}
+              value={loginData.password}
+              onChange={(e) =>
+                setLoginData({ ...loginData, password: e.target.value })
+              }
+              placeholder="Enter your password"
+              required
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2 transform"
+              onClick={() => setShowPassword(!showPassword)}
+            >
+              {showPassword ? (
+                <EyeOff className="h-4 w-4" />
               ) : (
-                <div
-                  className="w-20 h-20 rounded-full flex items-center justify-center border-4"
-                  style={{
-                    backgroundColor: schoolData.colorTheme + "20",
-                    borderColor: schoolData.colorTheme,
-                  }}
-                >
-                  <School
-                    className="w-10 h-10"
-                    style={{ color: schoolData.colorTheme }}
-                  />
-                </div>
+                <Eye className="h-4 w-4" />
               )}
-            </div>
-            <CardTitle className="text-2xl md:text-3xl font-bold">
-              {schoolData.name}
-            </CardTitle>
-            <div
-              className="text-lg font-semibold"
-              style={{ color: schoolData.colorTheme }}
-            >
-              Welcome to {autoSchoolName || schoolData?.name}!
-            </div>
-            <CardDescription className="mt-1">
-              School Code:{" "}
-              <span className="font-mono font-bold">
-                {schoolData.schoolCode
-                  ? schoolData.schoolCode.toUpperCase()
-                  : ""}
-              </span>
-            </CardDescription>
-            <Badge
-              variant={schoolData.status === "active" ? "default" : "secondary"}
-              className="mt-2"
-              style={{
-                backgroundColor:
-                  schoolData.status === "active"
-                    ? "hsl(var(--primary))"
-                    : "hsl(var(--secondary))",
-                color:
-                  schoolData.status === "active"
-                    ? "hsl(var(--primary-foreground))"
-                    : "hsl(var(--secondary-foreground))",
-              }}
-            >
-              {schoolData.status === "setup"
-                ? "Setup Required"
-                : schoolData.status}
-            </Badge>
-          </CardHeader>
-          <CardContent className="p-6">
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="schoolCode">School Code</Label>
-                <Input
-                  id="schoolCode"
-                  value={schoolCode}
-                  readOnly
-                  required
-                  className="bg-gray-100"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={loginData.email}
-                  onChange={(e) =>
-                    setLoginData({ ...loginData, email: e.target.value })
-                  }
-                  placeholder="Enter your email"
-                  required
-                />
-              </div>
+            </Button>
+          </div>
+        </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    value={loginData.password}
-                    onChange={(e) =>
-                      setLoginData({ ...loginData, password: e.target.value })
-                    }
-                    placeholder="Enter your password"
-                    required
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 w-8"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              </div>
+        {loginError && (
+          <div className="rounded-md border border-red-200 bg-red-50 p-3">
+            <p className="text-sm text-red-600">{loginError}</p>
+          </div>
+        )}
+        {infoMessage && (
+          <div className="rounded-md border border-blue-200 bg-blue-50 p-3">
+            <p className="text-sm text-blue-700">{infoMessage}</p>
+          </div>
+        )}
 
-              {loginError && (
-                <div className="bg-red-50 border border-red-200 rounded-md p-3">
-                  <p className="text-sm text-red-600">{loginError}</p>
-                </div>
-              )}
-              {infoMessage && (
-                <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-                  <p className="text-sm text-blue-700">{infoMessage}</p>
-                </div>
-              )}
+        <Button
+          type="submit"
+          className="w-full text-lg py-6"
+          disabled={isSubmitting}
+          style={{
+            backgroundColor: schoolData.colorTheme,
+            color: "#ffffff",
+          }}
+        >
+          <User className="w-4 h-4 mr-2" />
+          {`Sign In to ${schoolData.name}`}
+        </Button>
+        <Button
+          type="button"
+          variant="link"
+          className="w-full text-sm"
+          onClick={handleForgotPassword}
+          disabled={forgotSubmitting}
+        >
+          Forgot password?
+        </Button>
+        <div className="mt-1 flex flex-wrap items-center justify-center gap-3 text-xs">
+          <button
+            type="button"
+            className="text-blue-700 underline underline-offset-2 hover:text-blue-800"
+            onClick={() => {
+              setQuickError("");
+              setActiveQuickRole("parent");
+            }}
+          >
+            Parent Login
+          </button>
+          <button
+            type="button"
+            className="text-blue-700 underline underline-offset-2 hover:text-blue-800"
+            onClick={() => {
+              setQuickError("");
+              setActiveQuickRole("student");
+            }}
+          >
+            Student Login
+          </button>
+          <button
+            type="button"
+            className="text-blue-700 underline underline-offset-2 hover:text-blue-800"
+            onClick={() => {
+              setQuickError("");
+              setActiveQuickRole("teacher");
+            }}
+          >
+            Teacher Login
+          </button>
+        </div>
+      </form>
 
-              <Button
-                type="submit"
-                className="w-full text-lg py-6"
-                disabled={isSubmitting}
-                style={{
-                  backgroundColor: schoolData.colorTheme,
-                  color: "#ffffff",
-                }}
-              >
-                <User className="w-4 h-4 mr-2" />
-                {`Sign In to ${schoolData.name}`}
-              </Button>
-              <Button
-                type="button"
-                variant="link"
-                className="w-full text-sm"
-                onClick={handleForgotPassword}
-                disabled={forgotSubmitting}
-              >
-                Forgot password?
-              </Button>
-            </form>
-
-            <div className="text-center mt-6 text-sm text-gray-500">
-              Powered by Hi-Tech SMS
-            </div>
-          </CardContent>
-        </Card>
+      <div className="mt-6 text-center text-sm text-gray-500">
+        Powered by Hi-Tech SMS
       </div>
-    </div>
+      <Dialog open={!!activeQuickRole} onOpenChange={(open) => !open && setActiveQuickRole(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {activeQuickRole === "parent"
+                ? "Parent Quick Login"
+                : activeQuickRole === "student"
+                  ? "Student Quick Login"
+                  : "Teacher Quick Login"}
+            </DialogTitle>
+            <DialogDescription>
+              Enter credentials to continue to your portal.
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            className="space-y-3"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!activeQuickRole) return;
+              setQuickSubmitting(true);
+              setQuickError("");
+              try {
+                let endpoint = "";
+                let payload: Record<string, string> = {};
+
+                if (activeQuickRole === "parent") {
+                  endpoint = `/api/schools/${schoolCode}/parents/login`;
+                  payload = quickParent;
+                } else if (activeQuickRole === "student") {
+                  endpoint = `/api/schools/${schoolCode}/students/login`;
+                  payload = quickStudent;
+                } else {
+                  endpoint = `/api/schools/${schoolCode}/teachers/login`;
+                  payload = quickTeacher;
+                }
+
+                const res = await fetch(endpoint, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(payload),
+                });
+                const data = await res.json().catch(() => ({}));
+
+                if (!res.ok) {
+                  setQuickError(data.error || "Login failed. Check your credentials.");
+                  return;
+                }
+
+                setActiveQuickRole(null);
+                if (activeQuickRole === "parent") {
+                  router.push(`/schools/${schoolCode}/parent/${data.parentId}`);
+                } else if (activeQuickRole === "student") {
+                  router.push(`/schools/${schoolCode}/student`);
+                } else {
+                  router.push(`/schools/${schoolCode}/teacher`);
+                }
+              } catch {
+                setQuickError("An unexpected error occurred. Please try again.");
+              } finally {
+                setQuickSubmitting(false);
+              }
+            }}
+          >
+            {activeQuickRole === "student" ? (
+              <>
+                <Input
+                  placeholder="Admission Number (optional if using email)"
+                  value={quickStudent.admissionNumber}
+                  onChange={(e) =>
+                    setQuickStudent((prev) => ({ ...prev, admissionNumber: e.target.value }))
+                  }
+                />
+                <Input
+                  type="email"
+                  placeholder="Email (optional if using admission number)"
+                  value={quickStudent.email}
+                  onChange={(e) => setQuickStudent((prev) => ({ ...prev, email: e.target.value }))}
+                />
+                <Input
+                  type="password"
+                  placeholder="Password"
+                  value={quickStudent.password}
+                  onChange={(e) => setQuickStudent((prev) => ({ ...prev, password: e.target.value }))}
+                  required
+                />
+              </>
+            ) : null}
+
+            {activeQuickRole === "parent" ? (
+              <>
+                <Input
+                  placeholder="Phone Number"
+                  value={quickParent.phone}
+                  onChange={(e) => setQuickParent((prev) => ({ ...prev, phone: e.target.value }))}
+                  required
+                />
+                <Input
+                  type="password"
+                  placeholder="Password"
+                  value={quickParent.password}
+                  onChange={(e) => setQuickParent((prev) => ({ ...prev, password: e.target.value }))}
+                  required
+                />
+              </>
+            ) : null}
+
+            {activeQuickRole === "teacher" ? (
+              <>
+                <Input
+                  type="email"
+                  placeholder="Email"
+                  value={quickTeacher.email}
+                  onChange={(e) => setQuickTeacher((prev) => ({ ...prev, email: e.target.value }))}
+                  required
+                />
+                <Input
+                  type="password"
+                  placeholder="Password"
+                  value={quickTeacher.password}
+                  onChange={(e) => setQuickTeacher((prev) => ({ ...prev, password: e.target.value }))}
+                  required
+                />
+              </>
+            ) : null}
+
+            {quickError ? <p className="text-sm text-red-600">{quickError}</p> : null}
+            <Button type="submit" className="w-full" disabled={quickSubmitting}>
+              {quickSubmitting ? "Signing in..." : "Sign in"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </SchoolLoginShell>
   );
 }

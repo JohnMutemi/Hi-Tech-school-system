@@ -29,6 +29,7 @@ import {
   Menu,
   ArrowRight,
 } from "lucide-react";
+import { getSchoolThemeTokens, hexToRgba } from "@/lib/utils/school-theme";
 
 interface TeacherSidebarProps {
   activeTab: string;
@@ -98,6 +99,7 @@ export function TeacherSidebar({
 }: TeacherSidebarProps) {
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const theme = getSchoolThemeTokens(colorTheme);
 
   const handleLogout = () => {
     setShowLogoutDialog(false);
@@ -107,7 +109,10 @@ export function TeacherSidebar({
   return (
     <>
       {/* Desktop Sidebar */}
-      <div className="hidden lg:flex w-80 h-screen bg-gradient-to-b from-blue-900 via-blue-800 to-indigo-900 text-white shadow-2xl relative overflow-hidden">
+      <div
+        className="hidden lg:flex w-80 h-screen text-white shadow-2xl relative overflow-hidden"
+        style={{ background: `linear-gradient(to bottom, ${theme.primaryDeeper}, ${theme.primaryDark})` }}
+      >
         {/* Background Pattern */}
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.15)_1px,transparent_0)] bg-[length:20px_20px]" />
@@ -190,15 +195,20 @@ export function TeacherSidebar({
                     onClick={() => onTabChange(item.id)}
                     className={`w-full flex items-center space-x-4 px-4 py-3 rounded-xl transition-all duration-200 group ${
                       isActive
-                        ? "bg-white/20 text-white shadow-lg border border-white/20"
-                        : "text-blue-100 hover:bg-white/10 hover:text-white"
+                        ? "text-white shadow-lg border border-white/20"
+                        : "hover:bg-white/10 hover:text-white"
                     }`}
+                    style={{
+                      backgroundColor: isActive ? hexToRgba(theme.primary, 0.26) : "transparent",
+                      color: isActive ? "#ffffff" : hexToRgba("#ffffff", 0.82),
+                    }}
                     title={item.description}
                   >
                     <Icon
                       className={`w-5 h-5 transition-colors duration-200 ${
-                        isActive ? "text-white" : "text-blue-300 group-hover:text-white"
+                        isActive ? "text-white" : "group-hover:text-white"
                       }`}
+                      style={{ color: isActive ? "#ffffff" : hexToRgba("#ffffff", 0.72) }}
                     />
                     <span className="font-medium">{item.label}</span>
                     {isActive && (
@@ -254,14 +264,17 @@ export function TeacherSidebar({
           <div className="flex items-center gap-3">
             <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="hover:bg-blue-50 h-12 w-12 rounded-xl">
+                <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl" style={{ color: theme.primaryDark }}>
                   <Menu className="h-6 w-6" />
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="w-80 p-0">
-                <SheetHeader className="p-6 border-b bg-gradient-to-r from-blue-600 to-blue-700 text-white">
+                <SheetHeader
+                  className="p-6 border-b text-white"
+                  style={{ background: `linear-gradient(to right, ${theme.primary}, ${theme.primaryDark})` }}
+                >
                   <SheetTitle className="text-left text-white font-bold text-xl">Teacher Portal</SheetTitle>
-                  <p className="text-blue-100 text-sm mt-2">Hi-Tech SMS</p>
+                  <p className="text-sm mt-2" style={{ color: hexToRgba("#ffffff", 0.82) }}>Hi-Tech SMS</p>
                 </SheetHeader>
                 
                 {/* Mobile Profile Section */}
