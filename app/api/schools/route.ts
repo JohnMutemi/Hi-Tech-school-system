@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { SchoolSeedingService } from '@/lib/services/school-seeding-service';
+import { normalizePackageType } from '@/lib/finance-package-gate';
 
 const prisma = new PrismaClient();
 
@@ -38,12 +39,18 @@ export async function GET() {
     });
 
     // Transform data to match SchoolData interface
-    const transformedSchools = schools.map((school: any) => ({
+    const transformedSchools = schools.map((school: any) => {
+      const isInlineLogo =
+        typeof school.logo === 'string' && school.logo.trim().startsWith('data:');
+
+      return ({
       id: school.id,
       schoolCode: school.code,
       name: school.name,
-      logo: school.logo,
-      logoUrl: school.logo ?? "",
+      // Keep school listing payload lightweight; large inline logos can freeze the dashboard table.
+      logo: isInlineLogo ? null : school.logo,
+      logoUrl: isInlineLogo ? "" : (school.logo ?? ""),
+      hasLogo: Boolean(school.logo),
       colorTheme: school.colorTheme || "#d97706",
       portalUrl: `/schools/${school.code}`,
       description: "",
@@ -53,6 +60,7 @@ export async function GET() {
       adminLastName: school.users.find((u: any) => u.role === 'admin')?.name?.split(' ').slice(1).join(' ') || "User",
       createdAt: school.createdAt.toISOString(),
       status: school.isActive ? "active" : "suspended",
+      packageType: normalizePackageType((school as any).packageType),
       profile: {
         address: school.address,
         phone: school.phone,
@@ -91,7 +99,7 @@ export async function GET() {
         classTeacherId: "",
         subjects: []
       }))
-    }));
+    })});
 
     return NextResponse.json(transformedSchools);
   } catch (error) {
@@ -118,6 +126,7 @@ export async function POST(request: NextRequest) {
       status,
       logoUrl,
       logo,
+      packageType,
     } = body;
 
     // Validate required fields
@@ -151,6 +160,7 @@ export async function POST(request: NextRequest) {
       typeof colorTheme === 'string' && /^#[0-9A-Fa-f]{6}$/.test(colorTheme.trim())
         ? colorTheme.trim()
         : '#d97706';
+    const normalizedPackageType = normalizePackageType(packageType);
 
     // Create school (logo: data URL or URL string; colorTheme: hex)
     const school = await prisma.school.create({
@@ -162,6 +172,7 @@ export async function POST(request: NextRequest) {
         email,
         logo: logoData,
         colorTheme: themeHex,
+        packageType: normalizedPackageType,
         isActive: status !== 'suspended'
       }
     });
@@ -214,6 +225,7 @@ export async function POST(request: NextRequest) {
       adminLastName,
       createdAt: school.createdAt.toISOString(),
       status: school.isActive ? "active" : "suspended",
+      packageType: normalizePackageType((school as any).packageType),
       profile: {
         address: school.address,
         phone: school.phone,

@@ -98,9 +98,10 @@ interface Grade {
 
 interface BursarDashboardProps {
   schoolCode: string;
+  mode?: 'bursar' | 'finance';
 }
 
-export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
+export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboardProps) {
   const { toast } = useToast();
   const [students, setStudents] = useState<Student[]>([]);
   const [filteredStudents, setFilteredStudents] = useState<Student[]>([]);
@@ -133,6 +134,10 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
     studentsWithBalance: 0,
     fullyPaid: 0,
   });
+  const isFinanceMode = mode === 'finance';
+  const balancesEndpoint = isFinanceMode
+    ? `/api/finance/${schoolCode}/dashboard`
+    : `/api/schools/${schoolCode}/students/balances`;
 
   useEffect(() => {
     fetchGrades();
@@ -159,10 +164,14 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
 
   const fetchBursarInfo = async () => {
     try {
-      const response = await fetch(`/api/schools/${schoolCode}/bursar/session`);
+      const response = await fetch(
+        isFinanceMode
+          ? `/api/schools/${schoolCode}/finance/session`
+          : `/api/schools/${schoolCode}/bursar/session`
+      );
       if (response.ok) {
         const data = await response.json();
-        setBursarInfo(data.bursar);
+        setBursarInfo(data.bursar || data.user);
       }
     } catch (error) {
       console.error('Error fetching bursar info:', error);
@@ -171,12 +180,19 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
 
   const handleLogout = async () => {
     try {
-      const response = await fetch(`/api/schools/${schoolCode}/bursar/logout`, {
+      const response = await fetch(
+        isFinanceMode
+          ? `/api/schools/${schoolCode}/finance/logout`
+          : `/api/schools/${schoolCode}/bursar/logout`,
+        {
         method: 'POST',
-      });
+        }
+      );
       
       if (response.ok) {
-        window.location.href = `/schools/${schoolCode}/bursar/login`;
+        window.location.href = isFinanceMode
+          ? `/schools/${schoolCode}/finance/login`
+          : `/schools/${schoolCode}/bursar/login`;
       }
     } catch (error) {
       console.error('Logout error:', error);
@@ -213,7 +229,7 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
       if (selectedGrade && selectedGrade !== 'all') params.append('gradeId', selectedGrade);
       if (selectedClass && selectedClass !== 'all') params.append('classId', selectedClass);
 
-      const response = await fetch(`/api/schools/${schoolCode}/students/balances?${params}`);
+      const response = await fetch(`${balancesEndpoint}?${params}`);
       if (response.ok) {
         const data = await response.json();
         setStudents(data.students || []);
@@ -325,7 +341,9 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
             </div>
             <div className="absolute inset-0 w-16 h-16 bg-gradient-to-r from-amber-600 to-orange-600 rounded-2xl mx-auto opacity-20 animate-pulse"></div>
           </div>
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">Loading Bursar Dashboard</h2>
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">
+            {isFinanceMode ? 'Loading Finance Module' : 'Loading Bursar Dashboard'}
+          </h2>
           <p className="text-gray-600">Preparing financial management interface...</p>
         </div>
       </div>
@@ -898,7 +916,7 @@ export function BursarDashboard({ schoolCode }: BursarDashboardProps) {
                 {activeTab === 'analytics' && 'Payment Analytics'}
               </h1>
               <p className="text-amber-700/80 text-sm mt-2 font-medium">
-                {schoolInfo?.name || 'Financial Management System'}
+                {schoolInfo?.name || (isFinanceMode ? 'Independent Finance Module' : 'Financial Management System')}
               </p>
             </div>
             

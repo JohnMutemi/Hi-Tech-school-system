@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { 
   School, 
   Upload, 
@@ -51,6 +52,7 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
     principalName: "",
     establishedYear: new Date().getFullYear().toString(),
     motto: "",
+    packageType: "full",
   })
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [logoPreview, setLogoPreview] = useState<string>("")
@@ -131,7 +133,20 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
     setSuccess("")
 
     try {
-      const { name, address, phone, email, code, colorTheme, description, website, principalName, establishedYear, motto } = schoolData
+      const {
+        name,
+        address,
+        phone,
+        email,
+        code,
+        colorTheme,
+        description,
+        website,
+        principalName,
+        establishedYear,
+        motto,
+        packageType,
+      } = schoolData
 
       // Validate required fields
       if (!name || !address || !phone || !email) {
@@ -165,7 +180,8 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
         principalName,
         establishedYear,
         motto,
-        logoUrl
+        logoUrl,
+        packageType,
       })
 
       if (result.error) {
@@ -195,6 +211,7 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
           principalName: "",
           establishedYear: new Date().getFullYear().toString(),
           motto: "",
+          packageType: "full",
         })
         setLogoFile(null)
         setLogoPreview("")
@@ -308,6 +325,24 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
                       placeholder="Auto-generated if empty"
               />
             </div>
+                </div>
+
+                <div className="space-y-1.5 md:space-y-2">
+                  <Label htmlFor="packageType" className="text-xs md:text-sm font-medium text-stone-700">
+                    Package Rights
+                  </Label>
+                  <Select
+                    value={schoolData.packageType}
+                    onValueChange={(value) => setSchoolData({ ...schoolData, packageType: value })}
+                  >
+                    <SelectTrigger id="packageType" className="h-9 md:h-10 text-sm">
+                      <SelectValue placeholder="Select package" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="full">Full Package</SelectItem>
+                      <SelectItem value="finance_only">Finance Only</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 
                 <div className="space-y-1.5 md:space-y-2">
@@ -435,6 +470,7 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
                     placeholder="School motto or tagline"
               />
             </div>
+
               </TabsContent>
 
               {/* Branding Tab */}

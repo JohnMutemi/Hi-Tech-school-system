@@ -17,6 +17,7 @@ model School {
   logo                         String?
   /// Portal accent / theme color (hex), e.g. #d97706
   colorTheme                   String?
+  packageType                  String               @default("full")
   isActive                     Boolean              @default(true)
   createdAt                    DateTime             @default(now())
   updatedAt                    DateTime             @updatedAt

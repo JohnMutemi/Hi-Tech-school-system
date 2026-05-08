@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from 'zod';
 import { getSession } from "@/lib/session";
+import { normalizePackageType } from '@/lib/finance-package-gate';
 
 const prisma = new PrismaClient();
 
@@ -97,6 +98,7 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       adminLastName: schoolData.users.find(u => u.role === 'admin')?.name?.split(' ').slice(1).join(' ') || "User",
       createdAt: schoolData.createdAt.toISOString(),
       status: schoolData.isActive ? "active" : "suspended",
+      packageType: normalizePackageType((schoolData as any).packageType),
       profile: {
         address: schoolData.address,
         phone: schoolData.phone,
@@ -172,6 +174,7 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
       profile,
       logo,
       logoUrl,
+      packageType,
     } = body;
 
     // Find the school
@@ -205,6 +208,9 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
         ? String(colorTheme).trim()
         : undefined;
 
+    const normalizedPackageType =
+      packageType !== undefined ? normalizePackageType(packageType) : undefined;
+
     // Update school (use id — code in URL may differ in casing from DB)
     await prisma.school.update({
       where: { id: school.id },
@@ -219,6 +225,7 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
         }),
         ...(nextLogo !== undefined && { logo: nextLogo }),
         ...(nextColorTheme !== undefined && { colorTheme: nextColorTheme }),
+        ...(normalizedPackageType !== undefined && { packageType: normalizedPackageType }),
       },
     });
 
@@ -274,6 +281,7 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
       adminLastName: result.users.find(u => u.role === 'admin')?.name?.split(' ').slice(1).join(' ') || "User",
       createdAt: result.createdAt.toISOString(),
       status: result.isActive ? "active" : "suspended",
+      packageType: normalizePackageType((result as any).packageType),
       profile: {
         address: result.address,
         phone: result.phone,

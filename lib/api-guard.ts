@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { verify } from "jsonwebtoken";
 import { getSession } from "@/lib/session";
 import { withSchoolContext } from "@/lib/school-context";
+import { prisma } from "@/lib/prisma";
+import { getAdminCookieName } from "@/lib/admin-auth";
 
 export type ApiRole =
   | "super_admin"
@@ -20,10 +24,61 @@ export class ApiGuardError extends Error {
 
 export async function requireSession() {
   const session = await getSession();
-  if (!session?.isLoggedIn) {
+  if (session?.isLoggedIn) {
+    // Keep legacy "admin" users compatible with guard checks that expect "school_admin".
+    if (session.role === "admin") {
+      session.role = "school_admin";
+    }
+    return session;
+  }
+
+  // Fallback for school admin JWT-based login flow.
+  const adminToken =
+    cookies().get(getAdminCookieName())?.value ??
+    cookies().get("admin_auth_token")?.value;
+
+  if (!adminToken) {
     throw new ApiGuardError("Unauthorized", 401);
   }
-  return session;
+
+  let payload: { userId?: string; role?: string } | null = null;
+  try {
+    payload = verify(adminToken, process.env.JWT_SECRET!) as {
+      userId?: string;
+      role?: string;
+    };
+  } catch {
+    throw new ApiGuardError("Unauthorized", 401);
+  }
+
+  if (!payload?.userId) {
+    throw new ApiGuardError("Unauthorized", 401);
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: payload.userId },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      role: true,
+      schoolId: true,
+      isActive: true,
+    },
+  });
+
+  if (!user || !user.isActive) {
+    throw new ApiGuardError("Unauthorized", 401);
+  }
+
+  return {
+    isLoggedIn: true,
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role === "admin" ? "school_admin" : user.role,
+    schoolId: user.schoolId || undefined,
+  };
 }
 
 export function requireRole(session: { role?: string }, allowedRoles: ApiRole[]) {

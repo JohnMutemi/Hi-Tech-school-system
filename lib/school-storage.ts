@@ -2,6 +2,7 @@ export interface SchoolData {
   id: string
   schoolCode: string
   name: string
+  packageType?: "full" | "finance_only" | string
   logo?: string
   logoUrl?: string
   colorTheme: string

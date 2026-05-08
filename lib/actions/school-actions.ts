@@ -6,7 +6,21 @@ import { generateSchoolCode, generateTempPassword } from "@/lib/utils/school-gen
 
 export async function createSchoolClient(schoolData: any) {
   try {
-    const { name, address, phone, email, code, colorTheme, description, website, principalName, establishedYear, motto, logoUrl } = schoolData
+    const {
+      name,
+      address,
+      phone,
+      email,
+      code,
+      colorTheme,
+      description,
+      website,
+      principalName,
+      establishedYear,
+      motto,
+      logoUrl,
+      packageType,
+    } = schoolData
 
     if (!name || !address || !phone || !email) {
       return { error: "All required fields must be filled" }
@@ -30,6 +44,7 @@ export async function createSchoolClient(schoolData: any) {
     const newSchoolData = {
       schoolCode,
       name,
+      packageType: packageType || "full",
       logoUrl: logoUrl || "",
       colorTheme: colorTheme || "#d97706",
       portalUrl: `/schools/${schoolCode}`,

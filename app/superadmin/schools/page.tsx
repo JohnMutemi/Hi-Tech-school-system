@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { School, Plus, Search, Edit, Trash2, Users, GraduationCap, Calendar, LogIn, Copy, Power } from "lucide-react"
 import Link from "next/link"
@@ -18,6 +19,7 @@ export default function SchoolsManagementPage() {
   const { toast } = useToast()
   const [schools, setSchools] = useState<any[]>([])
   const [searchTerm, setSearchTerm] = useState("")
+  const [updatingPackageFor, setUpdatingPackageFor] = useState<string | null>(null)
 
   useEffect(() => {
     if (!user || (user && (!user.isLoggedIn || user.role !== 'super_admin'))) {
@@ -135,6 +137,35 @@ export default function SchoolsManagementPage() {
         description: error instanceof Error ? error.message : "Could not delete school.",
         variant: "destructive",
       })
+    }
+  }
+
+  const handlePackageTypeChange = async (school: any, packageType: string) => {
+    try {
+      setUpdatingPackageFor(school.id)
+      const res = await fetch(`/api/schools/${school.schoolCode}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ packageType }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Failed to update package rights")
+      toast({
+        title: "Package rights updated",
+        description:
+          packageType === "finance_only"
+            ? `${school.name} now has Finance Only rights.`
+            : `${school.name} now has Full Package rights.`,
+      })
+      loadSchools()
+    } catch (error) {
+      toast({
+        title: "Update failed",
+        description: error instanceof Error ? error.message : "Could not update package rights.",
+        variant: "destructive",
+      })
+    } finally {
+      setUpdatingPackageFor(null)
     }
   }
 
@@ -257,6 +288,7 @@ export default function SchoolsManagementPage() {
                       <TableHead>Students</TableHead>
                       <TableHead>Teachers</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Package</TableHead>
                       <TableHead>Created</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
@@ -324,6 +356,21 @@ export default function SchoolsManagementPage() {
                           >
                             {school.status}
                           </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={(school.packageType || "full").toLowerCase()}
+                            onValueChange={(value) => handlePackageTypeChange(school, value)}
+                            disabled={updatingPackageFor === school.id}
+                          >
+                            <SelectTrigger className="w-[170px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="full">Full Package</SelectItem>
+                              <SelectItem value="finance_only">Finance Only</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </TableCell>
                         <TableCell>{new Date(school.createdAt).toLocaleDateString()}</TableCell>
                         <TableCell>
