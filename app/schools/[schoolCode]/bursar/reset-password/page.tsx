@@ -1,4 +1,4 @@
 "use client"
 
-export { default } from "../../../finance/reset-password/page"
+export { default } from "../../finance/reset-password/page"
 
