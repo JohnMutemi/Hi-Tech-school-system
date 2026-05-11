@@ -23,7 +23,9 @@ import {
   LogOut,
   Settings,
   User,
-  ChevronDown
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,6 +42,7 @@ import PaymentHub from '@/components/payment/PaymentHub';
 import { PaymentHistoryModal } from './PaymentHistoryModal';
 import { BursarSidebar } from './BursarSidebar';
 import { portalGlassPanelLight } from '@/components/layout/portal-glass-styles';
+import { FeeManagement } from '@/components/school-portal/fee-management';
 
 interface Student {
   id: string;
@@ -120,9 +123,24 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
   // Payment History Modal state
   const [showPaymentHistory, setShowPaymentHistory] = useState(false);
   const [historyStudent, setHistoryStudent] = useState<Student | null>(null);
+  const [showAddStudent, setShowAddStudent] = useState(false);
+  const [creatingStudent, setCreatingStudent] = useState(false);
+  const [newStudent, setNewStudent] = useState({
+    fullName: '',
+    admissionNumber: '',
+    dateOfBirth: '',
+    dateAdmitted: '',
+    classId: '',
+    parentName: '',
+    parentPhone: '',
+    parentEmail: '',
+  });
   
   // Navigation state
   const [activeTab, setActiveTab] = useState('students');
+  const [studentsPage, setStudentsPage] = useState(1);
+  const [outstandingPage, setOutstandingPage] = useState(1);
+  const PAGE_SIZE = 7;
   
   // School and bursar info
   const [schoolInfo, setSchoolInfo] = useState<any>(null);
@@ -135,6 +153,10 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
     fullyPaid: 0,
   });
   const isFinanceMode = mode === 'finance';
+  const themeColor =
+    typeof schoolInfo?.colorTheme === 'string' && /^#[0-9A-Fa-f]{6}$/.test(schoolInfo.colorTheme)
+      ? schoolInfo.colorTheme
+      : '#d97706';
   const balancesEndpoint = isFinanceMode
     ? `/api/finance/${schoolCode}/dashboard`
     : `/api/schools/${schoolCode}/students/balances`;
@@ -149,6 +171,11 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
   useEffect(() => {
     filterStudents();
   }, [students, searchTerm, selectedGrade, selectedClass]);
+
+  useEffect(() => {
+    setStudentsPage(1);
+    setOutstandingPage(1);
+  }, [searchTerm, selectedGrade, selectedClass, academicYear, term, students.length]);
 
   const fetchSchoolInfo = async () => {
     try {
@@ -279,6 +306,88 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
     setSelectedStudent(null);
   };
 
+  const availableClasses = (
+    selectedGrade !== 'all'
+      ? grades.find((grade) => grade.id === selectedGrade)?.classes || []
+      : grades.flatMap((grade) => grade.classes || [])
+  ).filter(
+    (cls): cls is { id: string; name: string } =>
+      Boolean(cls && typeof cls.id === 'string' && typeof cls.name === 'string')
+  );
+
+  const handleCreateStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newStudent.fullName.trim() || !newStudent.classId || !newStudent.admissionNumber.trim()) {
+      toast({
+        title: 'Missing Details',
+        description: 'Student name, admission number, class, parent name, parent phone, and parent email are required.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (!newStudent.parentName.trim() || !newStudent.parentPhone.trim() || !newStudent.parentEmail.trim()) {
+      toast({
+        title: 'Missing Parent Details',
+        description: 'Parent name, phone, and email are required.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setCreatingStudent(true);
+      const parsedYearOfBirth = newStudent.dateOfBirth
+        ? new Date(newStudent.dateOfBirth).getFullYear()
+        : undefined;
+
+      const response = await fetch(`/api/schools/${schoolCode}/students`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newStudent.fullName.trim(),
+          classId: newStudent.classId,
+          admissionNumber: newStudent.admissionNumber.trim(),
+          dateOfBirth: newStudent.dateOfBirth || undefined,
+          yearOfBirth: parsedYearOfBirth,
+          dateAdmitted: newStudent.dateAdmitted || undefined,
+          parentName: newStudent.parentName.trim() || undefined,
+          parentPhone: newStudent.parentPhone.trim() || undefined,
+          parentEmail: newStudent.parentEmail.trim() || undefined,
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || 'Could not add student');
+      }
+
+      toast({
+        title: 'Student Onboarded',
+        description: `${newStudent.fullName.trim()} has been added successfully.`,
+      });
+      setShowAddStudent(false);
+      setNewStudent({
+        fullName: '',
+        admissionNumber: '',
+        dateOfBirth: '',
+        dateAdmitted: '',
+        classId: '',
+        parentName: '',
+        parentPhone: '',
+        parentEmail: '',
+      });
+      await fetchStudents();
+    } catch (error) {
+      toast({
+        title: 'Add Student Failed',
+        description: error instanceof Error ? error.message : 'Could not add student',
+        variant: 'destructive',
+      });
+    } finally {
+      setCreatingStudent(false);
+    }
+  };
+
   const exportToExcel = async () => {
     try {
       const csvData = filteredStudents.map(student => ({
@@ -333,13 +442,29 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 flex items-center justify-center">
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={
+          {
+            "--brand": themeColor,
+            "--brand-12": `${themeColor}12`,
+            "--brand-18": `${themeColor}18`,
+            backgroundColor: `${themeColor}12`,
+          } as React.CSSProperties
+        }
+      >
         <div className="text-center">
           <div className="relative">
-            <div className="w-16 h-16 bg-gradient-to-r from-amber-600 to-orange-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+            <div
+              className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg"
+              style={{ backgroundColor: themeColor }}
+            >
               <RefreshCw className="w-8 h-8 text-white animate-spin" />
             </div>
-            <div className="absolute inset-0 w-16 h-16 bg-gradient-to-r from-amber-600 to-orange-600 rounded-2xl mx-auto opacity-20 animate-pulse"></div>
+            <div
+              className="absolute inset-0 w-16 h-16 rounded-2xl mx-auto opacity-20 animate-pulse"
+              style={{ backgroundColor: themeColor }}
+            />
           </div>
           <h2 className="text-xl font-semibold text-gray-800 mb-2">
             {isFinanceMode ? 'Loading Finance Module' : 'Loading Bursar Dashboard'}
@@ -351,21 +476,91 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
   }
 
   const renderTabContent = () => {
+    const totalStudentsPages = Math.max(1, Math.ceil(filteredStudents.length / PAGE_SIZE));
+    const studentsPageData = filteredStudents.slice(
+      (studentsPage - 1) * PAGE_SIZE,
+      studentsPage * PAGE_SIZE
+    );
+    const outstandingStudents = filteredStudents.filter((s) => s.balance > 0);
+    const totalOutstandingPages = Math.max(1, Math.ceil(outstandingStudents.length / PAGE_SIZE));
+    const outstandingPageData = outstandingStudents.slice(
+      (outstandingPage - 1) * PAGE_SIZE,
+      outstandingPage * PAGE_SIZE
+    );
+
+    const renderPagination = (
+      page: number,
+      totalPages: number,
+      onPageChange: (value: number) => void
+    ) => {
+      if (totalPages <= 1) return null;
+      const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
+      return (
+        <div
+          className="flex items-center justify-between px-4 py-3"
+          style={{ borderTop: "1px solid var(--brand-18)" }}
+        >
+          <p className="text-sm" style={{ color: "var(--brand)" }}>
+            Page <span className="font-semibold">{page}</span> of{" "}
+            <span className="font-semibold">{totalPages}</span>
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={page <= 1}
+              onClick={() => onPageChange(page - 1)}
+              className="hover:bg-transparent"
+              style={{ borderColor: "var(--brand-24)", color: "var(--brand)" }}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            {pages.map((p) => (
+              <Button
+                key={p}
+                size="sm"
+                variant={p === page ? "default" : "outline"}
+                onClick={() => onPageChange(p)}
+                className={p === page ? "text-white" : "hover:bg-transparent"}
+                style={
+                  p === page
+                    ? { backgroundColor: "var(--brand)" }
+                    : { borderColor: "var(--brand-24)", color: "var(--brand)" }
+                }
+              >
+                {p}
+              </Button>
+            ))}
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={page >= totalPages}
+              onClick={() => onPageChange(page + 1)}
+              className="hover:bg-transparent"
+              style={{ borderColor: "var(--brand-24)", color: "var(--brand)" }}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      );
+    };
+
     switch (activeTab) {
       case 'dashboard':
         return (
           <div className="space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card className="bg-gradient-to-br from-amber-50 to-white border-amber-200/50 hover:shadow-xl hover:shadow-amber-100/50 transition-all duration-300 backdrop-blur-sm">
+              <Card className="bg-white/80 backdrop-blur-sm shadow-md transition-all duration-300 hover:shadow-lg" style={{ border: "1px solid var(--brand-24)" }}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                  <CardTitle className="text-sm font-semibold text-amber-800">Total Students</CardTitle>
-                  <div className="w-12 h-12 bg-gradient-to-br from-amber-600 to-orange-700 rounded-xl flex items-center justify-center shadow-lg border border-amber-500/20">
+                  <CardTitle className="text-sm font-semibold" style={{ color: "var(--brand)" }}>Total Students</CardTitle>
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg border" style={{ backgroundColor: "var(--brand)", borderColor: "var(--brand-24)" }}>
                     <Users className="h-6 w-6 text-white" />
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-amber-900 mb-1">{summary.totalStudents}</div>
-                  <p className="text-xs text-amber-700 font-medium">Enrolled students</p>
+                  <div className="text-3xl font-bold mb-1" style={{ color: "var(--brand)" }}>{summary.totalStudents}</div>
+                  <p className="text-xs font-medium text-slate-600">Enrolled students</p>
                 </CardContent>
               </Card>
               
@@ -384,16 +579,16 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                 </CardContent>
               </Card>
               
-              <Card className="bg-gradient-to-br from-amber-50 to-white border-amber-200/50 hover:shadow-xl hover:shadow-amber-100/50 transition-all duration-300 backdrop-blur-sm">
+              <Card className="bg-white/80 backdrop-blur-sm shadow-md transition-all duration-300 hover:shadow-lg" style={{ border: "1px solid var(--brand-24)" }}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                  <CardTitle className="text-sm font-semibold text-amber-800">With Balance</CardTitle>
-                  <div className="w-12 h-12 bg-gradient-to-br from-amber-600 to-amber-700 rounded-xl flex items-center justify-center shadow-lg border border-amber-500/20">
+                  <CardTitle className="text-sm font-semibold" style={{ color: "var(--brand)" }}>With Balance</CardTitle>
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg border" style={{ backgroundColor: "var(--brand)", borderColor: "var(--brand-24)" }}>
                     <Clock className="h-6 w-6 text-white" />
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-amber-900 mb-1">{summary.studentsWithBalance}</div>
-                  <p className="text-xs text-amber-600 font-medium">Require payment</p>
+                  <div className="text-3xl font-bold mb-1" style={{ color: "var(--brand)" }}>{summary.studentsWithBalance}</div>
+                  <p className="text-xs font-medium text-slate-600">Require payment</p>
                 </CardContent>
               </Card>
               
@@ -424,15 +619,15 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                 <p className="text-gray-600">Students with pending fee payments</p>
               </div>
             </div>
-            <Card className="bg-white shadow-sm border-gray-200 overflow-hidden">
-              <CardHeader className="border-b border-gray-100 bg-red-50">
+            <Card className="bg-white/80 backdrop-blur-sm shadow-md overflow-hidden" style={{ border: "1px solid var(--brand-18)" }}>
+              <CardHeader className="border-b bg-white/70" style={{ borderColor: "var(--brand-18)" }}>
                 <CardTitle className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-red-500 rounded-lg flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center border" style={{ backgroundColor: "var(--brand)", borderColor: "var(--brand-24)" }}>
                     <AlertCircle className="w-4 h-4 text-white" />
                   </div>
-                  <span className="text-gray-800">Students with Outstanding Balances</span>
-                  <Badge variant="destructive" className="bg-red-100 text-red-700 border-red-200">
-                    {filteredStudents.filter(s => s.balance > 0).length} students
+                  <span className="font-semibold text-slate-800">Students with Outstanding Balances</span>
+                  <Badge variant="secondary" className="text-white border" style={{ backgroundColor: "var(--brand)", borderColor: "var(--brand-24)" }}>
+                    {outstandingStudents.length} students
                   </Badge>
                 </CardTitle>
               </CardHeader>
@@ -440,19 +635,19 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
-                      <TableRow className="bg-red-50 border-b border-red-200">
-                        <TableHead className="font-semibold text-red-700 py-4">Student</TableHead>
-                        <TableHead className="font-semibold text-red-700">Grade & Class</TableHead>
-                        <TableHead className="font-semibold text-red-700 text-right">Outstanding Amount</TableHead>
-                        <TableHead className="font-semibold text-red-700 text-center">Actions</TableHead>
+                      <TableRow className="border-b" style={{ backgroundColor: "var(--brand-12)", borderColor: "var(--brand-18)" }}>
+                        <TableHead className="font-semibold py-4" style={{ color: "var(--brand)" }}>Student</TableHead>
+                        <TableHead className="font-semibold" style={{ color: "var(--brand)" }}>Grade & Class</TableHead>
+                        <TableHead className="font-semibold text-right" style={{ color: "var(--brand)" }}>Outstanding Amount</TableHead>
+                        <TableHead className="font-semibold text-center" style={{ color: "var(--brand)" }}>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredStudents.filter(student => student.balance > 0).map((student) => (
-                        <TableRow key={student.id} className="hover:bg-red-50 transition-colors duration-200 border-b border-gray-100">
+                      {outstandingPageData.map((student) => (
+                        <TableRow key={student.id} className="transition-colors duration-200 border-b hover:bg-[color:var(--brand-12)]" style={{ borderColor: "var(--brand-18)" }}>
                           <TableCell className="py-4">
                             <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 bg-gradient-to-r from-red-500 to-pink-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                              <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-sm border" style={{ backgroundColor: "var(--brand)", borderColor: "var(--brand-24)" }}>
                                 {student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                               </div>
                               <div>
@@ -477,7 +672,8 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                                 setSelectedStudent(student);
                                 setShowPaymentHub(true);
                               }}
-                              className="bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white"
+                              className="text-white"
+                              style={{ backgroundColor: "var(--brand)" }}
                             >
                               <CreditCard className="w-3 h-3 mr-1" />
                               Pay Now
@@ -487,7 +683,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                       ))}
                     </TableBody>
                   </Table>
-                  {filteredStudents.filter(s => s.balance > 0).length === 0 && (
+                  {outstandingStudents.length === 0 && (
                     <div className="text-center py-12">
                       <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                         <CheckCircle2 className="w-8 h-8 text-green-500" />
@@ -497,8 +693,68 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                     </div>
                   )}
                 </div>
+                {renderPagination(outstandingPage, totalOutstandingPages, setOutstandingPage)}
               </CardContent>
             </Card>
+          </div>
+        );
+
+      case 'fee-structure':
+        return (
+          <div className="space-y-4">
+            <Card className="bg-white/80 backdrop-blur-sm shadow-sm" style={{ border: "1px solid var(--brand-18)" }}>
+              <CardContent className="pt-6">
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold" style={{ color: "var(--brand)" }}>Fee Structure Actions</h3>
+                    <p className="text-sm text-slate-600">
+                      Add, update, and delete fee structures from this section.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      className="text-white"
+                      style={{ backgroundColor: "var(--brand)" }}
+                      onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add New Fee Structure
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="hover:bg-transparent"
+                      style={{ borderColor: "var(--brand-24)", color: "var(--brand)" }}
+                      onClick={() =>
+                        toast({
+                          title: 'Tip',
+                          description: 'Open any fee structure row below and click edit to update it.',
+                        })
+                      }
+                    >
+                      Update Fee Structure
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="hover:bg-transparent text-red-700"
+                      style={{ borderColor: "var(--brand-24)" }}
+                      onClick={() =>
+                        toast({
+                          title: 'Tip',
+                          description: 'Use the actions column in the fee structure table to edit or delete.',
+                        })
+                      }
+                    >
+                      Delete Fee Structure
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <FeeManagement
+              schoolCode={schoolCode}
+              colorTheme={themeColor}
+              onFeeStructureCreated={fetchStudents}
+            />
           </div>
         );
 
@@ -512,7 +768,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                 <h2 className="text-2xl font-bold text-gray-900">Financial Reports</h2>
                 <p className="text-gray-600">Generate comprehensive fee reports and statements</p>
               </div>
-              <Button onClick={exportToExcel} className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700">
+              <Button onClick={exportToExcel} className="text-white" style={{ backgroundColor: "var(--brand)" }}>
                 <Download className="w-4 h-4 mr-2" />
                 Export Current Data
               </Button>
@@ -521,39 +777,39 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
 
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <Card className="bg-gradient-to-br from-amber-50 to-orange-100 border-amber-200 hover:shadow-lg transition-all duration-300 cursor-pointer" onClick={exportToExcel}>
+              <Card className="bg-white/80 backdrop-blur-sm shadow-md hover:shadow-lg transition-all duration-300 cursor-pointer border" style={{ borderColor: "var(--brand-24)" }} onClick={exportToExcel}>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-3 text-amber-700">
+                  <CardTitle className="flex items-center gap-3" style={{ color: "var(--brand)" }}>
                     <Download className="w-5 h-5" />
                     Student Fee Report
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-amber-700 text-sm">Complete student fee summary with balances and payment history</p>
+                  <p className="text-slate-600 text-sm">Complete student fee summary with balances and payment history</p>
                 </CardContent>
               </Card>
 
-              <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 hover:shadow-lg transition-all duration-300 cursor-pointer">
+              <Card className="bg-white/80 backdrop-blur-sm shadow-md hover:shadow-lg transition-all duration-300 cursor-pointer border" style={{ borderColor: "var(--brand-24)" }}>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-3 text-green-700">
+                  <CardTitle className="flex items-center gap-3" style={{ color: "var(--brand)" }}>
                     <TrendingUp className="w-5 h-5" />
                     Collection Summary
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-green-600 text-sm">Total collections and outstanding amounts by period</p>
+                  <p className="text-slate-600 text-sm">Total collections and outstanding amounts by period</p>
                 </CardContent>
               </Card>
 
-              <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 hover:shadow-lg transition-all duration-300 cursor-pointer">
+              <Card className="bg-white/80 backdrop-blur-sm shadow-md hover:shadow-lg transition-all duration-300 cursor-pointer border" style={{ borderColor: "var(--brand-24)" }}>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-3 text-purple-700">
+                  <CardTitle className="flex items-center gap-3" style={{ color: "var(--brand)" }}>
                     <BarChart3 className="w-5 h-5" />
                     Grade-wise Analysis
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-purple-600 text-sm">Fee collection analysis by grade and class</p>
+                  <p className="text-slate-600 text-sm">Fee collection analysis by grade and class</p>
                 </CardContent>
               </Card>
             </div>
@@ -570,30 +826,30 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card className="bg-white shadow-sm border-gray-200">
+              <Card className="bg-white/80 backdrop-blur-sm shadow-md border" style={{ borderColor: "var(--brand-24)" }}>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-3">
-                    <TrendingUp className="w-5 h-5 text-amber-700" />
+                  <CardTitle className="flex items-center gap-3" style={{ color: "var(--brand)" }}>
+                    <TrendingUp className="w-5 h-5" style={{ color: "var(--brand)" }} />
                     Collection Rate
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-amber-700 mb-2">
+                  <div className="text-3xl font-bold mb-2" style={{ color: "var(--brand)" }}>
                     {summary.totalStudents > 0 ? Math.round((summary.fullyPaid / summary.totalStudents) * 100) : 0}%
                   </div>
                   <p className="text-gray-600 text-sm">Students with complete fee payment</p>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white shadow-sm border-gray-200">
+              <Card className="bg-white/80 backdrop-blur-sm shadow-md border" style={{ borderColor: "var(--brand-24)" }}>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-3">
-                    <DollarSign className="w-5 h-5 text-green-600" />
+                  <CardTitle className="flex items-center gap-3" style={{ color: "var(--brand)" }}>
+                    <DollarSign className="w-5 h-5" style={{ color: "var(--brand)" }} />
                     Average Outstanding
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-green-600 mb-2">
+                  <div className="text-3xl font-bold mb-2" style={{ color: "var(--brand)" }}>
                     {formatCurrency(summary.studentsWithBalance > 0 ? summary.totalOutstanding / summary.studentsWithBalance : 0)}
                   </div>
                   <p className="text-gray-600 text-sm">Per student with outstanding balance</p>
@@ -608,16 +864,25 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
       case 'students':
       default:
         return (
-          <div className="space-y-8">
-            <div className="flex items-center justify-between">
+          <div className="space-y-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="text-2xl font-bold text-amber-900">Student Fee Management</h2>
-                <p className="text-amber-700/80">Manage student fee payments and balances</p>
+                <h2 className="text-2xl font-bold" style={{ color: "var(--brand)" }}>Student Fee Management</h2>
+                <p className="text-slate-600">Manage student fee payments and balances</p>
               </div>
-              <div className="flex items-center space-x-3">
+              <div className="grid grid-cols-1 gap-2 sm:flex sm:items-center sm:space-x-3">
+                <Button
+                  onClick={() => setShowAddStudent(true)}
+                  className="text-white shadow-lg w-full sm:w-auto"
+                  style={{ backgroundColor: themeColor }}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Student
+                </Button>
                 <Button 
                   onClick={exportToExcel} 
-                  className="bg-gradient-to-r from-amber-600 to-orange-700 hover:from-amber-700 hover:to-orange-800 text-white shadow-lg hover:shadow-xl transition-all duration-200 border border-amber-500/20"
+                  className="text-white shadow-lg hover:shadow-xl transition-all duration-200 w-full sm:w-auto"
+                  style={{ backgroundColor: themeColor }}
                 >
                   <Download className="w-4 h-4 mr-2" />
                   Export Report
@@ -625,7 +890,8 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                 <Button 
                   onClick={fetchStudents}
                   variant="outline"
-                  className="border-amber-200 hover:bg-amber-50 hover:border-amber-300 text-amber-700 shadow-sm"
+                  className="shadow-sm w-full sm:w-auto"
+                  style={{ borderColor: themeColor, color: themeColor }}
                 >
                   <RefreshCw className="w-4 h-4 mr-2" />
                   Refresh
@@ -634,10 +900,10 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
             </div>
 
             {/* Enhanced Filters Section */}
-            <Card className="bg-gradient-to-r from-white to-amber-50/30 shadow-sm border-amber-100 hover:shadow-lg hover:shadow-amber-100/50 transition-all duration-300 backdrop-blur-sm">
+            <Card className="bg-white/80 backdrop-blur-sm shadow-sm transition-all duration-300 hover:shadow-md" style={{ border: "1px solid var(--brand-18)" }}>
               <CardHeader className="border-b border-gray-100 pb-4">
-                <CardTitle className="flex items-center gap-3 text-amber-900">
-                  <div className="w-8 h-8 bg-gradient-to-r from-amber-600 to-orange-700 rounded-lg flex items-center justify-center border border-amber-500/20 shadow-sm">
+                <CardTitle className="flex items-center gap-3" style={{ color: "var(--brand)" }}>
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center border shadow-sm" style={{ backgroundColor: "var(--brand)", borderColor: "var(--brand-24)" }}>
                     <Filter className="w-4 h-4 text-white" />
                   </div>
                   Advanced Filters
@@ -655,7 +921,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                       placeholder="Name, admission number, or parent..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="mt-1 border-gray-300 focus:border-amber-500 focus:ring-amber-500"
+                      className="mt-1 border-gray-300 focus-visible:border-[color:var(--brand)] focus-visible:ring-1 focus-visible:ring-[color:var(--brand)]"
                     />
                   </div>
                   
@@ -665,7 +931,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                       Grade
                     </Label>
                     <Select value={selectedGrade} onValueChange={setSelectedGrade}>
-                      <SelectTrigger className="mt-1 border-gray-300 focus:border-amber-500">
+                      <SelectTrigger className="mt-1 border-gray-300 focus-visible:border-[color:var(--brand)] focus-visible:ring-1 focus-visible:ring-[color:var(--brand)]">
                         <SelectValue placeholder="All Grades" />
                       </SelectTrigger>
                       <SelectContent>
@@ -685,7 +951,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                       Class
                     </Label>
                     <Select value={selectedClass} onValueChange={setSelectedClass}>
-                      <SelectTrigger className="mt-1 border-gray-300 focus:border-amber-500">
+                      <SelectTrigger className="mt-1 border-gray-300 focus-visible:border-[color:var(--brand)] focus-visible:ring-1 focus-visible:ring-[color:var(--brand)]">
                         <SelectValue placeholder="All Classes" />
                       </SelectTrigger>
                       <SelectContent>
@@ -707,7 +973,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                       Academic Year
                     </Label>
                     <Select value={academicYear} onValueChange={setAcademicYear}>
-                      <SelectTrigger className="mt-1 border-gray-300 focus:border-amber-500">
+                      <SelectTrigger className="mt-1 border-gray-300 focus-visible:border-[color:var(--brand)] focus-visible:ring-1 focus-visible:ring-[color:var(--brand)]">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -727,7 +993,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                         Term
                       </Label>
                       <Select value={term} onValueChange={setTerm}>
-                        <SelectTrigger className="mt-1 border-gray-300 focus:border-amber-500">
+                        <SelectTrigger className="mt-1 border-gray-300 focus-visible:border-[color:var(--brand)] focus-visible:ring-1 focus-visible:ring-[color:var(--brand)]">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -747,14 +1013,15 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                           setTerm('all');
                         }}
                         variant="outline"
-                        className="w-full border-amber-200 hover:bg-amber-50 hover:border-amber-300 text-amber-700"
+                        className="w-full hover:bg-transparent"
+                        style={{ borderColor: "var(--brand-24)", color: "var(--brand)" }}
                       >
                         Clear Filters
                       </Button>
                     </div>
                     <div className="flex items-end">
-                      <div className="text-sm text-amber-700 bg-amber-50/50 px-3 py-2 rounded-lg w-full border border-amber-100">
-                        Showing <span className="font-semibold text-amber-900">{filteredStudents.length}</span> of {students.length} students
+                      <div className="text-sm px-3 py-2 rounded-lg w-full border" style={{ color: "var(--brand)", backgroundColor: "var(--brand-12)", borderColor: "var(--brand-18)" }}>
+                        Showing <span className="font-semibold">{filteredStudents.length}</span> of {students.length} students
                       </div>
                     </div>
                   </div>
@@ -763,15 +1030,20 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
             </Card>
 
             {/* Students Table */}
-            <Card className="bg-gradient-to-br from-white to-amber-50/30 shadow-lg border-amber-100/50 overflow-hidden backdrop-blur-sm">
-              <CardHeader className="border-b border-amber-100/50 bg-gradient-to-r from-amber-50/50 to-amber-100/30">
+            <Card className="bg-white/80 shadow-lg overflow-hidden backdrop-blur-sm" style={{ border: "1px solid var(--brand-18)" }}>
+              <CardHeader className="border-b bg-white/70" style={{ borderColor: "var(--brand-18)" }}>
                 <CardTitle className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-gradient-to-r from-amber-600 to-orange-700 rounded-lg flex items-center justify-center border border-amber-500/20 shadow-sm">
+                    <div
+                      className="w-8 h-8 rounded-lg flex items-center justify-center border shadow-sm"
+                      style={{ backgroundColor: "var(--brand)", borderColor: "var(--brand-24)" }}
+                    >
                       <Users className="w-4 h-4 text-white" />
                     </div>
-                    <span className="text-amber-900 font-semibold">Student Fee Management</span>
-                    <Badge variant="secondary" className="bg-amber-100 text-amber-700 border-amber-200">
+                    <span className="font-semibold" style={{ color: "var(--brand)" }}>
+                      Student Fee Management
+                    </span>
+                    <Badge variant="secondary" className="text-white border" style={{ backgroundColor: "var(--brand)", borderColor: "var(--brand-24)" }}>
                       {filteredStudents.length} students
                     </Badge>
                   </div>
@@ -781,23 +1053,32 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
-                      <TableRow className="bg-gradient-to-r from-amber-50 to-amber-100/50 border-b border-amber-200">
-                        <TableHead className="font-semibold text-amber-800 py-4">Student Information</TableHead>
-                        <TableHead className="font-semibold text-amber-800">Grade & Class</TableHead>
-                        <TableHead className="font-semibold text-amber-800">Parent Contact</TableHead>
-                        <TableHead className="font-semibold text-amber-800 text-right">Fee Required</TableHead>
-                        <TableHead className="font-semibold text-amber-800 text-right">Amount Paid</TableHead>
-                        <TableHead className="font-semibold text-amber-800 text-right">Outstanding</TableHead>
-                        <TableHead className="font-semibold text-amber-800 text-center">Status</TableHead>
-                        <TableHead className="font-semibold text-amber-800 text-center">Actions</TableHead>
+                      <TableRow className="border-b" style={{ backgroundColor: "var(--brand-12)", borderColor: "var(--brand-18)" }}>
+                        <TableHead className="font-semibold py-4" style={{ color: "var(--brand)" }}>Student Information</TableHead>
+                        <TableHead className="font-semibold" style={{ color: "var(--brand)" }}>Grade & Class</TableHead>
+                        <TableHead className="font-semibold" style={{ color: "var(--brand)" }}>Parent Contact</TableHead>
+                        <TableHead className="font-semibold text-right" style={{ color: "var(--brand)" }}>Fee Required</TableHead>
+                        <TableHead className="font-semibold text-right" style={{ color: "var(--brand)" }}>Amount Paid</TableHead>
+                        <TableHead className="font-semibold text-right" style={{ color: "var(--brand)" }}>Outstanding</TableHead>
+                        <TableHead className="font-semibold text-center" style={{ color: "var(--brand)" }}>Status</TableHead>
+                        <TableHead className="font-semibold text-center" style={{ color: "var(--brand)" }}>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredStudents.map((student) => (
-                        <TableRow key={student.id} className="hover:bg-amber-50/30 transition-colors duration-200 border-b border-amber-100/50">
+                      {studentsPageData.map((student) => (
+                        <TableRow
+                          key={student.id}
+                          className="transition-colors duration-200 border-b hover:bg-[color:var(--brand-12)]"
+                          style={{
+                            borderColor: "var(--brand-18)",
+                          }}
+                        >
                           <TableCell className="py-4">
                             <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 bg-gradient-to-r from-amber-600 to-orange-700 rounded-full flex items-center justify-center text-white font-semibold text-sm shadow-sm border border-amber-500/20">
+                              <div
+                                className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-sm shadow-sm border"
+                                style={{ backgroundColor: "var(--brand)", borderColor: "var(--brand-24)" }}
+                              >
                                 {student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                               </div>
                               <div>
@@ -849,10 +1130,12 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                                   setSelectedStudent(student);
                                   setShowPaymentHub(true);
                                 }}
-                                className="bg-gradient-to-r from-amber-600 to-orange-700 hover:from-amber-700 hover:to-orange-800 text-white shadow-sm hover:shadow-md transition-all duration-200"
+                                className="text-white shadow-sm hover:shadow-md transition-all duration-200"
+                                style={{ backgroundColor: "var(--brand)" }}
                               >
                                 <CreditCard className="w-3 h-3 mr-1" />
-                                Record Payment
+                                <span className="hidden sm:inline">Record Payment</span>
+                                <span className="sm:hidden">Pay</span>
                               </Button>
                               <Button
                                 size="sm"
@@ -861,7 +1144,8 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                                   setHistoryStudent(student);
                                   setShowPaymentHistory(true);
                                 }}
-                                className="border-amber-200 hover:bg-amber-50 hover:border-amber-300 text-amber-700 shadow-sm"
+                                className="shadow-sm hover:bg-transparent"
+                                style={{ borderColor: "var(--brand-24)", color: "var(--brand)" }}
                               >
                                 <History className="w-3 h-3" />
                               </Button>
@@ -882,6 +1166,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                     </div>
                   )}
                 </div>
+                {renderPagination(studentsPage, totalStudentsPages, setStudentsPage)}
               </CardContent>
             </Card>
           </div>
@@ -890,7 +1175,18 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50">
+    <div
+      className="min-h-screen"
+      style={
+        {
+          "--brand": themeColor,
+          "--brand-12": `${themeColor}12`,
+          "--brand-18": `${themeColor}18`,
+          "--brand-24": `${themeColor}24`,
+          backgroundColor: `${themeColor}12`,
+        } as React.CSSProperties
+      }
+    >
       {/* Sidebar Navigation */}
             <BursarSidebar
         activeTab={activeTab}
@@ -899,23 +1195,28 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
         bursar={bursarInfo}
         schoolName={schoolInfo?.name}
         schoolCode={schoolCode}
+        colorTheme={themeColor}
         summary={summary}
       />
 
       {/* Main Content */}
       <div className="lg:ml-80">
         {/* Enhanced Top Header - Sticky */}
-        <div className="sticky-header bg-gradient-to-r from-white/95 to-amber-50/80 border-b border-amber-100/50 px-6 py-6 shadow-lg backdrop-blur-md supports-[backdrop-filter]:bg-white/80">
+        <div
+          className="sticky-header bg-gradient-to-r from-white/95 to-white/80 px-4 py-4 sm:px-6 sm:py-6 shadow-lg backdrop-blur-md supports-[backdrop-filter]:bg-white/80"
+          style={{ borderBottom: "1px solid var(--brand-18)" }}
+        >
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-amber-900 to-orange-700 bg-clip-text text-transparent">
+              <h1 className="text-3xl font-bold" style={{ color: themeColor }}>
                 {activeTab === 'dashboard' && 'Financial Dashboard'}
                 {activeTab === 'students' && 'Student Fee Management'}
                 {activeTab === 'outstanding' && 'Outstanding Fees'}
+                {activeTab === 'fee-structure' && 'Fee Structure Management'}
                 {activeTab === 'reports' && 'Financial Reports'}
                 {activeTab === 'analytics' && 'Payment Analytics'}
               </h1>
-              <p className="text-amber-700/80 text-sm mt-2 font-medium">
+              <p className="text-sm mt-2 font-medium" style={{ color: themeColor }}>
                 {schoolInfo?.name || (isFinanceMode ? 'Independent Finance Module' : 'Financial Management System')}
               </p>
             </div>
@@ -923,8 +1224,10 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
             {/* Current Tab Indicator */}
             <div className="hidden md:flex items-center space-x-4">
               <div className="text-right">
-                <p className="text-sm font-medium text-amber-700">Current Session</p>
-                <p className="text-xs text-amber-600">
+                <p className="text-sm font-medium" style={{ color: "var(--brand)" }}>
+                  Current Session
+                </p>
+                <p className="text-xs" style={{ color: "var(--brand)" }}>
                   {new Date().toLocaleDateString('en-US', { 
                     weekday: 'long', 
                     year: 'numeric', 
@@ -933,17 +1236,40 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                   })}
                 </p>
               </div>
-              <div className="w-12 h-12 bg-gradient-to-br from-amber-600 to-orange-700 rounded-xl flex items-center justify-center shadow-lg border border-amber-500/20">
-                <School className="w-6 h-6 text-white" />
-              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="h-12 w-12 rounded-full text-white shadow-lg border border-white/20 flex items-center justify-center"
+                    style={{ backgroundColor: themeColor }}
+                    aria-label="Profile menu"
+                  >
+                    <User className="h-6 w-6" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>
+                    {bursarInfo?.name || 'Bursar Account'}
+                  </DropdownMenuLabel>
+                  <div className="px-2 pb-2 text-xs text-muted-foreground">
+                    {bursarInfo?.email || 'Financial Management'}
+                  </div>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={handleLogout}
+                    className="text-red-700 focus:text-red-800"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </div>
 
-        <div
-          className={`p-6 pb-20 lg:pb-6 min-h-[calc(100vh-8rem)] bg-gradient-to-br from-amber-50/50 via-orange-50/30 to-yellow-50/40`}
-        >
-          <div className={`${portalGlassPanelLight} p-6 min-h-[320px]`}>{renderTabContent()}</div>
+        <div className="p-3 pb-20 sm:p-4 lg:p-6 lg:pb-6 min-h-[calc(100vh-8rem)]" style={{ backgroundColor: "var(--brand-12)" }}>
+          <div className={`${portalGlassPanelLight} p-3 sm:p-4 lg:p-6 min-h-[320px]`}>{renderTabContent()}</div>
         </div>
       </div>
 
@@ -952,7 +1278,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto bg-gradient-to-br from-white to-gray-50">
           <DialogHeader className="border-b border-gray-200 pb-4">
             <DialogTitle className="flex items-center gap-3 text-xl">
-              <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: "var(--brand)" }}>
                 <CreditCard className="w-5 h-5 text-white" />
               </div>
               <span className="bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
@@ -990,6 +1316,121 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
           schoolCode={schoolCode}
         />
       )}
+
+      {/* Add Student Onboarding Modal */}
+      <Dialog open={showAddStudent} onOpenChange={setShowAddStudent}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Onboard New Student</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreateStudent} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="studentName">Student Full Name</Label>
+              <Input
+                id="studentName"
+                value={newStudent.fullName}
+                onChange={(e) => setNewStudent((prev) => ({ ...prev, fullName: e.target.value }))}
+                placeholder="Enter student full name"
+                required
+              />
+            </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="admissionNumber">Admission Number</Label>
+                <Input
+                  id="admissionNumber"
+                  value={newStudent.admissionNumber}
+                  onChange={(e) => setNewStudent((prev) => ({ ...prev, admissionNumber: e.target.value }))}
+                  placeholder="Required (set by bursar)"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="dateOfBirth">Date of Birth</Label>
+                <Input
+                  id="dateOfBirth"
+                  type="date"
+                  value={newStudent.dateOfBirth}
+                  onChange={(e) => setNewStudent((prev) => ({ ...prev, dateOfBirth: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="dateAdmitted">Date Enrolled</Label>
+                <Input
+                  id="dateAdmitted"
+                  type="date"
+                  value={newStudent.dateAdmitted}
+                  onChange={(e) => setNewStudent((prev) => ({ ...prev, dateAdmitted: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="studentClass">Class</Label>
+              <Select
+                value={newStudent.classId}
+                onValueChange={(value) => setNewStudent((prev) => ({ ...prev, classId: value }))}
+              >
+                <SelectTrigger id="studentClass">
+                  <SelectValue placeholder="Select class" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableClasses.map((cls) => (
+                    <SelectItem key={cls.id} value={cls.id}>
+                      {cls.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="parentName">Parent/Guardian Name</Label>
+                <Input
+                  id="parentName"
+                  value={newStudent.parentName}
+                  onChange={(e) => setNewStudent((prev) => ({ ...prev, parentName: e.target.value }))}
+                  placeholder="Required"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="parentPhone">Parent Phone</Label>
+                <Input
+                  id="parentPhone"
+                  value={newStudent.parentPhone}
+                  onChange={(e) => setNewStudent((prev) => ({ ...prev, parentPhone: e.target.value }))}
+                  placeholder="Required"
+                  required
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="parentEmail">Parent Email</Label>
+              <Input
+                id="parentEmail"
+                type="email"
+                value={newStudent.parentEmail}
+                onChange={(e) => setNewStudent((prev) => ({ ...prev, parentEmail: e.target.value }))}
+                placeholder="Required"
+                required
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setShowAddStudent(false)}>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={creatingStudent}
+                className="text-white"
+                style={{ backgroundColor: themeColor }}
+              >
+                {creatingStudent ? 'Adding...' : 'Add Student'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

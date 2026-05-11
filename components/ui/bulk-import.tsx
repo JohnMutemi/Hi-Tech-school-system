@@ -37,40 +37,36 @@ export interface ImportTemplate {
 
 const IMPORT_TEMPLATES: Record<string, ImportTemplate> = {
   students: {
-    headers: ['Name', 'Admission Number', 'Email', 'Date of Birth', 'Gender', 'Address', 'Parent Name', 'Parent Email', 'Parent Phone', 'Class', 'Status', 'Notes'],
-    required: ['Name', 'Admission Number', 'Parent Name', 'Parent Phone'],
-    optional: ['Email', 'Date of Birth', 'Gender', 'Address', 'Parent Email', 'Class', 'Status', 'Notes'],
-    description: 'Import students with their parent information. Class names should match existing classes in your school.',
+    headers: ['First Name', 'Middle Name', 'Surname', 'Admission Number', 'Year of Birth', 'Date of Admission', 'Class', 'Parent Name', 'Parent Phone', 'Parent Email'],
+    required: ['First Name', 'Surname', 'Admission Number', 'Year of Birth', 'Date of Admission', 'Class', 'Parent Name', 'Parent Phone'],
+    optional: ['Middle Name', 'Parent Email'],
+    description: 'Import students using the simplified onboarding format. Class names should match existing classes in your school.',
     example: {
-      'Name': 'John Doe',
+      'First Name': 'John',
+      'Middle Name': 'Kimani',
+      'Surname': 'Doe',
       'Admission Number': 'ADM001',
-      'Email': 'john.doe@school.com',
-      'Date of Birth': '2010-05-15',
-      'Gender': 'Male',
-      'Address': '123 Main St',
-      'Parent Name': 'Jane Doe',
-      'Parent Email': 'jane.doe@email.com',
-      'Parent Phone': '+254700000000',
+      'Year of Birth': '2010',
+      'Date of Admission': '2026-01-10',
       'Class': 'Form 1A',
-      'Status': 'active',
-      'Notes': 'New student'
+      'Parent Name': 'Jane Doe',
+      'Parent Phone': '+254700000000',
+      'Parent Email': 'jane.doe@email.com'
     }
   },
   teachers: {
-    headers: ['Name', 'Email', 'Phone', 'Employee ID', 'Qualification', 'Date Joined', 'Assigned Class', 'Academic Year', 'Status'],
+    headers: ['Name', 'Email', 'Phone', 'Qualification', 'Date Joined', 'Assigned Class', 'Academic Year'],
     required: ['Name', 'Email', 'Phone'],
-    optional: ['Employee ID', 'Qualification', 'Date Joined', 'Assigned Class', 'Academic Year', 'Status'],
+    optional: ['Qualification', 'Date Joined', 'Assigned Class', 'Academic Year'],
     description: 'Import teachers with their qualifications and assignments. Phone numbers should include country code (e.g., +254700000001). Dates should be in YYYY-MM-DD format.',
     example: {
       'Name': 'Jane Smith',
       'Email': 'jane.smith@school.com',
       'Phone': '+254700000001',
-      'Employee ID': 'EMP001',
       'Qualification': 'B.Ed Mathematics',
       'Date Joined': '2024-01-15',
       'Assigned Class': 'Form 1A',
-      'Academic Year': '2024',
-      'Status': 'active'
+      'Academic Year': '2024'
     }
   },
   classes: {

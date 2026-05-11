@@ -240,24 +240,43 @@ export class SchoolDataManager {
    * Get grades available to this school (both school-specific and platform-level)
    */
   async getGrades() {
-    return await prisma.grade.findMany({
-      where: {
-        OR: [
-          // School-specific grades
-          {
-            schoolId: this.schoolContext.schoolId
+    // We store grades both at the platform level (schoolId = null) and per-school.
+    // Many schools will have the same grade names, so return a de-duplicated list
+    // preferring school-specific grades when present.
+    const [schoolGrades, platformGrades] = await Promise.all([
+      prisma.grade.findMany({
+        where: { schoolId: this.schoolContext.schoolId },
+        include: {
+          classes: {
+            where: {
+              schoolId: this.schoolContext.schoolId,
+              isActive: true,
+            },
+            select: { id: true, name: true },
+            orderBy: { name: 'asc' },
           },
-          // Platform-level grades (available to all schools)
-          {
-            schoolId: null
-          }
-        ]
-      },
+        },
+      }),
+      prisma.grade.findMany({
+        where: { schoolId: null },
+        include: {
+          // Platform grades don't have school classes; keep empty array for consistent shape.
+          classes: { select: { id: true, name: true }, where: { id: '__never__' } },
+        },
+      }),
+    ]);
 
-      orderBy: {
-        name: 'asc'
-      }
-    });
+    const byName = new Map<string, (typeof schoolGrades)[number]>();
+    for (const grade of platformGrades) {
+      byName.set(String(grade.name || '').trim().toLowerCase(), grade);
+    }
+    for (const grade of schoolGrades) {
+      byName.set(String(grade.name || '').trim().toLowerCase(), grade);
+    }
+
+    const unique = Array.from(byName.values());
+    unique.sort((a, b) => String(a.name).localeCompare(String(b.name), undefined, { numeric: true }));
+    return unique;
   }
 }
 

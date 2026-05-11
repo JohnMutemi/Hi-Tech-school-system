@@ -164,8 +164,8 @@ export class SchoolSeedingService {
       return platformGrades;
     }
 
-    // If no platform grades, create school-specific grades
-    for (let i = 1; i <= 6; i++) {
+    // If no platform grades, create school-specific grades (Grade 1–9)
+    for (let i = 1; i <= 9; i++) {
       const gradeName = `Grade ${i}`;
       
       try {
@@ -199,42 +199,41 @@ export class SchoolSeedingService {
   }
 
   /**
-   * Create classes for each grade (A, B, C sections)
+   * Create classes for each grade (no streams by default).
+   * Each grade gets one class named exactly like the grade (e.g. "Grade 1").
    */
   private async seedClasses(grades: any[]) {
     const allClasses = [];
-    const classSections = ['A', 'B', 'C'];
 
     for (const grade of grades) {
-      for (const section of classSections) {
-        const className = `${grade.name}${section}`;
-        
-        try {
-          const existingClass = await prisma.class.findFirst({
-            where: {
-              schoolId: this.schoolId,
-              name: className
-            }
-          });
+      const className = String(grade.name || '').trim();
+      if (!className) continue;
 
-          if (!existingClass) {
-            const newClass = await prisma.class.create({
-              data: {
-                schoolId: this.schoolId,
-                gradeId: grade.id,
-                name: className,
-                isActive: true
-              }
-            });
-            allClasses.push(newClass);
-            console.log(`✅ Created class: ${className}`);
-          } else {
-            allClasses.push(existingClass);
-            console.log(`✅ Class already exists: ${className}`);
-          }
-        } catch (error) {
-          console.error(`❌ Failed to create class ${className}:`, error);
+      try {
+        const existingClass = await prisma.class.findFirst({
+          where: {
+            schoolId: this.schoolId,
+            name: className,
+          },
+        });
+
+        if (!existingClass) {
+          const newClass = await prisma.class.create({
+            data: {
+              schoolId: this.schoolId,
+              gradeId: grade.id,
+              name: className,
+              isActive: true,
+            },
+          });
+          allClasses.push(newClass);
+          console.log(`✅ Created class: ${className}`);
+        } else {
+          allClasses.push(existingClass);
+          console.log(`✅ Class already exists: ${className}`);
         }
+      } catch (error) {
+        console.error(`❌ Failed to create class ${className}:`, error);
       }
     }
 

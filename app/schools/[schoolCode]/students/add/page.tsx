@@ -28,11 +28,17 @@ export default function AddStudentPage() {
   const params = useParams();
   const schoolCode = (params.schoolCode as string).toUpperCase();
   const [form, setForm] = useState({
-    name: "",
+    firstName: "",
+    middleName: "",
+    surname: "",
     admissionNumber: "",
-    email: "",
+    yearOfBirth: "",
     gradeId: "",
     classId: "",
+    dateAdmitted: "",
+    parentName: "",
+    parentPhone: "",
+    parentEmail: "",
   });
   const [grades, setGrades] = useState<any[]>([]);
   const [sections, setSections] = useState<any[]>([]);
@@ -113,11 +119,17 @@ export default function AddStudentPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        name: form.name,
+        firstName: form.firstName,
+        middleName: form.middleName,
+        surname: form.surname,
+        name: [form.firstName, form.middleName, form.surname].filter(Boolean).join(" ").trim(),
         admissionNumber: form.admissionNumber,
-        email: form.email,
+        yearOfBirth: form.yearOfBirth ? Number(form.yearOfBirth) : undefined,
         classId: form.classId,
-        phone: "",
+        dateAdmitted: form.dateAdmitted || undefined,
+        parentName: form.parentName,
+        parentPhone: form.parentPhone,
+        parentEmail: form.parentEmail || undefined,
       }),
     });
     if (res.ok) {
@@ -131,11 +143,17 @@ export default function AddStudentPage() {
         setAdmissionPreview(next);
       }
       setForm({
-        name: "",
+        firstName: "",
+        middleName: "",
+        surname: "",
         admissionNumber: next,
-        email: "",
+        yearOfBirth: "",
         gradeId: "",
         classId: "",
+        dateAdmitted: "",
+        parentName: "",
+        parentPhone: "",
+        parentEmail: "",
       });
     } else {
       setError("Failed to add student.");
@@ -259,9 +277,22 @@ export default function AddStudentPage() {
           </Dialog>
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
-              name="name"
-              placeholder="Name"
-              value={form.name}
+              name="firstName"
+              placeholder="First name"
+              value={form.firstName}
+              onChange={handleChange}
+              required
+            />
+            <Input
+              name="middleName"
+              placeholder="Middle name (optional)"
+              value={form.middleName}
+              onChange={handleChange}
+            />
+            <Input
+              name="surname"
+              placeholder="Surname"
+              value={form.surname}
               onChange={handleChange}
               required
             />
@@ -283,9 +314,20 @@ export default function AddStudentPage() {
               </div>
             )}
             <Input
-              name="email"
-              placeholder="Email"
-              value={form.email}
+              name="yearOfBirth"
+              type="number"
+              min="1900"
+              max="2100"
+              placeholder="Year of birth"
+              value={form.yearOfBirth}
+              onChange={handleChange}
+              required
+            />
+            <Input
+              name="dateAdmitted"
+              type="date"
+              placeholder="Date of admission"
+              value={form.dateAdmitted}
               onChange={handleChange}
               required
             />
@@ -328,6 +370,30 @@ export default function AddStudentPage() {
                 </option>
               ))}
             </select>
+            <div className="border rounded p-3 space-y-3">
+              <div className="text-sm font-medium">Parent details</div>
+              <Input
+                name="parentName"
+                placeholder="Parent full name"
+                value={form.parentName}
+                onChange={handleChange}
+                required
+              />
+              <Input
+                name="parentPhone"
+                placeholder="Parent phone"
+                value={form.parentPhone}
+                onChange={handleChange}
+                required
+              />
+              <Input
+                name="parentEmail"
+                type="email"
+                placeholder="Parent email (optional)"
+                value={form.parentEmail}
+                onChange={handleChange}
+              />
+            </div>
             {error && <div className="text-red-500 text-sm">{error}</div>}
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Adding..." : "Add Student"}

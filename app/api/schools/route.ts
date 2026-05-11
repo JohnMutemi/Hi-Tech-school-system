@@ -6,12 +6,16 @@ import { normalizePackageType } from '@/lib/finance-package-gate';
 
 const prisma = new PrismaClient();
 
+function getPrimaryPortalRole(packageType: string | null | undefined): 'admin' | 'bursar' {
+  return normalizePackageType(packageType) === 'finance_only' ? 'bursar' : 'admin';
+}
+
 export async function GET() {
   try {
     const schools = await prisma.school.findMany({
       include: {
         users: {
-          where: { role: 'admin' },
+          where: { role: { in: ['admin', 'bursar'] } },
           select: {
             id: true,
             name: true,
@@ -42,6 +46,9 @@ export async function GET() {
     const transformedSchools = schools.map((school: any) => {
       const isInlineLogo =
         typeof school.logo === 'string' && school.logo.trim().startsWith('data:');
+      const primaryRole = getPrimaryPortalRole(school.packageType);
+      const primaryUser = school.users.find((u: any) => u.role === primaryRole);
+      const fallbackUser = school.users.find((u: any) => u.role === 'admin');
 
       return ({
       id: school.id,
@@ -54,10 +61,13 @@ export async function GET() {
       colorTheme: school.colorTheme || "#d97706",
       portalUrl: `/schools/${school.code}`,
       description: "",
-      adminEmail: school.users.find((u: any) => u.role === 'admin')?.email || school.email,
+      adminEmail: primaryUser?.email || fallbackUser?.email || school.email,
       adminPassword: "", // Don't return password
-      adminFirstName: school.users.find((u: any) => u.role === 'admin')?.name?.split(' ')[0] || "Admin",
-      adminLastName: school.users.find((u: any) => u.role === 'admin')?.name?.split(' ').slice(1).join(' ') || "User",
+      adminFirstName: primaryUser?.name?.split(' ')[0] || fallbackUser?.name?.split(' ')[0] || "Admin",
+      adminLastName:
+        primaryUser?.name?.split(' ').slice(1).join(' ') ||
+        fallbackUser?.name?.split(' ').slice(1).join(' ') ||
+        "User",
       createdAt: school.createdAt.toISOString(),
       status: school.isActive ? "active" : "suspended",
       packageType: normalizePackageType((school as any).packageType),
@@ -184,15 +194,16 @@ export async function POST(request: NextRequest) {
 
     // Hash the admin password before saving
     const hashedPassword = await bcrypt.hash(adminPassword, 12);
+    const primaryRole = getPrimaryPortalRole(normalizedPackageType);
 
-    // Create admin user
+    // Create the initial portal user (admin for full package, bursar for finance-only).
     const adminUser = await prisma.user.create({
       data: {
         name: `${adminFirstName} ${adminLastName}`,
         email: adminEmail,
         password: hashedPassword,
         mustChangePassword: true,
-        role: 'admin',
+        role: primaryRole,
         schoolId: school.id,
         isActive: true
       }

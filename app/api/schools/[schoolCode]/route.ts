@@ -6,6 +6,10 @@ import { normalizePackageType } from '@/lib/finance-package-gate';
 
 const prisma = new PrismaClient();
 
+function getPrimaryPortalRole(packageType: string | null | undefined): 'admin' | 'bursar' {
+  return normalizePackageType(packageType) === 'finance_only' ? 'bursar' : 'admin';
+}
+
 export async function GET(request: NextRequest, { params }: { params: { schoolCode: string } }) {
   const { searchParams } = new URL(request.url);
   const action = searchParams.get('action');
@@ -49,7 +53,7 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       },
       include: {
         users: {
-          where: { role: 'admin' },
+          where: { role: { in: ['admin', 'bursar'] } },
           select: {
             id: true,
             name: true,
@@ -82,6 +86,9 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
 
     // Transform data to match SchoolData interface
     const theme = schoolData.colorTheme || "#d97706";
+    const primaryRole = getPrimaryPortalRole((schoolData as any).packageType);
+    const primaryUser = schoolData.users.find(u => u.role === primaryRole);
+    const fallbackUser = schoolData.users.find(u => u.role === 'admin');
 
     const transformedSchool = {
       id: schoolData.id,
@@ -92,10 +99,13 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       colorTheme: theme,
       portalUrl: `/schools/${schoolData.code}`,
       description: "",
-      adminEmail: schoolData.users.find(u => u.role === 'admin')?.email || schoolData.email,
+      adminEmail: primaryUser?.email || fallbackUser?.email || schoolData.email,
       adminPassword: "", // Don't return password
-      adminFirstName: schoolData.users.find(u => u.role === 'admin')?.name?.split(' ')[0] || "Admin",
-      adminLastName: schoolData.users.find(u => u.role === 'admin')?.name?.split(' ').slice(1).join(' ') || "User",
+      adminFirstName: primaryUser?.name?.split(' ')[0] || fallbackUser?.name?.split(' ')[0] || "Admin",
+      adminLastName:
+        primaryUser?.name?.split(' ').slice(1).join(' ') ||
+        fallbackUser?.name?.split(' ').slice(1).join(' ') ||
+        "User",
       createdAt: schoolData.createdAt.toISOString(),
       status: schoolData.isActive ? "active" : "suspended",
       packageType: normalizePackageType((schoolData as any).packageType),
@@ -187,7 +197,7 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
       },
       include: {
         users: {
-          where: { role: 'admin' }
+          where: { role: { in: ['admin', 'bursar'] } }
         }
       }
     });
@@ -229,10 +239,13 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
       },
     });
 
-    // Update admin user if provided
-    if (adminEmail && school.users[0]) {
+    const primaryRole = getPrimaryPortalRole((school as any).packageType);
+    const primaryUser = school.users.find((user) => user.role === primaryRole);
+
+    // Update the primary portal user for this package.
+    if (adminEmail && primaryUser) {
       await prisma.user.update({
-        where: { id: school.users[0].id },
+        where: { id: primaryUser.id },
         data: {
           name: `${adminFirstName || 'Admin'} ${adminLastName || 'User'}`,
           email: adminEmail
@@ -250,7 +263,7 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
       },
       include: {
         users: {
-          where: { role: 'admin' },
+          where: { role: { in: ['admin', 'bursar'] } },
           select: {
             id: true,
             name: true,
@@ -266,6 +279,10 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
       return NextResponse.json({ error: 'Failed to retrieve updated school' }, { status: 500 });
     }
 
+    const resultPrimaryRole = getPrimaryPortalRole((result as any).packageType);
+    const resultPrimaryUser = result.users.find(u => u.role === resultPrimaryRole);
+    const resultFallbackUser = result.users.find(u => u.role === 'admin');
+
     const transformedSchool = {
       id: result.id,
       schoolCode: result.code,
@@ -275,10 +292,13 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
       colorTheme: result.colorTheme || "#d97706",
       portalUrl: `/schools/${result.code}`,
       description: description || "",
-      adminEmail: result.users.find(u => u.role === 'admin')?.email || result.email,
+      adminEmail: resultPrimaryUser?.email || resultFallbackUser?.email || result.email,
       adminPassword: "",
-      adminFirstName: result.users.find(u => u.role === 'admin')?.name?.split(' ')[0] || "Admin",
-      adminLastName: result.users.find(u => u.role === 'admin')?.name?.split(' ').slice(1).join(' ') || "User",
+      adminFirstName: resultPrimaryUser?.name?.split(' ')[0] || resultFallbackUser?.name?.split(' ')[0] || "Admin",
+      adminLastName:
+        resultPrimaryUser?.name?.split(' ').slice(1).join(' ') ||
+        resultFallbackUser?.name?.split(' ').slice(1).join(' ') ||
+        "User",
       createdAt: result.createdAt.toISOString(),
       status: result.isActive ? "active" : "suspended",
       packageType: normalizePackageType((result as any).packageType),

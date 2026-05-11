@@ -1,23 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { generateNextAdmissionNumber } from '@/lib/utils/school-generator';
 import { withSchoolContext } from '@/lib/school-context';
 import { hashDefaultPasswordByRole } from '@/lib/utils/default-passwords';
 import { prisma } from "@/lib/prisma";
 import { jsonError, requireRole, requireSchoolAccess } from "@/lib/api-guard";
 
-function getNextAdmissionNumber(lastAdmissionNumber: string): string {
-  if (!lastAdmissionNumber) return '001';
-  const match = lastAdmissionNumber.match(/(\d+)(?!.*\d)/);
-  if (match) {
-    const number = match[1];
-    const next = (parseInt(number, 10) + 1).toString().padStart(number.length, '0');
-    return lastAdmissionNumber.replace(/(\d+)(?!.*\d)/, next);
-  }
-  return lastAdmissionNumber + '1';
-}
-
 function normalizeName(value?: string | null): string {
   return (value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function buildStudentFullName(payload: {
+  firstName?: string | null;
+  middleName?: string | null;
+  surname?: string | null;
+  name?: string | null;
+}): string {
+  const fromParts = [payload.firstName, payload.middleName, payload.surname]
+    .map((part) => (part || "").trim())
+    .filter(Boolean)
+    .join(" ");
+
+  if (fromParts) return fromParts;
+  return (payload.name || "").trim();
 }
 
 export async function GET(
@@ -154,20 +157,38 @@ export async function GET(
 export async function POST(req: NextRequest, { params }: { params: { schoolCode: string } }) {
   try {
     const { session, schoolContext } = await requireSchoolAccess(params.schoolCode);
-    requireRole(session, ["super_admin", "school_admin"]);
+    requireRole(session, ["super_admin", "school_admin", "bursar"]);
 
     const data = await req.json();
     const {
-      name, email, phone, admissionNumber, dateOfBirth, dateAdmitted,
+      name, firstName, middleName, surname, email, phone, admissionNumber, yearOfBirth, dateOfBirth, dateAdmitted,
       parentName, parentPhone, parentEmail, address, gender, classId, avatarUrl,
       emergencyContact, medicalInfo, notes
     } = data;
 
-    if (!name || !email || !classId) {
-      return NextResponse.json({ error: 'Missing required fields: name, email, and classId are required.' }, { status: 400 });
+    const fullName = buildStudentFullName({ firstName, middleName, surname, name });
+    if (
+      !fullName ||
+      !classId ||
+      !admissionNumber?.trim() ||
+      !parentName?.trim() ||
+      !parentPhone?.trim() ||
+      !parentEmail?.trim()
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Missing required fields: student name, admission number, class, parent name, parent phone, and parent email are required.",
+        },
+        { status: 400 }
+      );
     }
 
-    const emailTaken = await prisma.user.findUnique({ where: { email: email.trim() } });
+    const trimmedProvidedEmail = (email || "").trim().toLowerCase();
+
+    const emailTaken = trimmedProvidedEmail
+      ? await prisma.user.findUnique({ where: { email: trimmedProvidedEmail } })
+      : null;
     if (emailTaken) {
       return NextResponse.json(
         { error: 'This email is already registered. Each student must use a unique email.' },
@@ -175,25 +196,8 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
       );
     }
 
-    // Admission number logic - use school-specific settings
-    let finalAdmissionNumber = admissionNumber;
-    if (!finalAdmissionNumber) {
-      const settings = await prisma.school.findUnique({
-        where: { id: schoolContext.schoolId },
-        select: {
-          admissionNumberAutoIncrement: true,
-          lastAdmissionNumber: true,
-        },
-      });
-
-      if (settings?.admissionNumberAutoIncrement && settings.lastAdmissionNumber) {
-        // Use the school's last admission number and increment it
-        finalAdmissionNumber = getNextAdmissionNumber(settings.lastAdmissionNumber);
-      } else {
-        // Fallback to default
-        finalAdmissionNumber = 'ADM001';
-      }
-    }
+    // Admission number is bursar-controlled and required.
+    const finalAdmissionNumber = admissionNumber.trim();
 
     const admissionTaken = await prisma.student.findFirst({
       where: {
@@ -207,6 +211,13 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
         { status: 409 }
       );
     }
+
+    const normalizedSchoolCode = params.schoolCode.trim().toLowerCase();
+    const normalizedAdmission = String(finalAdmissionNumber || Date.now())
+      .replace(/[^a-zA-Z0-9]/g, "")
+      .toLowerCase();
+    const resolvedStudentEmail =
+      trimmedProvidedEmail || `student-${normalizedAdmission}-${normalizedSchoolCode}@student.local`;
 
     // Fetch current academic year and term
     const currentYear = await prisma.academicYear.findFirst({
@@ -256,26 +267,26 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
 
       parentUser = parentByEmail || parentByPhone;
 
-      // If the email exists globally but belongs to a non-parent account, block parent linkage.
-      if (!parentUser && trimmedParentEmail) {
-        const anyUserWithEmail = await prisma.user.findUnique({
-          where: { email: trimmedParentEmail },
-          select: { id: true, role: true, schoolId: true },
-        });
-        if (anyUserWithEmail && anyUserWithEmail.role !== 'parent') {
-          return NextResponse.json(
-            { error: 'Parent email belongs to another non-parent account. Use a different parent email.' },
-            { status: 409 }
-          );
-        }
-      }
+      // If the email exists globally but belongs to a non-parent account, don't block testing flows.
+      // We'll create a parent login using a generated email, while still storing the provided parentEmail
+      // on the student record.
+      const parentLoginEmail =
+        trimmedParentEmail ||
+        `${trimmedParentPhone || Date.now()}@parent.local`;
+      const parentEmailTaken = trimmedParentEmail
+        ? await prisma.user.findUnique({ where: { email: trimmedParentEmail }, select: { id: true } })
+        : null;
+      const resolvedParentLoginEmail =
+        parentEmailTaken && trimmedParentEmail
+          ? `parent-${(trimmedParentPhone || Date.now()).toString().replace(/[^0-9]/g, "")}@parent.local`
+          : parentLoginEmail;
 
       const hashedParentPassword = await hashDefaultPasswordByRole('parent');
       if (!parentUser) {
         parentUser = await prisma.user.create({
           data: {
             name: parentName || `Parent of ${name}`,
-            email: trimmedParentEmail || `${trimmedParentPhone || Date.now()}@parent.local`,
+            email: resolvedParentLoginEmail,
             phone: trimmedParentPhone,
             role: 'parent',
             password: hashedParentPassword,
@@ -313,8 +324,8 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
 
     const studentUser = await prisma.user.create({
       data: {
-        name,
-        email: email.trim(),
+        name: fullName,
+        email: resolvedStudentEmail,
         phone,
         password: hashedPassword,
         role: 'student',
@@ -329,7 +340,11 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
         schoolId: schoolContext.schoolId,
         classId,
         admissionNumber: finalAdmissionNumber,
-        dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
+        dateOfBirth: dateOfBirth
+          ? new Date(dateOfBirth)
+          : yearOfBirth
+            ? new Date(Number(yearOfBirth), 0, 1)
+            : null,
         dateAdmitted: dateAdmitted ? new Date(dateAdmitted) : new Date(),
         parentName,
         parentPhone,
@@ -368,6 +383,7 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
       name: studentUser.name,
       email: studentUser.email,
       phone: studentUser.phone,
+      tempPassword: 'student123',
       className: student.class?.name,
       gradeName: student.class?.grade?.name,
       parent: parentUser ? {
@@ -396,6 +412,9 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
 export async function PUT(req: NextRequest, { params }: { params: { schoolCode: string } }) {
   try {
     const { schoolCode } = params;
+    const { session, schoolContext } = await requireSchoolAccess(schoolCode);
+    requireRole(session, ["super_admin", "school_admin", "bursar"]);
+
     const body = await req.json();
     const studentId = body.studentId || body.id;
     const {
@@ -409,8 +428,11 @@ export async function PUT(req: NextRequest, { params }: { params: { schoolCode: 
       return NextResponse.json({ error: 'studentId is required for updating.' }, { status: 400 });
     }
 
-    const student = await prisma.student.findUnique({
-      where: { id: studentId },
+    const student = await prisma.student.findFirst({
+      where: {
+        id: studentId,
+        schoolId: schoolContext.schoolId,
+      },
       select: { id: true, userId: true, schoolId: true, parentId: true },
     });
 
@@ -478,25 +500,20 @@ export async function PUT(req: NextRequest, { params }: { params: { schoolCode: 
 
       let parentUser = parentByEmail || parentByPhone;
 
-      if (!parentUser && trimmedParentEmail) {
-        const anyUserWithEmail = await prisma.user.findUnique({
-          where: { email: trimmedParentEmail },
-          select: { id: true, role: true },
-        });
-        if (anyUserWithEmail && anyUserWithEmail.role !== 'parent') {
-          return NextResponse.json(
-            { error: 'Parent email belongs to another non-parent account. Use a different parent email.' },
-            { status: 409 }
-          );
-        }
-      }
+      const parentEmailTaken = trimmedParentEmail
+        ? await prisma.user.findUnique({ where: { email: trimmedParentEmail }, select: { id: true } })
+        : null;
+      const resolvedParentLoginEmail =
+        trimmedParentEmail && parentEmailTaken
+          ? `parent-${(trimmedParentPhone || Date.now()).toString().replace(/[^0-9]/g, "")}@parent.local`
+          : trimmedParentEmail || `${trimmedParentPhone || Date.now()}@parent.local`;
 
       if (!parentUser) {
         const hashedParentPassword = await hashDefaultPasswordByRole('parent');
         parentUser = await prisma.user.create({
           data: {
             name: parentName || `Parent of ${name || 'Student'}`,
-            email: trimmedParentEmail || `${trimmedParentPhone || Date.now()}@parent.local`,
+            email: resolvedParentLoginEmail,
             phone: trimmedParentPhone,
             role: 'parent',
             password: hashedParentPassword,
@@ -568,6 +585,9 @@ export async function PUT(req: NextRequest, { params }: { params: { schoolCode: 
 
 export async function DELETE(req: NextRequest, { params }: { params: { schoolCode: string } }) {
   try {
+    const { session, schoolContext } = await requireSchoolAccess(params.schoolCode);
+    requireRole(session, ["super_admin", "school_admin", "bursar"]);
+
     const body = await req.json();
     // Accept both 'studentId' and 'id' for compatibility
     const studentId = body.studentId || body.id;
@@ -576,8 +596,11 @@ export async function DELETE(req: NextRequest, { params }: { params: { schoolCod
       return NextResponse.json({ error: 'studentId is required for deletion.' }, { status: 400 });
     }
     
-    const student = await prisma.student.findUnique({
-      where: { id: studentId },
+    const student = await prisma.student.findFirst({
+      where: {
+        id: studentId,
+        schoolId: schoolContext.schoolId,
+      },
     });
 
     if (!student) {

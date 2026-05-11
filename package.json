@@ -10,6 +10,7 @@
     "seed:superadmin": "npx prisma db seed",
     "check:db-sync": "prisma generate && tsx prisma/check-db-sync.ts",
     "audit:school-isolation": "tsx scripts/audit-school-isolation.ts",
+    "migrate:finance-only-roles": "tsx scripts/migrate-finance-only-roles.ts",
     "test:school-isolation": "tsx scripts/test-school-isolation.ts",
     "cleanup:grades": "node scripts/cleanup-grades.js",
     "backup:run-scheduled": "tsx scripts/run-scheduled-backups.ts",

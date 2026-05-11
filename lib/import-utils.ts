@@ -229,18 +229,34 @@ export class ImportManager {
   }
 
   private parseStudentRow(row: any) {
+    const firstName = String(row['First Name'] || row['firstName'] || '').trim();
+    const middleName = String(row['Middle Name'] || row['middleName'] || '').trim();
+    const surname = String(row['Surname'] || row['Last Name'] || row['lastName'] || '').trim();
+    const legacyName = String(row['Name'] || row['name'] || row['NAME'] || '').trim();
+    const fullName = [firstName, middleName, surname].filter(Boolean).join(' ').trim() || legacyName;
+    const yearOfBirthRaw = row['Year of Birth'] || row['yearOfBirth'] || '';
+    const parsedYearOfBirth = yearOfBirthRaw ? Number(yearOfBirthRaw) : null;
+    const className = String(row['Class'] || row['className'] || '').trim();
+
     return {
-      name: String(row['Name'] || row['name'] || row['NAME'] || '').trim(),
+      name: fullName,
+      firstName,
+      middleName,
+      surname,
       email: String(row['Email'] || row['email'] || row['EMAIL'] || '').trim(),
       phone: this.formatPhoneNumber(String(row['Student Phone'] || '')),
       admissionNumber: String(row['Admission Number'] || ''),
-      dateOfBirth: this.parseDate(row['Date of Birth']),
+      yearOfBirth: Number.isFinite(parsedYearOfBirth) ? parsedYearOfBirth : null,
+      dateOfBirth: this.parseDate(
+        row['Date of Birth'] || (Number.isFinite(parsedYearOfBirth) ? `${parsedYearOfBirth}-01-01` : null)
+      ),
+      dateAdmitted: this.parseDate(row['Date of Admission'] || row['dateAdmitted']),
       parentName: String(row['Parent Name'] || ''),
       parentEmail: String(row['Parent Email'] || ''),
       parentPhone: this.formatPhoneNumber(String(row['Parent Phone'] || '')),
       address: String(row['Address'] || ''),
       gender: String(row['Gender'] || ''),
-      className: String(row['Class'] || ''),
+      className,
       status: String(row['Status'] || 'active'),
       emergencyContact: String(row['Emergency Contact'] || ''),
       medicalInfo: String(row['Medical Information'] || ''),
@@ -440,7 +456,7 @@ export class ImportManager {
         classId: classId,
         admissionNumber: data.admissionNumber,
         dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null,
-        dateAdmitted: new Date(),
+        dateAdmitted: data.dateAdmitted ? new Date(data.dateAdmitted) : new Date(),
         parentId: parent.id,
         parentName: data.parentName,
         parentPhone: data.parentPhone,
@@ -484,6 +500,7 @@ export class ImportManager {
       data: {
         admissionNumber: data.admissionNumber,
         dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null,
+        dateAdmitted: data.dateAdmitted ? new Date(data.dateAdmitted) : undefined,
         parentName: data.parentName,
         parentPhone: data.parentPhone,
         parentEmail: data.parentEmail,

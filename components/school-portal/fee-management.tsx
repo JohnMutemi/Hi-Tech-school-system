@@ -175,6 +175,11 @@ export function FeeManagement({
      );
    }, [feeStructures, searchText]);
 
+  const brandHex = useMemo(() => {
+    const t = (colorTheme || "").trim();
+    return /^#[0-9A-Fa-f]{6}$/i.test(t) ? t : "#2563eb";
+  }, [colorTheme]);
+
   // CSV import handler
   const handleCSVImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -392,6 +397,55 @@ export function FeeManagement({
 
     try {
       const isEdit = Boolean(editingFee?.id);
+      const applyingAllGrades = !isEdit && formData.gradeId === "__all__";
+      if (applyingAllGrades) {
+        const gradeIds = availableGrades.map((g: any) => g.id);
+        const settled = await Promise.allSettled(
+          gradeIds.map((gradeId: string) =>
+            fetch(`/api/schools/${schoolCode}/fee-structure`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ ...feePayload, gradeId }),
+            })
+          )
+        );
+
+        let createdCount = 0;
+        const failed: string[] = [];
+        for (let i = 0; i < settled.length; i++) {
+          const result = settled[i];
+          if (result.status === "fulfilled" && result.value.ok) {
+            createdCount += 1;
+          } else {
+            failed.push(availableGrades[i]?.name || `Grade ${i + 1}`);
+          }
+        }
+
+        if (createdCount === 0) {
+          throw new Error("Failed to create fee structures for all grades.");
+        }
+
+        toast({
+          title: "Fee structures created",
+          description:
+            failed.length > 0
+              ? `Created for ${createdCount} grades. Failed: ${failed.join(", ")}`
+              : `Created fee structures for all ${createdCount} grades.`,
+        });
+
+        setShowForm(false);
+        setEditingFee(null);
+        setFormData({
+          gradeId: "",
+          academicYearId: academicYearId,
+          termId: termId,
+        });
+        setBreakdown([{ name: "", value: "" }]);
+        await fetchFeeStructures();
+        if (onFeeStructureCreated) onFeeStructureCreated();
+        return;
+      }
+
       const response = await fetch(`/api/schools/${schoolCode}/fee-structure`, {
         method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
@@ -513,9 +567,20 @@ export function FeeManagement({
   };
 
   return (
-    <div className="space-y-8">
+    <div
+      className="space-y-8"
+      style={
+        {
+          "--fee-brand": brandHex,
+          "--fee-brand-ring": `${brandHex}55`,
+        } as React.CSSProperties
+      }
+    >
       {/* Enhanced Header with Gradient */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-700 p-8 text-white shadow-2xl">
+      <div
+        className="relative overflow-hidden rounded-3xl p-8 text-white shadow-2xl"
+        style={{ backgroundColor: brandHex }}
+      >
         <div className="absolute inset-0 bg-black/10"></div>
         <div className="relative z-10">
           <div className="flex items-center justify-between">
@@ -535,7 +600,7 @@ export function FeeManagement({
                   <Sparkles className="w-8 h-8 text-yellow-300" />
                   Fee Management
                 </h2>
-                <p className="text-blue-100 text-lg">
+                <p className="text-white/80 text-lg">
                   Manage termly fee structures for your school
                 </p>
               </div>
@@ -557,18 +622,24 @@ export function FeeManagement({
 
       {/* Enhanced Stats Cards with Responsive Components */}
       <ResponsiveGrid cols={{ mobile: 1, tablet: 2, desktop: 3, large: 4 }} gap="lg">
-        <ResponsiveCard className="group relative overflow-hidden rounded-2xl border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 bg-gradient-to-br from-green-50 to-emerald-100">
-          <div className="absolute inset-0 bg-gradient-to-r from-green-400/20 to-emerald-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+        <ResponsiveCard
+          className="group relative overflow-hidden rounded-2xl border shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 bg-white/90 backdrop-blur-sm"
+          style={{ borderColor: `${brandHex}33` }}
+        >
+          <div
+            className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+            style={{ backgroundColor: `${brandHex}14` }}
+          />
           <div className="p-6 relative z-10">
             <div className="flex items-center space-x-4">
-              <div className="p-3 bg-green-500 rounded-2xl shadow-lg">
+              <div className="p-3 rounded-2xl shadow-lg" style={{ backgroundColor: brandHex }}>
                 <DollarSign className="w-8 h-8 text-white" />
               </div>
               <div>
-                <ResponsiveText size="2xl" className="font-bold text-green-700">
+                <ResponsiveText size="2xl" className="font-bold" style={{ color: brandHex }}>
                   {feeStructures.length}
                 </ResponsiveText>
-                <ResponsiveText size="sm" className="text-green-600 font-medium">
+                <ResponsiveText size="sm" className="text-slate-600 font-medium">
                   Total Fee Structures
                 </ResponsiveText>
               </div>
@@ -576,18 +647,24 @@ export function FeeManagement({
           </div>
         </ResponsiveCard>
 
-        <ResponsiveCard className="group relative overflow-hidden rounded-2xl border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 bg-gradient-to-br from-blue-50 to-indigo-100">
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-400/20 to-indigo-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+        <ResponsiveCard
+          className="group relative overflow-hidden rounded-2xl border shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 bg-white/90 backdrop-blur-sm"
+          style={{ borderColor: `${brandHex}33` }}
+        >
+          <div
+            className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+            style={{ backgroundColor: `${brandHex}14` }}
+          />
           <div className="p-6 relative z-10">
             <div className="flex items-center space-x-4">
-              <div className="p-3 bg-blue-500 rounded-2xl shadow-lg">
+              <div className="p-3 rounded-2xl shadow-lg" style={{ backgroundColor: brandHex }}>
                 <CheckCircle className="w-8 h-8 text-white" />
               </div>
               <div>
-                <ResponsiveText size="2xl" className="font-bold text-blue-700">
+                <ResponsiveText size="2xl" className="font-bold" style={{ color: brandHex }}>
                   {feeStructures.filter((f) => f.isActive).length}
                 </ResponsiveText>
-                <ResponsiveText size="sm" className="text-blue-600 font-medium">
+                <ResponsiveText size="sm" className="text-slate-600 font-medium">
                   Active Structures
                 </ResponsiveText>
               </div>
@@ -595,22 +672,31 @@ export function FeeManagement({
           </div>
         </ResponsiveCard>
 
-        <ResponsiveCard className="group relative overflow-hidden rounded-2xl border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 bg-gradient-to-br from-purple-50 to-violet-100">
-          <div className="absolute inset-0 bg-gradient-to-r from-purple-400/20 to-violet-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+        <ResponsiveCard
+          className="group relative overflow-hidden rounded-2xl border shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 bg-white/90 backdrop-blur-sm"
+          style={{ borderColor: `${brandHex}33` }}
+        >
+          <div
+            className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+            style={{ backgroundColor: `${brandHex}14` }}
+          />
           <div className="p-6 relative z-10">
             <div className="flex items-center space-x-4">
-              <div className="p-3 bg-purple-500 rounded-2xl shadow-lg">
+              <div className="p-3 rounded-2xl shadow-lg" style={{ backgroundColor: brandHex }}>
                 <Calendar className="w-8 h-8 text-white" />
               </div>
               <div>
-                                 <ResponsiveText size="2xl" className="font-bold text-purple-700">
-                   {
-                     feeStructures.filter(
-                       (f) => f.term === currentTerm && (f.year === currentYear || (f.academicYear?.name && f.academicYear.name.includes(currentYear.toString())))
-                     ).length
-                   }
-                 </ResponsiveText>
-                <ResponsiveText size="sm" className="text-purple-600 font-medium">
+                <ResponsiveText size="2xl" className="font-bold" style={{ color: brandHex }}>
+                  {
+                    feeStructures.filter(
+                      (f) =>
+                        f.term === currentTerm &&
+                        (f.year === currentYear ||
+                          (f.academicYear?.name && f.academicYear.name.includes(currentYear.toString())))
+                    ).length
+                  }
+                </ResponsiveText>
+                <ResponsiveText size="sm" className="text-slate-600 font-medium">
                   Current Term
                 </ResponsiveText>
               </div>
@@ -618,18 +704,26 @@ export function FeeManagement({
           </div>
         </ResponsiveCard>
 
-        <ResponsiveCard className="group relative overflow-hidden rounded-2xl border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 bg-gradient-to-br from-orange-50 to-amber-100">
-          <div className="absolute inset-0 bg-gradient-to-r from-orange-400/20 to-amber-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+        <ResponsiveCard
+          className="group relative overflow-hidden rounded-2xl border shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 bg-white/90 backdrop-blur-sm"
+          style={{ borderColor: `${brandHex}33` }}
+        >
+          <div
+            className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+            style={{ backgroundColor: `${brandHex}14` }}
+          />
           <div className="p-6 relative z-10">
             <div className="flex items-center space-x-4">
-              <div className="p-3 bg-orange-500 rounded-2xl shadow-lg">
+              <div className="p-3 rounded-2xl shadow-lg" style={{ backgroundColor: brandHex }}>
                 <Users className="w-8 h-8 text-white" />
               </div>
               <div>
-                                 <ResponsiveText size="2xl" className="font-bold text-orange-700">
-                   {new Set(feeStructures.map((f) => f.gradeName).filter(Boolean)).size}
-                 </ResponsiveText>
-                <ResponsiveText size="sm" className="text-orange-600 font-medium">Grades</ResponsiveText>
+                <ResponsiveText size="2xl" className="font-bold" style={{ color: brandHex }}>
+                  {new Set(feeStructures.map((f) => f.gradeName).filter(Boolean)).size}
+                </ResponsiveText>
+                <ResponsiveText size="sm" className="text-slate-600 font-medium">
+                  Grades
+                </ResponsiveText>
               </div>
             </div>
           </div>
@@ -642,7 +736,7 @@ export function FeeManagement({
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <ResponsiveText size="2xl" className="font-bold text-gray-800 flex items-center gap-3">
-                <TrendingUp className="w-6 h-6 text-blue-600" />
+                <TrendingUp className="w-6 h-6" style={{ color: brandHex }} />
                 Fee Structures Overview
               </ResponsiveText>
               <ResponsiveText size="base" className="text-gray-600">
@@ -652,7 +746,7 @@ export function FeeManagement({
             <div className="w-full md:w-72">
               <input
                 type="text"
-                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[color:var(--fee-brand-ring)]"
                 placeholder="Search by term, year, grade, status, creator..."
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
@@ -663,7 +757,10 @@ export function FeeManagement({
         <div className="p-0">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+              <div
+                className="animate-spin rounded-full h-12 w-12 border-2 border-gray-200 border-t-transparent"
+                style={{ borderTopColor: "var(--fee-brand)" }}
+              />
               <span className="ml-3 text-gray-600">
                 Loading fee structures...
               </span>
@@ -916,6 +1013,9 @@ export function FeeManagement({
                   className="w-full border rounded px-3 py-2"
                 >
                   <option value="">Select Grade</option>
+                  {!editingFee && (
+                    <option value="__all__">All Grades</option>
+                  )}
                   {availableGrades.map((grade: any) => (
                     <option key={grade.id} value={grade.id}>
                       {grade.name}

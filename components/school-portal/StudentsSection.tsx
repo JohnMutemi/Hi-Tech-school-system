@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Edit, Trash2, Eye, GraduationCap } from "lucide-react";
+import { Plus, Edit, Trash2, Eye, GraduationCap, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,7 +49,7 @@ export default function StudentsSection({ schoolCode, colorTheme, toast }: Stude
   const responsive = useResponsive();
   const [students, setStudents] = useState<Student[]>([]);
   const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
-  const [newStudent, setNewStudent] = useState<Partial<Student>>({});
+  const [newStudent, setNewStudent] = useState<any>({});
   const [showStudentModal, setShowStudentModal] = useState(false);
   const [studentError, setStudentError] = useState<string>("");
 
@@ -76,6 +76,8 @@ export default function StudentsSection({ schoolCode, colorTheme, toast }: Stude
   // Add Student Modal state
   const [admissionPreview, setAdmissionPreview] = useState("");
   const [schoolSettings, setSchoolSettings] = useState<any>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 7;
 
   // Fetch school settings and compute next admission number
   useEffect(() => {
@@ -140,6 +142,10 @@ export default function StudentsSection({ schoolCode, colorTheme, toast }: Stude
     if (schoolCode) fetchStudents();
   }, [schoolCode, toast]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [students.length]);
+
   // Fetch classes from backend
   useEffect(() => {
     async function fetchClasses() {
@@ -171,15 +177,16 @@ export default function StudentsSection({ schoolCode, colorTheme, toast }: Stude
   // Add Student handler
   const createStudent = async (studentData: Partial<Student>) => {
     if (
-      !studentData.name ||
+      !studentData.firstName ||
+      !studentData.surname ||
+      !studentData.yearOfBirth ||
       !studentData.parentName ||
       !studentData.parentPhone ||
-      !studentData.email ||
       !studentData.className
     ) {
       toast({
         title: "Validation Error",
-        description: "Student Name, Email, Class, Parent Name, and Parent Phone are required.",
+        description: "First name, surname, class, parent name, and parent phone are required.",
         variant: "destructive",
       });
       return false;
@@ -194,8 +201,12 @@ export default function StudentsSection({ schoolCode, colorTheme, toast }: Stude
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             ...studentData,
+            name: [studentData.firstName, studentData.middleName, studentData.surname]
+              .filter(Boolean)
+              .join(" ")
+              .trim(),
             classId: studentData.className, // map className to classId
-            // Optionally remove className from payload
+            yearOfBirth: studentData.yearOfBirth ? Number(studentData.yearOfBirth) : undefined,
           }),
         }
       );
@@ -385,7 +396,9 @@ export default function StudentsSection({ schoolCode, colorTheme, toast }: Stude
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {students.map((student: any) => (
+                {students
+                  .slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+                  .map((student: any) => (
                   <TableRow 
                     key={student.id}
                     className="border-b border-gray-100 hover:bg-purple-50/30 transition-colors group"
@@ -466,6 +479,46 @@ export default function StudentsSection({ schoolCode, colorTheme, toast }: Stude
                 ))}
               </TableBody>
             </Table>
+            {Math.ceil(students.length / PAGE_SIZE) > 1 && (
+              <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3">
+                <p className="text-sm text-gray-600">
+                  Page <span className="font-semibold text-gray-800">{currentPage}</span> of{" "}
+                  <span className="font-semibold text-gray-800">
+                    {Math.ceil(students.length / PAGE_SIZE)}
+                  </span>
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  {Array.from({ length: Math.ceil(students.length / PAGE_SIZE) }, (_, i) => i + 1).map((p) => (
+                    <Button
+                      key={p}
+                      size="sm"
+                      variant={p === currentPage ? "default" : "outline"}
+                      onClick={() => setCurrentPage(p)}
+                    >
+                      {p}
+                    </Button>
+                  ))}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={currentPage === Math.ceil(students.length / PAGE_SIZE)}
+                    onClick={() =>
+                      setCurrentPage((p) => Math.min(Math.ceil(students.length / PAGE_SIZE), p + 1))
+                    }
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -499,11 +552,28 @@ export default function StudentsSection({ schoolCode, colorTheme, toast }: Stude
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     <div>
-                      <Label className="text-xs font-medium text-gray-700">Student Name *</Label>
+                      <Label className="text-xs font-medium text-gray-700">First Name *</Label>
                       <Input 
                         className="h-8 text-sm mt-1" 
-                        value={newStudent.name || ""} 
-                        onChange={e => setNewStudent({ ...newStudent, name: e.target.value })} 
+                        value={newStudent.firstName || ""} 
+                        onChange={e => setNewStudent({ ...newStudent, firstName: e.target.value })} 
+                        required 
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-medium text-gray-700">Middle Name (Optional)</Label>
+                      <Input 
+                        className="h-8 text-sm mt-1" 
+                        value={newStudent.middleName || ""} 
+                        onChange={e => setNewStudent({ ...newStudent, middleName: e.target.value })} 
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-medium text-gray-700">Surname *</Label>
+                      <Input 
+                        className="h-8 text-sm mt-1" 
+                        value={newStudent.surname || ""} 
+                        onChange={e => setNewStudent({ ...newStudent, surname: e.target.value })} 
                         required 
                       />
                     </div>
@@ -527,24 +597,6 @@ export default function StudentsSection({ schoolCode, colorTheme, toast }: Stude
                       )}
                     </div>
                     <div>
-                      <Label className="text-xs font-medium text-gray-700">Student Email *</Label>
-                      <Input 
-                        className="h-8 text-sm mt-1" 
-                        type="email" 
-                        value={newStudent.email || ""} 
-                        onChange={e => setNewStudent({ ...newStudent, email: e.target.value })} 
-                        required 
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs font-medium text-gray-700">Student Phone</Label>
-                      <Input 
-                        className="h-8 text-sm mt-1" 
-                        value={newStudent.phone || ""} 
-                        onChange={e => setNewStudent({ ...newStudent, phone: e.target.value })} 
-                      />
-                    </div>
-                    <div>
                       <Label className="text-xs font-medium text-gray-700">Class *</Label>
                       <Select
                         value={newStudent.className || ""}
@@ -564,42 +616,26 @@ export default function StudentsSection({ schoolCode, colorTheme, toast }: Stude
                       </Select>
                     </div>
                     <div>
-                      <Label className="text-xs font-medium text-gray-700">Date of Birth</Label>
+                      <Label className="text-xs font-medium text-gray-700">Year of Birth *</Label>
                       <Input 
                         className="h-8 text-sm mt-1" 
-                        type="date" 
-                        value={newStudent.dateOfBirth || ""} 
-                        onChange={e => setNewStudent({ ...newStudent, dateOfBirth: e.target.value })} 
+                        type="number"
+                        min="1900"
+                        max="2100"
+                        value={newStudent.yearOfBirth || ""} 
+                        onChange={e => setNewStudent({ ...newStudent, yearOfBirth: e.target.value })} 
+                        required
                       />
                     </div>
                     <div>
-                      <Label className="text-xs font-medium text-gray-700">Gender</Label>
-                      <Select
-                        value={newStudent.gender as "male" | "female" | undefined}
-                        onValueChange={value => setNewStudent({ ...newStudent, gender: value as "male" | "female" })}>
-                        <SelectTrigger className="h-8 text-sm mt-1">
-                          <SelectValue placeholder="Select gender" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="male">Male</SelectItem>
-                          <SelectItem value="female">Female</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label className="text-xs font-medium text-gray-700">Status</Label>
-                      <Select
-                        value={newStudent.status || "active"}
-                        onValueChange={value => setNewStudent({ ...newStudent, status: value as "active" | "inactive" | "graduated" })}>
-                        <SelectTrigger className="h-8 text-sm mt-1">
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="active">Active</SelectItem>
-                          <SelectItem value="inactive">Inactive</SelectItem>
-                          <SelectItem value="graduated">Graduated</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Label className="text-xs font-medium text-gray-700">Date of Admission *</Label>
+                      <Input 
+                        className="h-8 text-sm mt-1" 
+                        type="date" 
+                        value={newStudent.dateAdmitted || ""} 
+                        onChange={e => setNewStudent({ ...newStudent, dateAdmitted: e.target.value })} 
+                        required
+                      />
                     </div>
                   </div>
                 </div>
@@ -638,14 +674,6 @@ export default function StudentsSection({ schoolCode, colorTheme, toast }: Stude
                         type="email" 
                         value={newStudent.parentEmail || ""} 
                         onChange={e => setNewStudent({ ...newStudent, parentEmail: e.target.value })} 
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs font-medium text-gray-700">Address</Label>
-                      <Input 
-                        className="h-8 text-sm mt-1" 
-                        value={newStudent.address || ""} 
-                        onChange={e => setNewStudent({ ...newStudent, address: e.target.value })} 
                       />
                     </div>
                   </div>

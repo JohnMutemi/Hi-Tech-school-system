@@ -5,14 +5,11 @@ import {
   BarChart3,
   Users,
   DollarSign,
-  Receipt,
   FileText,
-  CreditCard,
   Menu,
   School,
   PieChart,
   AlertCircle,
-  CheckCircle2,
   LogOut
 } from "lucide-react";
 
@@ -40,6 +37,12 @@ const NAV_ITEMS = [
     description: "Track unpaid balances"
   },
   { 
+    id: "fee-structure", 
+    label: "Fee Structure", 
+    icon: DollarSign,
+    description: "Set fees by grade and term"
+  },
+  { 
     id: "reports", 
     label: "Financial Reports", 
     icon: FileText,
@@ -62,6 +65,7 @@ interface BursarSidebarProps {
   bursar?: any;
   schoolName?: string;
   schoolCode?: string;
+  colorTheme?: string;
   summary?: {
     totalStudents: number;
     totalOutstanding: number;
@@ -77,6 +81,7 @@ export const BursarSidebar: React.FC<BursarSidebarProps> = ({
   bursar,
   schoolName,
   schoolCode,
+  colorTheme = "#d97706",
   summary
 }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -92,44 +97,26 @@ export const BursarSidebar: React.FC<BursarSidebarProps> = ({
   const SidebarContent = () => (
     <>
       {/* Sidebar Header */}
-      <div className="flex flex-col items-center p-6 border-b border-amber-900 bg-gradient-to-r from-amber-950 to-orange-900">
-        <div className="w-16 h-16 bg-gradient-to-r from-amber-500 to-orange-600 rounded-2xl flex items-center justify-center mb-4 shadow-xl border border-amber-400/30">
+      <div className="flex flex-col items-center p-6 border-b border-white/10 bg-slate-950">
+        <div
+          className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4 shadow-xl border border-white/20"
+          style={{ backgroundColor: colorTheme }}
+        >
           <School className="w-8 h-8 text-white" />
         </div>
         <h2 className="text-xl font-bold text-white text-center mb-1">Bursar Portal</h2>
-        <p className="text-amber-100 text-sm text-center font-medium">Financial Management</p>
+        <p className="text-slate-200 text-sm text-center font-medium">Financial Management</p>
         {schoolName && (
-          <div className="mt-3 px-4 py-2 bg-amber-900/50 backdrop-blur-sm rounded-full border border-amber-700/30">
-            <span className="text-xs text-amber-100 font-medium">{schoolName}</span>
+          <div className="mt-3 px-4 py-2 backdrop-blur-sm rounded-full border border-white/10" style={{ backgroundColor: `${colorTheme}22` }}>
+            <span className="text-xs text-white/90 font-medium">{schoolName}</span>
           </div>
         )}
       </div>
 
-      {/* Bursar Profile */}
-      {bursar && (
-        <div className="p-4 border-b border-amber-900">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-amber-500 to-orange-600 rounded-full flex items-center justify-center text-white font-semibold text-sm shadow-lg border border-amber-400/30">
-              {bursar.name?.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() || 'B'}
-            </div>
-            <div>
-              <div className="font-semibold text-white text-sm">
-                {bursar.name || 'Bursar'}
-              </div>
-              <div className="text-amber-200 text-xs font-medium">
-                {bursar.email || 'Financial Officer'}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-
-
       {/* Navigation Links */}
-      <div className="flex-1 flex flex-col">
-        <nav className="p-4">
-          <h3 className="text-sm font-semibold text-amber-200 mb-4 uppercase tracking-wide">Navigation</h3>
+      <div className="flex-1 min-h-0 flex flex-col">
+        <nav className="p-4 overflow-y-auto">
+          <h3 className="text-sm font-semibold text-slate-300 mb-4 uppercase tracking-wide">Navigation</h3>
           <ul className="space-y-2">
             {NAV_ITEMS.map((item) => {
               const Icon = item.icon;
@@ -138,10 +125,11 @@ export const BursarSidebar: React.FC<BursarSidebarProps> = ({
                 <li key={item.id}>
                   <button
                     className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg text-left transition-all duration-200 group ${
-                      isActive 
-                        ? 'bg-gradient-to-r from-amber-600 to-orange-700 text-white shadow-lg border border-amber-500/30' 
-                        : 'text-amber-200 hover:bg-amber-900/50 hover:text-white'
+                      isActive
+                        ? 'text-white shadow-lg border border-white/20'
+                        : 'text-slate-200 hover:bg-white/5 hover:text-white'
                     }`}
+                    style={isActive ? { backgroundColor: colorTheme } : undefined}
                     onClick={() => {
                       onTabChange(item.id);
                       setIsMobileMenuOpen(false);
@@ -151,13 +139,13 @@ export const BursarSidebar: React.FC<BursarSidebarProps> = ({
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200 ${
                       isActive 
                         ? 'bg-white/20 border border-white/30' 
-                        : 'bg-amber-800/50 group-hover:bg-amber-700/50'
+                        : 'bg-white/5 group-hover:bg-white/10'
                     }`}>
                       <Icon className="w-4 h-4" />
                     </div>
                     <div className="flex-1">
                       <div className="font-medium text-sm">{item.label}</div>
-                      <div className={`text-xs ${isActive ? 'text-amber-100' : 'text-amber-300'}`}>
+                      <div className={`text-xs ${isActive ? 'text-white/90' : 'text-slate-400'}`}>
                         {item.description}
                       </div>
                     </div>
@@ -171,26 +159,6 @@ export const BursarSidebar: React.FC<BursarSidebarProps> = ({
           </ul>
         </nav>
 
-        {/* Logout Button at Bottom */}
-        <div className="mt-auto p-4 border-t border-amber-900">
-          {onLogout && (
-            <Button
-              onClick={onLogout}
-              variant="ghost"
-              className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-left transition-all duration-200 text-amber-200 hover:bg-red-800/50 hover:text-white group"
-            >
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200 bg-red-700/50 group-hover:bg-red-600/50">
-                <LogOut className="w-4 h-4" />
-              </div>
-              <div className="flex-1">
-                <div className="font-medium text-sm">Sign Out</div>
-                <div className="text-xs text-amber-300 group-hover:text-red-200">
-                  Leave portal safely
-                </div>
-              </div>
-            </Button>
-          )}
-        </div>
       </div>
     </>
   );
@@ -198,48 +166,57 @@ export const BursarSidebar: React.FC<BursarSidebarProps> = ({
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex fixed left-0 top-0 h-full w-80 z-50 bg-gradient-to-b from-amber-950 via-orange-950 to-amber-900 border-r border-amber-900/50 shadow-2xl flex-col backdrop-blur-xl">
+      <aside className="hidden lg:flex fixed left-0 top-0 h-full w-80 z-50 bg-slate-950 border-r border-white/10 shadow-2xl flex-col backdrop-blur-xl overflow-hidden">
         <SidebarContent />
       </aside>
 
       {/* Mobile Header */}
-      <header className="lg:hidden bg-gradient-to-r from-amber-950 to-orange-900 shadow-lg border-b border-amber-900 sticky top-0 z-40">
-        <div className="flex items-center justify-between px-4 py-4">
+      <header className="lg:hidden bg-slate-950 shadow-lg border-b border-white/10 sticky top-0 z-40">
+        <div className="flex items-center justify-between px-3 py-3">
           <div className="flex items-center gap-3">
             <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="hover:bg-amber-900/50 h-10 w-10 rounded-xl text-white border border-amber-700/30">
+                <Button variant="ghost" size="icon" className="hover:bg-white/10 h-10 w-10 rounded-xl text-white border border-white/10">
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-80 p-0 bg-gradient-to-b from-amber-950 via-orange-950 to-amber-900 text-white border-amber-900">
+              <SheetContent side="left" className="w-80 p-0 bg-slate-950 text-white border-white/10 overflow-hidden">
                 <div className="h-full flex flex-col">
                   <SidebarContent />
                 </div>
               </SheetContent>
             </Sheet>
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-gradient-to-r from-amber-500 to-orange-600 rounded-lg flex items-center justify-center border border-amber-400/30 shadow-lg">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center border border-white/20 shadow-lg" style={{ backgroundColor: colorTheme }}>
                 <School className="w-4 h-4 text-white" />
               </div>
               <div>
                 <span className="font-bold text-lg text-white">Bursar Portal</span>
-                <div className="text-xs text-amber-200 font-medium">
+                <div className="text-xs text-slate-300 font-medium">
                   {NAV_ITEMS.find(item => item.id === activeTab)?.label || 'Dashboard'}
                 </div>
               </div>
             </div>
           </div>
-          {summary && (
-            <div className="hidden sm:flex items-center gap-2">
-              <Badge variant="secondary" className="bg-amber-900/50 text-amber-100 border-amber-700/50 backdrop-blur-sm">
+          <div className="flex items-center gap-2">
+            {summary ? (
+              <Badge variant="secondary" className="hidden sm:flex text-white border-white/10 backdrop-blur-sm" style={{ backgroundColor: `${colorTheme}22` }}>
                 {summary.totalStudents} Students
               </Badge>
-              <Badge variant="destructive" className="bg-red-900 text-red-200 border-red-700">
-                {formatCurrency(summary.totalOutstanding)} Outstanding
-              </Badge>
-            </div>
-          )}
+            ) : null}
+            {onLogout ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onLogout}
+                className="h-9 w-9 rounded-lg border border-white/15 text-white hover:bg-red-900/40"
+                aria-label="Sign out"
+                title="Sign out"
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
+            ) : null}
+          </div>
         </div>
       </header>
 
@@ -254,10 +231,9 @@ export const BursarSidebar: React.FC<BursarSidebarProps> = ({
                 key={item.id}
                 onClick={() => onTabChange(item.id)}
                 className={`flex flex-col items-center py-2 px-1 rounded-lg transition-all duration-200 ${
-                  isActive 
-                    ? "text-amber-400 bg-amber-900/30"
-                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+                  isActive ? "text-white" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
                 }`}
+                style={isActive ? { backgroundColor: `${colorTheme}33` } : undefined}
                 aria-current={isActive ? "page" : undefined}
               >
                 <Icon className="w-5 h-5 mb-1" />

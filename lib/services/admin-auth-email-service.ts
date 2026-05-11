@@ -52,3 +52,10 @@ export async function sendAdminTwoFactorCodeEmail(to: string, schoolName: string
   const text = `Use this one-time login code: ${code}\nIt expires in 10 minutes.`
   return sendEmail(to, subject, html, text)
 }
+
+export async function sendFinanceResetEmail(to: string, schoolName: string, resetLink: string) {
+  const subject = `${schoolName}: Reset your finance password`
+  const html = `<p>You requested to reset your finance account password.</p><p><a href="${resetLink}">Reset password</a></p><p>This link expires in 30 minutes.</p>`
+  const text = `You requested to reset your finance account password.\nReset password: ${resetLink}\nThis link expires in 30 minutes.`
+  return sendEmail(to, subject, html, text)
+}

@@ -11,7 +11,6 @@ import { Badge } from "@/components/ui/badge";
 import { useRef, useState ,useEffect} from "react";
 import { CheckCircle, XCircle } from "lucide-react";
 import { BulkImport } from "@/components/ui/bulk-import";
-import { cn } from "@/lib/utils";
 
 const setupFormCardClass =
   "border border-slate-200/80 shadow-lg bg-white/85 backdrop-blur-md rounded-2xl overflow-hidden";
@@ -356,10 +355,6 @@ export default function StaffSection({ schoolCode, colorTheme, toast }: any) {
                 <Label className="text-slate-700 font-medium">Phone Number</Label>
                 <Input className={setupFormFieldClass} value={formData.phone || ""} onChange={e => setFormData({ ...formData, phone: e.target.value })} placeholder="+254 700 000 000" />
               </div>
-              <div className="space-y-2">
-                <Label className="text-slate-700 font-medium">Employee ID</Label>
-                <Input className={setupFormFieldClass} value={formData.employeeId || ""} onChange={e => setFormData({ ...formData, employeeId: e.target.value })} placeholder="e.g., T001" />
-              </div>
             </div>
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -380,20 +375,6 @@ export default function StaffSection({ schoolCode, colorTheme, toast }: any) {
                 <Label className="text-slate-700 font-medium">Academic Year</Label>
                 <Input className={setupFormFieldClass} value={formData.academicYear || ""} onChange={e => setFormData({ ...formData, academicYear: e.target.value })} placeholder="e.g., 2024" />
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-slate-700 font-medium">Status</Label>
-              <Select value={formData.status || "active"} onValueChange={value => setFormData({ ...formData, status: value })}>
-                <SelectTrigger className={cn(setupFormFieldClass, "h-11")}>
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                  <SelectItem value="on_leave">On Leave</SelectItem>
-                  <SelectItem value="terminated">Terminated</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
             <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
               <Button type="button" variant="outline" onClick={onCancel} className="rounded-xl border-slate-200">Cancel</Button>
