@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { getIronSession } from 'iron-session';
 import { cookies } from 'next/headers';
 import { resolveFinanceGateForSchoolCode } from '@/lib/finance-package-gate';
+import { getSession } from '@/lib/session';
 
 const prisma = new PrismaClient();
 
@@ -77,6 +78,17 @@ export async function POST(
       schoolCode,
     };
     await session.save();
+
+    // Also establish the primary app session so shared school routes
+    // (e.g. /api/schools/[schoolCode]/payments) can authorize finance users.
+    const appSession = await getSession();
+    appSession.isLoggedIn = true;
+    appSession.id = user.id;
+    appSession.email = user.email;
+    appSession.name = user.name;
+    appSession.role = user.role;
+    appSession.schoolId = user.schoolId || undefined;
+    await appSession.save();
 
     return NextResponse.json({
       success: true,

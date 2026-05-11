@@ -433,6 +433,35 @@ export async function POST(
 
     console.log("Fee structure created successfully:", feeStructure.id);
 
+    // Notify school's registered email (audit trail)
+    try {
+      const schoolRecord = await prisma.school.findUnique({ where: { id: school.id } })
+      if (schoolRecord?.email) {
+        const { EmailService } = await import('@/lib/services/email-service')
+        const emailService = new EmailService()
+        await emailService.sendSchoolFeeActionNotification({
+          schoolId: school.id,
+          toEmail: schoolRecord.email,
+          subject: `Fee structure created — ${feeStructure.grade?.name} ${feeStructure.term} ${feeStructure.academicYear?.name ?? feeStructure.year}`,
+          text:
+            `Fee structure created.\n\n` +
+            `School: ${schoolRecord.name} (${schoolRecord.code})\n` +
+            `Grade: ${feeStructure.grade?.name}\n` +
+            `Academic Year: ${feeStructure.academicYear?.name ?? feeStructure.year}\n` +
+            `Term: ${feeStructure.term}\n` +
+            `Total: KES ${Number(feeStructure.totalAmount).toLocaleString()}\n`,
+          html:
+            `<h2>Fee structure created</h2>` +
+            `<p><strong>School:</strong> ${schoolRecord.name} (${schoolRecord.code})</p>` +
+            `<p><strong>Grade:</strong> ${feeStructure.grade?.name}</p>` +
+            `<p><strong>Academic Year:</strong> ${feeStructure.academicYear?.name ?? feeStructure.year} <strong>Term:</strong> ${feeStructure.term}</p>` +
+            `<p><strong>Total:</strong> KES ${Number(feeStructure.totalAmount).toLocaleString()}</p>`,
+        })
+      }
+    } catch (err) {
+      console.error("Fee structure email notification failed:", err)
+    }
+
     // Transform the response to match expected format
     const response = {
       id: feeStructure.id,
@@ -585,6 +614,35 @@ export async function PUT(
 
     const response = mapTermlyToResponse(updated);
 
+    // Notify school's registered email (audit trail)
+    try {
+      const schoolRecord = await prisma.school.findUnique({ where: { id: schoolContext.schoolId } })
+      if (schoolRecord?.email) {
+        const { EmailService } = await import('@/lib/services/email-service')
+        const emailService = new EmailService()
+        await emailService.sendSchoolFeeActionNotification({
+          schoolId: schoolContext.schoolId,
+          toEmail: schoolRecord.email,
+          subject: `Fee structure updated — ${updated.grade?.name} ${updated.term} ${updated.academicYear?.name ?? updated.year}`,
+          text:
+            `Fee structure updated.\n\n` +
+            `School: ${schoolRecord.name} (${schoolRecord.code})\n` +
+            `Grade: ${updated.grade?.name}\n` +
+            `Academic Year: ${updated.academicYear?.name ?? updated.year}\n` +
+            `Term: ${updated.term}\n` +
+            `Total: KES ${Number(updated.totalAmount).toLocaleString()}\n`,
+          html:
+            `<h2>Fee structure updated</h2>` +
+            `<p><strong>School:</strong> ${schoolRecord.name} (${schoolRecord.code})</p>` +
+            `<p><strong>Grade:</strong> ${updated.grade?.name}</p>` +
+            `<p><strong>Academic Year:</strong> ${updated.academicYear?.name ?? updated.year} <strong>Term:</strong> ${updated.term}</p>` +
+            `<p><strong>Total:</strong> KES ${Number(updated.totalAmount).toLocaleString()}</p>`,
+        })
+      }
+    } catch (err) {
+      console.error("Fee structure update email notification failed:", err)
+    }
+
     return NextResponse.json({
       success: true,
       message: "Fee structure updated successfully",
@@ -631,6 +689,30 @@ export async function DELETE(
         details: { reason: "User deleted / deactivated fee structure" },
       },
     });
+
+    // Notify school's registered email (audit trail)
+    try {
+      const schoolRecord = await prisma.school.findUnique({ where: { id: schoolContext.schoolId } })
+      if (schoolRecord?.email) {
+        const { EmailService } = await import('@/lib/services/email-service')
+        const emailService = new EmailService()
+        await emailService.sendSchoolFeeActionNotification({
+          schoolId: schoolContext.schoolId,
+          toEmail: schoolRecord.email,
+          subject: `Fee structure deleted (deactivated)`,
+          text:
+            `Fee structure was deleted (deactivated).\n\n` +
+            `School: ${schoolRecord.name} (${schoolRecord.code})\n` +
+            `Fee structure id: ${id}\n`,
+          html:
+            `<h2>Fee structure deleted (deactivated)</h2>` +
+            `<p><strong>School:</strong> ${schoolRecord.name} (${schoolRecord.code})</p>` +
+            `<p><strong>Fee structure id:</strong> ${id}</p>`,
+        })
+      }
+    } catch (err) {
+      console.error("Fee structure delete email notification failed:", err)
+    }
 
     return NextResponse.json({ success: true, message: "Fee structure removed" });
   } catch (error) {

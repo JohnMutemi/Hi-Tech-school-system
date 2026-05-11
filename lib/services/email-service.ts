@@ -50,6 +50,30 @@ interface PaymentNotificationData {
 export class EmailService {
   private config: EmailConfig | null = null
 
+  async sendSchoolFeeActionNotification(params: {
+    schoolId: string
+    toEmail: string
+    subject: string
+    html: string
+    text: string
+  }): Promise<boolean> {
+    const ok = await this.initializeForSchool(params.schoolId)
+    if (!ok || !this.config) return false
+
+    const emailContent = { subject: params.subject, html: params.html, text: params.text }
+    switch (this.config.provider) {
+      case 'sendgrid':
+        return this.sendViaSendGrid(params.toEmail, emailContent)
+      case 'aws_ses':
+        return this.sendViaAWSSES(params.toEmail, emailContent)
+      case 'smtp':
+      case 'gmail':
+        return this.sendViaSMTP(params.toEmail, emailContent)
+      default:
+        return false
+    }
+  }
+
   private isEmailConfigUsable(config: EmailConfig | null): boolean {
     if (!config || !config.fromEmail) return false
 

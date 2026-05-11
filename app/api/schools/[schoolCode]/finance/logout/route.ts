@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getIronSession } from 'iron-session';
 import { cookies } from 'next/headers';
 import { resolveFinanceGateForSchoolCode } from '@/lib/finance-package-gate';
+import { getSession } from '@/lib/session';
 
 const sessionOptions = {
   password: process.env.SESSION_SECRET || 'complex_password_at_least_32_characters_long',
@@ -23,6 +24,8 @@ export async function POST(
 
     const session = await getIronSession(cookies(), sessionOptions);
     session.destroy();
+    const appSession = await getSession();
+    appSession.destroy();
 
     return NextResponse.json({
       success: true,

@@ -166,6 +166,7 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
     });
 
     let emailNotificationSent = false;
+    let schoolEmailNotificationSent = false;
     // Send email notification if parent email exists
     try {
       const { EmailService } = await import('@/lib/services/email-service');
@@ -175,6 +176,38 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
         schoolRecord.code
       );
       console.log('Email notification status for payment:', payment.id, emailNotificationSent);
+
+      // Notify the school's registered email for audit trail (receipt + statement links)
+      if (schoolRecord.email) {
+        const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000").replace(/\/$/, "");
+        const receiptUrl = `${baseUrl}/api/schools/${schoolRecord.code}/receipts/${encodeURIComponent(receipt.receiptNumber)}/download?size=A4`;
+        const statementUrl = `${baseUrl}/api/schools/${schoolRecord.code}/students/${encodeURIComponent(student.id)}/fee-statement/download?academicYearId=${encodeURIComponent(academicYearRecord.id)}`;
+        schoolEmailNotificationSent = await emailService.sendSchoolFeeActionNotification({
+          schoolId: schoolRecord.id,
+          toEmail: schoolRecord.email,
+          subject: `Payment recorded — ${student.user.name} (${student.admissionNumber})`,
+          text:
+            `A payment was recorded.\n\n` +
+            `School: ${schoolName} (${schoolRecord.code})\n` +
+            `Student: ${student.user.name}\n` +
+            `Admission: ${student.admissionNumber}\n` +
+            `Amount: KES ${Number(amount).toLocaleString()}\n` +
+            `Academic Year: ${academicYear}\n` +
+            `Term: ${term}\n` +
+            `Receipt: ${receipt.receiptNumber}\n\n` +
+            `Receipt PDF: ${receiptUrl}\n` +
+            `Annual fee statement: ${statementUrl}\n`,
+          html:
+            `<h2>Payment recorded</h2>` +
+            `<p><strong>School:</strong> ${schoolName} (${schoolRecord.code})</p>` +
+            `<p><strong>Student:</strong> ${student.user.name} (${student.admissionNumber})</p>` +
+            `<p><strong>Amount:</strong> KES ${Number(amount).toLocaleString()}</p>` +
+            `<p><strong>Academic Year:</strong> ${academicYear} <strong>Term:</strong> ${term}</p>` +
+            `<p><strong>Receipt:</strong> ${receipt.receiptNumber}</p>` +
+            `<p><a href="${receiptUrl}">Download receipt (A4 PDF)</a></p>` +
+            `<p><a href="${statementUrl}">Download annual fee statement</a></p>`,
+        });
+      }
     } catch (emailError) {
       console.error('Email notification failed:', emailError);
       // Don't fail the payment if email fails
@@ -206,6 +239,7 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
       },
       receipt,
       emailNotificationSent,
+      schoolEmailNotificationSent,
     }, { status: 201 });
 
   } catch (error: any) {
