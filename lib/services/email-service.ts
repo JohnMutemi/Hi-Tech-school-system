@@ -28,6 +28,7 @@ interface PaymentNotificationData {
   receiptDownloadUrlA3?: string
   receiptDownloadUrlA4?: string
   receiptDownloadUrlA5?: string
+  receiptViewUrl?: string
   feesStatementUrl?: string
   academicYearId?: string
   admissionNumber?: string
@@ -185,6 +186,23 @@ export class EmailService {
     }
   }
 
+  // Helper function to generate receipt view URL (same as portal receipt modal view)
+  private generateReceiptViewUrl(
+    schoolCode: string,
+    studentId: string,
+    receiptNumber: string
+  ): string {
+    let baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+    baseUrl = baseUrl.replace(/\/$/, '')
+    if (!baseUrl.includes('localhost') && !baseUrl.startsWith('https://')) {
+      baseUrl = baseUrl.replace('http://', 'https://')
+    }
+
+    const token = createEmailDownloadToken({ schoolCode, studentId, receiptNumber })
+    const tokenParam = token ? `?token=${encodeURIComponent(token)}` : ''
+    return `${baseUrl}/api/schools/${schoolCode}/receipts/${receiptNumber}/view${tokenParam}`
+  }
+
   // Helper function to generate fee statement direct download URL
   private generateFeeStatementDownloadUrl(schoolCode: string, studentId: string, academicYearId?: string): string {
     let baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
@@ -322,7 +340,7 @@ export class EmailService {
         }
       }
 
-      const emailContent = this.generatePaymentConfirmationEmail(paymentData)
+      const emailContent = this.generateUniformPaymentReceiptEmail(paymentData)
 
       let success = false
       switch (this.config.provider) {
@@ -358,125 +376,138 @@ export class EmailService {
     }
   }
 
-  // Enhanced function to send payment notification with complete payment data
+  private async buildPaymentNotificationData(
+    paymentId: string,
+    schoolCode: string
+  ): Promise<{
+    schoolId: string
+    parentEmail: string | null
+    paymentNotificationData: PaymentNotificationData
+  } | null> {
+    const school = await prisma.school.findUnique({ where: { code: schoolCode } })
+    if (!school) {
+      console.error('School not found:', schoolCode)
+      return null
+    }
+
+    const payment = await prisma.payment.findUnique({
+      where: { id: paymentId },
+      include: {
+        student: { include: { user: true, parent: true } },
+        academicYear: true,
+        term: true,
+        receipt: true,
+      },
+    })
+    if (!payment) {
+      console.error('Payment not found:', paymentId)
+      return null
+    }
+
+    const studentFull = await prisma.student.findFirst({
+      where: { id: payment.studentId },
+      include: { user: true, class: { include: { grade: true } } },
+    })
+
+    let outstandingAfter = 0
+    let academicYearOutstandingAfter = 0
+    let termOutstandingAfter = 0
+
+    if (studentFull && payment.academicYearId) {
+      const snap = await computeStudentFeesSnapshot(
+        prisma,
+        school,
+        studentFull,
+        payment.academicYearId,
+        { persistYearEndCarryForward: false }
+      )
+      if (!('error' in snap)) {
+        outstandingAfter = snap.outstanding
+        academicYearOutstandingAfter = snap.academicYearOutstanding
+        const termRow = snap.termBalances.find((t) => t.termId === payment.termId)
+        termOutstandingAfter = termRow ? termRow.balance : snap.academicYearOutstanding
+      }
+    }
+
+    const rcpt = payment.receipt
+    const termOutstandingBefore =
+      rcpt?.termOutstandingBefore ?? termOutstandingAfter + payment.amount
+    const academicYearOutstandingBefore =
+      rcpt?.academicYearOutstandingBefore ?? academicYearOutstandingAfter + payment.amount
+
+    const paymentNotificationData: PaymentNotificationData = {
+      studentName: payment.student.user.name,
+      studentId: payment.student.id,
+      amount: payment.amount,
+      paymentMethod: payment.paymentMethod || 'Manual Payment',
+      receiptNumber: payment.receiptNumber,
+      paymentDate: payment.paymentDate.toISOString(),
+      schoolName: school.name,
+      schoolCode: school.code,
+      termName: payment.term.name,
+      academicYear: payment.academicYear.name,
+      academicYearId: payment.academicYear.id,
+      balanceAfter: outstandingAfter,
+      balanceBefore: academicYearOutstandingBefore,
+      admissionNumber: payment.student.admissionNumber || undefined,
+      parentName: payment.student.parentName || undefined,
+      currency: 'KES',
+      status: 'COMPLETED',
+      issuedBy: payment.receivedBy || 'School',
+      reference: payment.referenceNumber || undefined,
+      phoneNumber: payment.student.parent?.phone || undefined,
+      transactionId: undefined,
+      feeType: payment.description || 'School Fees',
+      termOutstandingBefore,
+      termOutstandingAfter,
+      academicYearOutstandingBefore,
+      academicYearOutstandingAfter,
+      carryForward: 0,
+      ...this.generateReceiptDownloadUrls(schoolCode, payment.studentId, payment.receiptNumber),
+      receiptDownloadUrl: this.generateReceiptDownloadUrl(schoolCode, payment.studentId, payment.receiptNumber, 'A4'),
+      receiptViewUrl: this.generateReceiptViewUrl(schoolCode, payment.studentId, payment.receiptNumber),
+    }
+
+    return {
+      schoolId: school.id,
+      parentEmail: payment.student.parentEmail || null,
+      paymentNotificationData,
+    }
+  }
+
+  // Unified payment notification for parent
   async sendPaymentNotificationForPayment(
-    paymentId: string, 
+    paymentId: string,
     schoolCode: string
   ): Promise<boolean> {
     try {
-      // Initialize email service for the school
-      const school = await prisma.school.findUnique({ where: { code: schoolCode } })
-      if (!school) {
-        console.error('School not found:', schoolCode)
+      const payload = await this.buildPaymentNotificationData(paymentId, schoolCode)
+      if (!payload?.parentEmail) {
         return false
       }
-
-      const isEmailEnabled = await this.initializeForSchool(school.id)
-      if (!isEmailEnabled) {
-        console.log('Email notifications not enabled for school:', schoolCode)
-        return false
-      }
-
-      // Fetch complete payment data with related information
-      const payment = await prisma.payment.findUnique({
-        where: { id: paymentId },
-        include: {
-          student: {
-            include: {
-              user: true,
-              parent: true
-            }
-          },
-          academicYear: true,
-          term: true,
-          receipt: true
-        }
-      })
-
-      if (!payment) {
-        console.error('Payment not found:', paymentId)
-        return false
-      }
-
-      if (!payment.student.parentEmail) {
-        console.log('No parent email found for student:', payment.student.id)
-        return false
-      }
-
-      // Align balances with parent/bursar fees API (same engine as GET /students/[id]/fees)
-      const studentFull = await prisma.student.findFirst({
-        where: { id: payment.studentId },
-        include: { user: true, class: { include: { grade: true } } },
-      })
-
-      let outstandingAfter = 0
-      let academicYearOutstandingAfter = 0
-      let termOutstandingAfter = 0
-
-      if (studentFull && payment.academicYearId) {
-        const snap = await computeStudentFeesSnapshot(
-          prisma,
-          school,
-          studentFull,
-          payment.academicYearId,
-          { persistYearEndCarryForward: false }
-        )
-        if (!('error' in snap)) {
-          outstandingAfter = snap.outstanding
-          academicYearOutstandingAfter = snap.academicYearOutstanding
-          const termRow = snap.termBalances.find((t) => t.termId === payment.termId)
-          termOutstandingAfter = termRow ? termRow.balance : snap.academicYearOutstanding
-        }
-      }
-
-      const rcpt = payment.receipt
-      const termOutstandingBefore =
-        rcpt?.termOutstandingBefore ?? termOutstandingAfter + payment.amount
-      const academicYearOutstandingBefore =
-        rcpt?.academicYearOutstandingBefore ?? academicYearOutstandingAfter + payment.amount
-
-      // Prepare payment notification data
-      const paymentNotificationData: PaymentNotificationData = {
-        studentName: payment.student.user.name,
-        studentId: payment.student.id,
-        amount: payment.amount,
-        paymentMethod: payment.paymentMethod || 'Manual Payment',
-        receiptNumber: payment.receiptNumber,
-        paymentDate: payment.paymentDate.toISOString(),
-        schoolName: school.name,
-        schoolCode: school.code,
-        termName: payment.term.name,
-        academicYear: payment.academicYear.name,
-        academicYearId: payment.academicYear.id,
-        balanceAfter: outstandingAfter,
-        balanceBefore: academicYearOutstandingBefore,
-        admissionNumber: payment.student.admissionNumber || undefined,
-        parentName: payment.student.parentName || undefined,
-        currency: 'KES',
-        status: 'COMPLETED',
-        issuedBy: payment.receivedBy || 'School',
-        reference: payment.referenceNumber || undefined,
-        phoneNumber: payment.student.parent?.phone || undefined,
-        transactionId: undefined, // Not available in current schema
-        feeType: payment.description || 'School Fees',
-        termOutstandingBefore,
-        termOutstandingAfter,
-        academicYearOutstandingBefore,
-        academicYearOutstandingAfter,
-        carryForward: 0,
-        ...this.generateReceiptDownloadUrls(schoolCode, payment.studentId, payment.receiptNumber),
-        receiptDownloadUrl: this.generateReceiptDownloadUrl(schoolCode, payment.studentId, payment.receiptNumber, 'A4'),
-      }
-
-      // Send the notification
-      return await this.sendPaymentConfirmation(
-        payment.student.parentEmail,
-        paymentNotificationData,
-        paymentId
-      )
-
+      const isEmailEnabled = await this.initializeForSchool(payload.schoolId)
+      if (!isEmailEnabled) return false
+      return await this.sendPaymentConfirmation(payload.parentEmail, payload.paymentNotificationData, paymentId)
     } catch (error) {
       console.error('Error sending payment notification:', error)
+      return false
+    }
+  }
+
+  // Unified payment notification for any recipient (e.g., school audit email)
+  async sendPaymentNotificationToEmail(
+    paymentId: string,
+    schoolCode: string,
+    recipientEmail: string
+  ): Promise<boolean> {
+    try {
+      const payload = await this.buildPaymentNotificationData(paymentId, schoolCode)
+      if (!payload) return false
+      const isEmailEnabled = await this.initializeForSchool(payload.schoolId)
+      if (!isEmailEnabled) return false
+      return await this.sendPaymentConfirmation(recipientEmail, payload.paymentNotificationData, paymentId)
+    } catch (error) {
+      console.error('Error sending payment notification to recipient:', error)
       return false
     }
   }
@@ -1005,12 +1036,15 @@ export class EmailService {
         </div>
             
         <!-- Receipt + annual fee statement downloads -->
-            ${data.receiptDownloadUrlA4 || data.feesStatementUrl ? `
+            ${data.receiptViewUrl || data.receiptDownloadUrlA4 || data.feesStatementUrl ? `
             <div class="download-section">
                 <div class="download-content">
                     <div class="download-title">Your documents</div>
                     <div class="download-subtitle">Download your payment receipt and annual fee statement (PDF). If a link asks you to sign in, open this email while logged into the parent portal in the same browser.</div>
                     <div class="button-container">
+                        ${data.receiptViewUrl ? `
+                        <a href="${data.receiptViewUrl}" class="download-button receipt-button">View receipt (portal format)</a>
+                        ` : ''}
                         ${data.receiptDownloadUrlA4 ? `
                         <a href="${data.receiptDownloadUrlA4}" class="download-button receipt-button">Receipt (A4 PDF)</a>
                         ` : ''}
@@ -1135,8 +1169,9 @@ Applied to next term fees` : ''}
                       Money Receiver Sign
                         ${data.issuedBy || 'Bursar'}
 
-${data.receiptDownloadUrlA4 || data.feesStatementUrl ? `
+${data.receiptViewUrl || data.receiptDownloadUrlA4 || data.feesStatementUrl ? `
 DOCUMENTS (PDF):
+${data.receiptViewUrl ? `View receipt (portal format): ${data.receiptViewUrl}` : ''}
 ${data.receiptDownloadUrlA4 ? `Receipt (A4): ${data.receiptDownloadUrlA4}` : ''}
 ${data.receiptDownloadUrlA5 ? `Receipt (A5): ${data.receiptDownloadUrlA5}` : ''}
 ${data.feesStatementUrl ? `Annual fee statement: ${data.feesStatementUrl}` : ''}
@@ -1151,6 +1186,143 @@ Processed through: Bursar Portal
 
 ${data.schoolName}
     `
+
+    return { subject, html, text }
+  }
+
+  private generateUniformPaymentReceiptEmail(data: PaymentNotificationData) {
+    const subject = `Payment Receipt - ${data.schoolName}`
+    const paymentMethod = (data.paymentMethod || 'manual').replace('_', ' ')
+    const issuedDate = new Date(data.paymentDate).toLocaleDateString('en-GB')
+    const feeLabel = data.feeType || 'School Fees'
+    const viewLink =
+      data.receiptViewUrl ||
+      this.generateReceiptViewUrl(data.schoolCode, data.studentId, data.receiptNumber)
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${subject}</title>
+</head>
+<body style="margin:0;padding:20px;background:#f3f4f6;font-family:Arial,sans-serif;color:#111827;">
+  <div style="max-width:700px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;">
+    <div style="padding:24px;border-bottom:2px solid #e5e7eb;">
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td>
+            <h1 style="margin:0;font-size:28px;font-weight:800;color:#111827;">${data.schoolName}</h1>
+            <p style="margin:4px 0 0 0;font-size:13px;color:#6b7280;">Receipt No: ${data.receiptNumber}</p>
+          </td>
+          <td align="right">
+            <p style="margin:0;font-size:12px;color:#6b7280;">Date</p>
+            <p style="margin:4px 0 0 0;font-size:14px;font-weight:700;">${issuedDate}</p>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <div style="background:#111827;color:#ffffff;text-align:center;padding:12px 16px;">
+      <strong style="font-size:22px;letter-spacing:0.02em;">PAYMENT RECEIPT</strong>
+    </div>
+
+    <div style="padding:20px;background:#f9fafb;border-bottom:1px solid #e5e7eb;">
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td valign="top" width="50%">
+            <p style="margin:0 0 6px 0;font-size:12px;font-weight:700;color:#4b5563;text-transform:uppercase;">Received From</p>
+            <p style="margin:0;font-size:24px;font-weight:800;color:#111827;">${data.studentName}</p>
+            <p style="margin:4px 0 0 0;font-size:13px;color:#4b5563;">Admission No: ${data.admissionNumber || 'N/A'}</p>
+            <p style="margin:2px 0 0 0;font-size:13px;color:#4b5563;">Parent/Guardian: ${data.parentName || 'N/A'}</p>
+          </td>
+          <td valign="top" width="50%">
+            <p style="margin:0 0 6px 0;font-size:12px;font-weight:700;color:#4b5563;text-transform:uppercase;">Payment For</p>
+            <p style="margin:0;font-size:24px;font-weight:800;color:#111827;">${feeLabel}</p>
+            <p style="margin:4px 0 0 0;font-size:13px;color:#4b5563;">${data.academicYear || 'N/A'} - ${data.termName || 'N/A'}</p>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <div style="padding:20px;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+        <thead>
+          <tr>
+            <th align="left" style="padding:10px 6px;border-bottom:2px solid #e5e7eb;color:#374151;">Description</th>
+            <th align="center" style="padding:10px 6px;border-bottom:2px solid #e5e7eb;color:#374151;">Qty</th>
+            <th align="right" style="padding:10px 6px;border-bottom:2px solid #e5e7eb;color:#374151;">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="padding:12px 6px;border-bottom:1px solid #f3f4f6;">
+              <div style="font-weight:700;">${feeLabel}</div>
+              <div style="font-size:13px;color:#6b7280;">${data.academicYear || 'N/A'} - ${data.termName || 'N/A'}</div>
+              <div style="font-size:12px;color:#6b7280;">Payment Method: ${paymentMethod}</div>
+            </td>
+            <td align="center" style="padding:12px 6px;border-bottom:1px solid #f3f4f6;">1</td>
+            <td align="right" style="padding:12px 6px;border-bottom:1px solid #f3f4f6;font-weight:700;">KES ${Number(data.amount || 0).toLocaleString()}</td>
+          </tr>
+          <tr>
+            <td style="padding:12px 6px;background:#f9fafb;">
+              <div style="font-weight:700;">Account Balance Summary</div>
+              <div style="font-size:13px;color:#4b5563;">Term Balance: KES ${Number(data.termOutstandingBefore || 0).toLocaleString()} -> KES ${Number(data.termOutstandingAfter || 0).toLocaleString()}</div>
+              <div style="font-size:13px;color:#4b5563;">Year Balance: KES ${Number(data.academicYearOutstandingBefore || 0).toLocaleString()} -> KES ${Number(data.academicYearOutstandingAfter || 0).toLocaleString()}</div>
+            </td>
+            <td align="center" style="padding:12px 6px;background:#f9fafb;color:#9ca3af;">-</td>
+            <td align="right" style="padding:12px 6px;background:#f9fafb;color:#9ca3af;">-</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div style="background:#f97316;color:#ffffff;text-align:center;padding:14px 16px;">
+      <div style="font-size:12px;text-transform:uppercase;letter-spacing:0.04em;">Total Amount Paid</div>
+      <div style="font-size:30px;font-weight:800;">KES ${Number(data.amount || 0).toLocaleString()}</div>
+    </div>
+
+    <div style="padding:14px 18px;background:#f9fafb;border-top:1px solid #e5e7eb;">
+      <p style="margin:0 0 6px 0;font-size:11px;text-transform:uppercase;color:#6b7280;">Amount in words</p>
+      <p style="margin:0;font-size:13px;font-weight:700;color:#1f2937;font-style:italic;">${this.convertNumberToWords(Number(data.amount || 0))} Kenyan Shillings Only</p>
+    </div>
+
+    <div style="padding:16px 18px;text-align:center;border-top:1px solid #e5e7eb;">
+      <p style="margin:0 0 8px 0;font-size:14px;font-weight:700;">Thank you for your payment!</p>
+      <p style="margin:0;font-size:12px;color:#6b7280;">Issued by: ${data.issuedBy || 'Bursar Office'}</p>
+    </div>
+  </div>
+
+  <div style="max-width:700px;margin:12px auto 0 auto;text-align:center;">
+    <a href="${viewLink}" style="display:inline-block;background:#111827;color:#ffffff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:700;">Open Uniform Receipt</a>
+    ${data.feesStatementUrl ? `<a href="${data.feesStatementUrl}" style="display:inline-block;margin-left:8px;background:#f3f4f6;color:#111827;text-decoration:none;padding:10px 18px;border-radius:6px;border:1px solid #d1d5db;font-weight:700;">Annual Fee Statement</a>` : ''}
+  </div>
+</body>
+</html>`
+
+    const text = `
+${data.schoolName}
+PAYMENT RECEIPT
+===============================================
+Receipt No: ${data.receiptNumber}
+Date: ${issuedDate}
+Student: ${data.studentName}
+Admission No: ${data.admissionNumber || 'N/A'}
+Parent/Guardian: ${data.parentName || 'N/A'}
+
+Payment For: ${feeLabel}
+Academic Year: ${data.academicYear || 'N/A'}
+Term: ${data.termName || 'N/A'}
+Payment Method: ${paymentMethod}
+Amount Paid: KES ${Number(data.amount || 0).toLocaleString()}
+
+Term Balance: KES ${Number(data.termOutstandingBefore || 0).toLocaleString()} -> KES ${Number(data.termOutstandingAfter || 0).toLocaleString()}
+Year Balance: KES ${Number(data.academicYearOutstandingBefore || 0).toLocaleString()} -> KES ${Number(data.academicYearOutstandingAfter || 0).toLocaleString()}
+
+Open uniform receipt: ${viewLink}
+${data.feesStatementUrl ? `Annual fee statement: ${data.feesStatementUrl}` : ''}
+    `.trim()
 
     return { subject, html, text }
   }

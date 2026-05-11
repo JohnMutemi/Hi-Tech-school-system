@@ -418,9 +418,13 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       }
     });
 
-    // Calculate summary
-    const totalDebit = allRows.reduce((sum, row) => sum + (parseFloat(row.debit) || 0), 0);
-    const totalCredit = allRows.reduce((sum, row) => sum + (parseFloat(row.credit) || 0), 0);
+    // Calculate summary from ledger transactions only (exclude visual helper rows).
+    // This avoids inflating totals with synthetic "term closing" and carry-forward rows.
+    const summaryLedgerRows = allRows.filter((row) =>
+      ['invoice', 'payment', 'brought-forward', 'opening-balance'].includes(String(row.type || ''))
+    );
+    const totalDebit = summaryLedgerRows.reduce((sum, row) => sum + (parseFloat(row.debit) || 0), 0);
+    const totalCredit = summaryLedgerRows.reduce((sum, row) => sum + (parseFloat(row.credit) || 0), 0);
     const finalAcademicYearBalance = allRows.length > 0 ? (allRows[allRows.length - 1].academicYearBalance || 0) : arrearsBroughtForward;
 
     // Get academic year name

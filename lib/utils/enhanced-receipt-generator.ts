@@ -81,62 +81,76 @@ export async function generateEnhancedReceiptPDF(data: EnhancedReceiptData, size
   
   let yPosition = margin
 
-  // Header Section with Blue Background
-  pdf.setFillColor(30, 64, 175) // Blue background
-  pdf.rect(0, 0, pageWidth, 80, 'F')
-  
-  // School Name
-  pdf.setTextColor(255, 255, 255) // White text
-  pdf.setFontSize(size === 'A5' ? 18 : size === 'A3' ? 32 : 24)
+  // Header section (aligned to in-app payment history receipt style)
+  pdf.setFillColor(255, 255, 255)
+  pdf.rect(0, 0, pageWidth, 46, 'F')
+  pdf.setDrawColor(229, 231, 235)
+  pdf.setLineWidth(0.5)
+  pdf.line(0, 46, pageWidth, 46)
+
+  pdf.setTextColor(17, 24, 39)
+  pdf.setFontSize(size === 'A5' ? 16 : size === 'A3' ? 30 : 24)
   pdf.setFont('helvetica', 'bold')
-  const schoolNameWidth = pdf.getTextWidth(data.schoolName)
-  pdf.text(data.schoolName, (pageWidth - schoolNameWidth) / 2, 25)
-  
-  // School Subtitle
-  pdf.setFontSize(size === 'A5' ? 10 : size === 'A3' ? 16 : 12)
+  pdf.text(data.schoolName, margin, 20)
+  pdf.setFontSize(size === 'A5' ? 8 : size === 'A3' ? 12 : 10)
   pdf.setFont('helvetica', 'normal')
-  const subtitleWidth = pdf.getTextWidth('Excellence in Education')
-  pdf.text('Excellence in Education', (pageWidth - subtitleWidth) / 2, 35)
-  
-  // Receipt Title
-  pdf.setFillColor(251, 191, 36) // Yellow background
-  pdf.setTextColor(146, 64, 14) // Brown text
-  pdf.setFontSize(size === 'A5' ? 14 : size === 'A3' ? 20 : 16)
+  pdf.setTextColor(107, 114, 128)
+  pdf.text(`${(data.schoolCode || '').toLowerCase()}@school.ac.ke`, margin, 28)
+
+  // Date + receipt pill on right
+  pdf.setTextColor(107, 114, 128)
+  pdf.setFontSize(size === 'A5' ? 7 : size === 'A3' ? 11 : 9)
+  const rightX = pageWidth - margin - 55
+  pdf.text('Date', rightX, 14)
+  pdf.setTextColor(17, 24, 39)
+  pdf.setFont('helvetica', 'bold')
+  pdf.text(new Date(data.paymentDate).toLocaleDateString('en-GB'), rightX, 20)
+  pdf.setFillColor(255, 237, 213)
+  pdf.roundedRect(rightX, 24, 50, 14, 2, 2, 'F')
+  pdf.setTextColor(124, 45, 18)
+  pdf.setFontSize(size === 'A5' ? 7 : size === 'A3' ? 10 : 8)
+  pdf.text('RECEIPT NO', rightX + 3, 29)
+  pdf.setFont('helvetica', 'bold')
+  pdf.text(data.receiptNumber, rightX + 3, 35)
+
+  // Black title bar
+  pdf.setFillColor(17, 24, 39)
+  pdf.rect(0, 46, pageWidth, 16, 'F')
+  pdf.setTextColor(255, 255, 255)
+  pdf.setFontSize(size === 'A5' ? 11 : size === 'A3' ? 18 : 15)
   pdf.setFont('helvetica', 'bold')
   const titleText = 'PAYMENT RECEIPT'
   const titleWidth = pdf.getTextWidth(titleText)
-  const titleX = (pageWidth - titleWidth) / 2 - 10
-  pdf.roundedRect(titleX, 45, titleWidth + 20, 12, 3, 3, 'F')
-  pdf.text(titleText, (pageWidth - titleWidth) / 2, 53)
-  
-  yPosition = 90
+  pdf.text(titleText, (pageWidth - titleWidth) / 2, 56)
+
+  yPosition = 72
 
   // Receipt Number and Date Section
-  pdf.setTextColor(0, 0, 0) // Black text
-  pdf.setFillColor(248, 250, 252) // Light gray background
-  pdf.rect(0, yPosition, pageWidth, 25, 'F')
+  pdf.setTextColor(0, 0, 0)
+  pdf.setFillColor(249, 250, 251)
+  pdf.rect(0, yPosition, pageWidth, 30, 'F')
   
   // Receipt Number
   pdf.setFontSize(size === 'A5' ? 10 : size === 'A3' ? 16 : 12)
   pdf.setFont('helvetica', 'bold')
-  pdf.text('RECEIPT NO:', margin, yPosition + 8)
+  pdf.text('RECEIVED FROM:', margin, yPosition + 8)
   pdf.setFont('helvetica', 'normal')
-  pdf.text(data.receiptNumber, margin + 35, yPosition + 8)
+  pdf.text(data.studentName, margin, yPosition + 16)
+  pdf.setFontSize(size === 'A5' ? 8 : size === 'A3' ? 12 : 10)
+  pdf.setTextColor(75, 85, 99)
+  pdf.text(`Admission No: ${data.admissionNumber || 'N/A'}`, margin, yPosition + 23)
   
   // Date
   pdf.setFont('helvetica', 'bold')
-  pdf.text('DATE:', margin, yPosition + 18)
+  pdf.text('PAYMENT FOR:', pageWidth / 2 + 5, yPosition + 8)
   pdf.setFont('helvetica', 'normal')
-  pdf.text(formatDate(data.paymentDate), margin + 20, yPosition + 18)
+  pdf.setTextColor(17, 24, 39)
+  pdf.text(data.description || 'School Fees', pageWidth / 2 + 5, yPosition + 16)
+  pdf.setFontSize(size === 'A5' ? 8 : size === 'A3' ? 12 : 10)
+  pdf.setTextColor(75, 85, 99)
+  pdf.text(`${data.academicYear || ''} - ${data.term || ''}`, pageWidth / 2 + 5, yPosition + 23)
   
-  // Payment For (right side)
-  pdf.setFont('helvetica', 'bold')
-  const paymentForX = pageWidth - margin - 80
-  pdf.text('PAYMENT FOR:', paymentForX, yPosition + 8)
-  pdf.setFont('helvetica', 'normal')
-  pdf.text(data.description || 'School Fees', paymentForX, yPosition + 18)
-  
-  yPosition += 35
+  yPosition += 40
 
   // Student Information Section
   pdf.setFontSize(size === 'A5' ? 12 : size === 'A3' ? 18 : 14)
@@ -296,7 +310,12 @@ export async function generateEnhancedReceiptPDF(data: EnhancedReceiptData, size
   }
 
   // Footer Section
-  yPosition = pageHeight - 40
+  // Keep footer from overlapping content; if needed, move to a new page.
+  if (yPosition > pageHeight - 60) {
+    pdf.addPage()
+    yPosition = margin + 10
+  }
+  yPosition = Math.max(yPosition + 8, pageHeight - 40)
   pdf.setFillColor(248, 250, 252) // Light gray background
   pdf.rect(0, yPosition, pageWidth, 40, 'F')
   
