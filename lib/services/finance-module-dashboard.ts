@@ -66,7 +66,14 @@ export type FinanceDashboardPayload = {
     totalStudents: number;
     totalOutstanding: number;
     studentsWithBalance: number;
+    /** Billable fees cleared (positive bill and no outstanding balance). */
     fullyPaid: number;
+    /** Billable, owes balance, but has paid something toward fees */
+    partiallyPaid: number;
+    /** Billable, owes balance, no payments recorded */
+    unpaidBillable: number;
+    /** No fee structure / nothing billable for this view */
+    noBillableFee: number;
     totalFeeRequired: number;
     totalPaid: number;
   };
@@ -275,11 +282,20 @@ export async function getFinanceDashboardData(
     })
   );
 
+  const hasBillableFees = (s: FinanceStudentBalance) => s.totalFeeRequired > 0;
+
   const summary = {
     totalStudents: studentsWithBalances.length,
     totalOutstanding: studentsWithBalances.reduce((sum, s) => sum + s.balance, 0),
     studentsWithBalance: studentsWithBalances.filter((s) => s.balance > 0).length,
-    fullyPaid: studentsWithBalances.filter((s) => s.balance <= 0).length,
+    fullyPaid: studentsWithBalances.filter((s) => hasBillableFees(s) && s.balance <= 0).length,
+    partiallyPaid: studentsWithBalances.filter(
+      (s) => hasBillableFees(s) && s.balance > 0 && s.totalPaid > 0
+    ).length,
+    unpaidBillable: studentsWithBalances.filter(
+      (s) => hasBillableFees(s) && s.balance > 0 && s.totalPaid <= 0
+    ).length,
+    noBillableFee: studentsWithBalances.filter((s) => !hasBillableFees(s)).length,
     totalFeeRequired: studentsWithBalances.reduce((sum, s) => sum + s.totalFeeRequired, 0),
     totalPaid: studentsWithBalances.reduce((sum, s) => sum + s.totalPaid, 0),
   };

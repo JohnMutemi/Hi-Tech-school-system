@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Search, 
   Users, 
@@ -45,6 +45,37 @@ import { portalGlassPanelLight } from '@/components/layout/portal-glass-styles';
 import { FeeManagement } from '@/components/school-portal/fee-management';
 import PromotionsSection from '@/components/school-portal/PromotionsSection';
 import { getWorkspaceThemeTokens } from '@/lib/utils/school-theme';
+import { BulkImport } from '@/components/ui/bulk-import';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+
+interface GradeFeeRollup {
+  gradeName: string;
+  totalStudents: number;
+  totalFeeRequired: number;
+  totalPaid: number;
+  totalOutstanding: number;
+}
+
+interface FeeDashboardSummary {
+  totalStudents: number;
+  totalOutstanding: number;
+  studentsWithBalance: number;
+  fullyPaid: number;
+  partiallyPaid: number;
+  unpaidBillable: number;
+  noBillableFee: number;
+  totalFeeRequired: number;
+  totalPaid: number;
+}
 
 interface Student {
   id: string;
@@ -106,6 +137,14 @@ interface BursarDashboardProps {
   mode?: 'bursar' | 'finance';
 }
 
+function normalizeListPayload(data: unknown): unknown[] {
+  if (Array.isArray(data)) return data;
+  if (data && typeof data === 'object' && Array.isArray((data as { data?: unknown[] }).data)) {
+    return (data as { data: unknown[] }).data;
+  }
+  return [];
+}
+
 export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboardProps) {
   const { toast } = useToast();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -134,7 +173,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
     admissionNumber: '',
     dateOfBirth: '',
     dateAdmitted: '',
-    classId: '',
+    gradeId: '',
     parentName: '',
     parentPhone: '',
     parentEmail: '',
@@ -150,12 +189,18 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
   const [schoolInfo, setSchoolInfo] = useState<any>(null);
   const [bursarInfo, setBursarInfo] = useState<any>(null);
   
-  const [summary, setSummary] = useState({
+  const [summary, setSummary] = useState<FeeDashboardSummary>({
     totalStudents: 0,
     totalOutstanding: 0,
     studentsWithBalance: 0,
     fullyPaid: 0,
+    partiallyPaid: 0,
+    unpaidBillable: 0,
+    noBillableFee: 0,
+    totalFeeRequired: 0,
+    totalPaid: 0,
   });
+  const [byGrade, setByGrade] = useState<GradeFeeRollup[]>([]);
   const isFinanceMode = mode === 'finance';
   const themeColor =
     typeof schoolInfo?.colorTheme === 'string' && /^#[0-9A-Fa-f]{6}$/.test(schoolInfo.colorTheme)
@@ -166,12 +211,62 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
     : `/api/schools/${schoolCode}/students/balances`;
   const workspaceTheme = getWorkspaceThemeTokens(themeColor);
 
+  /** Grades API returns levels only; classes API has sections. Merge so filters & onboarding work. */
+  const fetchGradeClassCatalog = useCallback(async () => {
+    try {
+      const [gradesRes, classesRes] = await Promise.all([
+        fetch(`/api/schools/${schoolCode}/grades`, { credentials: 'include' }),
+        fetch(`/api/schools/${schoolCode}/classes`, { credentials: 'include' }),
+      ]);
+
+      const gradeRows = normalizeListPayload(gradesRes.ok ? await gradesRes.json() : []) as Array<{ id: string; name: string }>;
+      const classRows = normalizeListPayload(classesRes.ok ? await classesRes.json() : []) as Array<{
+        id: string;
+        name: string;
+        grade?: { id: string; name: string };
+        gradeId?: string;
+      }>;
+
+      const byGradeId = new Map<string, Grade>();
+
+      for (const cls of classRows) {
+        const gid = cls.grade?.id || cls.gradeId;
+        const gname = cls.grade?.name?.trim() || 'Grade';
+        if (!gid || !cls.id || !cls.name?.trim()) continue;
+        if (!byGradeId.has(gid)) {
+          byGradeId.set(gid, { id: gid, name: gname, classes: [] });
+        }
+        byGradeId.get(gid)!.classes.push({ id: cls.id, name: cls.name.trim() });
+      }
+
+      for (const g of gradeRows) {
+        if (g?.id && g?.name && !byGradeId.has(g.id)) {
+          byGradeId.set(g.id, { id: g.id, name: g.name.trim(), classes: [] });
+        }
+      }
+
+      const merged = Array.from(byGradeId.values()).sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+      );
+      setGrades(merged);
+    } catch (error) {
+      console.error('Error fetching grades/classes:', error);
+      setGrades([]);
+    }
+  }, [schoolCode]);
+
   useEffect(() => {
-    fetchGrades();
+    fetchGradeClassCatalog();
     fetchStudents();
     fetchSchoolInfo();
     fetchBursarInfo();
-  }, [schoolCode, selectedGrade, selectedClass, academicYear, term]);
+  }, [schoolCode, selectedGrade, selectedClass, academicYear, term, fetchGradeClassCatalog]);
+
+  useEffect(() => {
+    if (showAddStudent) {
+      fetchGradeClassCatalog();
+    }
+  }, [showAddStudent, fetchGradeClassCatalog]);
 
   useEffect(() => {
     const t = window.setInterval(() => setNow(new Date()), 1000);
@@ -241,18 +336,6 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
     }
   };
 
-  const fetchGrades = async () => {
-    try {
-      const response = await fetch(`/api/schools/${schoolCode}/grades`);
-      if (response.ok) {
-        const data = await response.json();
-        setGrades(data);
-      }
-    } catch (error) {
-      console.error('Error fetching grades:', error);
-    }
-  };
-
   const fetchStudents = async () => {
     try {
       setLoading(true);
@@ -270,12 +353,19 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
       if (response.ok) {
         const data = await response.json();
         setStudents(data.students || []);
-        setSummary(data.summary || {
+        setSummary({
           totalStudents: 0,
           totalOutstanding: 0,
           studentsWithBalance: 0,
           fullyPaid: 0,
+          partiallyPaid: 0,
+          unpaidBillable: 0,
+          noBillableFee: 0,
+          totalFeeRequired: 0,
+          totalPaid: 0,
+          ...(data.summary || {}),
         });
+        setByGrade(Array.isArray(data.byGrade) ? data.byGrade : []);
       } else {
         throw new Error('Failed to fetch students');
       }
@@ -316,21 +406,17 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
     setSelectedStudent(null);
   };
 
-  const availableClasses = (
-    selectedGrade !== 'all'
-      ? grades.find((grade) => grade.id === selectedGrade)?.classes || []
-      : grades.flatMap((grade) => grade.classes || [])
-  ).filter(
-    (cls): cls is { id: string; name: string } =>
-      Boolean(cls && typeof cls.id === 'string' && typeof cls.name === 'string')
-  );
+  /** One option per grade (backend resolves the single classId when only one class exists under that grade). */
+  const onboardGradeOptions = grades
+    .filter((g) => (g.classes || []).length > 0)
+    .map((g) => ({ id: g.id, label: g.name }));
 
   const handleCreateStudent = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newStudent.fullName.trim() || !newStudent.classId || !newStudent.admissionNumber.trim()) {
+    if (!newStudent.fullName.trim() || !newStudent.gradeId || !newStudent.admissionNumber.trim()) {
       toast({
         title: 'Missing Details',
-        description: 'Student name, admission number, class, parent name, parent phone, and parent email are required.',
+        description: 'Student name, admission number, grade, parent name, parent phone, and parent email are required.',
         variant: 'destructive',
       });
       return;
@@ -355,7 +441,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: newStudent.fullName.trim(),
-          classId: newStudent.classId,
+          gradeId: newStudent.gradeId,
           admissionNumber: newStudent.admissionNumber.trim(),
           dateOfBirth: newStudent.dateOfBirth || undefined,
           yearOfBirth: parsedYearOfBirth,
@@ -381,7 +467,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
         admissionNumber: '',
         dateOfBirth: '',
         dateAdmitted: '',
-        classId: '',
+        gradeId: '',
         parentName: '',
         parentPhone: '',
         parentEmail: '',
@@ -560,10 +646,53 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
     };
 
     switch (activeTab) {
-      case 'dashboard':
+      case 'dashboard': {
+        const pctOfEnrolled = (n: number) =>
+          summary.totalStudents > 0 ? Math.round((n / summary.totalStudents) * 100) : 0;
+        const enrolledFullyPct = pctOfEnrolled(summary.fullyPaid);
+        const enrolledPartialPct = pctOfEnrolled(summary.partiallyPaid);
+        const enrolledUnpaidPct = pctOfEnrolled(summary.unpaidBillable);
+        const enrolledNoFeePct = pctOfEnrolled(summary.noBillableFee);
+        const feeDen = summary.totalFeeRequired > 0 ? summary.totalFeeRequired : 0;
+        const collectionPct =
+          feeDen > 0 ? Math.min(100, Math.round((summary.totalPaid / feeDen) * 100)) : summary.totalStudents === 0 ? 0 : 100;
+
+        const gradePaymentChartData = byGrade.map((g) => ({
+          name: g.gradeName.length > 14 ? `${g.gradeName.slice(0, 12)}…` : g.gradeName,
+          fullName: g.gradeName,
+          collected: Math.round(g.totalPaid),
+          outstanding: Math.round(g.totalOutstanding),
+          students: g.totalStudents,
+        }));
+
+        const gradeHeadcountData = byGrade.map((g) => ({
+          name: g.gradeName.length > 14 ? `${g.gradeName.slice(0, 12)}…` : g.gradeName,
+          fullName: g.gradeName,
+          students: g.totalStudents,
+        }));
+
+        const paymentsByGradeChartHeight = Math.min(
+          420,
+          Math.max(260, gradePaymentChartData.length * 44 + 120)
+        );
+
+        const currencyTick = (v: number) =>
+          new Intl.NumberFormat('en-KE', {
+            notation: v >= 1_000_000 ? 'compact' : 'standard',
+            compactDisplay: 'short',
+            maximumFractionDigits: v >= 1_000_000 ? 1 : 0,
+          }).format(v);
+
+        const tooltipMoneyStyle = {
+          backgroundColor: 'rgba(255,255,255,0.96)',
+          border: '1px solid var(--brand-18)',
+          borderRadius: '8px',
+          fontSize: '12px',
+        };
+
         return (
           <div className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
               <Card className="bg-white/80 backdrop-blur-sm shadow-md transition-all duration-300 hover:shadow-lg" style={{ border: "1px solid var(--brand-24)" }}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                   <CardTitle className="text-sm font-semibold" style={{ color: "var(--brand)" }}>Total Students</CardTitle>
@@ -573,10 +702,10 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-bold mb-1" style={{ color: "var(--brand)" }}>{summary.totalStudents}</div>
-                  <p className="text-xs font-medium text-slate-600">Enrolled students</p>
+                  <p className="text-xs font-medium text-slate-600">Enrolled students in view</p>
                 </CardContent>
               </Card>
-              
+
               <Card className="bg-gradient-to-br from-red-50 to-white border-red-200/50 hover:shadow-xl hover:shadow-red-100/50 transition-all duration-300 backdrop-blur-sm">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                   <CardTitle className="text-sm font-semibold text-red-800">Total Outstanding</CardTitle>
@@ -588,10 +717,10 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                   <div className="text-3xl font-bold text-red-900 mb-1">
                     {formatCurrency(summary.totalOutstanding)}
                   </div>
-                  <p className="text-xs text-red-600 font-medium">Pending payments</p>
+                  <p className="text-xs text-red-600 font-medium">Pending payments (balance)</p>
                 </CardContent>
               </Card>
-              
+
               <Card className="bg-white/80 backdrop-blur-sm shadow-md transition-all duration-300 hover:shadow-lg" style={{ border: "1px solid var(--brand-24)" }}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                   <CardTitle className="text-sm font-semibold" style={{ color: "var(--brand)" }}>With Balance</CardTitle>
@@ -604,7 +733,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                   <p className="text-xs font-medium text-slate-600">Require payment</p>
                 </CardContent>
               </Card>
-              
+
               <Card className="bg-gradient-to-br from-emerald-50 to-white border-emerald-200/50 hover:shadow-xl hover:shadow-emerald-100/50 transition-all duration-300 backdrop-blur-sm">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                   <CardTitle className="text-sm font-semibold text-emerald-800">Fully Paid</CardTitle>
@@ -614,12 +743,246 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-bold text-emerald-900 mb-1">{summary.fullyPaid}</div>
-                  <p className="text-xs text-emerald-600 font-medium">Completed payments</p>
+                  <p className="text-xs text-emerald-600 font-medium">Billable fees cleared (no balance)</p>
                 </CardContent>
               </Card>
             </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card className="bg-white/80 backdrop-blur-sm shadow-md" style={{ border: "1px solid var(--brand-24)" }}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2" style={{ color: "var(--brand)" }}>
+                    <DollarSign className="h-4 w-4" />
+                    Total fees (billable)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold" style={{ color: "var(--brand)" }}>
+                    {formatCurrency(summary.totalFeeRequired)}
+                  </div>
+                  <p className="text-xs text-slate-600 mt-1">Expected fees for students in this view</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-white/80 backdrop-blur-sm shadow-md" style={{ border: "1px solid var(--brand-24)" }}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2" style={{ color: "var(--brand)" }}>
+                    <TrendingUp className="h-4 w-4" />
+                    Total collected
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-emerald-700">{formatCurrency(summary.totalPaid)}</div>
+                  <p className="text-xs text-slate-600 mt-1">Payments recorded toward those fees</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card className="bg-white/90 backdrop-blur-sm shadow-md overflow-hidden" style={{ border: "1px solid var(--brand-18)" }}>
+                <CardHeader className="pb-2 border-b border-slate-100">
+                  <CardTitle className="text-base font-semibold" style={{ color: "var(--brand)" }}>
+                    Students: payment status
+                  </CardTitle>
+                  <p className="text-xs text-slate-600 mt-1">
+                    Fully paid, partially paid, and unpaid (share of enrolled)
+                  </p>
+                </CardHeader>
+                <CardContent className="pt-6 space-y-4">
+                  <div className="flex h-10 w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-100 shadow-inner">
+                    {summary.totalStudents === 0 ? (
+                      <div className="flex w-full items-center justify-center text-xs text-slate-500">No students in this view</div>
+                    ) : (
+                      <>
+                        <div
+                          className="h-full flex items-center justify-center px-2 text-[11px] font-semibold text-white transition-all"
+                          style={{
+                            width: `${enrolledFullyPct}%`,
+                            backgroundColor: '#059669',
+                            minWidth: enrolledFullyPct > 0 ? '2.25rem' : 0,
+                          }}
+                          title={`Fully paid: ${summary.fullyPaid}`}
+                        >
+                          {enrolledFullyPct > 8 ? `${enrolledFullyPct}%` : ''}
+                        </div>
+                        <div
+                          className="h-full flex items-center justify-center px-2 text-[11px] font-semibold text-white transition-all"
+                          style={{
+                            width: `${enrolledPartialPct}%`,
+                            backgroundColor: '#d97706',
+                            minWidth: enrolledPartialPct > 0 ? '2.25rem' : 0,
+                          }}
+                          title={`Partially paid: ${summary.partiallyPaid}`}
+                        >
+                          {enrolledPartialPct > 8 ? `${enrolledPartialPct}%` : ''}
+                        </div>
+                        <div
+                          className="h-full flex items-center justify-center px-2 text-[11px] font-semibold text-white transition-all"
+                          style={{
+                            width: `${enrolledUnpaidPct}%`,
+                            backgroundColor: '#ea580c',
+                            minWidth: enrolledUnpaidPct > 0 ? '2.25rem' : 0,
+                          }}
+                          title={`Unpaid (billable): ${summary.unpaidBillable}`}
+                        >
+                          {enrolledUnpaidPct > 8 ? `${enrolledUnpaidPct}%` : ''}
+                        </div>
+                        <div
+                          className="h-full flex items-center justify-center px-2 text-[11px] font-semibold text-white transition-all"
+                          style={{
+                            width: `${enrolledNoFeePct}%`,
+                            backgroundColor: '#64748b',
+                            minWidth: enrolledNoFeePct > 0 ? '2.25rem' : 0,
+                          }}
+                          title={`No billable fee in view: ${summary.noBillableFee}`}
+                        >
+                          {enrolledNoFeePct > 8 ? `${enrolledNoFeePct}%` : ''}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs">
+                    <span className="inline-flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-emerald-600" />
+                      Fully paid: <strong>{summary.fullyPaid}</strong>
+                    </span>
+                    <span className="inline-flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-amber-600" />
+                      Partially paid: <strong>{summary.partiallyPaid}</strong>
+                    </span>
+                    <span className="inline-flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-orange-600" />
+                      Unpaid: <strong>{summary.unpaidBillable}</strong>
+                    </span>
+                    {summary.noBillableFee > 0 ? (
+                      <span className="inline-flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-slate-500" />
+                        No fee set: <strong>{summary.noBillableFee}</strong>
+                      </span>
+                    ) : null}
+                    <span className="inline-flex items-center gap-2 text-slate-500">
+                      With balance (any): <strong>{summary.studentsWithBalance}</strong>
+                    </span>
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-100">
+                    <div className="flex justify-between text-xs font-medium text-slate-700 mb-2">
+                      <span>Fee collection progress</span>
+                      <span>{collectionPct}%</span>
+                    </div>
+                    <div className="h-3 w-full rounded-full bg-slate-100 overflow-hidden border border-slate-200">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${collectionPct}%`,
+                          backgroundColor: themeColor,
+                          maxWidth: '100%',
+                        }}
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-2">
+                      Collected {formatCurrency(summary.totalPaid)} of {formatCurrency(summary.totalFeeRequired)} billable
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-white/90 backdrop-blur-sm shadow-md overflow-hidden" style={{ border: "1px solid var(--brand-18)" }}>
+                <CardHeader className="pb-2 border-b border-slate-100">
+                  <CardTitle className="text-base font-semibold" style={{ color: "var(--brand)" }}>
+                    Students per grade
+                  </CardTitle>
+                  <p className="text-xs text-slate-600 mt-1">Headcount by grade (current filters)</p>
+                </CardHeader>
+                <CardContent className="h-[280px] pt-4">
+                  {gradeHeadcountData.length === 0 ? (
+                    <div className="flex h-full items-center justify-center text-sm text-slate-500">No grade breakdown yet</div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={gradeHeadcountData} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200" />
+                        <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-28} textAnchor="end" height={72} />
+                        <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={36} />
+                        <Tooltip
+                          contentStyle={tooltipMoneyStyle}
+                          formatter={(value: number | string, name: string) => [
+                            typeof value === 'number' ? value : value,
+                            name === 'students' ? 'Students' : name,
+                          ]}
+                          labelFormatter={(_, payload) =>
+                            payload?.[0]?.payload?.fullName ? String(payload[0].payload.fullName) : ''
+                          }
+                        />
+                        <Bar dataKey="students" name="Students" fill={themeColor} radius={[6, 6, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card className="bg-white/90 backdrop-blur-sm shadow-md overflow-hidden" style={{ border: "1px solid var(--brand-18)" }}>
+              <CardHeader className="pb-2 border-b border-slate-100">
+                <CardTitle className="text-base font-semibold" style={{ color: "var(--brand)" }}>
+                  Payments by grade level
+                </CardTitle>
+                <p className="text-xs text-slate-600 mt-1">
+                  Collected first, then outstanding (stacked, KES) — hover a bar for student counts
+                </p>
+              </CardHeader>
+              <CardContent className="pt-4 pb-2">
+                {gradePaymentChartData.length === 0 ? (
+                  <div className="flex h-48 items-center justify-center text-sm text-slate-500">
+                    No grade-level fee data for this view
+                  </div>
+                ) : (
+                  <div className="w-full min-h-[260px]" style={{ height: paymentsByGradeChartHeight }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={gradePaymentChartData}
+                        layout="vertical"
+                        margin={{ top: 8, right: 24, left: 8, bottom: 8 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" horizontal className="stroke-slate-200" />
+                        <XAxis
+                          type="number"
+                          tickFormatter={(v) => currencyTick(Number(v))}
+                          tick={{ fontSize: 11 }}
+                        />
+                        <YAxis type="category" dataKey="name" width={88} tick={{ fontSize: 11 }} />
+                        <Tooltip
+                          contentStyle={tooltipMoneyStyle}
+                          formatter={(
+                            value: number | string,
+                            name: string,
+                            item: { dataKey?: string | number }
+                          ) => {
+                            const dk = String(item?.dataKey ?? '');
+                            const label =
+                              dk === 'collected' || name === 'Collected'
+                                ? 'Collected'
+                                : dk === 'outstanding' || name === 'Outstanding'
+                                  ? 'Outstanding'
+                                  : String(name);
+                            return [formatCurrency(Number(value)), label];
+                          }}
+                          labelFormatter={(_, payload) => {
+                            const row = payload?.[0]?.payload;
+                            if (!row) return '';
+                            return `${row.fullName} · ${row.students} students`;
+                          }}
+                        />
+                        <Legend wrapperStyle={{ fontSize: '12px' }} />
+                        <Bar dataKey="collected" name="Collected" stackId="fee" fill="#10b981" radius={[0, 4, 4, 0]} />
+                        <Bar dataKey="outstanding" name="Outstanding" stackId="fee" fill="#f97316" radius={[0, 4, 4, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         );
+      }
 
 
 
@@ -895,7 +1258,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                 <h2 className="text-2xl font-bold" style={{ color: "var(--brand)" }}>Student Fee Management</h2>
                 <p className="text-slate-600">Manage student fee payments and balances</p>
               </div>
-              <div className="grid grid-cols-1 gap-2 sm:flex sm:items-center sm:space-x-3">
+              <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
                 <Button
                   onClick={() => setShowAddStudent(true)}
                   className="text-white shadow-lg w-full sm:w-auto"
@@ -904,6 +1267,21 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                   <Plus className="w-4 h-4 mr-2" />
                   Add Student
                 </Button>
+                <BulkImport
+                  entityType="students"
+                  schoolCode={schoolCode}
+                  variant="outline"
+                  size="default"
+                  className="w-full sm:w-auto shadow-sm"
+                  onSuccess={() => {
+                    fetchGradeClassCatalog();
+                    fetchStudents();
+                    toast({
+                      title: 'Import finished',
+                      description: 'Review results in the import dialog if needed, then refresh the list.',
+                    });
+                  }}
+                />
                 <Button 
                   onClick={exportToExcel} 
                   className="text-white shadow-lg hover:shadow-xl transition-all duration-200 w-full sm:w-auto"
@@ -981,13 +1359,19 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Classes</SelectItem>
-                        {selectedGrade && selectedGrade !== "all" && grades
-                          .find(g => g.id === selectedGrade)
-                          ?.classes.map((cls) => (
-                            <SelectItem key={cls.id} value={cls.id}>
-                              {cls.name}
-                            </SelectItem>
-                          ))}
+                        {selectedGrade && selectedGrade !== 'all'
+                          ? (grades.find((g) => g.id === selectedGrade)?.classes || []).map((cls) => (
+                              <SelectItem key={cls.id} value={cls.id}>
+                                {cls.name}
+                              </SelectItem>
+                            ))
+                          : grades.flatMap((g) =>
+                              (g.classes || []).map((cls) => (
+                                <SelectItem key={cls.id} value={cls.id}>
+                                  {cls.name}
+                                </SelectItem>
+                              ))
+                            )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1419,22 +1803,31 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="studentClass">Class</Label>
+              <Label htmlFor="studentGrade">Grade</Label>
+              <p className="text-xs text-muted-foreground">
+                Choose the learner&apos;s grade (e.g. Grade 1). If that grade has more than one class/stream,
+                add them from Academic Setup by class or merge streams — grade-only enrolment applies when there is exactly one class under the grade.
+              </p>
               <Select
-                value={newStudent.classId}
-                onValueChange={(value) => setNewStudent((prev) => ({ ...prev, classId: value }))}
+                value={newStudent.gradeId || undefined}
+                onValueChange={(value) => setNewStudent((prev) => ({ ...prev, gradeId: value }))}
               >
-                <SelectTrigger id="studentClass">
-                  <SelectValue placeholder="Select class" />
+                <SelectTrigger id="studentGrade">
+                  <SelectValue placeholder="Select grade" />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableClasses.map((cls) => (
-                    <SelectItem key={cls.id} value={cls.id}>
-                      {cls.name}
+                  {onboardGradeOptions.map((row) => (
+                    <SelectItem key={row.id} value={row.id}>
+                      {row.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {onboardGradeOptions.length === 0 ? (
+                <p className="text-xs text-amber-700">
+                  No grades with classes loaded. Ensure grades and classes exist (Academic Setup), then click Refresh or reopen this form.
+                </p>
+              ) : null}
             </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">

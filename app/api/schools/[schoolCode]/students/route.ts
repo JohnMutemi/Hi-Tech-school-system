@@ -162,14 +162,50 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
     const data = await req.json();
     const {
       name, firstName, middleName, surname, email, phone, admissionNumber, yearOfBirth, dateOfBirth, dateAdmitted,
-      parentName, parentPhone, parentEmail, address, gender, classId, avatarUrl,
+      parentName, parentPhone, parentEmail, address, gender, classId, gradeId: gradeIdRaw, avatarUrl,
       emergencyContact, medicalInfo, notes
     } = data;
 
     const fullName = buildStudentFullName({ firstName, middleName, surname, name });
+
+    let resolvedClassId =
+      typeof classId === "string" && classId.trim()
+        ? classId.trim()
+        : "";
+
+    const gradeId =
+      typeof gradeIdRaw === "string" && gradeIdRaw.trim() ? gradeIdRaw.trim() : "";
+
+    if (!resolvedClassId && gradeId) {
+      const classesInGrade = await prisma.class.findMany({
+        where: {
+          schoolId: schoolContext.schoolId,
+          gradeId,
+          isActive: true,
+        },
+        orderBy: { name: "asc" },
+        select: { id: true, name: true },
+      });
+      if (classesInGrade.length === 0) {
+        return NextResponse.json(
+          { error: "No active class exists for the selected grade." },
+          { status: 400 }
+        );
+      }
+      if (classesInGrade.length > 1) {
+        return NextResponse.json(
+          {
+            error: `This grade has multiple classes (${classesInGrade.map((c) => c.name).join(", ")}). Enrol by class from Academic Setup, or use one class per grade for grade-only onboarding.`,
+          },
+          { status: 400 }
+        );
+      }
+      resolvedClassId = classesInGrade[0].id;
+    }
+
     if (
       !fullName ||
-      !classId ||
+      !resolvedClassId ||
       !admissionNumber?.trim() ||
       !parentName?.trim() ||
       !parentPhone?.trim() ||
@@ -178,7 +214,7 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
       return NextResponse.json(
         {
           error:
-            "Missing required fields: student name, admission number, class, parent name, parent phone, and parent email are required.",
+            "Missing required fields: student name, admission number, grade (or class), parent name, parent phone, and parent email are required.",
         },
         { status: 400 }
       );
@@ -338,7 +374,7 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
       data: {
         userId: studentUser.id,
         schoolId: schoolContext.schoolId,
-        classId,
+        classId: resolvedClassId,
         admissionNumber: finalAdmissionNumber,
         dateOfBirth: dateOfBirth
           ? new Date(dateOfBirth)

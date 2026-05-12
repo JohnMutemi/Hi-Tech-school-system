@@ -14,7 +14,9 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
   if (!file) return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
 
   // Resolve schoolId from school code
-  const school = await prisma.school.findUnique({ where: { code: params.schoolCode } });
+  const school = await prisma.school.findFirst({
+    where: { code: { equals: params.schoolCode, mode: 'insensitive' } },
+  });
   if (!school) return NextResponse.json({ error: 'School not found' }, { status: 400 });
 
   const arrayBuffer = await file.arrayBuffer();

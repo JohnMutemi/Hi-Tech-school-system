@@ -40,19 +40,20 @@ const IMPORT_TEMPLATES: Record<string, ImportTemplate> = {
     headers: ['First Name', 'Middle Name', 'Surname', 'Admission Number', 'Year of Birth', 'Date of Admission', 'Class', 'Parent Name', 'Parent Phone', 'Parent Email'],
     required: ['First Name', 'Surname', 'Admission Number', 'Year of Birth', 'Date of Admission', 'Class', 'Parent Name', 'Parent Phone'],
     optional: ['Middle Name', 'Parent Email'],
-    description: 'Import students using the simplified onboarding format. Class names should match existing classes in your school.',
+    description:
+      'Same data as manual onboarding: split the legal name into First / Middle / Surname. The Class column must match the exact class name in your school (as shown next to each grade). Dates: YYYY-MM-DD. Include Parent Email when parents should receive portal access.',
     example: {
-      'First Name': 'John',
-      'Middle Name': 'Kimani',
-      'Surname': 'Doe',
-      'Admission Number': 'ADM001',
-      'Year of Birth': '2010',
-      'Date of Admission': '2026-01-10',
-      'Class': 'Form 1A',
-      'Parent Name': 'Jane Doe',
-      'Parent Phone': '+254700000000',
-      'Parent Email': 'jane.doe@email.com'
-    }
+      'First Name': 'Mary',
+      'Middle Name': 'Wanjiru',
+      'Surname': 'Kamau',
+      'Admission Number': 'MHS-2026-0142',
+      'Year of Birth': '2009',
+      'Date of Admission': '2026-03-12',
+      'Class': 'Grade 10A',
+      'Parent Name': 'Peter Kamau',
+      'Parent Phone': '+254712345678',
+      'Parent Email': 'peter.kamau@example.com',
+    },
   },
   teachers: {
     headers: ['Name', 'Email', 'Phone', 'Qualification', 'Date Joined', 'Assigned Class', 'Academic Year'],
