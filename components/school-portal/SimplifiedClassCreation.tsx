@@ -51,10 +51,18 @@ export function SimplifiedClassCreation({
       const response = await fetch(`/api/schools/${schoolCode}/grades`);
       if (response.ok) {
         const data = await response.json();
-        setGrades(data);
+        const gradesArray = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.data)
+            ? data.data
+            : [];
+        setGrades(gradesArray);
+      } else {
+        setGrades([]);
       }
     } catch (error) {
       console.error('Error fetching grades:', error);
+      setGrades([]);
     }
   };
 

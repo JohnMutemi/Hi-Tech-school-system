@@ -9,6 +9,9 @@ const sessionOptions = {
   cookieName: 'finance-session',
   cookieOptions: {
     secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax' as const,
+    httpOnly: true,
+    path: '/',
   },
 };
 

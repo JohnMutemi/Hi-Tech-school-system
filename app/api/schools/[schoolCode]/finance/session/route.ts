@@ -8,6 +8,9 @@ const sessionOptions = {
   cookieName: 'finance-session',
   cookieOptions: {
     secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax' as const,
+    httpOnly: true,
+    path: '/',
   },
 };
 
@@ -30,7 +33,14 @@ export async function GET(
       );
     }
 
-    if (session.user.schoolCode !== params.schoolCode) {
+    const userSchoolId = session.user.schoolId;
+    const sessionCode = String(session.user.schoolCode || '').trim().toLowerCase();
+    const urlCode = String(params.schoolCode || '').trim().toLowerCase();
+    const schoolMatches =
+      userSchoolId === gate.school.id ||
+      (sessionCode !== '' && sessionCode === urlCode);
+
+    if (!schoolMatches) {
       return NextResponse.json(
         { error: 'Invalid school access' },
         { status: 403 }

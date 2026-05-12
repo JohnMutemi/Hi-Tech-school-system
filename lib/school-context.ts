@@ -25,9 +25,14 @@ export class SchoolDataManager {
    * Initialize school context by fetching school details
    */
   async initialize(): Promise<SchoolContext> {
-    const school = await prisma.school.findUnique({
-      where: { code: this.schoolContext.schoolCode },
-      select: { id: true, code: true, name: true }
+    const school = await prisma.school.findFirst({
+      where: {
+        code: {
+          equals: this.schoolContext.schoolCode,
+          mode: 'insensitive',
+        },
+      },
+      select: { id: true, code: true, name: true },
     });
 
     if (!school) {
@@ -37,7 +42,7 @@ export class SchoolDataManager {
     this.schoolContext = {
       schoolId: school.id,
       schoolCode: school.code,
-      schoolName: school.name
+      schoolName: school.name,
     };
 
     return this.schoolContext;

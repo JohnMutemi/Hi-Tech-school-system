@@ -13,6 +13,9 @@ const sessionOptions = {
   cookieName: 'finance-session',
   cookieOptions: {
     secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax' as const,
+    httpOnly: true,
+    path: '/',
   },
 };
 
@@ -21,23 +24,29 @@ export async function POST(
   { params }: { params: { schoolCode: string } }
 ) {
   try {
-    const { schoolCode } = params;
+    const schoolCode = String(params.schoolCode || "").trim();
     const { email, password } = await request.json();
+    const normalizedEmail = String(email || "").trim().toLowerCase();
     const gate = await resolveFinanceGateForSchoolCode(schoolCode);
 
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
 
-    if (!email || !password) {
+    if (!normalizedEmail || !password) {
       return NextResponse.json(
         { error: 'Email and password are required' },
         { status: 400 }
       );
     }
 
-    const school = await prisma.school.findUnique({
-      where: { code: schoolCode },
+    const school = await prisma.school.findFirst({
+      where: {
+        code: {
+          equals: schoolCode,
+          mode: 'insensitive',
+        },
+      },
     });
 
     if (!school) {
@@ -47,7 +56,10 @@ export async function POST(
     // Finance module currently reuses bursar users for authentication.
     const user = await prisma.user.findFirst({
       where: {
-        email,
+        email: {
+          equals: normalizedEmail,
+          mode: 'insensitive',
+        },
         role: 'bursar',
         schoolId: school.id,
       },
@@ -75,7 +87,8 @@ export async function POST(
       name: user.name,
       role: user.role,
       schoolId: user.schoolId,
-      schoolCode,
+      // Canonical code from DB so session validation matches any URL casing.
+      schoolCode: school.code,
     };
     await session.save();
 
