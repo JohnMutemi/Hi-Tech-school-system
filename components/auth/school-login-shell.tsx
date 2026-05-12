@@ -14,15 +14,27 @@ interface SchoolLoginShellProps {
   adminLoginHref?: string;
   logoUrl?: string | null;
   colorTheme?: string | null;
+  contentVariant?: "general" | "finance";
 }
 
-const HERO_SLIDES = [
+interface HeroSlide {
+  image: string;
+  liner: string;
+  quote: string;
+  author: string;
+  body: string;
+  alt: string;
+}
+
+const GENERAL_HERO_SLIDES: HeroSlide[] = [
   {
     image:
       "https://images.pexels.com/photos/8613089/pexels-photo-8613089.jpeg?auto=compress&cs=tinysrgb&w=1600",
     liner: "Bright minds learning together every day.",
     quote: "Education is the passport to the future, for tomorrow belongs to those who prepare for it today.",
     author: "Malcolm X",
+    body: "A secure digital gateway for students, teachers, parents, and school administrators.",
+    alt: "African children learning in school",
   },
   {
     image:
@@ -30,6 +42,8 @@ const HERO_SLIDES = [
     liner: "Curiosity, confidence, and character in one place.",
     quote: "The beautiful thing about learning is that no one can take it away from you.",
     author: "B.B. King",
+    body: "A secure digital gateway for students, teachers, parents, and school administrators.",
+    alt: "Students collaborating in a classroom",
   },
   {
     image:
@@ -37,6 +51,8 @@ const HERO_SLIDES = [
     liner: "Play, discover, and grow in a safe school community.",
     quote: "Develop a passion for learning. If you do, you will never cease to grow.",
     author: "Anthony J. D'Angelo",
+    body: "A secure digital gateway for students, teachers, parents, and school administrators.",
+    alt: "Young learners in a school activity",
   },
   {
     image:
@@ -44,6 +60,47 @@ const HERO_SLIDES = [
     liner: "Building leaders through learning and teamwork.",
     quote: "An investment in knowledge pays the best interest.",
     author: "Benjamin Franklin",
+    body: "A secure digital gateway for students, teachers, parents, and school administrators.",
+    alt: "Students and teacher in an engaged lesson",
+  },
+];
+
+const FINANCE_HERO_SLIDES: HeroSlide[] = [
+  {
+    image:
+      "https://images.pexels.com/photos/4386366/pexels-photo-4386366.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    liner: "Clarity in collections, confidence in every close.",
+    quote: "Beware of little expenses; a small leak will sink a great ship.",
+    author: "Benjamin Franklin",
+    body: "Built for bursars and finance officers to monitor fees, receipts, and balances with precision.",
+    alt: "Finance professional reviewing digital accounting reports",
+  },
+  {
+    image:
+      "https://images.pexels.com/photos/7821758/pexels-photo-7821758.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    liner: "From invoice to receipt, every transaction stays accountable.",
+    quote: "Do not save what is left after spending; spend what is left after saving.",
+    author: "Warren Buffett",
+    body: "Track payment flows, overdue balances, and statement updates in one secure workspace.",
+    alt: "Person calculating finances with laptop and documents",
+  },
+  {
+    image:
+      "https://images.pexels.com/photos/6694543/pexels-photo-6694543.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    liner: "Reliable school finance operations, day after day.",
+    quote: "Never depend on single income. Make investment to create a second source.",
+    author: "Warren Buffett",
+    body: "Improve financial planning with structured fee records and clear historical insights.",
+    alt: "Financial planning documents with charts and calculator",
+  },
+  {
+    image:
+      "https://images.pexels.com/photos/6963057/pexels-photo-6963057.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    liner: "Control, transparency, and trust across school finance.",
+    quote: "A budget is telling your money where to go instead of wondering where it went.",
+    author: "John C. Maxwell",
+    body: "Make faster finance decisions using accurate data from your independent module.",
+    alt: "Budget analysis with financial dashboard and notes",
   },
 ];
 
@@ -55,16 +112,18 @@ export function SchoolLoginShell({
   adminLoginHref,
   logoUrl,
   colorTheme,
+  contentVariant = "general",
 }: SchoolLoginShellProps) {
   const [activeSlide, setActiveSlide] = useState(0);
   const [direction, setDirection] = useState<1 | -1>(1);
   const theme = getSchoolThemeTokens(colorTheme);
+  const slides = contentVariant === "finance" ? FINANCE_HERO_SLIDES : GENERAL_HERO_SLIDES;
 
   useEffect(() => {
     const timer = window.setInterval(() => {
       setActiveSlide((prev) => {
         const next = prev + direction;
-        if (next >= HERO_SLIDES.length) {
+        if (next >= slides.length) {
           setDirection(-1);
           return prev - 1;
         }
@@ -76,7 +135,7 @@ export function SchoolLoginShell({
       });
     }, 8000);
     return () => window.clearInterval(timer);
-  }, [direction]);
+  }, [direction, slides.length]);
 
   return (
     <div className="min-h-screen bg-slate-100 p-4 md:p-6">
@@ -87,11 +146,11 @@ export function SchoolLoginShell({
               className="flex h-full w-full transition-transform duration-700 ease-out"
               style={{ transform: `translateX(-${activeSlide * 100}%)` }}
             >
-              {HERO_SLIDES.map((slide) => (
+              {slides.map((slide) => (
                 <div key={slide.image} className="relative h-full min-w-full">
                   <img
                     src={slide.image}
-                    alt="African children learning in school"
+                    alt={slide.alt}
                     className="h-full w-full object-cover"
                     draggable={false}
                   />
@@ -117,7 +176,7 @@ export function SchoolLoginShell({
                           {slide.liner}
                         </h2>
                         <p className="mt-4 max-w-md text-sm text-blue-100">
-                          A secure digital gateway for students, teachers, parents, and school administrators.
+                          {slide.body}
                         </p>
                       </div>
                     </div>
@@ -133,7 +192,7 @@ export function SchoolLoginShell({
             </div>
           </div>
           <div className="absolute bottom-8 left-10 z-20 flex items-center gap-2">
-            {HERO_SLIDES.map((_, i) => (
+            {slides.map((_, i) => (
               <button
                 key={i}
                 type="button"

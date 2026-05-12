@@ -54,3 +54,19 @@ export function getSchoolThemeTokens(colorTheme?: string | null) {
   };
 }
 
+export function getWorkspaceThemeTokens(colorTheme?: string | null) {
+  const primary = normalizeHex(colorTheme);
+  // Blend with teal to provide a dependable secondary accent
+  // regardless of the chosen primary theme color.
+  const secondary = mix(primary, "#14b8a6", 0.55);
+
+  return {
+    primary,
+    secondary,
+    primarySoft: mix(primary, "#ffffff", 0.9),
+    primaryMuted: mix(primary, "#e2e8f0", 0.78),
+    secondarySoft: mix(secondary, "#ffffff", 0.88),
+    secondaryMuted: mix(secondary, "#e2e8f0", 0.74),
+  };
+}
+

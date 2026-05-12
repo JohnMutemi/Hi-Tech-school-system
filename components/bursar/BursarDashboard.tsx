@@ -43,6 +43,8 @@ import { PaymentHistoryModal } from './PaymentHistoryModal';
 import { BursarSidebar } from './BursarSidebar';
 import { portalGlassPanelLight } from '@/components/layout/portal-glass-styles';
 import { FeeManagement } from '@/components/school-portal/fee-management';
+import PromotionsSection from '@/components/school-portal/PromotionsSection';
+import { getWorkspaceThemeTokens } from '@/lib/utils/school-theme';
 
 interface Student {
   id: string;
@@ -106,6 +108,8 @@ interface BursarDashboardProps {
 
 export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboardProps) {
   const { toast } = useToast();
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [now, setNow] = useState(() => new Date());
   const [students, setStudents] = useState<Student[]>([]);
   const [filteredStudents, setFilteredStudents] = useState<Student[]>([]);
   const [grades, setGrades] = useState<Grade[]>([]);
@@ -160,6 +164,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
   const balancesEndpoint = isFinanceMode
     ? `/api/finance/${schoolCode}/dashboard`
     : `/api/schools/${schoolCode}/students/balances`;
+  const workspaceTheme = getWorkspaceThemeTokens(themeColor);
 
   useEffect(() => {
     fetchGrades();
@@ -167,6 +172,11 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
     fetchSchoolInfo();
     fetchBursarInfo();
   }, [schoolCode, selectedGrade, selectedClass, academicYear, term]);
+
+  useEffect(() => {
+    const t = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(t);
+  }, []);
 
   useEffect(() => {
     filterStudents();
@@ -440,6 +450,9 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
     }).format(amount);
   };
 
+  const fyLabel = `FY ${academicYear}`;
+  const termLabel = term === "all" ? "All Terms" : term;
+
   if (loading) {
     return (
       <div
@@ -554,7 +567,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
               <Card className="bg-white/80 backdrop-blur-sm shadow-md transition-all duration-300 hover:shadow-lg" style={{ border: "1px solid var(--brand-24)" }}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                   <CardTitle className="text-sm font-semibold" style={{ color: "var(--brand)" }}>Total Students</CardTitle>
-                  <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg border" style={{ backgroundColor: "var(--brand)", borderColor: "var(--brand-24)" }}>
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg border" style={{ backgroundColor: "var(--secondary)", borderColor: "var(--secondary-24)" }}>
                     <Users className="h-6 w-6 text-white" />
                   </div>
                 </CardHeader>
@@ -582,7 +595,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
               <Card className="bg-white/80 backdrop-blur-sm shadow-md transition-all duration-300 hover:shadow-lg" style={{ border: "1px solid var(--brand-24)" }}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                   <CardTitle className="text-sm font-semibold" style={{ color: "var(--brand)" }}>With Balance</CardTitle>
-                  <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg border" style={{ backgroundColor: "var(--brand)", borderColor: "var(--brand-24)" }}>
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg border" style={{ backgroundColor: "var(--secondary)", borderColor: "var(--secondary-24)" }}>
                     <Clock className="h-6 w-6 text-white" />
                   </div>
                 </CardHeader>
@@ -626,7 +639,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                     <AlertCircle className="w-4 h-4 text-white" />
                   </div>
                   <span className="font-semibold text-slate-800">Students with Outstanding Balances</span>
-                  <Badge variant="secondary" className="text-white border" style={{ backgroundColor: "var(--brand)", borderColor: "var(--brand-24)" }}>
+                  <Badge variant="secondary" className="text-white border" style={{ backgroundColor: "var(--secondary)", borderColor: "var(--secondary-24)" }}>
                     {outstandingStudents.length} students
                   </Badge>
                 </CardTitle>
@@ -706,7 +719,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
               <CardContent className="pt-6">
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                   <div>
-                    <h3 className="text-lg font-semibold" style={{ color: "var(--brand)" }}>Fee Structure Actions</h3>
+                    <h3 className="text-lg font-semibold" style={{ color: "var(--secondary)" }}>Fee Structure Actions</h3>
                     <p className="text-sm text-slate-600">
                       Add, update, and delete fee structures from this section.
                     </p>
@@ -861,6 +874,18 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
 
 
 
+      case 'progression':
+        return (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-2xl font-bold" style={{ color: "var(--brand)" }}>Learner Progression</h2>
+              <p className="text-slate-600">
+                Apply progression criteria and advance eligible learners to the next level.
+              </p>
+            </div>
+            <PromotionsSection schoolCode={schoolCode} />
+          </div>
+        );
       case 'students':
       default:
         return (
@@ -1036,14 +1061,14 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                   <div className="flex items-center gap-3">
                     <div
                       className="w-8 h-8 rounded-lg flex items-center justify-center border shadow-sm"
-                      style={{ backgroundColor: "var(--brand)", borderColor: "var(--brand-24)" }}
+                      style={{ backgroundColor: "var(--secondary)", borderColor: "var(--secondary-24)" }}
                     >
                       <Users className="w-4 h-4 text-white" />
                     </div>
                     <span className="font-semibold" style={{ color: "var(--brand)" }}>
                       Student Fee Management
                     </span>
-                    <Badge variant="secondary" className="text-white border" style={{ backgroundColor: "var(--brand)", borderColor: "var(--brand-24)" }}>
+                    <Badge variant="secondary" className="text-white border" style={{ backgroundColor: "var(--secondary)", borderColor: "var(--secondary-24)" }}>
                       {filteredStudents.length} students
                     </Badge>
                   </div>
@@ -1180,9 +1205,12 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
       style={
         {
           "--brand": themeColor,
-          "--brand-12": `${themeColor}12`,
-          "--brand-18": `${themeColor}18`,
-          "--brand-24": `${themeColor}24`,
+          "--brand-12": `${workspaceTheme.primary}12`,
+          "--brand-18": `${workspaceTheme.primary}18`,
+          "--brand-24": `${workspaceTheme.primary}24`,
+          "--secondary": workspaceTheme.secondary,
+          "--secondary-24": `${workspaceTheme.secondary}24`,
+          "--secondary-12": `${workspaceTheme.secondary}12`,
           backgroundColor: `${themeColor}12`,
         } as React.CSSProperties
       }
@@ -1197,16 +1225,19 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
         schoolCode={schoolCode}
         colorTheme={themeColor}
         summary={summary}
+        showProgression={isFinanceMode}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
       />
 
       {/* Main Content */}
-      <div className="lg:ml-80">
+      <div className={`transition-all duration-300 ${isSidebarCollapsed ? "lg:ml-28" : "lg:ml-[21rem]"}`}>
         {/* Enhanced Top Header - Sticky */}
         <div
-          className="sticky-header bg-gradient-to-r from-white/95 to-white/80 px-4 py-4 sm:px-6 sm:py-6 shadow-lg backdrop-blur-md supports-[backdrop-filter]:bg-white/80"
-          style={{ borderBottom: "1px solid var(--brand-18)" }}
+          className="sticky-header mx-2 mt-2 rounded-3xl bg-gradient-to-r from-white/85 to-white/70 px-4 py-4 sm:px-6 sm:py-6 shadow-lg backdrop-blur-md supports-[backdrop-filter]:bg-white/70"
+          style={{ border: "1px solid var(--brand-18)" }}
         >
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <h1 className="text-3xl font-bold" style={{ color: themeColor }}>
                 {activeTab === 'dashboard' && 'Financial Dashboard'}
@@ -1215,25 +1246,43 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                 {activeTab === 'fee-structure' && 'Fee Structure Management'}
                 {activeTab === 'reports' && 'Financial Reports'}
                 {activeTab === 'analytics' && 'Payment Analytics'}
+                {activeTab === 'progression' && 'Learner Progression'}
               </h1>
               <p className="text-sm mt-2 font-medium" style={{ color: themeColor }}>
                 {schoolInfo?.name || (isFinanceMode ? 'Independent Finance Module' : 'Financial Management System')}
               </p>
+              <div className="mt-3 flex flex-wrap gap-2 md:hidden">
+                <Badge
+                  variant="secondary"
+                  className="border text-white"
+                  style={{ backgroundColor: "var(--brand)", borderColor: "var(--brand-24)" }}
+                >
+                  {fyLabel}
+                </Badge>
+                <Badge
+                  variant="secondary"
+                  className="border text-white"
+                  style={{ backgroundColor: "var(--brand)", borderColor: "var(--brand-24)" }}
+                >
+                  {termLabel}
+                </Badge>
+                <div
+                  className="rounded-xl border px-3 py-1.5 text-xs font-semibold"
+                  style={{ color: "var(--brand)", borderColor: "var(--brand-18)", backgroundColor: "var(--brand-12)" }}
+                >
+                  {now.toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                </div>
+              </div>
             </div>
             
             {/* Current Tab Indicator */}
             <div className="hidden md:flex items-center space-x-4">
               <div className="text-right">
                 <p className="text-sm font-medium" style={{ color: "var(--brand)" }}>
-                  Current Session
+                  {fyLabel} • {termLabel}
                 </p>
                 <p className="text-xs" style={{ color: "var(--brand)" }}>
-                  {new Date().toLocaleDateString('en-US', { 
-                    weekday: 'long', 
-                    year: 'numeric', 
-                    month: 'short', 
-                    day: 'numeric' 
-                  })}
+                  {now.toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "short", day: "numeric" })} • {now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
                 </p>
               </div>
               <DropdownMenu>
@@ -1269,7 +1318,12 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
         </div>
 
         <div className="p-3 pb-20 sm:p-4 lg:p-6 lg:pb-6 min-h-[calc(100vh-8rem)]" style={{ backgroundColor: "var(--brand-12)" }}>
-          <div className={`${portalGlassPanelLight} p-3 sm:p-4 lg:p-6 min-h-[320px]`}>{renderTabContent()}</div>
+          <div
+            className={`${portalGlassPanelLight} rounded-3xl p-3 sm:p-4 lg:p-6 min-h-[320px]`}
+            style={{ border: "1px solid var(--brand-18)", boxShadow: "0 18px 45px rgba(15, 23, 42, 0.08)" }}
+          >
+            {renderTabContent()}
+          </div>
         </div>
       </div>
 

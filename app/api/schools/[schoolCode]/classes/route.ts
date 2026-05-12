@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { withSchoolContext } from '@/lib/school-context';
+import { DEFAULT_GRADE_NAMES } from "@/lib/default-school-structure";
 
 async function assertTeacherFreeForClass(
   schoolId: string,
@@ -27,7 +28,55 @@ async function assertTeacherFreeForClass(
 export async function GET(request: NextRequest, { params }: { params: { schoolCode: string } }) {
   try {
     const schoolManager = withSchoolContext(params.schoolCode);
-    await schoolManager.initialize();
+    const schoolContext = await schoolManager.initialize();
+
+    // Auto-heal default Grade 1-9 class set so student onboarding
+    // and fee structure grade selectors always have a complete baseline.
+    for (const gradeName of DEFAULT_GRADE_NAMES) {
+      let grade = await prisma.grade.findFirst({
+        where: {
+          schoolId: schoolContext.schoolId,
+          name: gradeName,
+        },
+      });
+
+      if (!grade) {
+        const platformGrade = await prisma.grade.findFirst({
+          where: {
+            schoolId: null,
+            name: gradeName,
+          },
+        });
+        grade =
+          platformGrade ||
+          (await prisma.grade.create({
+            data: {
+              schoolId: schoolContext.schoolId,
+              name: gradeName,
+              isAlumni: false,
+            },
+          }));
+      }
+
+      const existingClass = await prisma.class.findFirst({
+        where: {
+          schoolId: schoolContext.schoolId,
+          name: gradeName,
+        },
+        select: { id: true },
+      });
+
+      if (!existingClass) {
+        await prisma.class.create({
+          data: {
+            schoolId: schoolContext.schoolId,
+            gradeId: grade.id,
+            name: gradeName,
+            isActive: true,
+          },
+        });
+      }
+    }
     
     const { searchParams } = new URL(request.url);
     const gradeId = searchParams.get('gradeId');

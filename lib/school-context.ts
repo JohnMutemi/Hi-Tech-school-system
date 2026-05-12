@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { DEFAULT_GRADE_NAMES, sortGradeNames } from "@/lib/default-school-structure";
 
 export interface SchoolContext {
   schoolId: string;
@@ -240,6 +241,27 @@ export class SchoolDataManager {
    * Get grades available to this school (both school-specific and platform-level)
    */
   async getGrades() {
+    // Ensure platform defaults include Grade 1-9 so all modules
+    // (students, classes, fee structures) consume one shared baseline.
+    for (const gradeName of DEFAULT_GRADE_NAMES) {
+      const existing = await prisma.grade.findFirst({
+        where: {
+          schoolId: null,
+          name: gradeName,
+        },
+        select: { id: true },
+      });
+      if (!existing) {
+        await prisma.grade.create({
+          data: {
+            name: gradeName,
+            schoolId: null,
+            isAlumni: false,
+          },
+        });
+      }
+    }
+
     // We store grades both at the platform level (schoolId = null) and per-school.
     // Many schools will have the same grade names, so return a de-duplicated list
     // preferring school-specific grades when present.
@@ -275,7 +297,8 @@ export class SchoolDataManager {
     }
 
     const unique = Array.from(byName.values());
-    unique.sort((a, b) => String(a.name).localeCompare(String(b.name), undefined, { numeric: true }));
+    const sortedNames = sortGradeNames(unique.map((grade) => String(grade.name || "")));
+    unique.sort((a, b) => sortedNames.indexOf(String(a.name || "")) - sortedNames.indexOf(String(b.name || "")));
     return unique;
   }
 }

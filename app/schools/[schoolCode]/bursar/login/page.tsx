@@ -20,6 +20,35 @@ export default function BursarLoginPage() {
     password: '',
   });
   const [loading, setLoading] = useState(false);
+  const [contentVariant, setContentVariant] = useState<'general' | 'finance'>('general');
+  const [subheading, setSubheading] = useState('Login to your bursar workspace');
+
+  React.useEffect(() => {
+    let ignore = false;
+    const detectPackageType = async () => {
+      try {
+        const response = await fetch(`/api/schools/${schoolCode}`);
+        if (!response.ok || ignore) return;
+        const data = await response.json();
+        const packageType = String(data?.packageType || '').toLowerCase();
+        if (packageType === 'finance_only') {
+          router.replace(`/schools/${schoolCode}/finance/login`);
+          setContentVariant('finance');
+          setSubheading('Login to your independent finance workspace');
+        }
+      } catch (error) {
+        console.error('Could not detect package type:', error);
+      }
+    };
+
+    if (schoolCode) {
+      detectPackageType();
+    }
+
+    return () => {
+      ignore = true;
+    };
+  }, [schoolCode, router]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -82,8 +111,9 @@ export default function BursarLoginPage() {
     <SchoolLoginShell
       schoolCode={schoolCode}
       heading="Welcome Back!"
-      subheading="Login to your bursar workspace"
+      subheading={subheading}
       adminLoginHref={`/schools/${schoolCode}`}
+      contentVariant={contentVariant}
     >
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>

@@ -845,7 +845,7 @@ export function FeeManagement({
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-2">
-                          <DollarSign className="w-4 h-4 text-green-600" />
+                          <span className="text-sm font-semibold text-green-700">KES</span>
                           <span className="font-bold text-green-700">
                             {(fee.totalAmount || fee.amount || 0).toLocaleString()}
                           </span>
@@ -873,10 +873,10 @@ export function FeeManagement({
                       <TableCell>
                         <div>
                           <p className="font-medium text-gray-900">
-                            {fee.creator?.name || 'N/A'}
+                            {fee.creator?.name || 'Admin'}
                           </p>
                           <p className="text-sm text-gray-500">
-                            {fee.creator?.email || 'N/A'}
+                            {fee.creator?.email || 'admin'}
                           </p>
                         </div>
                       </TableCell>
@@ -1268,10 +1268,10 @@ export function FeeManagement({
                         Created By
                       </div>
                       <div className="font-semibold text-xs text-blue-800">
-                        {viewingFee.creator?.name || 'N/A'}
+                        {viewingFee.creator?.name || 'Admin'}
                       </div>
                       <div className="text-sm text-blue-600">
-                        {viewingFee.creator?.email || 'N/A'}
+                        {viewingFee.creator?.email || 'admin'}
                       </div>
                     </div>
                     <div className="bg-green-50 rounded-lg p-3">

@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { DEFAULT_GRADE_NAMES } from '@/lib/default-school-structure';
 
 const prisma = new PrismaClient();
 
@@ -164,9 +165,8 @@ export class SchoolSeedingService {
       return platformGrades;
     }
 
-    // If no platform grades, create school-specific grades (Grade 1–9)
-    for (let i = 1; i <= 9; i++) {
-      const gradeName = `Grade ${i}`;
+    // If no platform grades, create school-specific grades from defaults.
+    for (const gradeName of DEFAULT_GRADE_NAMES) {
       
       try {
         const existingGrade = await prisma.grade.findFirst({

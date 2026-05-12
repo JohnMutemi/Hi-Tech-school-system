@@ -538,13 +538,25 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
     }
   };
 
+  const brandStyles = {
+    brand: { color: "var(--brand)" } as React.CSSProperties,
+    brandBg: { backgroundColor: "var(--brand)" } as React.CSSProperties,
+    brandBorder: { borderColor: "var(--brand-24)" } as React.CSSProperties,
+    brandSoftBg: { backgroundColor: "var(--brand-12)" } as React.CSSProperties,
+    brandSoftBorder: { borderColor: "var(--brand-18)" } as React.CSSProperties,
+    secondary: { color: "var(--secondary, var(--brand))" } as React.CSSProperties,
+    secondaryBg: { backgroundColor: "var(--secondary, var(--brand))" } as React.CSSProperties,
+    secondaryBorder: { borderColor: "var(--secondary-24, var(--brand-24))" } as React.CSSProperties,
+    secondarySoftBg: { backgroundColor: "var(--secondary-12, var(--brand-12))" } as React.CSSProperties,
+  };
+
   return (
     <div className="space-y-6">
       {/* Step Indicator */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <CheckCircle className="h-6 w-6 text-green-600" />
+            <CheckCircle className="h-6 w-6" style={brandStyles.secondary} />
             Learner progression
           </CardTitle>
           <CardDescription>
@@ -552,27 +564,31 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between mb-6">
+          <div className="mb-2 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[1, 2, 3, 4].map((step) => (
-              <div key={step} className="flex items-center">
-                <div className={`flex items-center justify-center w-12 h-12 rounded-full border-2 ${
-                  currentStep >= step 
-                    ? "bg-blue-600 text-white border-blue-600" 
-                    : "bg-gray-100 text-gray-400 border-gray-300"
-                }`}>
-                  {getStepIcon(step)}
+              <div
+                key={step}
+                className="flex items-center gap-3 rounded-2xl border bg-white/70 p-3 shadow-sm"
+                style={{
+                  borderColor: currentStep >= step ? "var(--brand-24)" : "rgba(148,163,184,0.35)",
+                }}
+              >
+                <div
+                  className="flex h-11 w-11 items-center justify-center rounded-xl border text-white shadow-sm"
+                  style={
+                    currentStep >= step
+                      ? { ...brandStyles.brandBg, ...brandStyles.brandBorder }
+                      : { backgroundColor: "rgba(148,163,184,0.12)", borderColor: "rgba(148,163,184,0.28)", color: "rgb(100,116,139)" }
+                  }
+                >
+                  <span style={currentStep >= step ? undefined : { color: "rgb(100,116,139)" }}>{getStepIcon(step)}</span>
                 </div>
-                <div className="ml-3">
-                  <div className={`text-sm font-medium ${
-                    currentStep >= step ? "text-blue-600" : "text-gray-400"
-                  }`}>
+                <div className="min-w-0">
+                  <div className="text-xs font-semibold uppercase tracking-wide" style={currentStep >= step ? brandStyles.brand : { color: "rgb(148,163,184)" }}>
                     Step {step}
                   </div>
-                  <div className="text-xs text-gray-500">{getStepTitle(step)}</div>
+                  <div className="text-sm font-semibold text-slate-900 truncate">{getStepTitle(step)}</div>
                 </div>
-                {step < 4 && (
-                  <ChevronRight className="h-5 w-5 text-gray-300 mx-4" />
-                )}
               </div>
             ))}
           </div>
@@ -605,9 +621,10 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
                       key={year.id}
                       className={`cursor-pointer transition-all ${
                         selectedAcademicYear === year.id
-                          ? "ring-2 ring-blue-500 bg-blue-50"
+                          ? "ring-2 bg-white"
                           : "hover:bg-gray-50"
                       }`}
+                      style={selectedAcademicYear === year.id ? { boxShadow: "0 0 0 2px var(--brand-24)", backgroundColor: "var(--brand-12)" } : undefined}
                       onClick={() => {
                         setSelectedAcademicYear(year.id);
                         setCriteria(prev => ({ ...prev, academicYearId: year.id }));
@@ -645,6 +662,7 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
                       setShowCriteriaModal(true);
                     }}
                     className="flex items-center gap-2"
+                    style={brandStyles.secondaryBg}
                   >
                     <Plus className="h-4 w-4" />
                     New Criteria
@@ -657,9 +675,10 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
                       key={saved.id}
                       className={`cursor-pointer transition-all ${
                         selectedCriteria === saved.id
-                          ? "ring-2 ring-blue-500 bg-blue-50"
+                          ? "ring-2 bg-white"
                           : "hover:bg-gray-50"
                       }`}
+                      style={selectedCriteria === saved.id ? { boxShadow: "0 0 0 2px var(--brand-24)", backgroundColor: "var(--brand-12)" } : undefined}
                     >
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
@@ -703,10 +722,11 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
             </Tabs>
             
             <div className="flex justify-end">
-              <Button
+                <Button
                 onClick={() => setCurrentStep(2)}
                 disabled={!selectedAcademicYear}
                 className="flex items-center gap-2"
+                style={brandStyles.secondaryBg}
               >
                 Next Step
                 <ChevronRight className="h-4 w-4" />
@@ -787,12 +807,12 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
               </div>
             </div>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="rounded-2xl border p-4" style={{ ...brandStyles.secondarySoftBg, ...brandStyles.secondaryBorder }}>
               <div className="flex items-center gap-2 mb-2">
-                <Info className="h-5 w-5 text-blue-600" />
-                <span className="font-semibold text-blue-800">Criteria Summary</span>
+                <Info className="h-5 w-5" style={brandStyles.secondary} />
+                <span className="font-semibold" style={brandStyles.secondary}>Criteria Summary</span>
               </div>
-              <div className="text-sm text-blue-700">
+              <div className="text-sm text-slate-700">
                 Students must have: <strong>Grade ≥ {criteria.minGrade}%</strong>, 
                 <strong>Fee Balance ≤ ${criteria.maxFeeBalance.toLocaleString()}</strong>, and 
                 <strong>Disciplinary Cases ≤ {criteria.maxDisciplinaryCases}</strong> to be eligible for progression.
@@ -804,6 +824,7 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
                 variant="outline"
                 onClick={() => setCurrentStep(1)}
                 className="flex items-center gap-2"
+                style={brandStyles.brandBorder}
               >
                 <ChevronLeft className="h-4 w-4" />
                 Previous
@@ -812,6 +833,7 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
                 onClick={saveCriteria}
                 disabled={loading}
                 className="flex items-center gap-2"
+                style={brandStyles.secondaryBg}
               >
                 Save Criteria & Continue
                 <ChevronRight className="h-4 w-4" />
@@ -835,27 +857,27 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={selectAllEligible}>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" onClick={selectAllEligible} style={brandStyles.brandBorder}>
                   Select All Eligible
                 </Button>
-                <Button variant="outline" onClick={deselectAll}>
+                <Button variant="outline" onClick={deselectAll} style={brandStyles.brandBorder}>
                   Deselect All
                 </Button>
               </div>
               
-              <div className="flex gap-2">
-                <div className="relative">
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                <div className="relative w-full sm:w-auto">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
                     placeholder="Search students..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 w-64"
+                    className="pl-10 w-full sm:w-64"
                   />
                 </div>
                 <Select value={filterEligible} onValueChange={(value: "all" | "eligible" | "ineligible") => setFilterEligible(value)}>
-                  <SelectTrigger className="w-40">
+                  <SelectTrigger className="w-full sm:w-40">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -872,8 +894,9 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
             </div>
 
             {filteredStudents.length > 0 ? (
-              <div className="border rounded-lg overflow-hidden">
-                <Table>
+              <div className="border rounded-2xl overflow-hidden" style={brandStyles.brandSoftBorder}>
+                <div className="overflow-x-auto">
+                  <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-12">Select</TableHead>
@@ -935,7 +958,8 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
                       </TableRow>
                     ))}
                   </TableBody>
-                </Table>
+                  </Table>
+                </div>
               </div>
             ) : (
               <div className="text-center py-8 text-gray-500">
@@ -952,6 +976,7 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
                 variant="outline"
                 onClick={() => setCurrentStep(2)}
                 className="flex items-center gap-2"
+                style={brandStyles.brandBorder}
               >
                 <ChevronLeft className="h-4 w-4" />
                 Previous
@@ -960,6 +985,7 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
                 onClick={checkEligibility}
                 disabled={loading}
                 className="flex items-center gap-2"
+                style={brandStyles.secondaryBg}
               >
                 Check Eligibility
                 <ChevronRight className="h-4 w-4" />
@@ -982,12 +1008,12 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="rounded-2xl border p-4" style={{ ...brandStyles.secondarySoftBg, ...brandStyles.secondaryBorder }}>
               <div className="flex items-center gap-2 mb-2">
-                <AlertTriangle className="h-5 w-5 text-blue-600" />
-                <span className="font-semibold text-blue-800">Ready to Promote</span>
+                <AlertTriangle className="h-5 w-5" style={brandStyles.secondary} />
+                <span className="font-semibold" style={brandStyles.secondary}>Ready to Promote</span>
               </div>
-              <div className="text-sm text-blue-700">
+              <div className="text-sm text-slate-700">
                 {selectedStudents.length} learners selected for progression to the next academic year.
                 This action cannot be undone.
               </div>
@@ -1018,14 +1044,16 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
                 variant="outline"
                 onClick={() => setCurrentStep(3)}
                 className="flex items-center gap-2"
+                style={brandStyles.brandBorder}
               >
                 <ChevronLeft className="h-4 w-4" />
                 Previous
               </Button>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   variant="outline"
                   onClick={() => setShowHistoryModal(true)}
+                  style={brandStyles.brandBorder}
                 >
                   <Eye className="h-4 w-4 mr-2" />
                   View History
@@ -1034,6 +1062,7 @@ export default function PromotionsSection({ schoolCode }: { schoolCode: string }
                   onClick={executePromotion}
                   disabled={loading || selectedStudents.length === 0}
                   className="flex items-center gap-2"
+                  style={brandStyles.secondaryBg}
                 >
                   Run progression
                   <Play className="h-4 w-4" />

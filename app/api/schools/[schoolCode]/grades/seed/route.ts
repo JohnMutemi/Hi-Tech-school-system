@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
 import { withSchoolContext } from '@/lib/school-context';
+import { DEFAULT_GRADE_NAMES } from '@/lib/default-school-structure';
 
 const prisma = new PrismaClient();
 
@@ -27,10 +28,9 @@ export async function POST(
       },
     });
     
-    // Create new grades 1-9 and default classes (no streams)
+    // Create new default grades and classes from a shared source of truth.
     const grades = [];
-    for (let i = 1; i <= 9; i++) {
-      const gradeName = `Grade ${i}`;
+    for (const gradeName of DEFAULT_GRADE_NAMES) {
       const grade = await prisma.grade.create({ 
         data: { 
           name: gradeName,

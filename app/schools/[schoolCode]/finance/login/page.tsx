@@ -167,6 +167,7 @@ export default function FinanceLoginPage() {
       subheading="Login to your independent finance workspace"
       logoUrl={schoolLogoUrl}
       colorTheme={schoolTheme}
+      contentVariant="finance"
     >
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>
