@@ -97,6 +97,7 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
         role: 'bursar',
         isActive: true,
         schoolId: school.id,
+        mustChangePassword: true,
       },
       select: {
         id: true,

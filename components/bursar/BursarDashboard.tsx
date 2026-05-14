@@ -25,7 +25,9 @@ import {
   User,
   ChevronDown,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,6 +35,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -178,6 +189,23 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
     parentPhone: '',
     parentEmail: '',
   });
+
+  const [showEditStudent, setShowEditStudent] = useState(false);
+  const [editStudentRecord, setEditStudentRecord] = useState<Student | null>(null);
+  const [updatingStudent, setUpdatingStudent] = useState(false);
+  const [editForm, setEditForm] = useState({
+    studentId: '',
+    fullName: '',
+    admissionNumber: '',
+    dateOfBirth: '',
+    dateAdmitted: '',
+    gradeId: '',
+    parentName: '',
+    parentPhone: '',
+    parentEmail: '',
+  });
+  const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
+  const [deletingStudent, setDeletingStudent] = useState(false);
   
   // Navigation state
   const [activeTab, setActiveTab] = useState('students');
@@ -395,12 +423,18 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
     setFilteredStudents(filtered);
   };
 
-  const handlePaymentComplete = async (receipt: any) => {
-    toast({
-      title: 'Payment Successful',
-      description: `Payment of KES ${receipt.amount.toLocaleString()} recorded successfully`,
-    });
-    
+  const handlePaymentComplete = async (
+    _receipt: unknown,
+    opts?: { undoWindowActive?: boolean }
+  ) => {
+    await fetchStudents();
+    if (!opts?.undoWindowActive) {
+      setShowPaymentHub(false);
+      setSelectedStudent(null);
+    }
+  };
+
+  const handlePaymentUndoSettled = async () => {
     await fetchStudents();
     setShowPaymentHub(false);
     setSelectedStudent(null);
@@ -481,6 +515,137 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
       });
     } finally {
       setCreatingStudent(false);
+    }
+  };
+
+  const openEditStudent = (student: Student) => {
+    setEditStudentRecord(student);
+    setEditForm({
+      studentId: student.id,
+      fullName: student.name,
+      admissionNumber: student.admissionNumber,
+      dateOfBirth: '',
+      dateAdmitted: '',
+      gradeId: student.class?.grade?.id || '',
+      parentName: student.parent?.name || '',
+      parentPhone: student.parent?.phone || '',
+      parentEmail: student.parent?.email || '',
+    });
+    setShowEditStudent(true);
+  };
+
+  const handleUpdateStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editForm.studentId || !editStudentRecord) return;
+    if (!editForm.fullName.trim() || !editForm.gradeId || !editForm.admissionNumber.trim()) {
+      toast({
+        title: 'Missing Details',
+        description: 'Student name, admission number, and grade are required.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (!editForm.parentName.trim() || !editForm.parentPhone.trim() || !editForm.parentEmail.trim()) {
+      toast({
+        title: 'Missing Parent Details',
+        description: 'Parent name, phone, and email are required.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    let classId: string | null = null;
+    if (editForm.gradeId === editStudentRecord.class?.grade?.id) {
+      classId = editStudentRecord.class?.id || null;
+    } else {
+      const list = grades.find((g) => g.id === editForm.gradeId)?.classes || [];
+      if (list.length === 1) classId = list[0].id;
+    }
+    if (!classId) {
+      toast({
+        title: 'Class not resolved',
+        description:
+          'Keep the same grade, or choose a grade that has exactly one class under it (same rule as onboarding).',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setUpdatingStudent(true);
+      const response = await fetch(`/api/schools/${schoolCode}/students`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentId: editForm.studentId,
+          name: editForm.fullName.trim(),
+          admissionNumber: editForm.admissionNumber.trim(),
+          dateOfBirth: editForm.dateOfBirth || undefined,
+          dateAdmitted: editForm.dateAdmitted || undefined,
+          classId,
+          parentName: editForm.parentName.trim(),
+          parentPhone: editForm.parentPhone.trim(),
+          parentEmail: editForm.parentEmail.trim(),
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || 'Could not update student');
+      }
+      toast({
+        title: 'Student updated',
+        description: `${editForm.fullName.trim()} was saved successfully.`,
+      });
+      setShowEditStudent(false);
+      setEditStudentRecord(null);
+      await fetchStudents();
+    } catch (error) {
+      toast({
+        title: 'Update failed',
+        description: error instanceof Error ? error.message : 'Could not update student',
+        variant: 'destructive',
+      });
+    } finally {
+      setUpdatingStudent(false);
+    }
+  };
+
+  const handleConfirmDeleteStudent = async () => {
+    if (!studentToDelete) return;
+    try {
+      setDeletingStudent(true);
+      const res = await fetch(`/api/schools/${schoolCode}/students`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studentId: studentToDelete.id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Could not delete student');
+      }
+      toast({
+        title: 'Student removed',
+        description: `${studentToDelete.name} and related fee records were deleted.`,
+      });
+      const removedId = studentToDelete.id;
+      setStudentToDelete(null);
+      if (selectedStudent?.id === removedId) {
+        setSelectedStudent(null);
+        setShowPaymentHub(false);
+      }
+      if (historyStudent?.id === removedId) {
+        setShowPaymentHistory(false);
+        setHistoryStudent(null);
+      }
+      await fetchStudents();
+    } catch (error) {
+      toast({
+        title: 'Delete failed',
+        description: error instanceof Error ? error.message : 'Could not delete student',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingStudent(false);
     }
   };
 
@@ -1042,18 +1207,39 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                             <div className="font-bold text-red-600">{formatCurrency(student.balance)}</div>
                           </TableCell>
                           <TableCell className="text-center">
-                            <Button
-                              size="sm"
-                              onClick={() => {
-                                setSelectedStudent(student);
-                                setShowPaymentHub(true);
-                              }}
-                              className="text-white"
-                              style={{ backgroundColor: "var(--brand)" }}
-                            >
-                              <CreditCard className="w-3 h-3 mr-1" />
-                              Pay Now
-                            </Button>
+                            <div className="flex flex-wrap items-center justify-center gap-1.5">
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedStudent(student);
+                                  setShowPaymentHub(true);
+                                }}
+                                className="text-white"
+                                style={{ backgroundColor: "var(--brand)" }}
+                              >
+                                <CreditCard className="w-3 h-3 mr-1" />
+                                Pay Now
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => openEditStudent(student)}
+                                style={{ borderColor: "var(--brand-24)", color: "var(--brand)" }}
+                                title="Edit student"
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setStudentToDelete(student)}
+                                className="text-red-700 hover:bg-red-50"
+                                style={{ borderColor: "var(--brand-24)" }}
+                                title="Delete student"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -1532,7 +1718,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center justify-center gap-2">
+                            <div className="flex flex-wrap items-center justify-center gap-1.5">
                               <Button
                                 size="sm"
                                 onClick={() => {
@@ -1555,8 +1741,29 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                                 }}
                                 className="shadow-sm hover:bg-transparent"
                                 style={{ borderColor: "var(--brand-24)", color: "var(--brand)" }}
+                                title="Payment history"
                               >
                                 <History className="w-3 h-3" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => openEditStudent(student)}
+                                className="shadow-sm hover:bg-transparent"
+                                style={{ borderColor: "var(--brand-24)", color: "var(--brand)" }}
+                                title="Edit student"
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setStudentToDelete(student)}
+                                className="shadow-sm text-red-700 hover:bg-red-50"
+                                style={{ borderColor: "var(--brand-24)" }}
+                                title="Delete student"
+                              >
+                                <Trash2 className="w-3 h-3" />
                               </Button>
                             </div>
                           </TableCell>
@@ -1733,6 +1940,8 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                 studentId={selectedStudent.id}
                 schoolCode={schoolCode}
                 onPaymentComplete={handlePaymentComplete}
+                onUndoPaymentSettled={handlePaymentUndoSettled}
+                bursarUndoWindowSeconds={60}
                 initialAcademicYear={academicYear}
                 initialSelectedTerm={term !== 'all' ? term : undefined}
                 paymentRecordedBy="Bursar Office"
@@ -1878,6 +2087,154 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
           </form>
         </DialogContent>
       </Dialog>
+
+      <Dialog
+        open={showEditStudent}
+        onOpenChange={(open) => {
+          setShowEditStudent(open);
+          if (!open) setEditStudentRecord(null);
+        }}
+      >
+        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit student</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleUpdateStudent} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="editStudentName">Student full name</Label>
+              <Input
+                id="editStudentName"
+                value={editForm.fullName}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, fullName: e.target.value }))}
+                required
+              />
+            </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="editAdmissionNumber">Admission number</Label>
+                <Input
+                  id="editAdmissionNumber"
+                  value={editForm.admissionNumber}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, admissionNumber: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="editDateOfBirth">Date of birth</Label>
+                <Input
+                  id="editDateOfBirth"
+                  type="date"
+                  value={editForm.dateOfBirth}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, dateOfBirth: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="editDateAdmitted">Date enrolled</Label>
+                <Input
+                  id="editDateAdmitted"
+                  type="date"
+                  value={editForm.dateAdmitted}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, dateAdmitted: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editStudentGrade">Grade</Label>
+              <p className="text-xs text-muted-foreground">
+                To move to another grade, pick a grade with exactly one class (same rule as onboarding). Otherwise keep
+                the current grade.
+              </p>
+              <Select
+                value={editForm.gradeId || undefined}
+                onValueChange={(value) => setEditForm((prev) => ({ ...prev, gradeId: value }))}
+              >
+                <SelectTrigger id="editStudentGrade">
+                  <SelectValue placeholder="Select grade" />
+                </SelectTrigger>
+                <SelectContent>
+                  {onboardGradeOptions.map((row) => (
+                    <SelectItem key={row.id} value={row.id}>
+                      {row.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="editParentName">Parent/guardian name</Label>
+                <Input
+                  id="editParentName"
+                  value={editForm.parentName}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, parentName: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="editParentPhone">Parent phone</Label>
+                <Input
+                  id="editParentPhone"
+                  value={editForm.parentPhone}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, parentPhone: e.target.value }))}
+                  required
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editParentEmail">Parent email</Label>
+              <Input
+                id="editParentEmail"
+                type="email"
+                value={editForm.parentEmail}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, parentEmail: e.target.value }))}
+                required
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setShowEditStudent(false)}>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={updatingStudent}
+                className="text-white"
+                style={{ backgroundColor: themeColor }}
+              >
+                {updatingStudent ? 'Saving…' : 'Save changes'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog
+        open={!!studentToDelete}
+        onOpenChange={(open) => {
+          if (!open && !deletingStudent) setStudentToDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this student?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {studentToDelete
+                ? `This will permanently remove ${studentToDelete.name} (${studentToDelete.admissionNumber}), their portal login, fee assignments, and recorded payments for this school. This cannot be undone.`
+                : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingStudent}>Cancel</AlertDialogCancel>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={deletingStudent}
+              onClick={() => void handleConfirmDeleteStudent()}
+            >
+              {deletingStudent ? 'Deleting…' : 'Delete student'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

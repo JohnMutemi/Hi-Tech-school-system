@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,7 @@ import {
   Loader2,
   DollarSign,
   History,
+  Undo2,
 } from "lucide-react";
 import ReceiptComponent from "./ReceiptComponent";
 import PaymentHistory from "./PaymentHistory";
@@ -24,7 +25,11 @@ import PaymentHistory from "./PaymentHistory";
 interface PaymentHubProps {
   studentId: string;
   schoolCode: string;
-  onPaymentComplete?: (receipt: ReceiptData) => void;
+  onPaymentComplete?: (receipt: ReceiptData, options?: { undoWindowActive?: boolean }) => void;
+  /** After a successful payment, bursar/finance can revert within this many seconds (requires API support). */
+  bursarUndoWindowSeconds?: number;
+  /** Called when the undo window ends (timeout) or after a successful undo. */
+  onUndoPaymentSettled?: () => void;
   initialSelectedTerm?: string;
   initialAmount?: number;
   initialAcademicYear?: string;
@@ -89,13 +94,30 @@ interface BalanceData {
 
 
 
-export default function PaymentHub({ studentId, schoolCode, onPaymentComplete, initialSelectedTerm, initialAmount, initialAcademicYear, paymentRecordedBy = "Parent Portal" }: PaymentHubProps) {
+export default function PaymentHub({
+  studentId,
+  schoolCode,
+  onPaymentComplete,
+  bursarUndoWindowSeconds,
+  onUndoPaymentSettled,
+  initialSelectedTerm,
+  initialAmount,
+  initialAcademicYear,
+  paymentRecordedBy = "Parent Portal",
+}: PaymentHubProps) {
   const { toast } = useToast();
   const schoolPath = encodeURIComponent(schoolCode);
+  const undoSettledRef = useRef(onUndoPaymentSettled);
+  undoSettledRef.current = onUndoPaymentSettled;
   const [isLoading, setIsLoading] = useState(false);
   const [balanceData, setBalanceData] = useState<BalanceData | null>(null);
   const [showReceipt, setShowReceipt] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<ReceiptData | null>(null);
+  const [pendingUndo, setPendingUndo] = useState<{
+    paymentId: string;
+    secondsLeft: number;
+  } | null>(null);
+  const [undoLoading, setUndoLoading] = useState(false);
   const [paymentState, setPaymentState] = useState({
     step: 1,
     selectedTerm: "",
@@ -122,6 +144,21 @@ export default function PaymentHub({ studentId, schoolCode, onPaymentComplete, i
       setPaymentState(prev => ({ ...prev, paymentAmount: initialAmount }));
     }
   }, [initialAmount]);
+
+  useEffect(() => {
+    if (!pendingUndo) return;
+    const id = window.setInterval(() => {
+      setPendingUndo((prev) => {
+        if (!prev) return null;
+        if (prev.secondsLeft <= 1) {
+          queueMicrotask(() => undoSettledRef.current?.());
+          return null;
+        }
+        return { ...prev, secondsLeft: prev.secondsLeft - 1 };
+      });
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [pendingUndo?.paymentId]);
 
   const fetchBalanceData = async () => {
     try {
@@ -234,6 +271,37 @@ export default function PaymentHub({ studentId, schoolCode, onPaymentComplete, i
     return true;
   };
 
+  const handleUndoPayment = async () => {
+    if (!pendingUndo) return;
+    try {
+      setUndoLoading(true);
+      const res = await fetch(`/api/schools/${schoolPath}/payments/${pendingUndo.paymentId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(typeof data.error === "string" ? data.error : "Could not revert payment");
+      }
+      toast({
+        title: "Payment reverted",
+        description: "The payment was removed and balances were recalculated.",
+      });
+      setPendingUndo(null);
+      setShowReceipt(false);
+      setSelectedReceipt(null);
+      await fetchBalanceData();
+      onUndoPaymentSettled?.();
+    } catch (e) {
+      toast({
+        title: "Undo failed",
+        description: e instanceof Error ? e.message : "Try again or contact support.",
+        variant: "destructive",
+      });
+    } finally {
+      setUndoLoading(false);
+    }
+  };
+
   const simulateMPESAPayment = async (): Promise<string> => {
     return new Promise((resolve) => {
       setTimeout(() => {
@@ -329,9 +397,20 @@ export default function PaymentHub({ studentId, schoolCode, onPaymentComplete, i
         setSelectedReceipt(receipt);
         setShowReceipt(true);
 
-        // Call completion callback
+        const canUndoWindow =
+          typeof bursarUndoWindowSeconds === "number" &&
+          bursarUndoWindowSeconds > 0 &&
+          Boolean(receipt.paymentId);
+
+        if (canUndoWindow) {
+          setPendingUndo({
+            paymentId: receipt.paymentId,
+            secondsLeft: bursarUndoWindowSeconds,
+          });
+        }
+
         if (onPaymentComplete) {
-          onPaymentComplete(receipt);
+          onPaymentComplete(receipt, canUndoWindow ? { undoWindowActive: true } : undefined);
         }
       } else {
         const error = await response.json();
@@ -457,7 +536,9 @@ export default function PaymentHub({ studentId, schoolCode, onPaymentComplete, i
 
           <Button
             onClick={processPayment}
-            disabled={paymentState.isProcessing || !paymentState.paymentAmount}
+            disabled={
+              paymentState.isProcessing || !paymentState.paymentAmount || Boolean(pendingUndo)
+            }
             className="w-full"
           >
             {paymentState.isProcessing ? (
@@ -492,6 +573,39 @@ export default function PaymentHub({ studentId, schoolCode, onPaymentComplete, i
 
   return (
     <div className="space-y-6">
+      {pendingUndo ? (
+        <Card className="border-amber-200 bg-amber-50">
+          <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-medium text-amber-950">Recorded the wrong amount?</p>
+              <p className="text-sm text-amber-900">
+                You can undo this payment for{" "}
+                <span className="font-semibold tabular-nums">{pendingUndo.secondsLeft}</span> more second
+                {pendingUndo.secondsLeft === 1 ? "" : "s"}. After that, this option disappears.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="shrink-0 border-amber-300 bg-white hover:bg-amber-100"
+              onClick={handleUndoPayment}
+              disabled={undoLoading}
+            >
+              {undoLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Reverting…
+                </>
+              ) : (
+                <>
+                  <Undo2 className="mr-2 h-4 w-4" />
+                  Undo payment
+                </>
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
       <Tabs defaultValue="payment" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="payment" className="flex items-center gap-2">

@@ -27,6 +27,18 @@ export default function FinanceLoginPage() {
   const [schoolLogoUrl, setSchoolLogoUrl] = useState<string | undefined>(undefined);
 
   React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const qs = new URLSearchParams(window.location.search);
+    if (qs.get('relogin') === '1') {
+      toast({
+        title: 'Sign in with your new password',
+        description: 'Your password was updated. Use the new password you just set.',
+      });
+      router.replace(`/schools/${schoolCode}/finance/login`, { scroll: false });
+    }
+  }, [schoolCode, router, toast]);
+
+  React.useEffect(() => {
     let ignore = false;
     const loadSchoolTheme = async () => {
       try {

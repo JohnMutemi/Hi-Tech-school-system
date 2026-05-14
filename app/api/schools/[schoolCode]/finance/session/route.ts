@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getIronSession } from 'iron-session';
 import { cookies } from 'next/headers';
-import { resolveFinanceGateForSchoolCode } from '@/lib/finance-package-gate';
+import { normalizePackageType, resolveFinanceGateForSchoolCode } from '@/lib/finance-package-gate';
+import { prisma } from '@/lib/prisma';
 
 const sessionOptions = {
   password: process.env.SESSION_SECRET || 'complex_password_at_least_32_characters_long',
@@ -47,9 +48,20 @@ export async function GET(
       );
     }
 
+    const dbUser = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { mustChangePassword: true },
+    });
+
+    const requiresInitialPasswordChange =
+      normalizePackageType(gate.school.packageType) === 'finance_only' &&
+      Boolean(dbUser?.mustChangePassword);
+
     return NextResponse.json({
       success: true,
       user: session.user,
+      requiresInitialPasswordChange,
+      packageType: normalizePackageType(gate.school.packageType),
     });
   } catch (error) {
     console.error('Finance session check error:', error);

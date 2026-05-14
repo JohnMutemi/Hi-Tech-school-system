@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { BursarDashboard } from '@/components/bursar/BursarDashboard';
+import { FinanceFirstLoginPasswordDialog } from '@/components/finance/FinanceFirstLoginPasswordDialog';
 import { useParams, useRouter } from 'next/navigation';
 
 export default function FinanceModulePage() {
@@ -10,6 +11,7 @@ export default function FinanceModulePage() {
   const schoolCode = params.schoolCode as string;
   const [authorized, setAuthorized] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
+  const [requiresInitialPasswordChange, setRequiresInitialPasswordChange] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -25,7 +27,9 @@ export default function FinanceModulePage() {
           return;
         }
 
+        const data = await response.json().catch(() => ({}));
         if (!cancelled) {
+          setRequiresInitialPasswordChange(Boolean(data.requiresInitialPasswordChange));
           setAuthorized(true);
         }
       } catch {
@@ -71,6 +75,9 @@ export default function FinanceModulePage() {
         ></div>
       </div>
       <BursarDashboard schoolCode={schoolCode} mode="finance" />
+      {requiresInitialPasswordChange ? (
+        <FinanceFirstLoginPasswordDialog schoolCode={schoolCode} />
+      ) : null}
     </div>
   );
 }

@@ -679,6 +679,16 @@ export async function DELETE(req: NextRequest, { params }: { params: { schoolCod
       where: { studentId: studentId },
     });
 
+    const paymentIds = await prisma.payment.findMany({
+      where: { studentId },
+      select: { id: true },
+    });
+    if (paymentIds.length > 0) {
+      await prisma.paymentNotificationLog.deleteMany({
+        where: { paymentId: { in: paymentIds.map((p) => p.id) } },
+      });
+    }
+
     // 8. Delete payments
     await prisma.payment.deleteMany({
       where: { studentId: studentId },
