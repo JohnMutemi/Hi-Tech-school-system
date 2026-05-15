@@ -1,44 +1,47 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { findSchoolByCode } from "@/lib/school-lookup";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { schoolCode: string } }
 ) {
   try {
-    const { schoolCode } = params;
+    const school = await findSchoolByCode(params.schoolCode);
+    if (!school) {
+      return NextResponse.json({ error: "School not found" }, { status: 404 });
+    }
 
-    // Get the current academic year
+    const academicYearRecord = await prisma.academicYear.findFirst({
+      where: {
+        schoolId: school.id,
+        isCurrent: true,
+      },
+      orderBy: { startDate: "desc" },
+    });
+
+    if (academicYearRecord) {
+      return NextResponse.json({
+        year: academicYearRecord.name,
+        isActive: academicYearRecord.isCurrent,
+        startDate: academicYearRecord.startDate,
+        endDate: academicYearRecord.endDate,
+      });
+    }
+
+    // Fallback when no row is marked current (calendar estimate only)
     const currentYear = new Date().getFullYear();
-    const currentMonth = new Date().getMonth() + 1; // 1-12
-
-    // Determine academic year based on current date
-    // If we're in the first half of the year (Jan-June), it's the previous year's academic year
-    // If we're in the second half (July-Dec), it's the current year's academic year
+    const currentMonth = new Date().getMonth() + 1;
     let academicYear = currentYear;
     if (currentMonth >= 1 && currentMonth <= 6) {
       academicYear = currentYear - 1;
     }
 
-    // Try to find the academic year in the database
-    const academicYearRecord = await prisma.academicYear.findFirst({
-      where: {
-        school: {
-          schoolCode: schoolCode,
-        },
-        name: academicYear.toString(),
-        isCurrent: true,
-      },
-    });
-
-    // If not found, return the calculated year
-    const year = academicYearRecord?.name || academicYear.toString();
-
     return NextResponse.json({
-      year,
-      isActive: academicYearRecord?.isCurrent || false,
-      startDate: academicYearRecord?.startDate,
-      endDate: academicYearRecord?.endDate,
+      year: academicYear.toString(),
+      isActive: false,
+      startDate: null,
+      endDate: null,
     });
   } catch (error) {
     console.error("Error fetching current academic year:", error);
@@ -47,4 +50,4 @@ export async function GET(
       { status: 500 }
     );
   }
-} 
+}
