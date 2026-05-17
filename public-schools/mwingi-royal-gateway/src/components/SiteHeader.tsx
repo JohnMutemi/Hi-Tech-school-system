@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
+import { StaffLoginButton } from "@/components/StaffLoginButton";
 
 const nav = [
   { to: "/", label: "Home" },
@@ -38,6 +39,7 @@ export function SiteHeader() {
               {i.label}
             </Link>
           ))}
+          <StaffLoginButton />
           <Link
             to="/admissions"
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90"
@@ -68,6 +70,7 @@ export function SiteHeader() {
                 {i.label}
               </Link>
             ))}
+            <StaffLoginButton variant="mobile" onNavigate={() => setOpen(false)} />
             <Link
               to="/admissions"
               onClick={() => setOpen(false)}

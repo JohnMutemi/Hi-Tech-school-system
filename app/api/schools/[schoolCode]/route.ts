@@ -7,6 +7,7 @@ import { normalizePackageType } from '@/lib/finance-package-gate';
 import { getPaletteBySlug } from '@/lib/school-website/palettes';
 import { normalizeTemplateSlug } from '@/lib/school-website/templates';
 import { transformSchoolForApi } from '@/lib/school-website/transform-school-response';
+import { deleteSchoolAndAllRelatedData } from '@/lib/services/school-deletion-service';
 
 const prisma = new PrismaClient();
 
@@ -315,89 +316,16 @@ export async function DELETE(request: NextRequest, { params }: { params: { schoo
       return NextResponse.json({ error: 'School not found' }, { status: 404 });
     }
 
-    await prisma.$transaction(async (tx) => {
-      // Remove deepest dependencies first
-      await tx.schoolTermsAcceptance.deleteMany({ where: { schoolId: school.id } })
-
-      await tx.schoolRestoreJob.deleteMany({
-        where: {
-          OR: [{ targetSchoolId: school.id }, { sourceSchoolId: school.id }],
-        },
-      })
-      await tx.schoolBackup.deleteMany({ where: { schoolId: school.id } })
-
-      await tx.studentPromotionRequest.deleteMany({
-        where: { promotionRequest: { schoolId: school.id } },
-      })
-      await tx.promotionRequest.deleteMany({ where: { schoolId: school.id } })
-
-      await tx.promotionExclusion.deleteMany({
-        where: { student: { schoolId: school.id } },
-      })
-      await tx.promotionLog.deleteMany({
-        where: { student: { schoolId: school.id } },
-      })
-      await tx.classProgression.deleteMany({ where: { schoolId: school.id } })
-      await tx.bulkPromotionConfig.deleteMany({ where: { schoolId: school.id } })
-      await tx.promotionCriteria.deleteMany({ where: { schoolId: school.id } })
-
-      await tx.paymentNotificationLog.deleteMany({
-        where: { payment: { student: { schoolId: school.id } } },
-      })
-      await tx.receipt.deleteMany({
-        where: { student: { schoolId: school.id } },
-      })
-      await tx.payment.deleteMany({
-        where: { student: { schoolId: school.id } },
-      })
-      await tx.paymentRequest.deleteMany({ where: { schoolId: school.id } })
-
-      await tx.feeStatement.deleteMany({
-        where: { student: { schoolId: school.id } },
-      })
-      await tx.studentFee.deleteMany({
-        where: { student: { schoolId: school.id } },
-      })
-      await tx.studentArrear.deleteMany({ where: { schoolId: school.id } })
-      await tx.studentYearlyBalance.deleteMany({
-        where: { student: { schoolId: school.id } },
-      })
-
-      await tx.feeStructureLog.deleteMany({
-        where: { feeStructure: { schoolId: school.id } },
-      })
-      await tx.termlyFeeStructure.deleteMany({ where: { schoolId: school.id } })
-      await tx.feeStructure.deleteMany({ where: { schoolId: school.id } })
-
-      await tx.alumni.deleteMany({ where: { schoolId: school.id } })
-      await tx.subject.deleteMany({ where: { schoolId: school.id } })
-      await tx.student.deleteMany({ where: { schoolId: school.id } })
-      await tx.class.deleteMany({ where: { schoolId: school.id } })
-      await tx.grade.deleteMany({ where: { schoolId: school.id } })
-
-      await tx.term.deleteMany({
-        where: { academicYear: { schoolId: school.id } },
-      })
-      await tx.academicYear.deleteMany({ where: { schoolId: school.id } })
-
-      await tx.emailNotificationConfig.deleteMany({ where: { schoolId: school.id } })
-      await tx.schoolWebsiteSection.deleteMany({ where: { schoolId: school.id } })
-      await tx.user.deleteMany({ where: { schoolId: school.id } })
-
-      await tx.school.delete({ where: { id: school.id } })
-    }, {
-      // School teardown can touch many related tables; keep transaction alive longer.
-      maxWait: 10_000,
-      timeout: 120_000,
-    })
+    await deleteSchoolAndAllRelatedData(school.id)
 
     return NextResponse.json({ message: 'School deleted successfully' });
   } catch (error) {
     console.error("Error deleting school:", error);
+    const detail =
+      error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
       {
-        error:
-          "Failed to delete school. It may still have protected linked records. Please deactivate it if deletion is not allowed.",
+        error: `Failed to delete school: ${detail}`,
       },
       { status: 500 }
     );

@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
-import { MapPin, Phone, Mail, Lock } from "lucide-react";
+import { MapPin, Phone, Mail } from "lucide-react";
+import { StaffLoginButton } from "@/components/StaffLoginButton";
 
 export function SiteFooter() {
   return (
@@ -33,12 +34,7 @@ export function SiteFooter() {
       <div className="border-t border-white/10">
         <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-3 px-5 py-5 text-xs text-primary-foreground/60 sm:flex-row sm:items-center sm:px-6">
           <div>© {new Date().getFullYear()} Mwingi Royal Junior Academy. All rights reserved.</div>
-          <Link
-            to="/staff-login"
-            className="inline-flex items-center gap-1.5 rounded-md border border-white/15 px-3 py-1.5 text-[11px] font-medium text-primary-foreground/80 hover:bg-white/10"
-          >
-            <Lock size={12} /> Staff Login
-          </Link>
+          <StaffLoginButton variant="footer" />
         </div>
       </div>
     </footer>

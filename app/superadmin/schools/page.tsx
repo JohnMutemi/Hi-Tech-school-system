@@ -119,7 +119,9 @@ export default function SchoolsManagementPage() {
 
   const handleDeleteSchool = async (school: any) => {
     const confirmed = window.confirm(
-      `Delete ${school.name}? This removes the school and related records. This action cannot be undone.`
+      `Permanently delete "${school.name}" (code: ${school.schoolCode})?\n\n` +
+        `This force-removes the school and ALL related data: students, staff accounts, fees, payments, grades, promotions, backups, and website content. ` +
+        `You can recreate the same school code afterward for testing. This cannot be undone.`
     )
     if (!confirmed) return
     try {
