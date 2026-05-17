@@ -6,14 +6,17 @@
 // You can pass additional config via defineConfig({ vite: { ... } }) if needed.
 import { loadEnv } from "vite";
 import { defineConfig as defineTanstackConfig } from "@lovable.dev/vite-tanstack-config";
+import { nitro } from "nitro/vite";
 
-// Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
-// @cloudflare/vite-plugin builds from this — wrangler.jsonc main alone is insufficient.
+const isVercel = Boolean(process.env.VERCEL);
+
 export default defineTanstackConfig(({ mode }) => {
   const env = loadEnv(mode, import.meta.dirname, "");
   const platformUrl = (env.VITE_PLATFORM_URL || "http://localhost:3000").replace(/\/$/, "");
 
   return {
+    cloudflare: isVercel ? false : undefined,
+    plugins: isVercel ? [nitro()] : [],
     tanstackStart: {
       server: { entry: "server" },
     },
