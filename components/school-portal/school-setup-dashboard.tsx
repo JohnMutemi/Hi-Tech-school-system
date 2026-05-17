@@ -445,6 +445,7 @@ export function SchoolSetupDashboard({
         colorTheme={schoolData.colorTheme}
         onLogout={onLogout}
         schoolData={schoolData}
+        logoUrl={schoolData.logoUrl}
         onCollapseChange={setIsSidebarCollapsed}
       />
       
@@ -766,9 +767,7 @@ export function SchoolSetupDashboard({
                   </Card>
                 </div>
               </TabsContent>
-
-              {/* Enhanced Tab Content with consistent styling */}
-              <TabsContent value="profile" className="space-y-8">
+<TabsContent value="profile" className="space-y-8">
                 <div className={`${portalGlassPanelLight} p-8`}>
                   <SchoolProfileSection
                     schoolCode={schoolData.schoolCode}

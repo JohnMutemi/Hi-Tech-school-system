@@ -1,6 +1,7 @@
 import { SchoolPortal } from "@/components/school-portal/school-portal"
 import { prisma } from "@/lib/prisma"
 import { redirect } from "next/navigation"
+import { normalizePackageType, staffPortalLoginPath } from "@/lib/finance-package-gate"
 
 interface SchoolPortalPageProps {
   params: {
@@ -48,10 +49,10 @@ export default async function SchoolPortalPage({ params, searchParams }: SchoolP
       },
     })
 
-    const packageType = (school?.packageType || "full").toLowerCase()
+    const packageType = normalizePackageType(school?.packageType)
     if (packageType === "finance_only") {
       const qs = toSearchString(searchParams)
-      redirect(`/schools/${params.schoolCode}/finance/login${qs}`)
+      redirect(`${staffPortalLoginPath(params.schoolCode!, school?.packageType)}${qs}`)
     }
   } catch (error) {
     // Next.js redirect() throws a special error; never swallow it.

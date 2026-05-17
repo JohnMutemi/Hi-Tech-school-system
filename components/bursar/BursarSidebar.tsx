@@ -7,6 +7,7 @@ import {
   DollarSign,
   FileText,
   GraduationCap,
+  Globe,
   LogOut,
   Menu,
   PanelLeftClose,
@@ -33,6 +34,7 @@ interface BursarSidebarProps {
   onTabChange: (tab: string) => void;
   onLogout?: () => void;
   schoolName?: string;
+  logoUrl?: string | null;
   colorTheme?: string;
   summary?: {
     totalStudents: number;
@@ -41,8 +43,11 @@ interface BursarSidebarProps {
     fullyPaid: number;
   };
   showProgression?: boolean;
+  showWebsiteEditor?: boolean;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  bursar?: unknown;
+  schoolCode?: string;
 }
 
 export const BursarSidebar: React.FC<BursarSidebarProps> = ({
@@ -50,29 +55,61 @@ export const BursarSidebar: React.FC<BursarSidebarProps> = ({
   onTabChange,
   onLogout,
   schoolName,
+  logoUrl,
   colorTheme = "#d97706",
   summary,
   showProgression = false,
+  showWebsiteEditor = false,
   isCollapsed = false,
   onToggleCollapse,
+  bursar: _bursar,
+  schoolCode: _schoolCode,
 }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const navItems = showProgression
-    ? [...BASE_NAV_ITEMS, { id: "progression", label: "Learner Progression", icon: GraduationCap, description: "Run class progression workflow" }]
-    : BASE_NAV_ITEMS;
+  let navItems = [...BASE_NAV_ITEMS];
+  if (showWebsiteEditor) {
+    navItems = [
+      ...navItems,
+      {
+        id: "website",
+        label: "Public Website",
+        icon: Globe,
+        description: "Edit your school's public site",
+      },
+    ];
+  }
+  if (showProgression) {
+    navItems = [
+      ...navItems,
+      {
+        id: "progression",
+        label: "Learner Progression",
+        icon: GraduationCap,
+        description: "Run class progression workflow",
+      },
+    ];
+  }
 
   const renderSidebarBody = () => (
     <>
       <div className={`border-b border-white/15 bg-white/5 ${isCollapsed ? "px-3 py-3" : "px-4 py-4"}`}>
         <div className={`flex items-start ${isCollapsed ? "justify-center" : "justify-between gap-2"}`}>
           <div className={`flex ${isCollapsed ? "justify-center" : "items-center gap-3"} min-w-0`}>
+            {logoUrl?.trim() ? (
+              <img
+                src={logoUrl.trim()}
+                alt=""
+                className="w-11 h-11 rounded-xl object-contain border border-white/20 bg-white/95 p-1 shadow-lg shrink-0"
+              />
+            ) : (
             <div
               className="w-11 h-11 rounded-xl flex items-center justify-center shadow-lg border border-white/20 shrink-0"
               style={{ backgroundColor: colorTheme }}
             >
               <School className="w-5 h-5 text-white" />
             </div>
+            )}
             {!isCollapsed ? (
               <div className="min-w-0">
                 <div className="flex items-center gap-2">

@@ -55,6 +55,11 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       }
     });
 
+    const school = await prisma.school.findUnique({
+      where: { id: payload.schoolId },
+      select: { feePaymentParentSmsEnabled: true },
+    });
+
     return NextResponse.json({
       parent: {
         id: parent.id,
@@ -62,6 +67,7 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
         phone: parent.phone,
         email: parent.email,
       },
+      feePaymentParentSmsEnabled: school?.feePaymentParentSmsEnabled ?? false,
       students: students.map(student => ({
         id: student.id,
         userId: student.userId,
@@ -82,7 +88,8 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
         parentEmail: student.parentEmail,
         address: student.address,
         gender: student.gender,
-        status: student.status
+        status: student.status,
+        feePaymentSmsOptIn: student.feePaymentSmsOptIn ?? false,
       }))
     });
   } catch (error) {

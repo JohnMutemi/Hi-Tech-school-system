@@ -12,6 +12,7 @@ import Link from "next/link"
 import { useUser } from "@/hooks/use-user"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
+import { normalizePackageType, staffPortalLoginPath } from "@/lib/finance-package-gate"
 
 export default function SchoolsManagementPage() {
   const router = useRouter()
@@ -55,28 +56,26 @@ export default function SchoolsManagementPage() {
 
   const handleAutofillLogin = async (school: any) => {
     try {
-      // Get admin credentials for this school
+      const staffPath = staffPortalLoginPath(school.schoolCode, school.packageType)
       const res = await fetch(`/api/schools/${school.schoolCode}/admin-credentials`)
       if (res.ok) {
         const data = await res.json()
-        // Open the school portal with just the email autofilled
-        const portalUrl = `${window.location.origin}/schools/${school.schoolCode}?email=${encodeURIComponent(data.email)}&schoolName=${encodeURIComponent(school.name)}`
+        const portalUrl = `${window.location.origin}${staffPath}?email=${encodeURIComponent(data.email)}&schoolName=${encodeURIComponent(school.name)}`
         window.open(portalUrl, "_blank")
         toast({
           title: "Login Page Opened",
-          description: `School login page opened with autofilled email for ${school.name}. Please enter your password.`,
+          description: `Opened ${normalizePackageType(school.packageType) === "finance_only" ? "finance" : "staff"} login for ${school.name}.`,
         })
       } else {
-        // Fallback: open portal without autofill
-        window.open(school.portalUrl, "_blank")
+        window.open(`${window.location.origin}${staffPath}`, "_blank")
         toast({
           title: "Portal Opened",
-          description: `School portal opened for ${school.name}`,
+          description: `Opened staff login for ${school.name}`,
         })
       }
     } catch (error) {
-      // Fallback: open portal without autofill
-      window.open(school.portalUrl, "_blank")
+      const staffPath = staffPortalLoginPath(school.schoolCode, school.packageType)
+      window.open(`${window.location.origin}${staffPath}`, "_blank")
       toast({
         title: "Portal Opened",
         description: `School portal opened for ${school.name}`,
@@ -85,11 +84,12 @@ export default function SchoolsManagementPage() {
   }
 
   const copyPortalUrl = (school: any) => {
-    const portalUrl = `${window.location.origin}${school.portalUrl}`
+    const staffPath = staffPortalLoginPath(school.schoolCode, school.packageType)
+    const portalUrl = `${window.location.origin}${staffPath}`
     navigator.clipboard.writeText(portalUrl)
     toast({
       title: "URL Copied",
-      description: `Portal URL for ${school.name} copied to clipboard`,
+      description: `Staff portal URL for ${school.name} copied to clipboard`,
     })
   }
 
@@ -384,8 +384,10 @@ export default function SchoolsManagementPage() {
                             <Button variant="ghost" size="icon" onClick={() => handleToggleSchoolStatus(school)}>
                               <Power className="w-4 h-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" disabled>
-                              <Edit className="w-4 h-4" />
+                            <Button variant="ghost" size="icon" asChild title="Edit school">
+                              <Link href={`/superadmin/schools/${school.schoolCode}/edit`}>
+                                <Edit className="w-4 h-4" />
+                              </Link>
                             </Button>
                             <Button variant="ghost" size="icon" onClick={() => handleDeleteSchool(school)}>
                               <Trash2 className="w-4 h-4" />

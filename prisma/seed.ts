@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { formatSyncReport, getReplicationSyncReport } from './db-sync-check';
+import { COMPREHENSIVE_GRADE_SEQUENCE } from '../lib/default-school-structure';
 
 const prisma = new PrismaClient();
 
@@ -87,21 +88,18 @@ async function main() {
   const deletedGrades = await prisma.grade.deleteMany({});
   console.log(`✅ Deleted ${deletedGrades.count} existing grades`);
   
-  // Create platform-level grades (Grade 1 to Grade 9)
+  // Platform-level ECD + primary ladder
   console.log('🌱 Creating platform-level grades...');
   const platformGrades = [];
-  
-  for (let i = 1; i <= 9; i++) {
-    const gradeName = `Grade ${i}`;
-    
+
+  for (const gradeName of COMPREHENSIVE_GRADE_SEQUENCE) {
     const platformGrade = await prisma.grade.create({
       data: {
         name: gradeName,
-        schoolId: null, // Platform-level grade (not tied to any specific school)
-        isAlumni: false
-      }
+        schoolId: null,
+        isAlumni: false,
+      },
     });
-    
     platformGrades.push(platformGrade);
     console.log(`✅ Created platform-level grade: ${gradeName}`);
   }
@@ -109,25 +107,21 @@ async function main() {
   console.log(`🎉 Created ${platformGrades.length} platform-level grades`);
   console.log('📝 These grades will be available to all schools');
   
-  // Seed grades for each existing school (Grade 1 to Grade 9)
   const schools = await prisma.school.findMany();
-  
+
   for (const school of schools) {
     console.log(`🌱 Seeding grades for school: ${school.name}`);
-    
-    // Create grades for this school
+
     const grades = [];
-    for (let i = 1; i <= 9; i++) {
-      const gradeName = `Grade ${i}`;
-      
+    for (const gradeName of COMPREHENSIVE_GRADE_SEQUENCE) {
       const newGrade = await prisma.grade.create({
         data: {
           name: gradeName,
           schoolId: school.id,
-          isAlumni: false
-        }
+          isAlumni: false,
+        },
       });
-      
+
       grades.push(newGrade);
       console.log(`✅ Created grade: ${gradeName} for school: ${school.name}`);
 
@@ -146,15 +140,16 @@ async function main() {
     console.log(`   - Created ${grades.length} grades`);
     console.log(`   - Created ${grades.length} classes (one per grade)`);
   }
-  
+
+  const perSchool = COMPREHENSIVE_GRADE_SEQUENCE.length;
   console.log('');
   console.log('📊 SEEDING SUMMARY:');
   console.log(`   - Platform-level grades created: ${platformGrades.length}`);
   console.log(`   - Schools processed: ${schools.length}`);
-  console.log(`   - School-specific grades created: ${schools.length * 9}`);
+  console.log(`   - School-specific grades created: ${schools.length * perSchool}`);
   console.log('');
-  console.log('✅ Platform now has Grade 1-9 available for all schools');
-  console.log('✅ All existing schools now have Grade 1-9');
+  console.log('✅ Platform now has Playgroup & Day Care / PP1 / PP2 / Grade 1–9');
+  console.log('✅ All existing schools now have the same ladder');
   console.log('📝 Schools can create classes and custom grades through the admin interface');
 }
 

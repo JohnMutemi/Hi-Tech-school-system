@@ -2,10 +2,18 @@ import React from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { LogOut, User, Lock, Bell, Settings } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { LogOut, User, Lock, Bell, MessageSquare } from "lucide-react";
+import { useState } from "react";
+import { useToast } from "@/components/ui/use-toast";
 
 interface SettingsSectionProps {
   parent?: any;
+  schoolCode?: string;
+  parentId?: string;
+  students?: any[];
+  feePaymentParentSmsEnabled?: boolean;
+  refreshParentData?: () => void | Promise<void>;
   oldPassword?: string;
   newPassword?: string;
   confirmPassword?: string;
@@ -19,6 +27,11 @@ interface SettingsSectionProps {
 
 export default function SettingsSection({
   parent = {},
+  schoolCode = "",
+  parentId = "",
+  students = [],
+  feePaymentParentSmsEnabled = false,
+  refreshParentData,
   oldPassword = "",
   newPassword = "",
   confirmPassword = "",
@@ -30,6 +43,45 @@ export default function SettingsSection({
   handleLogout,
 }: SettingsSectionProps) {
   const safeParent = parent || {};
+  const { toast } = useToast();
+  const [smsSavingId, setSmsSavingId] = useState<string | null>(null);
+
+  const updateFeeSmsOptIn = async (studentId: string, optIn: boolean) => {
+    if (!schoolCode || !parentId) return;
+    setSmsSavingId(studentId);
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin;
+      const res = await fetch(
+        `${baseUrl}/api/schools/${encodeURIComponent(schoolCode)}/parents/${parentId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ studentId, feePaymentSmsOptIn: optIn }),
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Could not update preference");
+      }
+      toast({
+        title: "Saved",
+        description: optIn
+          ? "You will receive SMS when this learner’s fees are paid (if the school has SMS enabled)."
+          : "SMS fee alerts are off for this learner.",
+      });
+      await refreshParentData?.();
+    } catch (e) {
+      toast({
+        title: "Error",
+        description: e instanceof Error ? e.message : "Update failed",
+        variant: "destructive",
+      });
+    } finally {
+      setSmsSavingId(null);
+    }
+  };
+
   return (
     <div className="h-full flex flex-col space-y-8">
       {/* Profile Information Card */}
@@ -144,18 +196,51 @@ export default function SettingsSection({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="bg-white/70 rounded-lg p-6 border border-indigo-100">
-            <div className="text-center py-8">
-              <Settings className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500 font-medium text-lg">Notification Settings</p>
-              <p className="text-gray-400 text-sm mt-2">Email and SMS notification preferences will be available soon.</p>
-              <div className="mt-6">
-                <Button variant="outline" className="border-indigo-200 text-indigo-600 hover:bg-indigo-50" disabled>
-                  <Bell className="w-4 h-4 mr-2" />
-                  Configure Notifications
-                </Button>
+          <div className="bg-white/70 rounded-lg p-6 border border-indigo-100 space-y-4">
+            <div className="flex items-start gap-3">
+              <MessageSquare className="w-6 h-6 text-indigo-600 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-semibold text-gray-900">Fee payment SMS</p>
+                <p className="text-sm text-gray-600">
+                  {feePaymentParentSmsEnabled
+                    ? "Your school allows fee payment text messages. Turn on below for each child you want to receive alerts for. Standard SMS rates may apply."
+                    : "Your school has not enabled fee payment SMS. When they do, you can opt in here for each child."}
+                </p>
               </div>
             </div>
+
+            {students.length === 0 ? (
+              <p className="text-sm text-gray-500">No learners linked to this account.</p>
+            ) : (
+              <ul className="space-y-4">
+                {students.map((s) => (
+                  <li
+                    key={s.id}
+                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-indigo-100/80 bg-white/80 p-4"
+                  >
+                    <div>
+                      <p className="font-medium text-gray-900">{s.name}</p>
+                      <p className="text-xs text-gray-500">
+                        {s.gradeName} · Adm. {s.admissionNumber}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-gray-600">SMS when fees are paid</span>
+                      <Switch
+                        checked={Boolean(s.feePaymentSmsOptIn)}
+                        disabled={
+                          !feePaymentParentSmsEnabled || smsSavingId === s.id
+                        }
+                        onCheckedChange={(checked) =>
+                          updateFeeSmsOptIn(s.id, checked)
+                        }
+                        aria-label={`Fee SMS for ${s.name}`}
+                      />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </CardContent>
       </Card>

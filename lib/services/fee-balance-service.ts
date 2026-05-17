@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { normalizeStudentFeeSegment } from '@/lib/fees/fee-structure-resolve';
 
 const prisma = new PrismaClient();
 
@@ -36,16 +37,32 @@ class FeeBalanceService {
   /**
    * Get existing fee structure for a grade or return a default structure based on grade level
    */
-  async getFeeStructureForGrade(schoolId: string, gradeId: string, academicYear: string, term: string) {
-    const existing = await prisma.termlyFeeStructure.findFirst({
-      where: {
-        schoolId,
-        gradeId,
-        year: parseInt(academicYear),
-        term,
-        isActive: true,
-      },
-    });
+  async getFeeStructureForGrade(
+    schoolId: string,
+    gradeId: string,
+    academicYear: string,
+    term: string,
+    feeSegmentRaw?: unknown
+  ) {
+    const feeSegment = normalizeStudentFeeSegment(feeSegmentRaw);
+    const common = {
+      schoolId,
+      gradeId,
+      year: parseInt(academicYear, 10),
+      term,
+      isActive: true,
+    } as const;
+
+    let existing =
+      (await prisma.termlyFeeStructure.findFirst({
+        where: { ...common, feeAccommodation: feeSegment },
+      })) || null;
+
+    if (!existing) {
+      existing = await prisma.termlyFeeStructure.findFirst({
+        where: { ...common, feeAccommodation: null },
+      });
+    }
 
     if (existing) {
       return existing;
@@ -79,6 +96,7 @@ class FeeBalanceService {
       dueDate: null,
       academicYearId: null,
       termId: null,
+      feeAccommodation: null,
     };
   }
 
@@ -228,31 +246,51 @@ class FeeBalanceService {
 
     // Use the same approach as parent dashboard - fetch fee data from student fees API logic
     try {
-      // Get actual fee structure from database (same as parent dashboard)
-      const feeStructure = await prisma.termlyFeeStructure.findFirst({
-        where: {
-          schoolId: student.schoolId,
-          gradeId: student.class?.gradeId || '',
-          year: parseInt(academicYear),
-          term: term,
-          isActive: true,
-        },
-        include: {
-          grade: {
-            select: {
-              name: true,
+      const picked =
+        (await prisma.termlyFeeStructure.findFirst({
+          where: {
+            schoolId: student.schoolId,
+            gradeId: student.class?.gradeId || '',
+            year: parseInt(academicYear, 10),
+            term,
+            isActive: true,
+            feeAccommodation: normalizeStudentFeeSegment(student.feeAccommodation),
+          },
+          include: {
+            grade: {
+              select: {
+                name: true,
+              },
             },
           },
-        },
-      });
+        })) ||
+        (await prisma.termlyFeeStructure.findFirst({
+          where: {
+            schoolId: student.schoolId,
+            gradeId: student.class?.gradeId || '',
+            year: parseInt(academicYear, 10),
+            term,
+            isActive: true,
+            feeAccommodation: null,
+          },
+          include: {
+            grade: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        }));
+
+      const feeStructure = picked;
 
       if (!feeStructure) {
-        // If no fee structure exists, fall back to default
         const defaultStructure = await this.getFeeStructureForGrade(
           student.schoolId,
           student.class?.gradeId || '',
           academicYear,
-          term
+          term,
+          student.feeAccommodation
         );
         
         return this.calculateBalanceFromStructure(studentId, academicYear, term, defaultStructure);
@@ -266,7 +304,8 @@ class FeeBalanceService {
         student.schoolId,
         student.class?.gradeId || '',
         academicYear,
-        term
+        term,
+        student.feeAccommodation
       );
       
       return this.calculateBalanceFromStructure(studentId, academicYear, term, defaultStructure);
@@ -602,16 +641,30 @@ class FeeBalanceService {
       throw new Error(`Student with ID ${studentId} not found`);
     }
 
-    // Get term-specific fee structure
-    const feeStructure = await prisma.termlyFeeStructure.findFirst({
-      where: {
-        schoolId: student.schoolId,
-        gradeId: student.class?.gradeId || '',
-        year: parseInt(academicYear),
-        term: term,
-        isActive: true,
-      },
-    });
+    let feeStructure =
+      (await prisma.termlyFeeStructure.findFirst({
+        where: {
+          schoolId: student.schoolId,
+          gradeId: student.class?.gradeId || '',
+          year: parseInt(academicYear, 10),
+          term: term,
+          isActive: true,
+          feeAccommodation: normalizeStudentFeeSegment(student.feeAccommodation),
+        },
+      })) || null;
+
+    if (!feeStructure) {
+      feeStructure = await prisma.termlyFeeStructure.findFirst({
+        where: {
+          schoolId: student.schoolId,
+          gradeId: student.class?.gradeId || '',
+          year: parseInt(academicYear, 10),
+          term: term,
+          isActive: true,
+          feeAccommodation: null,
+        },
+      });
+    }
 
     if (!feeStructure) {
       return {

@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
+import { FEE_SEG_BOARDER, FEE_SEG_DAY_SCHOLAR } from "@/lib/fees/fee-structure-resolve";
 import { jsonError, requireRole, requireSchoolAccess } from "@/lib/api-guard";
+
+function parseFeeStructureAccommodation(raw: unknown): string | null {
+  if (raw === FEE_SEG_BOARDER || raw === "boarder") return FEE_SEG_BOARDER;
+  if (raw === FEE_SEG_DAY_SCHOLAR || raw === "day_scholar") return FEE_SEG_DAY_SCHOLAR;
+  return null;
+}
 
 function normalizeFeeBreakdown(breakdown: unknown): Record<string, number> {
   if (breakdown == null) return {};
@@ -40,6 +47,7 @@ function mapTermlyToResponse(feeStructure: {
   isReleased: boolean;
   createdAt: Date;
   updatedAt: Date;
+  feeAccommodation?: string | null;
   grade?: { name: string } | null;
   academicYear?: { name: string } | null;
   termRef?: { name: string } | null;
@@ -62,6 +70,7 @@ function mapTermlyToResponse(feeStructure: {
     isReleased: feeStructure.isReleased,
     createdAt: feeStructure.createdAt.toISOString(),
     updatedAt: feeStructure.updatedAt.toISOString(),
+    feeAccommodation: feeStructure.feeAccommodation ?? null,
   };
 }
 
@@ -140,6 +149,7 @@ export async function GET(
         isReleased: structure.isReleased,
         createdAt: structure.createdAt.toISOString(),
         updatedAt: structure.updatedAt.toISOString(),
+        feeAccommodation: structure.feeAccommodation ?? null,
       }));
 
       return NextResponse.json({
@@ -250,6 +260,7 @@ export async function POST(
 
     // Validate required fields
     const { gradeId, term, totalAmount, breakdown, academicYearId, termId, dueDate } = body;
+    const feeAccommodation = parseFeeStructureAccommodation(body.feeAccommodation);
 
     if (!gradeId || !totalAmount || !academicYearId || !termId) {
       return NextResponse.json(
@@ -345,6 +356,7 @@ export async function POST(
         term: termName,
         academicYearId: academicYearId,
         isActive: true,
+        feeAccommodation: feeAccommodation,
       },
     });
 
@@ -383,6 +395,7 @@ export async function POST(
       data: {
         term: termName,
         year: academicYear.startDate.getFullYear(),
+        feeAccommodation,
         totalAmount: totalAmount,
         breakdown: normalizeFeeBreakdown(breakdown),
         isActive: true,
@@ -462,31 +475,10 @@ export async function POST(
       console.error("Fee structure email notification failed:", err)
     }
 
-    // Transform the response to match expected format
-    const response = {
-      id: feeStructure.id,
-      gradeId: feeStructure.gradeId,
-      gradeName: feeStructure.grade?.name,
-      term: feeStructure.term,
-      year: feeStructure.year,
-      amount: parseFloat(feeStructure.totalAmount.toString()),
-      totalAmount: parseFloat(feeStructure.totalAmount.toString()),
-      dueDate: feeStructure.dueDate?.toISOString().split('T')[0] || "",
-      breakdown: feeStructure.breakdown as Record<string, number>,
-      academicYear: feeStructure.academicYear?.name || feeStructure.year.toString(),
-      academicYearId: feeStructure.academicYearId,
-      termId: feeStructure.termId,
-      termName: feeStructure.termRef?.name,
-      isActive: feeStructure.isActive,
-      isReleased: feeStructure.isReleased,
-      createdAt: feeStructure.createdAt.toISOString(),
-      updatedAt: feeStructure.updatedAt.toISOString(),
-    };
-
     return NextResponse.json({
       success: true,
       message: "Fee structure created successfully",
-      feeStructure: response,
+      feeStructure: mapTermlyToResponse(feeStructure),
     });
 
   } catch (error) {
@@ -515,6 +507,7 @@ export async function PUT(
       gradeId,
       termId,
       academicYearId,
+      feeAccommodation: feeAccommodationPayload,
     } = body;
 
     if (!id) {
@@ -555,6 +548,11 @@ export async function PUT(
 
     const termName = termRecord.name;
 
+    const nextAccommodation =
+      feeAccommodationPayload !== undefined
+        ? parseFeeStructureAccommodation(feeAccommodationPayload)
+        : existing.feeAccommodation ?? null;
+
     const duplicate = await prisma.termlyFeeStructure.findFirst({
       where: {
         schoolId: schoolContext.schoolId,
@@ -563,6 +561,7 @@ export async function PUT(
         term: termName,
         isActive: true,
         id: { not: id },
+        feeAccommodation: nextAccommodation,
       },
     });
     if (duplicate) {
@@ -592,6 +591,9 @@ export async function PUT(
         termId: nextTermId,
         term: termName,
         year: academicYear.startDate.getFullYear(),
+        ...(feeAccommodationPayload !== undefined
+          ? { feeAccommodation: nextAccommodation }
+          : {}),
       },
       include: {
         grade: { select: { name: true } },

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { computeStudentFeesSnapshot } from '@/lib/services/student-fees-snapshot';
+import { resolveTermStructuresForFees } from '@/lib/fees/fee-structure-resolve';
 import { assertStudentFeeAccess, resolvePortalFeeAuth } from '@/lib/portal-fee-auth';
 import { verifyEmailDownloadToken } from '@/lib/email-download-token';
 
@@ -43,6 +44,7 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
         joinedAcademicYearId: true,
         joinedTermId: true,
         dateAdmitted: true,
+        feeAccommodation: true,
         classId: true,
         class: {
           select: {
@@ -68,7 +70,7 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     }
 
     // Get all termly fee structures (charges/invoices) for this student/grade
-    const feeStructures = await prisma.termlyFeeStructure.findMany({
+    let feeStructures = await prisma.termlyFeeStructure.findMany({
       where: {
         gradeId: student.class?.gradeId,
         isActive: true,
@@ -79,6 +81,8 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
         ...(targetAcademicYearId ? { academicYearId: targetAcademicYearId } : {})
       }
     });
+
+    feeStructures = resolveTermStructuresForFees(feeStructures, student.feeAccommodation);
 
     console.log('DEBUG: Filtered fee structures found:', feeStructures.map(fs => ({
       id: fs.id,

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { SMSService } from "@/lib/services/sms-service";
+import { shouldSendParentFeePaymentSms } from "@/lib/fee-payment-sms";
 import { EmailService } from "@/lib/services/email-service";
+import { resolveTermStructuresForFees } from "@/lib/fees/fee-structure-resolve";
 import { jsonError, requireRole, requireSchoolAccess } from "@/lib/api-guard";
 
 export async function POST(
@@ -23,7 +25,7 @@ export async function POST(
       referenceNumber,
       paymentDate,
       receivedBy,
-      sendSMS = true,
+      sendSMS = false,
     } = body;
 
     // Validate required fields
@@ -127,13 +129,19 @@ export async function POST(
       },
     });
 
-    // Send SMS notification if requested and parent phone exists
+    // Send SMS only when staff requests it, school allows SMS, and guardian opted in.
     let smsResult = null;
-    if (sendSMS && student.parent?.phone) {
+    const smsPhone =
+      student.parent?.phone?.trim() || student.parentPhone?.trim() || "";
+    if (
+      sendSMS &&
+      smsPhone &&
+      shouldSendParentFeePaymentSms(school, student)
+    ) {
       try {
         smsResult = await SMSService.sendManualPaymentConfirmation(
-          student.parent.phone,
-          student.parent.name,
+          smsPhone,
+          student.parent?.name || student.parentName || "Parent",
           student.user.name,
           parseFloat(amount),
           new Date(paymentDate),
@@ -214,7 +222,7 @@ async function calculateBalances(studentId: string, academicYearId: string, term
       return { academicYearOutstanding: 0, termOutstanding: 0 };
     }
 
-    const feeStructures = await prisma.termlyFeeStructure.findMany({
+    const rawStructures = await prisma.termlyFeeStructure.findMany({
       where: {
         gradeId: student.class.gradeId,
         isActive: true,
@@ -222,6 +230,8 @@ async function calculateBalances(studentId: string, academicYearId: string, term
         NOT: [{ termId: null }]
       }
     });
+
+    const feeStructures = resolveTermStructuresForFees(rawStructures, student.feeAccommodation);
 
     const payments = await prisma.payment.findMany({
       where: { 

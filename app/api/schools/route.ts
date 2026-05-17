@@ -2,7 +2,12 @@ import { PrismaClient } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { SchoolSeedingService } from '@/lib/services/school-seeding-service';
-import { normalizePackageType } from '@/lib/finance-package-gate';
+import { normalizePackageType, staffPortalLoginPath } from '@/lib/finance-package-gate';
+import { getPaletteBySlug } from '@/lib/school-website/palettes';
+import { normalizeTemplateSlug } from '@/lib/school-website/templates';
+import { transformSchoolForApi } from '@/lib/school-website/transform-school-response';
+import { getPublicSiteUrl } from '@/lib/school-website/custom-domain';
+import { resolveSchoolCustomDomain } from '@/lib/school-website/resolve-school-custom-domain';
 
 const prisma = new PrismaClient();
 
@@ -59,7 +64,10 @@ export async function GET() {
       logoUrl: isInlineLogo ? "" : (school.logo ?? ""),
       hasLogo: Boolean(school.logo),
       colorTheme: school.colorTheme || "#d97706",
-      portalUrl: `/schools/${school.code}`,
+      portalUrl: staffPortalLoginPath(school.code, school.packageType),
+      staffPortalUrl: staffPortalLoginPath(school.code, school.packageType),
+      publicSiteUrl: getPublicSiteUrl(school.code, school.customDomain ?? null),
+      publicWebsiteEnabled: school.publicWebsiteEnabled !== false,
       description: "",
       adminEmail: primaryUser?.email || fallbackUser?.email || school.email,
       adminPassword: "", // Don't return password
@@ -137,7 +145,17 @@ export async function POST(request: NextRequest) {
       logoUrl,
       logo,
       packageType,
+      websiteTemplateSlug,
+      colorPaletteSlug,
+      motto,
+      principalName,
+      establishedYear,
+      websiteUrl,
+      customDomain,
+      profile,
     } = body;
+
+    const warnings: string[] = [];
 
     // Validate required fields
     if (!name || !schoolCode || !address || !phone || !email || !adminEmail || !adminPassword) {
@@ -166,11 +184,27 @@ export async function POST(request: NextRequest) {
           ? logo
           : null;
 
+    const palette = getPaletteBySlug(colorPaletteSlug);
     const themeHex =
       typeof colorTheme === 'string' && /^#[0-9A-Fa-f]{6}$/.test(colorTheme.trim())
         ? colorTheme.trim()
-        : '#d97706';
+        : palette?.primary ?? '#d97706';
     const normalizedPackageType = normalizePackageType(packageType);
+    const templateSlug = normalizeTemplateSlug(websiteTemplateSlug);
+    const yearRaw = establishedYear ?? profile?.establishedYear;
+    const established =
+      yearRaw != null && String(yearRaw).trim() !== ''
+        ? parseInt(String(yearRaw), 10)
+        : null;
+
+    const websiteUrlValue = websiteUrl ?? profile?.website ?? null;
+    const domainResult = await resolveSchoolCustomDomain({
+      customDomain,
+      websiteUrl: websiteUrlValue,
+    });
+    if (!domainResult.ok) {
+      return NextResponse.json({ error: domainResult.error }, { status: domainResult.status });
+    }
 
     // Create school (logo: data URL or URL string; colorTheme: hex)
     const school = await prisma.school.create({
@@ -182,9 +216,18 @@ export async function POST(request: NextRequest) {
         email,
         logo: logoData,
         colorTheme: themeHex,
+        colorPaletteSlug: palette?.slug ?? colorPaletteSlug ?? null,
+        websiteTemplateSlug: templateSlug,
         packageType: normalizedPackageType,
-        isActive: status !== 'suspended'
-      }
+        motto: motto ?? profile?.motto ?? null,
+        principalName: principalName ?? profile?.principalName ?? null,
+        establishedYear: established && !Number.isNaN(established) ? established : null,
+        description: description ?? profile?.description ?? null,
+        websiteUrl: websiteUrlValue,
+        customDomain: domainResult.customDomain,
+        isActive: status !== 'suspended',
+        publicWebsiteEnabled: false,
+      },
     });
 
     // Automatically seed grades for the new school
@@ -220,41 +263,24 @@ export async function POST(request: NextRequest) {
       // Don't fail school creation if seeding fails - it can be done manually later
     }
 
-    // Return the created school with admin info
-    const createdSchool = {
-      id: school.id,
-      schoolCode: school.code,
-      name: school.name,
-      logo: school.logo,
-      logoUrl: school.logo ?? "",
-      colorTheme: school.colorTheme || themeHex,
-      portalUrl: `/schools/${school.code}`,
-      description: description || "",
-      adminEmail: adminUser.email,
-      adminPassword: "", // Don't return password
-      adminFirstName,
-      adminLastName,
-      createdAt: school.createdAt.toISOString(),
-      status: school.isActive ? "active" : "suspended",
-      packageType: normalizePackageType((school as any).packageType),
-      profile: {
-        address: school.address,
-        phone: school.phone,
-        website: "",
-        principalName: "",
-        establishedYear: new Date().getFullYear().toString(),
-        description: description || "",
-        email: school.email,
-        motto: "",
-        type: "primary" as const
+    const createdSchool = transformSchoolForApi(
+      {
+        ...school,
+        users: [{ ...adminUser, role: primaryRole, isActive: true }],
       },
-      teachers: [],
-      students: [],
-      subjects: [],
-      classes: []
-    };
+      { description: description || "" }
+    );
 
-    return NextResponse.json(createdSchool, { status: 201 });
+    return NextResponse.json(
+      {
+        ...createdSchool,
+        adminEmail: adminUser.email,
+        adminFirstName,
+        adminLastName,
+        ...(warnings.length > 0 ? { warnings } : {}),
+      },
+      { status: 201 }
+    );
   } catch (error) {
     console.error('Error creating school:', error);
     return NextResponse.json(

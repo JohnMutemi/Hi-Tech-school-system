@@ -1,0 +1,12 @@
+{
+  "name": "hi-tech-public-schools",
+  "private": true,
+  "description": "Run dev from this folder — do not use the parent Hi-Tech-school-system dev script here.",
+  "scripts": {
+    "dev": "npm run dev --prefix ./thebridgeacademy",
+    "dev:waita": "npm run dev --prefix ./waita-academy-showcase",
+    "dev:mwingi": "npm run dev --prefix ./mwingi-royal-gateway",
+    "build": "npm run build --prefix ./thebridgeacademy",
+    "preview": "npm run preview --prefix ./thebridgeacademy"
+  }
+}

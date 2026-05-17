@@ -110,10 +110,18 @@ interface FeeStructure {
   gradeName: string;
   academicYearId: string;
   termId: string;
+  /** null/undefined = applies to both day scholars and boarders (legacy unified). */
+  feeAccommodation?: string | null;
   academicYear?: {
     name: string;
     id: string;
   };
+}
+
+function feeStructureAppliesLabel(seg: string | null | undefined) {
+  if (seg === "boarder") return "Boarder";
+  if (seg === "day_scholar") return "Day scholar";
+  return "Unified";
 }
 
 interface FeeManagementProps {
@@ -159,20 +167,35 @@ export function FeeManagement({
     gradeId: "",
     academicYearId: "",
     termId: "",
+    feeAccommodation: "" as "" | "day_scholar" | "boarder",
   });
   const [breakdown, setBreakdown] = useState([{ name: "", value: "" }]);
+  /** Create flow: separate day vs boarder structures, or single unified row. */
+  const [createFeeMode, setCreateFeeMode] = useState<"segmented" | "unified">(
+    "segmented"
+  );
+  const [dayBreakdown, setDayBreakdown] = useState([{ name: "", value: "" }]);
+  const [boarderBreakdown, setBoarderBreakdown] = useState([
+    { name: "", value: "" },
+  ]);
 
   // Search and filter state
   const [searchText, setSearchText] = useState("");
      const filteredFeeStructures = useMemo(() => {
-     return feeStructures.filter((fee) =>
-       (fee.gradeName && fee.gradeName.toLowerCase().includes(searchText.toLowerCase())) ||
-       (fee.term && fee.term.toLowerCase().includes(searchText.toLowerCase())) ||
+     const q = searchText.toLowerCase();
+     return feeStructures.filter((fee) => {
+       if (!q) return true;
+       const applies = feeStructureAppliesLabel(fee.feeAccommodation).toLowerCase();
+       return (
+       (fee.gradeName && fee.gradeName.toLowerCase().includes(q)) ||
+       (fee.term && fee.term.toLowerCase().includes(q)) ||
+       applies.includes(q) ||
        (fee.creator?.name &&
-         fee.creator.name.toLowerCase().includes(searchText.toLowerCase())) ||
+         fee.creator.name.toLowerCase().includes(q)) ||
        (fee.creator?.email &&
-         fee.creator.email.toLowerCase().includes(searchText.toLowerCase()))
-     );
+         fee.creator.email.toLowerCase().includes(q))
+       );
+     });
    }, [feeStructures, searchText]);
 
   const brandHex = useMemo(() => {
@@ -180,23 +203,29 @@ export function FeeManagement({
     return /^#[0-9A-Fa-f]{6}$/i.test(t) ? t : "#2563eb";
   }, [colorTheme]);
 
-  // CSV import handler
-  const handleCSVImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    Papa.parse(file, {
-      header: true,
-      complete: (results: Papa.ParseResult<any>) => {
-        const imported = results.data
-          .filter((row: any) => row["Breakdown Name"] && row["Amount"])
-          .map((row: any) => ({
-            name: row["Breakdown Name"],
-            value: row["Amount"].toString(),
-          }));
-        setBreakdown(imported.length ? imported : [{ name: "", value: "" }]);
-      },
-    });
-  };
+  // CSV import → fill a breakdown table
+  const buildCsvImportHandler =
+    (
+      setRows: React.Dispatch<
+        React.SetStateAction<{ name: string; value: string }[]>
+      >
+    ) =>
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      Papa.parse(file, {
+        header: true,
+        complete: (results: Papa.ParseResult<any>) => {
+          const imported = results.data
+            .filter((row: any) => row["Breakdown Name"] && row["Amount"])
+            .map((row: any) => ({
+              name: row["Breakdown Name"],
+              value: row["Amount"].toString(),
+            }));
+          setRows(imported.length ? imported : [{ name: "", value: "" }]);
+        },
+      });
+    };
 
   // Calculate total from breakdown
   const calculateTotal = () => {
@@ -204,6 +233,28 @@ export function FeeManagement({
       (sum, item) => sum + (parseFloat(item.value) || 0),
       0
     );
+  };
+
+  const sumBreakdownLines = (rows: { name: string; value: string }[]) =>
+    rows.reduce((sum, item) => sum + (parseFloat(item.value) || 0), 0);
+
+  const linesToFeeBreakdownPayload = (rows: { name: string; value: string }[]) =>
+    rows.map((item) => ({
+      name: item.name,
+      value: parseFloat(item.value) || 0,
+    }));
+
+  const resetCreateFormState = () => {
+    setFormData({
+      gradeId: "",
+      academicYearId: academicYearId,
+      termId: termId,
+      feeAccommodation: "",
+    });
+    setBreakdown([{ name: "", value: "" }]);
+    setDayBreakdown([{ name: "", value: "" }]);
+    setBoarderBreakdown([{ name: "", value: "" }]);
+    setCreateFeeMode("segmented");
   };
 
   // Get current term and year
@@ -383,29 +434,165 @@ export function FeeManagement({
   // Handle form submit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const total = calculateTotal();
-    const feePayload = {
-      ...formData,
-      totalAmount: total,
-      academicYearId: formData.academicYearId || academicYearId,
-      termId: formData.termId || termId,
-      breakdown: breakdown.map((item) => ({
-        name: item.name,
-        value: parseFloat(item.value) || 0,
-      })),
-    };
 
     try {
       const isEdit = Boolean(editingFee?.id);
       const applyingAllGrades = !isEdit && formData.gradeId === "__all__";
+
+      if (isEdit) {
+        const total = calculateTotal();
+        const feePayload = {
+          ...formData,
+          totalAmount: total,
+          academicYearId: formData.academicYearId || academicYearId,
+          termId: formData.termId || termId,
+          breakdown: linesToFeeBreakdownPayload(breakdown),
+        };
+
+        const response = await fetch(`/api/schools/${schoolCode}/fee-structure`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: editingFee!.id, ...feePayload }),
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          toast({
+            title: "Success!",
+            description: "Fee structure updated successfully!",
+          });
+          setShowForm(false);
+          setEditingFee(null);
+          resetCreateFormState();
+          await fetchFeeStructures();
+          window.dispatchEvent(
+            new CustomEvent("feeStructureUpdated", {
+              detail: { schoolCode, feeStructure: result.feeStructure },
+            })
+          );
+          if (onFeeStructureCreated) onFeeStructureCreated();
+        } else {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || "Failed to save fee structure");
+        }
+        return;
+      }
+
+      type Seg = "day_scholar" | "boarder";
+      const postSegment = async (gradeId: string, seg: Seg, rows: typeof dayBreakdown) => {
+        const totalAmount = sumBreakdownLines(rows);
+        return fetch(`/api/schools/${schoolCode}/fee-structure`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            gradeId,
+            academicYearId: formData.academicYearId || academicYearId,
+            termId: formData.termId || termId,
+            totalAmount,
+            breakdown: linesToFeeBreakdownPayload(rows),
+            feeAccommodation: seg,
+          }),
+        });
+      };
+
+      if (createFeeMode === "segmented") {
+        const daySum = sumBreakdownLines(dayBreakdown);
+        const boardSum = sumBreakdownLines(boarderBreakdown);
+        if (daySum <= 0 && boardSum <= 0) {
+          toast({
+            title: "Amount required",
+            description:
+              "Enter fee lines for day scholars and/or boarders (totals must be greater than zero).",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        const segments: Array<{ seg: Seg; rows: typeof dayBreakdown }> = [];
+        if (daySum > 0) segments.push({ seg: "day_scholar", rows: dayBreakdown });
+        if (boardSum > 0) segments.push({ seg: "boarder", rows: boarderBreakdown });
+
+        if (applyingAllGrades) {
+          let ok = 0;
+          const failed: string[] = [];
+          for (const g of availableGrades) {
+            const gid = (g as { id?: string })?.id;
+            if (!gid) continue;
+            for (const { seg, rows } of segments) {
+              const res = await postSegment(gid, seg, rows);
+              if (res.ok) ok++;
+              else {
+                failed.push(
+                  `${(g as { name?: string }).name || "Grade"} — ${
+                    seg === "boarder" ? "Boarders" : "Day scholars"
+                  }`
+                );
+              }
+            }
+          }
+
+          if (ok === 0) {
+            throw new Error("Failed to create fee structures for all grades.");
+          }
+
+          toast({
+            title: "Fee structures created",
+            description:
+              failed.length > 0
+                ? `Saved ${ok} structure(s). Check: ${failed.join(", ")}`
+                : `Created ${ok} fee structure(s) across grades.`,
+          });
+
+          setShowForm(false);
+          setEditingFee(null);
+          resetCreateFormState();
+          await fetchFeeStructures();
+          if (onFeeStructureCreated) onFeeStructureCreated();
+          return;
+        }
+
+        for (const { seg, rows } of segments) {
+          const res = await postSegment(formData.gradeId, seg, rows);
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || "Failed to save fee structure");
+          }
+        }
+
+        toast({
+          title: "Success!",
+          description:
+            segments.length > 1
+              ? "Day scholar and boarder fee structures created."
+              : "Fee structure created successfully!",
+        });
+        setShowForm(false);
+        setEditingFee(null);
+        resetCreateFormState();
+        await fetchFeeStructures();
+        if (onFeeStructureCreated) onFeeStructureCreated();
+        return;
+      }
+
+      // Unified create (single structure for all accommodations, legacy)
+      const total = calculateTotal();
+      const unifiedBody = {
+        gradeId: formData.gradeId,
+        academicYearId: formData.academicYearId || academicYearId,
+        termId: formData.termId || termId,
+        totalAmount: total,
+        breakdown: linesToFeeBreakdownPayload(breakdown),
+        feeAccommodation: null as string | null,
+      };
+
       if (applyingAllGrades) {
-        const gradeIds = availableGrades.map((g: any) => g.id);
+        const gradeIds = availableGrades.map((g: { id: string }) => g.id);
         const settled = await Promise.allSettled(
           gradeIds.map((gradeId: string) =>
             fetch(`/api/schools/${schoolCode}/fee-structure`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ ...feePayload, gradeId }),
+              body: JSON.stringify({ ...unifiedBody, gradeId }),
             })
           )
         );
@@ -430,63 +617,41 @@ export function FeeManagement({
           description:
             failed.length > 0
               ? `Created for ${createdCount} grades. Failed: ${failed.join(", ")}`
-              : `Created fee structures for all ${createdCount} grades.`,
+              : `Created unified fee structures for all ${createdCount} grades.`,
         });
 
         setShowForm(false);
         setEditingFee(null);
-        setFormData({
-          gradeId: "",
-          academicYearId: academicYearId,
-          termId: termId,
-        });
-        setBreakdown([{ name: "", value: "" }]);
+        resetCreateFormState();
         await fetchFeeStructures();
         if (onFeeStructureCreated) onFeeStructureCreated();
         return;
       }
 
       const response = await fetch(`/api/schools/${schoolCode}/fee-structure`, {
-        method: isEdit ? "PUT" : "POST",
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          isEdit ? { id: editingFee!.id, ...feePayload } : feePayload
-        ),
+        body: JSON.stringify(unifiedBody),
       });
 
       if (response.ok) {
         const result = await response.json();
-        console.log("Fee structure saved:", result);
-
         toast({
           title: "Success!",
-          description: isEdit
-            ? "Fee structure updated successfully!"
-            : "Fee structure created successfully!",
+          description: "Unified fee structure created successfully!",
         });
         setShowForm(false);
         setEditingFee(null);
-        setFormData({
-          gradeId: "",
-          academicYearId: academicYearId,
-          termId: termId,
-        });
-        setBreakdown([{ name: "", value: "" }]);
-
+        resetCreateFormState();
         await fetchFeeStructures();
-
         window.dispatchEvent(
           new CustomEvent("feeStructureUpdated", {
             detail: { schoolCode, feeStructure: result.feeStructure },
           })
         );
-
-        if (onFeeStructureCreated) {
-          onFeeStructureCreated();
-        }
+        if (onFeeStructureCreated) onFeeStructureCreated();
       } else {
         const errorData = await response.json().catch(() => ({}));
-        console.error("Failed to save fee structure:", errorData);
         throw new Error(errorData.error || "Failed to save fee structure");
       }
     } catch (error) {
@@ -539,6 +704,10 @@ export function FeeManagement({
       gradeId: fee.gradeId,
       academicYearId: fee.academicYearId || academicYearId,
       termId: fee.termId || termId,
+      feeAccommodation:
+        fee.feeAccommodation === "boarder" || fee.feeAccommodation === "day_scholar"
+          ? fee.feeAccommodation
+          : "",
     });
     setBreakdown(
       Array.isArray(fee.breakdown)
@@ -558,12 +727,13 @@ export function FeeManagement({
   const handleCloseForm = () => {
     setShowForm(false);
     setEditingFee(null);
-    setFormData({
-      gradeId: "",
-      academicYearId: academicYearId,
-      termId: termId,
-    });
-    setBreakdown([{ name: "", value: "" }]);
+    resetCreateFormState();
+  };
+
+  const openCreateForm = () => {
+    setEditingFee(null);
+    resetCreateFormState();
+    setShowForm(true);
   };
 
   return (
@@ -606,7 +776,7 @@ export function FeeManagement({
               </div>
             </div>
             <Button
-              onClick={() => setShowForm(true)}
+              onClick={openCreateForm}
               className="bg-white/20 hover:bg-white/30 backdrop-blur-sm border border-white/30 text-white font-semibold px-6 py-3 rounded-2xl transition-all duration-300 hover:scale-105 shadow-lg"
             >
               <Plus className="w-5 h-5 mr-2" />
@@ -779,7 +949,7 @@ export function FeeManagement({
                   : "Create your first fee structure to get started"}
               </p>
               <Button
-                onClick={() => setShowForm(true)}
+                onClick={openCreateForm}
                 className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold px-6 py-3 rounded-2xl transition-all duration-300 hover:scale-105 shadow-lg"
               >
                 <Plus className="w-5 h-5 mr-2" />
@@ -796,6 +966,9 @@ export function FeeManagement({
                     </TableHead>
                     <TableHead className="font-semibold text-gray-700">
                       Grade
+                    </TableHead>
+                    <TableHead className="font-semibold text-gray-700">
+                      Applies to
                     </TableHead>
                     <TableHead className="font-semibold text-gray-700">
                       Total Amount
@@ -841,6 +1014,11 @@ export function FeeManagement({
                           className="bg-purple-50 text-purple-700 border-purple-200 font-medium"
                         >
                           {fee.gradeName || 'N/A'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs font-medium whitespace-nowrap">
+                          {feeStructureAppliesLabel(fee.feeAccommodation)}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -925,7 +1103,7 @@ export function FeeManagement({
 
       {/* Enhanced Form Dialog */}
       <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl border-0 shadow-2xl bg-gradient-to-br from-white to-gray-50">
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto rounded-3xl border-0 shadow-2xl bg-gradient-to-br from-white to-gray-50">
           <DialogHeader className="relative">
             <Button
               variant="ghost"
@@ -942,13 +1120,13 @@ export function FeeManagement({
             <DialogDescription className="text-gray-600">
               {editingFee
                 ? "Update the fee structure details below"
-                : "Set up a new fee structure for your school"}
+                : "Define day scholar and boarder fees per grade, or one unified schedule for all students."}
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Basic Information */}
-            <div className="grid md:grid-cols-3 gap-6">
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="space-y-2">
                 <Label className="text-sm font-semibold text-gray-700">
                   Academic Year *
@@ -1023,16 +1201,77 @@ export function FeeManagement({
                   ))}
                 </select>
               </div>
+
+              {editingFee ? (
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold text-gray-700">
+                    Applies to (fees)
+                  </Label>
+                  <select
+                    className="border rounded px-3 py-2 w-full"
+                    value={formData.feeAccommodation}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        feeAccommodation: e.target.value as typeof formData.feeAccommodation,
+                      })
+                    }
+                  >
+                    <option value="">Unified — day & boarder</option>
+                    <option value="day_scholar">Day scholars only</option>
+                    <option value="boarder">Boarders only</option>
+                  </select>
+                  <p className="text-xs text-gray-500">
+                    One record = one segment or unified schedule.
+                  </p>
+                </div>
+              ) : null}
             </div>
 
-            {/* Fee Breakdown */}
+            {!editingFee ? (
+              <div className="rounded-xl border border-slate-200 bg-slate-50/90 p-4 space-y-3">
+                <Label className="text-sm font-semibold text-gray-800">
+                  How should this grade (or all grades) be billed?
+                </Label>
+                <Tabs
+                  value={createFeeMode}
+                  onValueChange={(v) =>
+                    setCreateFeeMode(v as "segmented" | "unified")
+                  }
+                >
+                  <TabsList className="grid w-full max-w-xl grid-cols-2 h-auto py-1">
+                    <TabsTrigger value="segmented" className="text-xs sm:text-sm">
+                      Day & boarder (recommended)
+                    </TabsTrigger>
+                    <TabsTrigger value="unified" className="text-xs sm:text-sm">
+                      Unified (legacy)
+                    </TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="segmented" className="pt-2 m-0">
+                    <p className="text-xs text-gray-600">
+                      Enter fee lines for each group. Only groups with a total
+                      greater than zero are saved. Both can be saved in one step
+                      for the selected grade.
+                    </p>
+                  </TabsContent>
+                  <TabsContent value="unified" className="pt-2 m-0">
+                    <p className="text-xs text-gray-600">
+                      One termly structure with no day/board split (applies to
+                      every student when no segmented rows exist).
+                    </p>
+                  </TabsContent>
+                </Tabs>
+              </div>
+            ) : null}
+
+            {editingFee || createFeeMode === "unified" ? (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <Label className="text-lg font-semibold text-gray-800">
-                  Fee Breakdown
+                  {editingFee ? "Fee breakdown" : "Unified fee breakdown"}
                 </Label>
                 <div className="text-right">
-                  <div className="text-sm text-gray-600">Total Amount</div>
+                  <div className="text-sm text-gray-600">Total amount</div>
                   <div className="text-2xl font-bold text-green-600">
                     KES {calculateTotal().toLocaleString()}
                   </div>
@@ -1043,7 +1282,7 @@ export function FeeManagement({
                   <div key={idx} className="flex gap-2 items-center">
                     <Input
                       type="text"
-                      placeholder="Breakdown Name"
+                      placeholder="Breakdown name"
                       value={item.name}
                       onChange={(e) => {
                         const updated = [...breakdown];
@@ -1082,16 +1321,196 @@ export function FeeManagement({
                     setBreakdown([...breakdown, { name: "", value: "" }])
                   }
                 >
-                  Add Breakdown
+                  Add line
                 </Button>
                 <div className="pt-2">
-                  <input type="file" accept=".csv" onChange={handleCSVImport} />
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={buildCsvImportHandler(setBreakdown)}
+                  />
                   <span className="text-xs text-gray-500 ml-2">
-                    Import from CSV (columns: Breakdown Name, Amount)
+                    CSV: Breakdown Name, Amount
                   </span>
                 </div>
               </div>
             </div>
+            ) : (
+              <div className="grid lg:grid-cols-2 gap-6">
+                <div className="space-y-3 rounded-xl border-2 border-blue-100/80 bg-blue-50/50 p-4">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
+                    <div>
+                      <Label className="text-base font-semibold text-blue-950">
+                        Day scholars
+                      </Label>
+                      <p className="text-xs text-blue-900/70 mt-0.5">
+                        Per-grade fee for day scholars (segment{" "}
+                        <code className="text-[10px]">day_scholar</code>).
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="text-xs text-gray-600">Subtotal</div>
+                      <div className="text-lg font-bold text-blue-800">
+                        KES{" "}
+                        {sumBreakdownLines(dayBreakdown).toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {dayBreakdown.map((item, idx) => (
+                      <div key={`d-${idx}`} className="flex gap-2 items-center">
+                        <Input
+                          type="text"
+                          placeholder="Item"
+                          value={item.name}
+                          onChange={(e) => {
+                            const u = [...dayBreakdown];
+                            u[idx].name = e.target.value;
+                            setDayBreakdown(u);
+                          }}
+                          className="flex-1"
+                        />
+                        <Input
+                          type="number"
+                          placeholder="KES"
+                          value={item.value}
+                          onChange={(e) => {
+                            const u = [...dayBreakdown];
+                            u[idx].value = e.target.value;
+                            setDayBreakdown(u);
+                          }}
+                          className="w-28"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() =>
+                            setDayBreakdown(
+                              dayBreakdown.filter((_, i) => i !== idx)
+                            )
+                          }
+                          disabled={dayBreakdown.length === 1}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setDayBreakdown([
+                          ...dayBreakdown,
+                          { name: "", value: "" },
+                        ])
+                      }
+                    >
+                      Add line
+                    </Button>
+                    <input
+                      type="file"
+                      accept=".csv"
+                      className="text-xs"
+                      onChange={buildCsvImportHandler(setDayBreakdown)}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-3 rounded-xl border-2 border-amber-100/80 bg-amber-50/50 p-4">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
+                    <div>
+                      <Label className="text-base font-semibold text-amber-950">
+                        Boarders
+                      </Label>
+                      <p className="text-xs text-amber-900/70 mt-0.5">
+                        Per-grade fee for boarders (segment{" "}
+                        <code className="text-[10px]">boarder</code>).
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="text-xs text-gray-600">Subtotal</div>
+                      <div className="text-lg font-bold text-amber-900">
+                        KES{" "}
+                        {sumBreakdownLines(boarderBreakdown).toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="w-full sm:w-auto"
+                    onClick={() =>
+                      setBoarderBreakdown(
+                        dayBreakdown.map((r) => ({ ...r }))
+                      )
+                    }
+                  >
+                    Copy lines from day scholars
+                  </Button>
+                  <div className="flex flex-col gap-2">
+                    {boarderBreakdown.map((item, idx) => (
+                      <div key={`b-${idx}`} className="flex gap-2 items-center">
+                        <Input
+                          type="text"
+                          placeholder="Item"
+                          value={item.name}
+                          onChange={(e) => {
+                            const u = [...boarderBreakdown];
+                            u[idx].name = e.target.value;
+                            setBoarderBreakdown(u);
+                          }}
+                          className="flex-1"
+                        />
+                        <Input
+                          type="number"
+                          placeholder="KES"
+                          value={item.value}
+                          onChange={(e) => {
+                            const u = [...boarderBreakdown];
+                            u[idx].value = e.target.value;
+                            setBoarderBreakdown(u);
+                          }}
+                          className="w-28"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() =>
+                            setBoarderBreakdown(
+                              boarderBreakdown.filter((_, i) => i !== idx)
+                            )
+                          }
+                          disabled={boarderBreakdown.length === 1}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setBoarderBreakdown([
+                          ...boarderBreakdown,
+                          { name: "", value: "" },
+                        ])
+                      }
+                    >
+                      Add line
+                    </Button>
+                    <input
+                      type="file"
+                      accept=".csv"
+                      className="text-xs"
+                      onChange={buildCsvImportHandler(setBoarderBreakdown)}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Action Buttons */}
             <div className="flex justify-end space-x-4 pt-6 border-t border-gray-200">
@@ -1109,7 +1528,11 @@ export function FeeManagement({
                 className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold px-8 py-3 rounded-xl transition-all duration-300 hover:scale-105 shadow-lg"
               >
                 <CheckCircle className="w-4 h-4 mr-2" />
-                {editingFee ? "Update Fee Structure" : "Create Fee Structure"}
+                {editingFee
+                  ? "Update Fee Structure"
+                  : createFeeMode === "segmented"
+                    ? "Create day & boarder fee structures"
+                    : "Create unified fee structure"}
               </Button>
             </div>
           </form>

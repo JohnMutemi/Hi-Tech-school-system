@@ -1,31 +1,48 @@
 import { prisma } from '@/lib/prisma';
 import {
+  FEE_SEG_BOARDER,
+  FEE_SEG_DAY_SCHOLAR,
+} from '@/lib/fees/fee-structure-resolve';
+import {
   computeStudentFeesSnapshot,
   resolveAcademicYearIdForSchool,
+  type StudentWithClass,
 } from '@/lib/services/student-fees-snapshot';
+
+function toDateInputValue(d: Date | null | undefined): string | null {
+  if (!d) return null;
+  const x = new Date(d);
+  if (Number.isNaN(x.getTime())) return null;
+  return x.toISOString().slice(0, 10);
+}
 
 type FinanceDashboardOptions = {
   academicYear?: string | null;
   term?: string | null;
   gradeId?: string | null;
   classId?: string | null;
+  /** When set to day_scholar or boarder, only those students are included. */
+  feeAccommodation?: string | null;
 };
 
 type FinanceStudentBalance = {
   id: string;
   name: string;
   admissionNumber: string;
-  email: string;
-  phone: string;
+  email: string | null;
+  phone: string | null;
   gradeName: string;
   className: string;
   academicYear: number;
   parent: {
     id: string;
     name: string;
-    email: string;
-    phone: string;
+    email: string | null;
+    phone: string | null;
   } | null;
+  feeAccommodation: string;
+  /** ISO yyyy-MM-dd for forms */
+  dateAdmitted: string | null;
   class: {
     id: string;
     name: string;
@@ -121,6 +138,15 @@ export async function getFinanceDashboardData(
     whereClause.classId = options.classId;
   }
 
+  const accRaw = options.feeAccommodation?.trim().toLowerCase() ?? '';
+  if (accRaw && accRaw !== 'all') {
+    if (accRaw === FEE_SEG_BOARDER || accRaw === 'boarder') {
+      whereClause.feeAccommodation = FEE_SEG_BOARDER;
+    } else if (accRaw === FEE_SEG_DAY_SCHOLAR || accRaw === 'day_scholar') {
+      whereClause.feeAccommodation = FEE_SEG_DAY_SCHOLAR;
+    }
+  }
+
   const students = await prisma.student.findMany({
     where: whereClause,
     include: {
@@ -170,12 +196,16 @@ export async function getFinanceDashboardData(
   });
 
   const studentsWithBalances: FinanceStudentBalance[] = await Promise.all(
-    students.map(async (student) => {
+    students.map(async (row) => {
+      const student = row as typeof row & {
+        feeAccommodation?: string | null;
+        dateAdmitted?: Date | null;
+      };
       try {
         const snapshot = await computeStudentFeesSnapshot(
           prisma,
           school,
-          student,
+          student as unknown as StudentWithClass,
           targetAcademicYearId,
           { persistYearEndCarryForward: false, termFilter }
         );
@@ -201,6 +231,8 @@ export async function getFinanceDashboardData(
                 phone: student.parent.phone,
               }
             : null,
+          feeAccommodation: student.feeAccommodation || 'day_scholar',
+          dateAdmitted: toDateInputValue(student.dateAdmitted),
           class: student.class
             ? {
                 id: student.class.id,
@@ -254,6 +286,8 @@ export async function getFinanceDashboardData(
                 phone: student.parent.phone,
               }
             : null,
+          feeAccommodation: student.feeAccommodation || 'day_scholar',
+          dateAdmitted: toDateInputValue(student.dateAdmitted),
           class: student.class
             ? {
                 id: student.class.id,

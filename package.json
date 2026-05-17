@@ -4,6 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:bridge": "pnpm --dir public-schools/thebridgeacademy dev",
+    "dev:waita": "pnpm --dir public-schools/waita-academy-showcase dev",
+    "dev:mwingi": "pnpm --dir public-schools/mwingi-royal-gateway dev",
+    "install:showcases": "pnpm --dir public-schools/waita-academy-showcase install --ignore-workspace && pnpm --dir public-schools/mwingi-royal-gateway install --ignore-workspace",
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
@@ -14,7 +18,8 @@
     "test:school-isolation": "tsx scripts/test-school-isolation.ts",
     "cleanup:grades": "node scripts/cleanup-grades.js",
     "backup:run-scheduled": "tsx scripts/run-scheduled-backups.ts",
-    "test:backup-system": "tsx scripts/test-school-backup.ts"
+    "test:backup-system": "tsx scripts/test-school-backup.ts",
+    "seed:website-showcase": "tsx scripts/seed-website-showcase-schools.ts"
   },
   "dependencies": {
     "@aws-sdk/client-rds-data": "latest",

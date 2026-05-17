@@ -1,9 +1,13 @@
 import type { PrismaClient, School, Student, User, Class, Grade } from '@prisma/client';
 import { academicYearTransitionService } from '@/lib/services/academic-year-transition-service';
+import { resolveTermStructuresForFees } from '@/lib/fees/fee-structure-resolve';
 
-type StudentWithClass = Student & {
+export type StudentWithClass = Student & {
   user: User;
   class: (Class & { grade: Grade }) | null;
+} & {
+  /** Present on DB model; widen for Prisma client stale / partial picks. */
+  feeAccommodation?: string | null;
 };
 
 export type TermBalanceRow = {
@@ -92,27 +96,24 @@ export async function computeStudentFeesSnapshot(
     };
   }
 
-  let feeStructures = await prisma.termlyFeeStructure.findMany({
-    where: {
-      gradeId: targetGradeId,
-      isActive: true,
-      ...(targetAcademicYearId ? { academicYearId: targetAcademicYearId } : {}),
-      NOT: [{ termId: null }, { academicYearId: null }],
-    },
-    include: {
-      grade: true,
-      academicYear: { select: { name: true } },
-    },
-  });
+  let feeStructures = resolveTermStructuresForFees(
+    await prisma.termlyFeeStructure.findMany({
+      where: {
+        gradeId: targetGradeId,
+        isActive: true,
+        ...(targetAcademicYearId ? { academicYearId: targetAcademicYearId } : {}),
+        NOT: [{ termId: null }, { academicYearId: null }],
+      },
+      include: {
+        grade: true,
+        academicYear: { select: { name: true } },
+      },
+    }),
+    student.feeAccommodation
+  );
 
   const termOrder: Record<string, number> = { 'Term 1': 1, 'Term 2': 2, 'Term 3': 3 };
-  const feeStructuresByTerm = new Map<string, (typeof feeStructures)[0]>();
-  for (const fs of feeStructures) {
-    if (!feeStructuresByTerm.has(fs.term)) {
-      feeStructuresByTerm.set(fs.term, fs);
-    }
-  }
-  const filteredFeeStructures = Array.from(feeStructuresByTerm.values()).sort(
+  const filteredFeeStructures = [...feeStructures].sort(
     (a, b) => (termOrder[a.term] || 0) - (termOrder[b.term] || 0)
   );
 

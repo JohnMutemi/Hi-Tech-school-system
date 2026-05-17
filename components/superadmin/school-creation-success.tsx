@@ -47,7 +47,7 @@ export function SchoolCreationSuccess({
   const handleShareEmail = () => {
     const subject = encodeURIComponent(`Hi-Tech SMS School Portal Credentials for ${schoolName}`)
     const body = encodeURIComponent(
-      `Hello School Admin,\n\nYour school portal is ready!\n\nPortal URL: ${portalUrl}\nEmail: ${adminEmail}\nTemporary Password: ${tempPassword}\n\nPlease log in and change your password immediately.\n\nBest regards,\nHi-Tech SMS Team`
+      `Hello School Admin,\n\nYour school portal is ready!\n\nStaff portal: ${portalUrl}\nEmail: ${adminEmail}\nTemporary Password: ${tempPassword}\n\nPlease log in and change your password immediately.\n\nBest regards,\nHi-Tech SMS Team`
     )
     window.open(`mailto:${adminEmail}?subject=${subject}&body=${body}`)
     onClose()
@@ -55,7 +55,7 @@ export function SchoolCreationSuccess({
 
   const handleShareWhatsApp = () => {
     const text = encodeURIComponent(
-      `Hi! Your Hi-Tech SMS school portal is ready.\n\nPortal: ${portalUrl}\nEmail: ${adminEmail}\nTemporary Password: ${tempPassword}\n\nPlease log in and change your password immediately.`
+      `Hi! Your Hi-Tech SMS school portal is ready.\n\nStaff portal: ${portalUrl}\nEmail: ${adminEmail}\nTemporary Password: ${tempPassword}\n\nPlease log in and change your password immediately.`
     )
     window.open(`https://wa.me/?text=${text}`)
     onClose()
@@ -121,6 +121,7 @@ export function SchoolCreationSuccess({
             </div>
           </div>
 
+
           <div className="rounded-xl border border-orange-200 bg-orange-50/80 p-4">
             <div className="mb-3 flex items-center space-x-3">
               <div className="rounded-full bg-orange-200/70 p-2">
@@ -129,7 +130,7 @@ export function SchoolCreationSuccess({
               <h3 className="text-lg font-semibold text-orange-950">Portal URL</h3>
             </div>
             <div className="space-y-2">
-              <p className="text-sm text-orange-950/90">Share this URL with the school admin to access the portal:</p>
+              <p className="text-sm text-orange-950/90">Staff portal (private login for admins and finance).</p>
               <div className="flex flex-col items-start space-y-2 sm:flex-row sm:items-center sm:space-x-2 sm:space-y-0">
                 <Badge variant="outline" className="w-full break-all bg-white text-left font-mono text-xs">
                   {portalUrl}

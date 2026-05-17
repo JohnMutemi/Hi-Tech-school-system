@@ -1,6 +1,8 @@
 import { PrismaClient } from '@prisma/client'
 import { feeBalanceService } from './fee-balance-service'
 import { EmailService } from './email-service'
+import { SMSService } from './sms-service'
+import { shouldSendParentFeePaymentSms } from '@/lib/fee-payment-sms'
 
 const prisma = new PrismaClient()
 
@@ -60,6 +62,10 @@ class PaymentService {
           id: studentId,
           schoolId: school.id,
           isActive: true
+        },
+        include: {
+          user: true,
+          parent: true,
         }
       })
 
@@ -93,6 +99,26 @@ class PaymentService {
       } catch (emailError) {
         console.error('Email notification failed:', emailError);
         // Don't fail the payment if email fails
+      }
+
+      const smsTo = student.parent?.phone?.trim() || student.parentPhone?.trim() || ''
+      if (
+        smsTo &&
+        shouldSendParentFeePaymentSms(school, student)
+      ) {
+        try {
+          await SMSService.sendPaymentConfirmation(
+            smsTo,
+            student.parent?.name || student.parentName || 'Parent',
+            student.user.name,
+            amount,
+            new Date(),
+            school.name,
+            paymentMethod,
+          )
+        } catch (smsError) {
+          console.error('SMS notification failed:', smsError)
+        }
       }
 
       return {

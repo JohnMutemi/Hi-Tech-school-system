@@ -142,6 +142,40 @@ html {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+/* School public site — dual-direction gallery marquees */
+@keyframes school-gallery-marquee-ltr {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes school-gallery-marquee-rtl {
+  0% {
+    transform: translateX(-50%);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+.school-gallery-marquee-ltr {
+  animation: school-gallery-marquee-ltr 48s linear infinite;
+}
+
+.school-gallery-marquee-rtl {
+  animation: school-gallery-marquee-rtl 54s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .school-gallery-marquee-ltr,
+  .school-gallery-marquee-rtl {
+    animation: none;
+  }
+}
+
 /* Mobile Navigation Styles */
 @layer components {
   /* Bottom navigation bar */

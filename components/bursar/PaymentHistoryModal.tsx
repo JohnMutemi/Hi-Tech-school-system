@@ -29,16 +29,18 @@ interface Student {
   id: string;
   name: string;
   admissionNumber: string;
-  email: string;
-  phone: string;
+  email?: string | null;
+  phone?: string | null;
   gradeName: string;
   className: string;
   parent: {
     id: string;
     name: string;
-    email: string;
-    phone: string;
+    email: string | null;
+    phone: string | null;
   } | null;
+  feeAccommodation?: string;
+  dateAdmitted?: string | null;
 }
 
 interface PaymentHistoryModalProps {
@@ -288,8 +290,6 @@ export function PaymentHistoryModal({
                     </Badge>
                   </div>
                 </div>
-                
-                {console.log("🎯 About to render payment table with", paymentHistory.length, "payments:", paymentHistory)}
                 
                 <Table>
                   <TableHeader>

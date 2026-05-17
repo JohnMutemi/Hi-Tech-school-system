@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, ReactNode } from 'react';
+import React, { useState, useEffect, ReactNode, CSSProperties } from 'react';
 import { Menu, X, ChevronDown, ChevronUp } from 'lucide-react';
 
 // ===== RESPONSIVE CONTAINER =====
@@ -85,6 +85,7 @@ export const ResponsiveGrid: React.FC<ResponsiveGridProps> = ({
 interface ResponsiveCardProps {
   children: ReactNode;
   className?: string;
+  style?: CSSProperties;
   onClick?: () => void;
   hover?: boolean;
 }
@@ -92,6 +93,7 @@ interface ResponsiveCardProps {
 export const ResponsiveCard: React.FC<ResponsiveCardProps> = ({
   children,
   className = '',
+  style,
   onClick,
   hover = true
 }) => {
@@ -103,6 +105,7 @@ export const ResponsiveCard: React.FC<ResponsiveCardProps> = ({
         ${onClick ? 'cursor-pointer' : ''}
         ${className}
       `}
+      style={style}
       onClick={onClick}
     >
       {children}
@@ -559,12 +562,14 @@ interface ResponsiveTextProps {
   children: ReactNode;
   size?: 'sm' | 'base' | 'lg' | 'xl' | '2xl';
   className?: string;
+  style?: CSSProperties;
 }
 
 export const ResponsiveText: React.FC<ResponsiveTextProps> = ({
   children,
   size = 'base',
-  className = ''
+  className = '',
+  style
 }) => {
   const sizeClasses = {
     sm: 'text-responsive-sm',
@@ -575,7 +580,7 @@ export const ResponsiveText: React.FC<ResponsiveTextProps> = ({
   };
 
   return (
-    <div className={`${sizeClasses[size]} ${className}`}>
+    <div className={`${sizeClasses[size]} ${className}`} style={style}>
       {children}
     </div>
   );

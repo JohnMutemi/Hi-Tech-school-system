@@ -44,48 +44,50 @@ export function useParentDashboard(schoolCode: string, parentId?: string) {
   const [loadingPayments, setLoadingPayments] = useState(false);
   const [paymentsError, setPaymentsError] = useState("");
   const [schoolColorTheme, setSchoolColorTheme] = useState<string | null>(null);
+  const [feePaymentParentSmsEnabled, setFeePaymentParentSmsEnabled] = useState(false);
 
-  // Fetch parent and children
-  useEffect(() => {
-    async function fetchParentAndChildren() {
-      if (!schoolCode || !parentId) return;
-      try {
-        // Get base URL for deployed environment
-        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin;
-        const res = await fetch(
-          `${baseUrl}/api/schools/${encodeURIComponent(schoolCode)}/parents/${parentId}`
+  const fetchParentAndChildren = useCallback(async () => {
+    if (!schoolCode || !parentId) return;
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin;
+      const res = await fetch(
+        `${baseUrl}/api/schools/${encodeURIComponent(schoolCode)}/parents/${parentId}`,
+        { credentials: "include" }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const mergedParent = data.parent
+          ? {
+              ...data.parent,
+              schoolName: data.schoolName ?? data.parent.schoolName,
+              school: data.parent.school ?? { name: data.schoolName },
+              currentAcademicYearName: data.currentAcademicYearName,
+              currentAcademicYearId: data.currentAcademicYearId,
+            }
+          : null;
+        setParent(mergedParent);
+        setStudents(data.students ?? []);
+        setFeePaymentParentSmsEnabled(Boolean(data.feePaymentParentSmsEnabled));
+        setSchoolColorTheme(
+          typeof data.colorTheme === "string" && data.colorTheme.trim()
+            ? data.colorTheme.trim()
+            : null
         );
-        if (res.ok) {
-          const data = await res.json();
-          const mergedParent = data.parent
-            ? {
-                ...data.parent,
-                schoolName: data.schoolName ?? data.parent.schoolName,
-                school: data.parent.school ?? { name: data.schoolName },
-                currentAcademicYearName: data.currentAcademicYearName,
-                currentAcademicYearId: data.currentAcademicYearId,
-              }
-            : null;
-          setParent(mergedParent);
-          setStudents(data.students ?? []);
-          setSchoolColorTheme(
-            typeof data.colorTheme === "string" && data.colorTheme.trim()
-              ? data.colorTheme.trim()
-              : null
-          );
-          if (data.currentAcademicYearName) {
-            setCurrentAcademicYear({
-              name: data.currentAcademicYearName,
-              id: data.currentAcademicYearId,
-            });
-          }
+        if (data.currentAcademicYearName) {
+          setCurrentAcademicYear({
+            name: data.currentAcademicYearName,
+            id: data.currentAcademicYearId,
+          });
         }
-      } catch (e) {
-        // Optionally handle error
       }
+    } catch (e) {
+      // Optionally handle error
     }
-    fetchParentAndChildren();
   }, [schoolCode, parentId]);
+
+  useEffect(() => {
+    fetchParentAndChildren();
+  }, [fetchParentAndChildren]);
 
   const fetchAllReceipts = useCallback(async () => {
     if (!students || students.length === 0) {
@@ -189,6 +191,8 @@ export function useParentDashboard(schoolCode: string, parentId?: string) {
   // ...
 
   return {
+    schoolCode,
+    parentId,
     parent,
     students,
     isLoading,
@@ -260,6 +264,8 @@ export function useParentDashboard(schoolCode: string, parentId?: string) {
     loadingPayments,
     paymentsError,
     schoolColorTheme,
+    feePaymentParentSmsEnabled,
+    refreshParentData: fetchParentAndChildren,
     refreshPayments,
     fetchAllReceipts,
     handleAvatarChange,

@@ -8,6 +8,17 @@ export function normalizePackageType(input: string | null | undefined): string {
   return (input || 'full').trim().toLowerCase();
 }
 
+/** Staff entry URL: finance-only schools use the finance login page, not the full admin portal shell. */
+export function staffPortalLoginPath(schoolCode: string, packageType?: string | null): string {
+  const code = String(schoolCode || '')
+    .trim()
+    .toLowerCase();
+  if (!code) return '/schools';
+  return normalizePackageType(packageType) === 'finance_only'
+    ? `/schools/${code}/finance/login`
+    : `/schools/${code}`;
+}
+
 export function isFinancePackageAllowed(packageType: string | null | undefined): boolean {
   return FINANCE_ALLOWED_PACKAGES.includes(
     normalizePackageType(packageType) as FinancePackageType

@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
+import { normalizePackageType } from '@/lib/finance-package-gate';
 
 const prisma = new PrismaClient();
 
@@ -7,12 +8,11 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
   try {
     const schoolCode = params.schoolCode.toLowerCase();
 
-    // Find the school and its admin user
     const school = await prisma.school.findUnique({
       where: { code: schoolCode },
       include: {
         users: {
-          where: { role: 'admin' },
+          where: { role: { in: ['admin', 'bursar'] } },
           select: {
             id: true,
             email: true,
@@ -28,18 +28,26 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       return NextResponse.json({ error: 'School not found' }, { status: 404 });
     }
 
-    const adminUser = school.users.find(u => u.role === 'admin');
-    if (!adminUser) {
-      return NextResponse.json({ error: 'Admin user not found' }, { status: 404 });
+    const financeOnly = normalizePackageType(school.packageType) === 'finance_only';
+    const preferredRole = financeOnly ? 'bursar' : 'admin';
+    const portalUser =
+      school.users.find((u) => u.role === preferredRole && u.isActive) ||
+      school.users.find((u) => u.role === preferredRole) ||
+      school.users.find((u) => u.role === 'admin') ||
+      school.users.find((u) => u.role === 'bursar');
+
+    if (!portalUser) {
+      return NextResponse.json({ error: 'Portal user not found' }, { status: 404 });
     }
 
-    // For security reasons, we can't return the actual stored password
-    // Instead, we return the admin email and provide helpful information
     return NextResponse.json({
-      email: adminUser.email,
+      email: portalUser.email,
       schoolName: school.name,
       schoolCode: school.code,
-      message: "Admin credentials retrieved. Please use the admin email and your actual password to login.",
+      role: portalUser.role,
+      message: financeOnly
+        ? 'Finance portal login email (use Finance workspace password).'
+        : 'Admin credentials retrieved. Please use the admin email and your actual password to login.',
       note: "If you don't remember your password, please contact the system administrator or use the password reset functionality."
     });
 

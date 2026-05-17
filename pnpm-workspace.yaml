@@ -7,3 +7,4 @@ onlyBuiltDependencies:
   - esbuild
   - prisma
   - sqlite3
+  - unrs-resolver

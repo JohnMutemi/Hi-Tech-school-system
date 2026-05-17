@@ -18,6 +18,7 @@ export async function GET(
       classId: searchParams.get('classId'),
       academicYear: searchParams.get('academicYear'),
       term: searchParams.get('term'),
+      feeAccommodation: searchParams.get('feeAccommodation'),
     });
 
     if (!payload) {

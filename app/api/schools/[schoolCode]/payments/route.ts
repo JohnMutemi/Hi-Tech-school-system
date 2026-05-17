@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from "@/lib/prisma";
 import { jsonError, requireRole, requireSchoolAccess } from "@/lib/api-guard";
 import { computeStudentFeesSnapshot } from "@/lib/services/student-fees-snapshot";
+import { SMSService } from "@/lib/services/sms-service";
+import { shouldSendParentFeePaymentSms } from "@/lib/fee-payment-sms";
 
 // POST: Process a new payment
 export async function POST(request: NextRequest, { params }: { params: { schoolCode: string } }) {
@@ -52,6 +54,7 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
       include: {
         user: true,
         class: true,
+        parent: true,
       }
     });
     
@@ -190,6 +193,29 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
       // Don't fail the payment if email fails
     }
 
+    const smsTo =
+      student.parent?.phone?.trim() || student.parentPhone?.trim() || '';
+    let smsSent = false;
+    if (
+      smsTo &&
+      shouldSendParentFeePaymentSms(schoolRecord, student)
+    ) {
+      try {
+        const sms = await SMSService.sendPaymentConfirmation(
+          smsTo,
+          student.parent?.name || student.parentName || 'Parent',
+          student.user.name,
+          Number(amount),
+          new Date(),
+          schoolName,
+          String(paymentMethod || 'payment'),
+        );
+        smsSent = Boolean(sms?.success);
+      } catch (smsErr) {
+        console.error('SMS notification failed:', smsErr);
+      }
+    }
+
     return NextResponse.json({
       message: 'Payment processed successfully',
       payment: {
@@ -213,10 +239,12 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
         termOutstandingAfter,
         carryForward,
         emailNotificationSent,
+        smsSent,
       },
       receipt,
       emailNotificationSent,
       schoolEmailNotificationSent,
+      smsSent,
     }, { status: 201 });
 
   } catch (error: any) {

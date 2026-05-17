@@ -2,7 +2,11 @@ import { PrismaClient } from '@prisma/client';
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from 'zod';
 import { getSession } from "@/lib/session";
+import { requireSchoolAccess, ApiGuardError } from "@/lib/api-guard";
 import { normalizePackageType } from '@/lib/finance-package-gate';
+import { getPaletteBySlug } from '@/lib/school-website/palettes';
+import { normalizeTemplateSlug } from '@/lib/school-website/templates';
+import { transformSchoolForApi } from '@/lib/school-website/transform-school-response';
 
 const prisma = new PrismaClient();
 
@@ -84,43 +88,8 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       return NextResponse.json({ error: 'School not found' }, { status: 404 });
     }
 
-    // Transform data to match SchoolData interface
-    const theme = schoolData.colorTheme || "#d97706";
-    const primaryRole = getPrimaryPortalRole((schoolData as any).packageType);
-    const primaryUser = schoolData.users.find(u => u.role === primaryRole);
-    const fallbackUser = schoolData.users.find(u => u.role === 'admin');
-
     const transformedSchool = {
-      id: schoolData.id,
-      schoolCode: schoolData.code,
-      name: schoolData.name,
-      logo: schoolData.logo,
-      logoUrl: schoolData.logo ?? "",
-      colorTheme: theme,
-      portalUrl: `/schools/${schoolData.code}`,
-      description: "",
-      adminEmail: primaryUser?.email || fallbackUser?.email || schoolData.email,
-      adminPassword: "", // Don't return password
-      adminFirstName: primaryUser?.name?.split(' ')[0] || fallbackUser?.name?.split(' ')[0] || "Admin",
-      adminLastName:
-        primaryUser?.name?.split(' ').slice(1).join(' ') ||
-        fallbackUser?.name?.split(' ').slice(1).join(' ') ||
-        "User",
-      createdAt: schoolData.createdAt.toISOString(),
-      status: schoolData.isActive ? "active" : "suspended",
-      packageType: normalizePackageType((schoolData as any).packageType),
-      profile: {
-        address: schoolData.address,
-        phone: schoolData.phone,
-        website: "",
-        principalName: "",
-        establishedYear: new Date().getFullYear().toString(),
-        description: "",
-        email: schoolData.email,
-        motto: "",
-        type: "primary" as const
-      },
-      teachers: [],
+      ...transformSchoolForApi(schoolData as any),
       students: schoolData.students.map(s => ({
         id: s.id,
         name: "",
@@ -137,7 +106,6 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
         dateAdmitted: (s as any).createdAt?.toISOString() || new Date().toISOString(),
         status: s.isActive ? "active" : "inactive"
       })),
-      subjects: [],
       classes: schoolData.classes.map(c => ({
         id: c.id,
         name: c.name,
@@ -147,10 +115,6 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
         classTeacherId: "",
         subjects: []
       })),
-      // Add admission number settings
-      admissionNumberFormat: schoolData.admissionNumberFormat || '{SCHOOL_CODE}-{YEAR}-{SEQ}',
-      lastAdmissionNumber: schoolData.lastAdmissionNumber || '',
-      admissionNumberAutoIncrement: schoolData.admissionNumberAutoIncrement ?? true,
     };
 
     return NextResponse.json(transformedSchool);
@@ -162,9 +126,17 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
 
 export async function PUT(request: NextRequest, { params }: { params: { schoolCode: string } }) {
   try {
-    const session = await getSession()
-    if (!session.isLoggedIn || session.role !== "super_admin") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
+    const session = await getSession();
+    const isSuperAdmin = session.isLoggedIn && session.role === "super_admin";
+    if (!isSuperAdmin) {
+      try {
+        await requireSchoolAccess(params.schoolCode);
+      } catch (err) {
+        if (err instanceof ApiGuardError) {
+          return NextResponse.json({ error: err.message }, { status: err.status });
+        }
+        return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+      }
     }
 
     const schoolCode = params.schoolCode;
@@ -219,22 +191,56 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
         : undefined;
 
     const normalizedPackageType =
-      packageType !== undefined ? normalizePackageType(packageType) : undefined;
+      isSuperAdmin && packageType !== undefined
+        ? normalizePackageType(packageType)
+        : undefined;
+
+    const palette =
+      body.colorPaletteSlug !== undefined
+        ? getPaletteBySlug(body.colorPaletteSlug)
+        : undefined;
+
+    const profileYear = profile?.establishedYear;
+    const established =
+      profileYear != null && String(profileYear).trim() !== ''
+        ? parseInt(String(profileYear), 10)
+        : undefined;
 
     // Update school (use id — code in URL may differ in casing from DB)
     await prisma.school.update({
       where: { id: school.id },
       data: {
-        name: name || school.name,
-        address: address || school.address,
-        phone: phone || school.phone,
-        email: email || school.email,
-        isActive: status !== "suspended",
+        ...(isSuperAdmin && name ? { name } : {}),
+        ...(address ? { address } : {}),
+        ...(phone ? { phone } : {}),
+        ...(email ? { email } : {}),
+        ...(isSuperAdmin && status !== undefined ? { isActive: status !== "suspended" } : {}),
         ...(body.lastAdmissionNumber !== undefined && {
           lastAdmissionNumber: body.lastAdmissionNumber,
         }),
         ...(nextLogo !== undefined && { logo: nextLogo }),
         ...(nextColorTheme !== undefined && { colorTheme: nextColorTheme }),
+        ...(palette && nextColorTheme === undefined && body.colorPaletteSlug
+          ? { colorTheme: palette.primary, colorPaletteSlug: palette.slug }
+          : body.colorPaletteSlug !== undefined
+            ? { colorPaletteSlug: palette?.slug ?? null }
+            : {}),
+        ...(body.websiteTemplateSlug !== undefined && {
+          websiteTemplateSlug: normalizeTemplateSlug(body.websiteTemplateSlug),
+        }),
+        ...(body.publicWebsiteEnabled !== undefined && {
+          publicWebsiteEnabled: Boolean(body.publicWebsiteEnabled),
+        }),
+        ...(body.feePaymentParentSmsEnabled !== undefined && {
+          feePaymentParentSmsEnabled: Boolean(body.feePaymentParentSmsEnabled),
+        }),
+        ...(profile?.motto !== undefined && { motto: profile.motto || null }),
+        ...(profile?.principalName !== undefined && {
+          principalName: profile.principalName || null,
+        }),
+        ...(established !== undefined && !Number.isNaN(established) && { establishedYear: established }),
+        ...(profile?.description !== undefined && { description: profile.description || null }),
+        ...(profile?.website !== undefined && { websiteUrl: profile.website || null }),
         ...(normalizedPackageType !== undefined && { packageType: normalizedPackageType }),
       },
     });
@@ -242,8 +248,8 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
     const primaryRole = getPrimaryPortalRole((school as any).packageType);
     const primaryUser = school.users.find((user) => user.role === primaryRole);
 
-    // Update the primary portal user for this package.
-    if (adminEmail && primaryUser) {
+    // Update the primary portal user for this package (superadmin only).
+    if (isSuperAdmin && adminEmail && primaryUser) {
       await prisma.user.update({
         where: { id: primaryUser.id },
         data: {
@@ -279,47 +285,7 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
       return NextResponse.json({ error: 'Failed to retrieve updated school' }, { status: 500 });
     }
 
-    const resultPrimaryRole = getPrimaryPortalRole((result as any).packageType);
-    const resultPrimaryUser = result.users.find(u => u.role === resultPrimaryRole);
-    const resultFallbackUser = result.users.find(u => u.role === 'admin');
-
-    const transformedSchool = {
-      id: result.id,
-      schoolCode: result.code,
-      name: result.name,
-      logo: result.logo,
-      logoUrl: result.logo ?? "",
-      colorTheme: result.colorTheme || "#d97706",
-      portalUrl: `/schools/${result.code}`,
-      description: description || "",
-      adminEmail: resultPrimaryUser?.email || resultFallbackUser?.email || result.email,
-      adminPassword: "",
-      adminFirstName: resultPrimaryUser?.name?.split(' ')[0] || resultFallbackUser?.name?.split(' ')[0] || "Admin",
-      adminLastName:
-        resultPrimaryUser?.name?.split(' ').slice(1).join(' ') ||
-        resultFallbackUser?.name?.split(' ').slice(1).join(' ') ||
-        "User",
-      createdAt: result.createdAt.toISOString(),
-      status: result.isActive ? "active" : "suspended",
-      packageType: normalizePackageType((result as any).packageType),
-      profile: {
-        address: result.address,
-        phone: result.phone,
-        website: profile?.website || "",
-        principalName: profile?.principalName || "",
-        establishedYear: profile?.establishedYear || new Date().getFullYear().toString(),
-        description: profile?.description || "",
-        email: result.email,
-        motto: profile?.motto || "",
-        type: profile?.type || "primary"
-      },
-      teachers: [],
-      students: [],
-      subjects: [],
-      classes: []
-    };
-
-    return NextResponse.json(transformedSchool);
+    return NextResponse.json(transformSchoolForApi(result as any, { description: description || "" }));
   } catch (error) {
     console.error("Error updating school:", error);
     return NextResponse.json({ error: "Failed to update school" }, { status: 500 });
@@ -415,6 +381,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { schoo
       await tx.academicYear.deleteMany({ where: { schoolId: school.id } })
 
       await tx.emailNotificationConfig.deleteMany({ where: { schoolId: school.id } })
+      await tx.schoolWebsiteSection.deleteMany({ where: { schoolId: school.id } })
       await tx.user.deleteMany({ where: { schoolId: school.id } })
 
       await tx.school.delete({ where: { id: school.id } })

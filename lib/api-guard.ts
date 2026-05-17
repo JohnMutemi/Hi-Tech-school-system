@@ -14,6 +14,8 @@ export type ApiRole =
   | "parent"
   | "student";
 
+const WEBSITE_EDITOR_ROLES: ApiRole[] = ["super_admin", "school_admin", "bursar"];
+
 export class ApiGuardError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -104,6 +106,16 @@ export async function requireSchoolAccess(schoolCode: string) {
   }
 
   return { session, schoolContext, schoolManager };
+}
+
+/** School admins and bursars (incl. finance-only login) may edit the public website. */
+export async function requireWebsiteEditorAccess(schoolCode: string) {
+  const result = await requireSchoolAccess(schoolCode);
+  const role = result.session.role as ApiRole | undefined;
+  if (!role || !WEBSITE_EDITOR_ROLES.includes(role)) {
+    throw new ApiGuardError("Forbidden", 403);
+  }
+  return result;
 }
 
 export function jsonError(error: unknown) {

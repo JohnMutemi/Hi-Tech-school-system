@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { NextRequest, NextResponse } from "next/server";
+import { verify } from "jsonwebtoken";
 
 const prisma = new PrismaClient();
 
@@ -74,6 +75,7 @@ export async function GET(
       schoolName: school.name,
       schoolCode: school.code,
       colorTheme: school.colorTheme ?? null,
+      feePaymentParentSmsEnabled: school.feePaymentParentSmsEnabled ?? false,
       currentAcademicYearId: currentAcademicYearRecord?.id ?? null,
       currentAcademicYearName,
       parent: {
@@ -105,7 +107,8 @@ export async function GET(
         parentEmail: student.parentEmail,
         address: student.address,
         gender: student.gender,
-        status: student.status
+        status: student.status,
+        feePaymentSmsOptIn: student.feePaymentSmsOptIn ?? false,
       }))
     });
 
@@ -116,4 +119,77 @@ export async function GET(
       { status: 500 }
     );
   }
-} 
+}
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: { schoolCode: string; parentId: string } }
+) {
+  try {
+    const token = req.cookies.get("parent_auth_token")?.value;
+    if (!token) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    let payload: { role?: string; userId?: string; schoolCode?: string; schoolId?: string };
+    try {
+      payload = verify(token, process.env.JWT_SECRET!) as typeof payload;
+    } catch {
+      return NextResponse.json({ error: "Invalid session" }, { status: 401 });
+    }
+
+    const decodedSchoolCode = decodeURIComponent(params.schoolCode).toLowerCase();
+    if (
+      payload.role !== "parent" ||
+      payload.userId !== params.parentId ||
+      (payload.schoolCode && payload.schoolCode.toLowerCase() !== decodedSchoolCode)
+    ) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const body = await req.json();
+    const studentId = body.studentId as string | undefined;
+    const feePaymentSmsOptIn = body.feePaymentSmsOptIn;
+
+    if (!studentId || typeof feePaymentSmsOptIn !== "boolean") {
+      return NextResponse.json(
+        { error: "studentId and boolean feePaymentSmsOptIn are required" },
+        { status: 400 }
+      );
+    }
+
+    const school = await prisma.school.findFirst({
+      where: { code: { equals: decodedSchoolCode, mode: "insensitive" } },
+    });
+    if (!school) {
+      return NextResponse.json({ error: "School not found" }, { status: 404 });
+    }
+
+    const student = await prisma.student.findFirst({
+      where: {
+        id: studentId,
+        parentId: params.parentId,
+        schoolId: school.id,
+        isActive: true,
+      },
+    });
+
+    if (!student) {
+      return NextResponse.json({ error: "Student not found" }, { status: 404 });
+    }
+
+    const updated = await prisma.student.update({
+      where: { id: studentId },
+      data: { feePaymentSmsOptIn },
+      select: { id: true, feePaymentSmsOptIn: true },
+    });
+
+    return NextResponse.json({ success: true, student: updated });
+  } catch (error) {
+    console.error("Error updating parent SMS preference:", error);
+    return NextResponse.json(
+      { error: "An internal error occurred" },
+      { status: 500 }
+    );
+  }
+}

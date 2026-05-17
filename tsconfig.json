@@ -35,6 +35,11 @@
     ".next/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "public-schools/thebridgeacademy",
+    "public-schools/waita-academy-showcase",
+    "public-schools/mwingi-royal-gateway",
+    "public-schools/waitaprogressive",
+    "public-schools/mwingiroyaljunior"
   ]
 }

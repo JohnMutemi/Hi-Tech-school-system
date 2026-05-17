@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withSchoolContext } from '@/lib/school-context';
 import { hashDefaultPasswordByRole } from '@/lib/utils/default-passwords';
 import { prisma } from "@/lib/prisma";
+import { normalizeStudentFeeSegment } from '@/lib/fees/fee-structure-resolve';
 import { jsonError, requireRole, requireSchoolAccess } from "@/lib/api-guard";
 
 function normalizeName(value?: string | null): string {
@@ -161,9 +162,18 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
 
     const data = await req.json();
     const {
-      name, firstName, middleName, surname, email, phone, admissionNumber, yearOfBirth, dateOfBirth, dateAdmitted,
+      name,
+      firstName,
+      middleName,
+      surname,
+      email,
+      phone,
+      admissionNumber,
+      yearOfBirth,
+      dateOfBirth,
+      dateAdmitted,
       parentName, parentPhone, parentEmail, address, gender, classId, gradeId: gradeIdRaw, avatarUrl,
-      emergencyContact, medicalInfo, notes
+      emergencyContact, medicalInfo, notes, feeAccommodation: feeRaw
     } = data;
 
     const fullName = buildStudentFullName({ firstName, middleName, surname, name });
@@ -208,13 +218,12 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
       !resolvedClassId ||
       !admissionNumber?.trim() ||
       !parentName?.trim() ||
-      !parentPhone?.trim() ||
-      !parentEmail?.trim()
+      !parentPhone?.trim()
     ) {
       return NextResponse.json(
         {
           error:
-            "Missing required fields: student name, admission number, grade (or class), parent name, parent phone, and parent email are required.",
+            "Missing required fields: student name, admission number, grade (or class), parent name, and parent phone are required.",
         },
         { status: 400 }
       );
@@ -393,6 +402,7 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
         emergencyContact,
         medicalInfo,
         notes,
+        feeAccommodation: normalizeStudentFeeSegment(feeRaw),
         isActive: true,
         currentAcademicYearId: currentYear?.id,
         currentTermId: currentTerm?.id,
@@ -456,8 +466,10 @@ export async function PUT(req: NextRequest, { params }: { params: { schoolCode: 
     const {
       name, email, phone, admissionNumber, dateOfBirth, dateAdmitted,
       parentName, parentPhone, parentEmail, address, gender, parentId,
-      classId, status, avatarUrl, emergencyContact, medicalInfo, notes, isActive,
-      currentAcademicYearId, currentTermId
+      classId, status, avatarUrl,       emergencyContact, medicalInfo, notes, isActive,
+      currentAcademicYearId, currentTermId,
+      feeAccommodation: feeSegmentBody,
+      feePaymentSmsOptIn: feeSmsOptBody,
     } = body;
 
     if (!studentId) {
@@ -603,6 +615,10 @@ export async function PUT(req: NextRequest, { params }: { params: { schoolCode: 
         emergencyContact,
         medicalInfo,
         notes,
+        ...(feeSegmentBody !== undefined && feeSegmentBody !== null
+          ? { feeAccommodation: normalizeStudentFeeSegment(feeSegmentBody) }
+          : {}),
+        ...(typeof feeSmsOptBody === 'boolean' ? { feePaymentSmsOptIn: feeSmsOptBody } : {}),
         isActive: typeof isActive === "boolean" ? isActive : (status === "active"),
         updatedAt: new Date(),
         currentAcademicYearId: currentAcademicYearId ?? student.currentAcademicYearId,

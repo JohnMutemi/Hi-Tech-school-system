@@ -71,6 +71,8 @@ interface SidebarProps {
   colorTheme?: string;
   onLogout?: () => void;
   schoolData?: any;
+  /** School logo (data URL or https). Falls back to platform mark. */
+  logoUrl?: string | null;
   onCollapseChange?: (isCollapsed: boolean) => void;
 }
 
@@ -80,6 +82,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   colorTheme,
   onLogout,
   schoolData,
+  logoUrl,
   onCollapseChange,
 }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -89,6 +92,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
     () => NAV_SECTIONS.flatMap((section) => section.items),
     []
   );
+
+  const resolvedLogo =
+    (typeof logoUrl === "string" && logoUrl.trim()) ||
+    (schoolData && (schoolData.logoUrl || schoolData.logo)) ||
+    "";
 
   React.useEffect(() => {
     onCollapseChange?.(isCollapsed);
@@ -112,8 +120,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {/* Logo section at the top */}
           <div className={`flex items-center ${isCollapsed ? "justify-center" : "justify-between"} h-20 mb-4`}>
             <img 
-              src="/hi-tech-logo.svg" 
-              alt="Logo" 
+              src={resolvedLogo || "/hi-tech-logo.svg"} 
+              alt="School logo" 
               className={`w-auto rounded-xl border-2 shadow-lg p-2 transition-all ${isCollapsed ? "h-12" : "h-16"}`} 
               style={{ borderColor: colorTheme || '#3b82f6' }}
             />

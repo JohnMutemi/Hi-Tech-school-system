@@ -22,6 +22,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Select } from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
 import { SchoolLoginShell } from "@/components/auth/school-login-shell";
+import { normalizePackageType, staffPortalLoginPath } from "@/lib/finance-package-gate";
 import {
   Dialog,
   DialogContent,
@@ -89,6 +90,13 @@ export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
 
     fetchSchool();
   }, [schoolCode]);
+
+  useEffect(() => {
+    if (!schoolData?.packageType || !schoolCode) return;
+    if (normalizePackageType(schoolData.packageType) !== "finance_only") return;
+    const search = typeof window !== "undefined" ? window.location.search : "";
+    router.replace(`${staffPortalLoginPath(schoolCode, schoolData.packageType)}${search}`);
+  }, [schoolData, schoolCode, router]);
 
   // Fetch students from API on component mount
   useEffect(() => {

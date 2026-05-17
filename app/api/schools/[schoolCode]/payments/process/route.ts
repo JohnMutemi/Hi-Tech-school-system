@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { academicYearTransitionService } from "@/lib/services/academic-year-transition-service";
 import { prisma } from "@/lib/prisma";
+import { resolveTermStructuresForFees } from "@/lib/fees/fee-structure-resolve";
 import { jsonError, requireRole, requireSchoolAccess } from "@/lib/api-guard";
 
 export async function POST(
@@ -231,8 +232,8 @@ async function calculateStudentBalances(studentId: string, academicYearId: strin
     };
   }
 
-  // Get fee structures for the academic year
-  const feeStructures = await prisma.termlyFeeStructure.findMany({
+  // Get fee structures for the academic year (segment-aware)
+  const rawFeeStructures = await prisma.termlyFeeStructure.findMany({
     where: {
       gradeId: student.class.gradeId,
       isActive: true,
@@ -241,6 +242,8 @@ async function calculateStudentBalances(studentId: string, academicYearId: strin
     },
     include: { termRef: true }
   });
+
+  const feeStructures = resolveTermStructuresForFees(rawFeeStructures, student.feeAccommodation);
 
   // Get all payments for the academic year
   const payments = await prisma.payment.findMany({

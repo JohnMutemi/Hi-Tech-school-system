@@ -18,10 +18,22 @@ model School {
   /// Portal accent / theme color (hex), e.g. #d97706
   colorTheme                   String?
   packageType                  String               @default("full")
+  motto                        String?
+  principalName                String?
+  establishedYear              Int?
+  description                  String?
+  websiteUrl                   String?
+  websiteTemplateSlug          String               @default("classic")
+  colorPaletteSlug             String?
+  publicWebsiteEnabled         Boolean              @default(true)
+  /// Normalized hostname only, e.g. www.bridgeacademy.ac.ke (no protocol)
+  customDomain                 String?              @unique
   isActive                     Boolean              @default(true)
   createdAt                    DateTime             @default(now())
   updatedAt                    DateTime             @updatedAt
   admissionNumberAutoIncrement Boolean              @default(true)
+  /// When true, parents who opted in may receive fee payment SMS (school-controlled).
+  feePaymentParentSmsEnabled   Boolean              @default(false)
   admissionNumberFormat        String?
   lastAdmissionNumber          String?
   backupEnabled                Boolean              @default(true)
@@ -49,6 +61,23 @@ model School {
   gradingCriteria              GradingCriteria[]
   assessments                  Assessment[]
   studentGradeResults          StudentGradeResult[]
+  websiteSections              SchoolWebsiteSection[]
+}
+
+model SchoolWebsiteSection {
+  id          String   @id @default(uuid())
+  schoolId    String
+  sectionKey  String
+  title       String?
+  content     Json
+  isVisible   Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  school      School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, sectionKey])
+  @@index([schoolId])
 }
 
 model User {
@@ -155,6 +184,9 @@ model Student {
   emergencyContact         String?
   medicalInfo              String?
   notes                    String?
+  feeAccommodation         String                    @default("day_scholar")
+  /// Guardian opt-in: SMS fee receipts when school enables fee SMS.
+  feePaymentSmsOptIn       Boolean                   @default(false)
   status                   String                    @default("active")
   academicYear             Int?                      @default(2025)
   currentAcademicYearId    String?
@@ -245,6 +277,8 @@ model TermlyFeeStructure {
   id             String            @id @default(uuid())
   term           String
   year           Int
+  /// null = unified / legacy fee for all accommodations; otherwise day_scholar | boarder
+  feeAccommodation String?
   totalAmount    Decimal           @db.Decimal(10, 2)
   breakdown      Json
   isActive       Boolean           @default(true)

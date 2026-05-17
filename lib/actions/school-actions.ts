@@ -3,6 +3,7 @@
 
 import { saveSchool, getSchool, getAllSchools, createSchool, deleteSchool } from "@/lib/school-storage"
 import { generateSchoolCode, generateTempPassword } from "@/lib/utils/school-generator"
+import { staffPortalLoginPath } from "@/lib/finance-package-gate"
 
 export async function createSchoolClient(schoolData: any) {
   try {
@@ -20,6 +21,7 @@ export async function createSchoolClient(schoolData: any) {
       motto,
       logoUrl,
       packageType,
+      colorPaletteSlug,
     } = schoolData
 
     if (!name || !address || !phone || !email) {
@@ -47,7 +49,7 @@ export async function createSchoolClient(schoolData: any) {
       packageType: packageType || "full",
       logoUrl: logoUrl || "",
       colorTheme: colorTheme || "#d97706",
-      portalUrl: `/schools/${schoolCode}`,
+      portalUrl: staffPortalLoginPath(schoolCode, packageType || "full"),
       description: description || "",
       adminEmail: email,
       adminPassword: tempPassword,
@@ -57,6 +59,12 @@ export async function createSchoolClient(schoolData: any) {
       address,
       phone,
       email,
+      websiteTemplateSlug: "classic",
+      colorPaletteSlug: colorPaletteSlug || "amber",
+      motto: motto || "",
+      principalName: principalName || "",
+      establishedYear: establishedYear || new Date().getFullYear().toString(),
+      websiteUrl: website || "",
       profile: {
         address,
         phone,
@@ -75,12 +83,22 @@ export async function createSchoolClient(schoolData: any) {
     }
 
     const createdSchool = await createSchool(newSchoolData as any)
+    const apiSchool = createdSchool as typeof createdSchool & {
+      publicSiteUrl?: string
+      customDomain?: string | null
+      warnings?: string[]
+    }
+
+    const pkg = packageType || "full"
 
     return {
       success: true,
       schoolCode,
       tempPassword,
-      portalUrl: `/schools/${schoolCode}`,
+      portalUrl: staffPortalLoginPath(schoolCode, pkg),
+      publicSiteUrl: apiSchool.publicSiteUrl || "",
+      customDomain: apiSchool.customDomain ?? null,
+      warnings: apiSchool.warnings,
       message: "School created successfully",
     }
   } catch (error) {

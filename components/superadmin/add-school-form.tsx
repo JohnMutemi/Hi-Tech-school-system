@@ -7,28 +7,21 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { 
-  School, 
-  Upload, 
-  Palette, 
-  Link as LinkIcon, 
-  Eye, 
-  Copy,
-  CheckCircle,
-  AlertCircle,
+import {
+  School,
+  Upload,
   Building2,
   Contact,
   Settings,
-  Image
+  Image,
 } from "lucide-react"
 import { saveSchool, getSchool, getAllSchools } from "@/lib/school-storage"
 import { generateSchoolCode, generateTempPassword } from "@/lib/utils/school-generator"
 import { SchoolCreationSuccess } from "./school-creation-success"
 import { createSchoolClient } from "@/lib/actions/school-actions"
+import { ColorPalettePicker } from "./color-palette-picker"
 import { isAcceptableSchoolLogoFile, SCHOOL_LOGO_ACCEPT } from "@/lib/utils/school-logo-file"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
@@ -53,13 +46,13 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
     establishedYear: new Date().getFullYear().toString(),
     motto: "",
     packageType: "full",
+    colorPaletteSlug: "amber",
   })
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [logoPreview, setLogoPreview] = useState<string>("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
-  const [generatedPortalUrl, setGeneratedPortalUrl] = useState("")
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [successData, setSuccessData] = useState({
     schoolCode: "",
@@ -73,19 +66,6 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
     setSchoolData({ ...schoolData, [name]: value })
-    
-    // Auto-generate portal URL when school name changes
-    if (name === "name" && value) {
-      const code = schoolData.code || generateSchoolCode(value)
-      setGeneratedPortalUrl(`https://app.yourdomain.com/schools/${code.toUpperCase()}`)
-    }
-  }
-
-  const generateSchoolCode = (schoolName: string): string => {
-    const cleanName = schoolName.replace(/[^a-zA-Z]/g, "").toUpperCase()
-    const prefix = cleanName.substring(0, 3) || "SCH"
-    const suffix = Math.floor(Math.random() * 9000) + 1000
-    return `${prefix}${suffix}`
   }
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -146,6 +126,7 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
         establishedYear,
         motto,
         packageType,
+        colorPaletteSlug,
       } = schoolData
 
       // Validate required fields
@@ -167,7 +148,6 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
         }
       }
 
-      // Create school using client-side function
       const result = await createSchoolClient({
         name,
         address,
@@ -182,11 +162,21 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
         motto,
         logoUrl,
         packageType,
+        colorPaletteSlug,
       })
 
       if (result.error) {
         setError(result.error)
       } else if (result.success) {
+        if ("warnings" in result && Array.isArray(result.warnings) && result.warnings.length > 0) {
+          result.warnings.forEach((w) =>
+            toast({
+              title: "Notice",
+              description: w,
+              duration: 10_000,
+            })
+          )
+        }
         // Show success modal
         setSuccessData({
           schoolCode: result.schoolCode,
@@ -212,10 +202,10 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
           establishedYear: new Date().getFullYear().toString(),
           motto: "",
           packageType: "full",
+          colorPaletteSlug: "amber",
         })
         setLogoFile(null)
         setLogoPreview("")
-        setGeneratedPortalUrl("")
       }
 
     } catch (error) {
@@ -224,14 +214,6 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
     }
 
     setIsSubmitting(false)
-  }
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text)
-    toast({
-      title: "Copied!",
-      description: "Credentials copied to clipboard",
-    })
   }
 
   const handleSuccessModalClose = () => {
@@ -411,17 +393,20 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
                 
                 <div className="space-y-1.5 md:space-y-2">
                   <Label htmlFor="website" className="text-xs md:text-sm font-medium text-stone-700">
-                    Website
+                    Public site domain
                   </Label>
               <Input
                 id="website"
                 name="website"
-                type="url"
+                type="text"
                 value={schoolData.website}
                 onChange={handleChange}
                     className="h-9 md:h-10 text-sm"
-                    placeholder="https://example.com"
+                    placeholder="www.yourschool.ac.ke or https://www.yourschool.ac.ke"
               />
+              <p className="text-xs text-stone-500">
+                Used for the school&apos;s public website hostname when DNS points to this platform.
+              </p>
             </div>
               </TabsContent>
 
@@ -475,6 +460,17 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
 
               {/* Branding Tab */}
               <TabsContent value="branding" className="space-y-3 md:space-y-4">
+                <p className="text-xs text-stone-600">
+                  Logo and colours apply to the school portal and any linked public page. Marketing
+                  copy and photos for dedicated sites are edited in{" "}
+                  <code className="rounded bg-stone-100 px-1 text-[10px]">public-schools/&lt;school&gt;/</code>.
+                </p>
+                <ColorPalettePicker
+                  value={schoolData.colorPaletteSlug}
+                  onChange={(slug, primary) =>
+                    setSchoolData({ ...schoolData, colorPaletteSlug: slug, colorTheme: primary })
+                  }
+                />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                   <div className="space-y-1.5 md:space-y-2">
                     <Label htmlFor="colorTheme" className="text-xs md:text-sm font-medium text-stone-700">
@@ -552,49 +548,12 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
                   className="hidden"
                 />
               </div>
-            </div>
                 </div>
-                
-                <div className="space-y-1.5 md:space-y-2">
-                  <Label className="text-xs md:text-sm font-medium text-stone-700">
-                    Generated Portal URL
-                  </Label>
-                  <div className="space-y-2 rounded-lg border border-amber-100 bg-amber-50/80 p-2 md:p-3">
-                <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-stone-600">Portal URL:</span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                        className="h-6 text-xs"
-                    onClick={() => copyToClipboard(generatedPortalUrl)}
-                  >
-                        <Copy className="w-3 h-3 mr-1" />
-                    Copy
-                  </Button>
                 </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="font-mono text-xs flex-1 text-left break-all">
-                        {generatedPortalUrl || "Will be generated after school name is entered"}
-                  </Badge>
-                      {generatedPortalUrl && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                          className="h-6 w-6 p-0 flex-shrink-0"
-                    onClick={() => window.open(generatedPortalUrl, "_blank")}
-                  >
-                          <Eye className="w-3 h-3" />
-                  </Button>
-                      )}
-                </div>
-              </div>
-            </div>
+
               </TabsContent>
             </Tabs>
 
-            {/* Submit Button */}
             <div className="border-t border-amber-100 pt-3 md:pt-4">
             <Button
               type="submit"
@@ -617,7 +576,7 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
           </form>
         </CardContent>
       </Card>
-      
+
       {showSuccessModal && (
         <SchoolCreationSuccess
           {...successData}

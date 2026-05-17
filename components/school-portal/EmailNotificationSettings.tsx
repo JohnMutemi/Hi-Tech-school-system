@@ -11,14 +11,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { 
   Mail, 
-  Settings, 
   CheckCircle, 
   AlertCircle,
   Eye,
   EyeOff,
   Send,
   Loader2,
-  Shield
+  Shield,
+  MessageSquare,
 } from 'lucide-react'
 import { useToast } from "@/hooks/use-toast"
 
@@ -103,10 +103,66 @@ export default function EmailNotificationSettings({ schoolCode, colorTheme }: Em
   const [testing, setTesting] = useState(false)
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({})
   const [testEmail, setTestEmail] = useState('')
+  const [feeSmsEnabled, setFeeSmsEnabled] = useState(false)
+  const [feeSmsLoading, setFeeSmsLoading] = useState(true)
+  const [feeSmsSaving, setFeeSmsSaving] = useState(false)
 
   useEffect(() => {
     fetchEmailConfig()
   }, [schoolCode])
+
+  useEffect(() => {
+    let cancelled = false
+    async function loadFeeSms() {
+      setFeeSmsLoading(true)
+      try {
+        const r = await fetch(`/api/schools/${schoolCode}`)
+        if (!r.ok || cancelled) return
+        const d = await r.json()
+        if (!cancelled) {
+          setFeeSmsEnabled(Boolean(d.feePaymentParentSmsEnabled))
+        }
+      } catch {
+        if (!cancelled) setFeeSmsEnabled(false)
+      } finally {
+        if (!cancelled) setFeeSmsLoading(false)
+      }
+    }
+    if (schoolCode) loadFeeSms()
+    return () => {
+      cancelled = true
+    }
+  }, [schoolCode])
+
+  const saveFeeSmsSchoolSetting = async (enabled: boolean) => {
+    setFeeSmsSaving(true)
+    try {
+      const r = await fetch(`/api/schools/${schoolCode}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ feePaymentParentSmsEnabled: enabled }),
+      })
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}))
+        throw new Error(err.error || 'Could not save SMS setting')
+      }
+      setFeeSmsEnabled(enabled)
+      toast({
+        title: 'Saved',
+        description: enabled
+          ? 'Parents can opt in to fee payment SMS per child in the parent portal.'
+          : 'Fee payment SMS is off. No guardian will receive payment texts.',
+      })
+    } catch (e) {
+      toast({
+        title: 'Error',
+        description: e instanceof Error ? e.message : 'Save failed',
+        variant: 'destructive',
+      })
+    } finally {
+      setFeeSmsSaving(false)
+    }
+  }
 
   const fetchEmailConfig = async () => {
     try {
@@ -401,6 +457,47 @@ export default function EmailNotificationSettings({ schoolCode, colorTheme }: Em
           </Badge>
         </div>
       </div>
+
+      <Card className="border-cyan-200/80 bg-gradient-to-r from-cyan-50/80 to-slate-50/80">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MessageSquare className="w-5 h-5" />
+            Fee payment SMS (guardians)
+          </CardTitle>
+          <CardDescription>
+            Disabled by default for the whole school. When you turn this on, guardians can choose to receive
+            text alerts when a fee payment is recorded for each learner (parent portal → Settings). SMS delivery
+            still depends on your SMS_PROVIDER environment configuration (Africa&apos;s Talking, Twilio, or simulation).
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <Label htmlFor="feeSmsSchool">Allow guardians to opt in for fee payment SMS</Label>
+              <p className="text-sm text-gray-500">
+                Both this switch and the guardian&apos;s per-child preference must be on before any SMS is sent.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {feeSmsLoading ? (
+                <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
+              ) : (
+                <Switch
+                  id="feeSmsSchool"
+                  checked={feeSmsEnabled}
+                  disabled={feeSmsSaving}
+                  onCheckedChange={(v) => {
+                    void saveFeeSmsSchoolSetting(v);
+                  }}
+                />
+              )}
+              {feeSmsSaving ? (
+                <span className="text-xs text-gray-500">Saving…</span>
+              ) : null}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Tabs defaultValue="settings" className="w-full">
         <TabsList className="grid w-full grid-cols-2">

@@ -424,6 +424,7 @@ export class BackupService {
               id,
               term: row.term,
               year: row.year,
+              feeAccommodation: row.feeAccommodation ?? null,
               totalAmount: row.totalAmount,
               breakdown: row.breakdown,
               isActive: row.isActive,

@@ -45,6 +45,19 @@ interface StudentsSectionProps {
   toast: any;
 }
 
+type CreateStudentForm = {
+  firstName?: string;
+  middleName?: string;
+  surname?: string;
+  admissionNumber?: string;
+  className?: string;
+  dateAdmitted?: string;
+  feeAccommodation?: string;
+  parentName?: string;
+  parentPhone?: string;
+  parentEmail?: string;
+};
+
 export default function StudentsSection({ schoolCode, colorTheme, toast }: StudentsSectionProps) {
   const responsive = useResponsive();
   const [students, setStudents] = useState<Student[]>([]);
@@ -175,38 +188,43 @@ export default function StudentsSection({ schoolCode, colorTheme, toast }: Stude
   }, [schoolCode]);
 
   // Add Student handler
-  const createStudent = async (studentData: Partial<Student>) => {
+  const createStudent = async (studentData: CreateStudentForm) => {
     if (
       !studentData.firstName ||
       !studentData.surname ||
-      !studentData.yearOfBirth ||
       !studentData.parentName ||
       !studentData.parentPhone ||
-      !studentData.className
+      !studentData.className ||
+      !studentData.dateAdmitted
     ) {
       toast({
         title: "Validation Error",
-        description: "First name, surname, class, parent name, and parent phone are required.",
+        description:
+          "First name, surname, class, date of enrolment, parent name, and parent phone are required.",
         variant: "destructive",
       });
       return false;
     }
-    const tempPassword = "student123";
-    const admissionNumber = studentData.admissionNumber || `ADM${Date.now()}`;
+    const admissionNumber = studentData.admissionNumber?.trim() || `ADM${Date.now()}`;
     try {
+      const fullName = [studentData.firstName, studentData.middleName, studentData.surname]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
       const response = await fetch(
         `/api/schools/${schoolCode}/students`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            ...studentData,
-            name: [studentData.firstName, studentData.middleName, studentData.surname]
-              .filter(Boolean)
-              .join(" ")
-              .trim(),
-            classId: studentData.className, // map className to classId
-            yearOfBirth: studentData.yearOfBirth ? Number(studentData.yearOfBirth) : undefined,
+            name: fullName,
+            classId: studentData.className,
+            admissionNumber,
+            dateAdmitted: studentData.dateAdmitted || undefined,
+            feeAccommodation: studentData.feeAccommodation || "day_scholar",
+            parentName: studentData.parentName?.trim(),
+            parentPhone: studentData.parentPhone?.trim(),
+            parentEmail: studentData.parentEmail?.trim() || undefined,
           }),
         }
       );
@@ -616,19 +634,24 @@ export default function StudentsSection({ schoolCode, colorTheme, toast }: Stude
                       </Select>
                     </div>
                     <div>
-                      <Label className="text-xs font-medium text-gray-700">Year of Birth *</Label>
-                      <Input 
-                        className="h-8 text-sm mt-1" 
-                        type="number"
-                        min="1900"
-                        max="2100"
-                        value={newStudent.yearOfBirth || ""} 
-                        onChange={e => setNewStudent({ ...newStudent, yearOfBirth: e.target.value })} 
-                        required
-                      />
+                      <Label className="text-xs font-medium text-gray-700">Fees apply as</Label>
+                      <Select
+                        value={newStudent.feeAccommodation || "day_scholar"}
+                        onValueChange={(value) =>
+                          setNewStudent({ ...newStudent, feeAccommodation: value })
+                        }
+                      >
+                        <SelectTrigger className="h-8 text-sm mt-1">
+                          <SelectValue placeholder="Day or boarder" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="day_scholar">Day scholar</SelectItem>
+                          <SelectItem value="boarder">Boarder</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div>
-                      <Label className="text-xs font-medium text-gray-700">Date of Admission *</Label>
+                      <Label className="text-xs font-medium text-gray-700">Date of enrolment *</Label>
                       <Input 
                         className="h-8 text-sm mt-1" 
                         type="date" 
@@ -668,12 +691,13 @@ export default function StudentsSection({ schoolCode, colorTheme, toast }: Stude
                       />
                     </div>
                     <div>
-                      <Label className="text-xs font-medium text-gray-700">Parent Email</Label>
+                      <Label className="text-xs font-medium text-gray-700">Parent email (optional)</Label>
                       <Input 
                         className="h-8 text-sm mt-1" 
                         type="email" 
                         value={newStudent.parentEmail || ""} 
                         onChange={e => setNewStudent({ ...newStudent, parentEmail: e.target.value })} 
+                        placeholder="SMS uses phone for fee alerts"
                       />
                     </div>
                   </div>

@@ -7,6 +7,8 @@ interface SMSConfig {
   provider: 'africas_talking' | 'twilio' | 'simulation';
   apiKey?: string;
   apiSecret?: string;
+  /** Africa's Talking account username */
+  username?: string;
   senderId?: string;
   phoneNumber?: string;
 }
@@ -19,13 +21,26 @@ interface SMSMessage {
 }
 
 export class SMSService {
-  private static config: SMSConfig = {
-    provider: 'simulation', // Default to simulation for development
-    apiKey: process.env.SMS_API_KEY,
-    apiSecret: process.env.SMS_API_SECRET,
-    senderId: process.env.SMS_SENDER_ID || 'SCHOOL',
-    phoneNumber: process.env.SMS_PHONE_NUMBER,
-  };
+  private static config: SMSConfig = (() => {
+    const explicit = (process.env.SMS_PROVIDER || '').toLowerCase().trim();
+    const provider: SMSConfig['provider'] =
+      explicit === 'africas_talking' || explicit === 'twilio' || explicit === 'simulation'
+        ? (explicit as SMSConfig['provider'])
+        : process.env.AFRIICASTALKING_API_KEY && process.env.AFRIICASTALKING_USERNAME
+          ? 'africas_talking'
+          : 'simulation';
+    return {
+      provider,
+      apiKey: process.env.AFRIICASTALKING_API_KEY || process.env.SMS_API_KEY,
+      username: process.env.AFRIICASTALKING_USERNAME,
+      apiSecret: process.env.SMS_API_SECRET,
+      senderId:
+        process.env.AFRIICASTALKING_SHORTCODE ||
+        process.env.SMS_SENDER_ID ||
+        'SCHOOL',
+      phoneNumber: process.env.SMS_PHONE_NUMBER,
+    };
+  })();
 
   /**
    * Initialize SMS service with configuration
@@ -161,14 +176,15 @@ export class SMSService {
    */
   private static async sendSMS(smsMessage: SMSMessage): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
+      const normalized: SMSMessage = { ...smsMessage, to: this.formatPhoneNumber(smsMessage.to) };
       switch (this.config.provider) {
         case 'africas_talking':
-          return await this.sendViaAfricasTalking(smsMessage);
+          return await this.sendViaAfricasTalking(normalized);
         case 'twilio':
-          return await this.sendViaTwilio(smsMessage);
+          return await this.sendViaTwilio(normalized);
         case 'simulation':
         default:
-          return await this.sendViaSimulation(smsMessage);
+          return await this.sendViaSimulation(normalized);
       }
     } catch (error) {
       console.error('SMS sending error:', error);
@@ -184,8 +200,10 @@ export class SMSService {
    */
   private static async sendViaAfricasTalking(smsMessage: SMSMessage): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
-      if (!this.config.apiKey || !this.config.apiSecret) {
-        throw new Error('Africa\'s Talking API credentials not configured');
+      if (!this.config.apiKey || !this.config.username) {
+        throw new Error(
+          "Africa's Talking API key or username not configured (AFRIICASTALKING_API_KEY, AFRIICASTALKING_USERNAME)"
+        );
       }
 
       const response = await fetch('https://api.africastalking.com/version1/messaging', {
@@ -195,7 +213,7 @@ export class SMSService {
           'apiKey': this.config.apiKey,
         },
         body: new URLSearchParams({
-          username: this.config.apiSecret,
+          username: this.config.username,
           to: smsMessage.to,
           message: smsMessage.message,
           from: this.config.senderId || 'SCHOOL',

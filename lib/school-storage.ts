@@ -7,6 +7,9 @@ export interface SchoolData {
   logoUrl?: string
   colorTheme: string
   portalUrl: string
+  staffPortalUrl?: string
+  publicSiteUrl?: string
+  publicWebsiteEnabled?: boolean
   description?: string
   adminEmail: string
   adminPassword: string
@@ -19,6 +22,8 @@ export interface SchoolData {
   students?: Student[]
   subjects?: Subject[]
   classes?: SchoolClass[]
+  /** Present when POST /api/schools returns non-fatal issues (e.g. AI draft skipped) */
+  warnings?: string[]
 }
 
 export interface SchoolProfile {
@@ -156,7 +161,7 @@ export async function createSchool(schoolData: Omit<SchoolData, "id" | "createdA
       throw new Error(errorData.error || `HTTP error! status: ${response.status}`)
     }
 
-    const createdSchool = await response.json()
+    const createdSchool = (await response.json()) as SchoolData
     console.log("School created successfully via API")
     return createdSchool
   } catch (error) {

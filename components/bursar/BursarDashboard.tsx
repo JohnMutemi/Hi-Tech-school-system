@@ -92,17 +92,19 @@ interface Student {
   id: string;
   name: string;
   admissionNumber: string;
-  email: string;
-  phone: string;
+  email: string | null;
+  phone: string | null;
   gradeName: string;
   className: string;
   academicYear: number;
   parent: {
     id: string;
     name: string;
-    email: string;
-    phone: string;
+    email: string | null;
+    phone: string | null;
   } | null;
+  feeAccommodation: string;
+  dateAdmitted: string | null;
   class: {
     id: string;
     name: string;
@@ -156,6 +158,10 @@ function normalizeListPayload(data: unknown): unknown[] {
   return [];
 }
 
+function feeSegmentDisplay(seg: string) {
+  return seg === 'boarder' ? 'Boarder' : 'Day scholar';
+}
+
 export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboardProps) {
   const { toast } = useToast();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -167,6 +173,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGrade, setSelectedGrade] = useState<string>('all');
   const [selectedClass, setSelectedClass] = useState<string>('all');
+  const [accommodationFilter, setAccommodationFilter] = useState<'all' | 'day_scholar' | 'boarder'>('all');
   const [academicYear, setAcademicYear] = useState(new Date().getFullYear().toString());
   const [term, setTerm] = useState<string>('all');
   
@@ -182,9 +189,9 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
   const [newStudent, setNewStudent] = useState({
     fullName: '',
     admissionNumber: '',
-    dateOfBirth: '',
     dateAdmitted: '',
     gradeId: '',
+    feeAccommodation: 'day_scholar',
     parentName: '',
     parentPhone: '',
     parentEmail: '',
@@ -197,9 +204,9 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
     studentId: '',
     fullName: '',
     admissionNumber: '',
-    dateOfBirth: '',
     dateAdmitted: '',
     gradeId: '',
+    feeAccommodation: 'day_scholar',
     parentName: '',
     parentPhone: '',
     parentEmail: '',
@@ -288,7 +295,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
     fetchStudents();
     fetchSchoolInfo();
     fetchBursarInfo();
-  }, [schoolCode, selectedGrade, selectedClass, academicYear, term, fetchGradeClassCatalog]);
+  }, [schoolCode, selectedGrade, selectedClass, accommodationFilter, academicYear, term, fetchGradeClassCatalog]);
 
   useEffect(() => {
     if (showAddStudent) {
@@ -376,6 +383,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
 
       if (selectedGrade && selectedGrade !== 'all') params.append('gradeId', selectedGrade);
       if (selectedClass && selectedClass !== 'all') params.append('classId', selectedClass);
+      if (accommodationFilter !== 'all') params.append('feeAccommodation', accommodationFilter);
 
       const response = await fetch(`${balancesEndpoint}?${params}`);
       if (response.ok) {
@@ -450,15 +458,15 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
     if (!newStudent.fullName.trim() || !newStudent.gradeId || !newStudent.admissionNumber.trim()) {
       toast({
         title: 'Missing Details',
-        description: 'Student name, admission number, grade, parent name, parent phone, and parent email are required.',
+        description: 'Student name, admission number, and grade are required.',
         variant: 'destructive',
       });
       return;
     }
-    if (!newStudent.parentName.trim() || !newStudent.parentPhone.trim() || !newStudent.parentEmail.trim()) {
+    if (!newStudent.parentName.trim() || !newStudent.parentPhone.trim()) {
       toast({
         title: 'Missing Parent Details',
-        description: 'Parent name, phone, and email are required.',
+        description: 'Parent name and phone are required. Email is optional.',
         variant: 'destructive',
       });
       return;
@@ -466,9 +474,6 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
 
     try {
       setCreatingStudent(true);
-      const parsedYearOfBirth = newStudent.dateOfBirth
-        ? new Date(newStudent.dateOfBirth).getFullYear()
-        : undefined;
 
       const response = await fetch(`/api/schools/${schoolCode}/students`, {
         method: 'POST',
@@ -477,9 +482,8 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
           name: newStudent.fullName.trim(),
           gradeId: newStudent.gradeId,
           admissionNumber: newStudent.admissionNumber.trim(),
-          dateOfBirth: newStudent.dateOfBirth || undefined,
-          yearOfBirth: parsedYearOfBirth,
           dateAdmitted: newStudent.dateAdmitted || undefined,
+          feeAccommodation: newStudent.feeAccommodation,
           parentName: newStudent.parentName.trim() || undefined,
           parentPhone: newStudent.parentPhone.trim() || undefined,
           parentEmail: newStudent.parentEmail.trim() || undefined,
@@ -499,9 +503,9 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
       setNewStudent({
         fullName: '',
         admissionNumber: '',
-        dateOfBirth: '',
         dateAdmitted: '',
         gradeId: '',
+        feeAccommodation: 'day_scholar',
         parentName: '',
         parentPhone: '',
         parentEmail: '',
@@ -524,9 +528,9 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
       studentId: student.id,
       fullName: student.name,
       admissionNumber: student.admissionNumber,
-      dateOfBirth: '',
-      dateAdmitted: '',
+      dateAdmitted: student.dateAdmitted ?? '',
       gradeId: student.class?.grade?.id || '',
+      feeAccommodation: student.feeAccommodation || 'day_scholar',
       parentName: student.parent?.name || '',
       parentPhone: student.parent?.phone || '',
       parentEmail: student.parent?.email || '',
@@ -545,10 +549,10 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
       });
       return;
     }
-    if (!editForm.parentName.trim() || !editForm.parentPhone.trim() || !editForm.parentEmail.trim()) {
+    if (!editForm.parentName.trim() || !editForm.parentPhone.trim()) {
       toast({
         title: 'Missing Parent Details',
-        description: 'Parent name, phone, and email are required.',
+        description: 'Parent name and phone are required. Email is optional.',
         variant: 'destructive',
       });
       return;
@@ -580,12 +584,12 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
           studentId: editForm.studentId,
           name: editForm.fullName.trim(),
           admissionNumber: editForm.admissionNumber.trim(),
-          dateOfBirth: editForm.dateOfBirth || undefined,
           dateAdmitted: editForm.dateAdmitted || undefined,
+          feeAccommodation: editForm.feeAccommodation,
           classId,
           parentName: editForm.parentName.trim(),
           parentPhone: editForm.parentPhone.trim(),
-          parentEmail: editForm.parentEmail.trim(),
+          parentEmail: editForm.parentEmail.trim() || undefined,
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -651,9 +655,19 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
 
   const exportToExcel = async () => {
     try {
-      const csvData = filteredStudents.map(student => ({
+      if (filteredStudents.length === 0) {
+        toast({
+          title: 'Nothing to export',
+          description: 'Adjust filters so at least one student appears in the list.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const csvData = filteredStudents.map((student) => ({
         'Admission Number': student.admissionNumber,
         'Student Name': student.name,
+        'Fees (day/board)': feeSegmentDisplay(student.feeAccommodation),
         'Grade': student.gradeName,
         'Class': student.className,
         'Parent Name': student.parent?.name || 'N/A',
@@ -1179,6 +1193,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                       <TableRow className="border-b" style={{ backgroundColor: "var(--brand-12)", borderColor: "var(--brand-18)" }}>
                         <TableHead className="font-semibold py-4" style={{ color: "var(--brand)" }}>Student</TableHead>
                         <TableHead className="font-semibold" style={{ color: "var(--brand)" }}>Grade & Class</TableHead>
+                        <TableHead className="font-semibold" style={{ color: "var(--brand)" }}>Fee segment</TableHead>
                         <TableHead className="font-semibold text-right" style={{ color: "var(--brand)" }}>Outstanding Amount</TableHead>
                         <TableHead className="font-semibold text-center" style={{ color: "var(--brand)" }}>Actions</TableHead>
                       </TableRow>
@@ -1202,6 +1217,11 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                               <div className="font-medium text-gray-900">{student.gradeName}</div>
                               <div className="text-sm text-gray-600">{student.className}</div>
                             </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-xs font-medium whitespace-nowrap">
+                              {feeSegmentDisplay(student.feeAccommodation)}
+                            </Badge>
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="font-bold text-red-600">{formatCurrency(student.balance)}</div>
@@ -1499,7 +1519,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
                   <div className="lg:col-span-2">
                     <Label htmlFor="search" className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                       <Search className="w-4 h-4" />
@@ -1563,6 +1583,28 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                   </div>
                   
                   <div>
+                    <Label htmlFor="feeSegment" className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                      Day / boarding
+                    </Label>
+                    <Select
+                      value={accommodationFilter}
+                      onValueChange={(v) => setAccommodationFilter(v as 'all' | 'day_scholar' | 'boarder')}
+                    >
+                      <SelectTrigger
+                        id="feeSegment"
+                        className="mt-1 border-gray-300 focus-visible:border-[color:var(--brand)] focus-visible:ring-1 focus-visible:ring-[color:var(--brand)]"
+                      >
+                        <SelectValue placeholder="All students" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All students</SelectItem>
+                        <SelectItem value="day_scholar">Day scholars</SelectItem>
+                        <SelectItem value="boarder">Boarders</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
                     <Label htmlFor="academicYear" className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                       <Calendar className="w-4 h-4" />
                       Academic Year
@@ -1605,6 +1647,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                           setSearchTerm('');
                           setSelectedGrade('all');
                           setSelectedClass('all');
+                          setAccommodationFilter('all');
                           setTerm('all');
                         }}
                         variant="outline"
@@ -1651,6 +1694,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                       <TableRow className="border-b" style={{ backgroundColor: "var(--brand-12)", borderColor: "var(--brand-18)" }}>
                         <TableHead className="font-semibold py-4" style={{ color: "var(--brand)" }}>Student Information</TableHead>
                         <TableHead className="font-semibold" style={{ color: "var(--brand)" }}>Grade & Class</TableHead>
+                        <TableHead className="font-semibold" style={{ color: "var(--brand)" }}>Fee segment</TableHead>
                         <TableHead className="font-semibold" style={{ color: "var(--brand)" }}>Parent Contact</TableHead>
                         <TableHead className="font-semibold text-right" style={{ color: "var(--brand)" }}>Fee Required</TableHead>
                         <TableHead className="font-semibold text-right" style={{ color: "var(--brand)" }}>Amount Paid</TableHead>
@@ -1687,6 +1731,11 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                               <div className="font-medium text-gray-900">{student.gradeName}</div>
                               <div className="text-sm text-gray-600">{student.className}</div>
                             </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-xs font-medium whitespace-nowrap">
+                              {feeSegmentDisplay(student.feeAccommodation)}
+                            </Badge>
                           </TableCell>
                           <TableCell>
                             <div>
@@ -1813,10 +1862,12 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
         onLogout={handleLogout}
         bursar={bursarInfo}
         schoolName={schoolInfo?.name}
+        logoUrl={schoolInfo?.logoUrl || schoolInfo?.logo || null}
         schoolCode={schoolCode}
         colorTheme={themeColor}
         summary={summary}
         showProgression={isFinanceMode}
+        showWebsiteEditor={false}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
       />
@@ -1993,22 +2044,31 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="dateOfBirth">Date of Birth</Label>
-                <Input
-                  id="dateOfBirth"
-                  type="date"
-                  value={newStudent.dateOfBirth}
-                  onChange={(e) => setNewStudent((prev) => ({ ...prev, dateOfBirth: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="dateAdmitted">Date Enrolled</Label>
+                <Label htmlFor="dateAdmitted">Date of enrolment</Label>
                 <Input
                   id="dateAdmitted"
                   type="date"
                   value={newStudent.dateAdmitted}
                   onChange={(e) => setNewStudent((prev) => ({ ...prev, dateAdmitted: e.target.value }))}
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="feeAccommodationNew">Fees apply as</Label>
+                <Select
+                  value={newStudent.feeAccommodation}
+                  onValueChange={(value) => setNewStudent((prev) => ({ ...prev, feeAccommodation: value }))}
+                >
+                  <SelectTrigger id="feeAccommodationNew">
+                    <SelectValue placeholder="Choose day or boarding" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="day_scholar">Day scholar</SelectItem>
+                    <SelectItem value="boarder">Boarder</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Separate fee schedules can apply for boarders versus day scholars.
+                </p>
               </div>
             </div>
             <div className="space-y-2">
@@ -2061,14 +2121,13 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="parentEmail">Parent Email</Label>
+              <Label htmlFor="parentEmail">Parent Email (optional)</Label>
               <Input
                 id="parentEmail"
                 type="email"
                 value={newStudent.parentEmail}
                 onChange={(e) => setNewStudent((prev) => ({ ...prev, parentEmail: e.target.value }))}
-                placeholder="Required"
-                required
+                placeholder="If provided, used for receipts; SMS relies on phone"
               />
             </div>
             <div className="flex justify-end gap-2">
@@ -2120,22 +2179,28 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="editDateOfBirth">Date of birth</Label>
-                <Input
-                  id="editDateOfBirth"
-                  type="date"
-                  value={editForm.dateOfBirth}
-                  onChange={(e) => setEditForm((prev) => ({ ...prev, dateOfBirth: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="editDateAdmitted">Date enrolled</Label>
+                <Label htmlFor="editDateAdmitted">Date of enrolment</Label>
                 <Input
                   id="editDateAdmitted"
                   type="date"
                   value={editForm.dateAdmitted}
                   onChange={(e) => setEditForm((prev) => ({ ...prev, dateAdmitted: e.target.value }))}
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="editFeeAccommodation">Fees apply as</Label>
+                <Select
+                  value={editForm.feeAccommodation}
+                  onValueChange={(value) => setEditForm((prev) => ({ ...prev, feeAccommodation: value }))}
+                >
+                  <SelectTrigger id="editFeeAccommodation">
+                    <SelectValue placeholder="Choose day or boarding" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="day_scholar">Day scholar</SelectItem>
+                    <SelectItem value="boarder">Boarder</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div className="space-y-2">
@@ -2181,13 +2246,12 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="editParentEmail">Parent email</Label>
+              <Label htmlFor="editParentEmail">Parent email (optional)</Label>
               <Input
                 id="editParentEmail"
                 type="email"
                 value={editForm.parentEmail}
                 onChange={(e) => setEditForm((prev) => ({ ...prev, parentEmail: e.target.value }))}
-                required
               />
             </div>
             <div className="flex justify-end gap-2">
