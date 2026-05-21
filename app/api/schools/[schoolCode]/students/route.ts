@@ -4,6 +4,12 @@ import { hashDefaultPasswordByRole } from '@/lib/utils/default-passwords';
 import { prisma } from "@/lib/prisma";
 import { normalizeStudentFeeSegment } from '@/lib/fees/fee-structure-resolve';
 import { jsonError, requireRole, requireSchoolAccess } from "@/lib/api-guard";
+import {
+  findExistingParentUser,
+  resolveParentLoginEmail,
+  resolveStudentLoginEmail,
+} from '@/lib/student-parent-users';
+import { deleteStudentCompletely } from '@/lib/services/delete-student-service';
 
 function normalizeName(value?: string | null): string {
   return (value || '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -229,18 +235,6 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
       );
     }
 
-    const trimmedProvidedEmail = (email || "").trim().toLowerCase();
-
-    const emailTaken = trimmedProvidedEmail
-      ? await prisma.user.findUnique({ where: { email: trimmedProvidedEmail } })
-      : null;
-    if (emailTaken) {
-      return NextResponse.json(
-        { error: 'This email is already registered. Each student must use a unique email.' },
-        { status: 409 }
-      );
-    }
-
     // Admission number is bursar-controlled and required.
     const finalAdmissionNumber = admissionNumber.trim();
 
@@ -249,20 +243,24 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
         schoolId: schoolContext.schoolId,
         admissionNumber: finalAdmissionNumber,
       },
+      select: { id: true, isActive: true },
     });
     if (admissionTaken) {
       return NextResponse.json(
-        { error: `Admission number "${finalAdmissionNumber}" is already in use for this school.` },
+        {
+          error: admissionTaken.isActive
+            ? `Admission number "${finalAdmissionNumber}" is already in use for this school.`
+            : `Admission number "${finalAdmissionNumber}" exists on an inactive record. Remove that record first (by student ID in admin tools) before re-using this number.`,
+        },
         { status: 409 }
       );
     }
 
-    const normalizedSchoolCode = params.schoolCode.trim().toLowerCase();
-    const normalizedAdmission = String(finalAdmissionNumber || Date.now())
-      .replace(/[^a-zA-Z0-9]/g, "")
-      .toLowerCase();
-    const resolvedStudentEmail =
-      trimmedProvidedEmail || `student-${normalizedAdmission}-${normalizedSchoolCode}@student.local`;
+    const resolvedStudentEmail = await resolveStudentLoginEmail(
+      finalAdmissionNumber,
+      params.schoolCode,
+      schoolContext.schoolId
+    );
 
     // Fetch current academic year and term
     const currentYear = await prisma.academicYear.findFirst({
@@ -280,57 +278,34 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
     if (parentPhone || parentEmail) {
       const trimmedParentPhone = parentPhone?.trim() || null;
       const trimmedParentEmail = parentEmail?.trim().toLowerCase() || null;
-      const normalizedParentName = normalizeName(parentName);
 
-      const [parentByPhone, parentByEmail] = await Promise.all([
-        trimmedParentPhone
-          ? prisma.user.findFirst({
-              where: {
-                role: 'parent',
-                schoolId: schoolContext.schoolId,
-                phone: trimmedParentPhone,
-              },
-            })
-          : Promise.resolve(null),
+      parentUser = await findExistingParentUser(
+        schoolContext.schoolId,
+        trimmedParentPhone,
         trimmedParentEmail
-          ? prisma.user.findFirst({
-              where: {
-                role: 'parent',
-                schoolId: schoolContext.schoolId,
-                email: trimmedParentEmail,
-              },
-            })
-          : Promise.resolve(null),
-      ]);
+      );
 
-      if (parentByPhone && parentByEmail && parentByPhone.id !== parentByEmail.id) {
-        return NextResponse.json(
-          { error: 'Parent email and phone belong to different parent records. Please use matching parent details.' },
-          { status: 409 }
-        );
+      const resolvedParentLoginEmail = await resolveParentLoginEmail(
+        schoolContext.schoolId,
+        trimmedParentEmail,
+        trimmedParentPhone
+      );
+
+      if (!parentUser) {
+        parentUser = await prisma.user.findFirst({
+          where: {
+            role: 'parent',
+            schoolId: schoolContext.schoolId,
+            email: resolvedParentLoginEmail,
+          },
+        });
       }
-
-      parentUser = parentByEmail || parentByPhone;
-
-      // If the email exists globally but belongs to a non-parent account, don't block testing flows.
-      // We'll create a parent login using a generated email, while still storing the provided parentEmail
-      // on the student record.
-      const parentLoginEmail =
-        trimmedParentEmail ||
-        `${trimmedParentPhone || Date.now()}@parent.local`;
-      const parentEmailTaken = trimmedParentEmail
-        ? await prisma.user.findUnique({ where: { email: trimmedParentEmail }, select: { id: true } })
-        : null;
-      const resolvedParentLoginEmail =
-        parentEmailTaken && trimmedParentEmail
-          ? `parent-${(trimmedParentPhone || Date.now()).toString().replace(/[^0-9]/g, "")}@parent.local`
-          : parentLoginEmail;
 
       const hashedParentPassword = await hashDefaultPasswordByRole('parent');
       if (!parentUser) {
         parentUser = await prisma.user.create({
           data: {
-            name: parentName || `Parent of ${name}`,
+            name: parentName || `Parent of ${fullName}`,
             email: resolvedParentLoginEmail,
             phone: trimmedParentPhone,
             role: 'parent',
@@ -339,29 +314,12 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
             schoolId: schoolContext.schoolId,
           },
         });
-      } else {
-        const existingName = normalizeName(parentUser.name);
-        const existingEmail = (parentUser.email || '').trim().toLowerCase();
-        const existingPhone = (parentUser.phone || '').trim();
-
-        if (normalizedParentName && existingName && normalizedParentName !== existingName) {
-          return NextResponse.json(
-            { error: 'Parent name does not match existing parent record for the provided email/phone.' },
-            { status: 409 }
-          );
-        }
-        if (trimmedParentEmail && existingEmail && trimmedParentEmail !== existingEmail) {
-          return NextResponse.json(
-            { error: 'Parent email does not match existing parent record.' },
-            { status: 409 }
-          );
-        }
-        if (trimmedParentPhone && existingPhone && trimmedParentPhone !== existingPhone) {
-          return NextResponse.json(
-            { error: 'Parent phone does not match existing parent record.' },
-            { status: 409 }
-          );
-        }
+      } else if (trimmedParentPhone && !parentUser.phone) {
+        await prisma.user.update({
+          where: { id: parentUser.id },
+          data: { phone: trimmedParentPhone },
+        });
+        parentUser = { ...parentUser, phone: trimmedParentPhone };
       }
     }
 
@@ -446,7 +404,10 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
         : '';
     if (code === 'P2002') {
       return NextResponse.json(
-        { error: 'Duplicate value: email or admission number must be unique.' },
+        {
+          error:
+            'Duplicate admission number, or a previous student login was not fully removed. Try again or use a different admission number.',
+        },
         { status: 409 }
       );
     }
@@ -488,25 +449,10 @@ export async function PUT(req: NextRequest, { params }: { params: { schoolCode: 
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
 
-    const trimmedEmail = email?.trim();
-    if (trimmedEmail) {
-      const existingUser = await prisma.user.findUnique({
-        where: { email: trimmedEmail },
-        select: { id: true },
-      });
-      if (existingUser && existingUser.id !== student.userId) {
-        return NextResponse.json(
-          { error: 'This email is already registered. Each student must use a unique email.' },
-          { status: 409 }
-        );
-      }
-    }
-
     await prisma.user.update({
       where: { id: student.userId },
       data: {
         name: name,
-        email: trimmedEmail,
         phone: phone,
         isActive: isActive,
       },
@@ -516,45 +462,28 @@ export async function PUT(req: NextRequest, { params }: { params: { schoolCode: 
     if (parentPhone || parentEmail || parentName) {
       const trimmedParentPhone = parentPhone?.trim() || null;
       const trimmedParentEmail = parentEmail?.trim().toLowerCase() || null;
-      const normalizedParentName = normalizeName(parentName);
 
-      const [parentByPhone, parentByEmail] = await Promise.all([
-        trimmedParentPhone
-          ? prisma.user.findFirst({
-              where: {
-                role: 'parent',
-                schoolId: student.schoolId,
-                phone: trimmedParentPhone,
-              },
-            })
-          : Promise.resolve(null),
+      let parentUser = await findExistingParentUser(
+        student.schoolId,
+        trimmedParentPhone,
         trimmedParentEmail
-          ? prisma.user.findFirst({
-              where: {
-                role: 'parent',
-                schoolId: student.schoolId,
-                email: trimmedParentEmail,
-              },
-            })
-          : Promise.resolve(null),
-      ]);
+      );
 
-      if (parentByPhone && parentByEmail && parentByPhone.id !== parentByEmail.id) {
-        return NextResponse.json(
-          { error: 'Parent email and phone belong to different parent records. Please use matching parent details.' },
-          { status: 409 }
-        );
+      const resolvedParentLoginEmail = await resolveParentLoginEmail(
+        student.schoolId,
+        trimmedParentEmail,
+        trimmedParentPhone
+      );
+
+      if (!parentUser) {
+        parentUser = await prisma.user.findFirst({
+          where: {
+            role: 'parent',
+            schoolId: student.schoolId,
+            email: resolvedParentLoginEmail,
+          },
+        });
       }
-
-      let parentUser = parentByEmail || parentByPhone;
-
-      const parentEmailTaken = trimmedParentEmail
-        ? await prisma.user.findUnique({ where: { email: trimmedParentEmail }, select: { id: true } })
-        : null;
-      const resolvedParentLoginEmail =
-        trimmedParentEmail && parentEmailTaken
-          ? `parent-${(trimmedParentPhone || Date.now()).toString().replace(/[^0-9]/g, "")}@parent.local`
-          : trimmedParentEmail || `${trimmedParentPhone || Date.now()}@parent.local`;
 
       if (!parentUser) {
         const hashedParentPassword = await hashDefaultPasswordByRole('parent');
@@ -569,29 +498,11 @@ export async function PUT(req: NextRequest, { params }: { params: { schoolCode: 
             schoolId: student.schoolId,
           },
         });
-      } else {
-        const existingName = normalizeName(parentUser.name);
-        const existingEmail = (parentUser.email || '').trim().toLowerCase();
-        const existingPhone = (parentUser.phone || '').trim();
-
-        if (normalizedParentName && existingName && normalizedParentName !== existingName) {
-          return NextResponse.json(
-            { error: 'Parent name does not match existing parent record for the provided email/phone.' },
-            { status: 409 }
-          );
-        }
-        if (trimmedParentEmail && existingEmail && trimmedParentEmail !== existingEmail) {
-          return NextResponse.json(
-            { error: 'Parent email does not match existing parent record.' },
-            { status: 409 }
-          );
-        }
-        if (trimmedParentPhone && existingPhone && trimmedParentPhone !== existingPhone) {
-          return NextResponse.json(
-            { error: 'Parent phone does not match existing parent record.' },
-            { status: 409 }
-          );
-        }
+      } else if (trimmedParentPhone && !parentUser.phone) {
+        await prisma.user.update({
+          where: { id: parentUser.id },
+          data: { phone: trimmedParentPhone },
+        });
       }
 
       resolvedParentId = parentUser.id;
@@ -643,99 +554,38 @@ export async function DELETE(req: NextRequest, { params }: { params: { schoolCod
     const body = await req.json();
     // Accept both 'studentId' and 'id' for compatibility
     const studentId = body.studentId || body.id;
+    const admissionNumber =
+      typeof body.admissionNumber === 'string' ? body.admissionNumber.trim() : '';
 
-    if (!studentId) {
-      return NextResponse.json({ error: 'studentId is required for deletion.' }, { status: 400 });
+    if (!studentId && !admissionNumber) {
+      return NextResponse.json(
+        { error: 'studentId or admissionNumber is required for deletion.' },
+        { status: 400 }
+      );
     }
-    
+
     const student = await prisma.student.findFirst({
-      where: {
-        id: studentId,
-        schoolId: schoolContext.schoolId,
-      },
+      where: studentId
+        ? { id: studentId, schoolId: schoolContext.schoolId }
+        : { schoolId: schoolContext.schoolId, admissionNumber },
+      select: { id: true },
     });
 
     if (!student) {
-      return NextResponse.json({ error: 'Student not found' }, { status: 404 });
-    }
-    
-    // Delete related records in the correct order to avoid foreign key constraint violations
-    // 1. Delete promotion exclusions first (they reference promotion logs)
-    await prisma.promotionExclusion.deleteMany({
-      where: { studentId: studentId },
-    });
-
-    // 2. Delete promotion logs
-    await prisma.promotionLog.deleteMany({
-      where: { studentId: studentId },
-    });
-
-    // 3. Delete student promotion requests
-    await prisma.studentPromotionRequest.deleteMany({
-      where: { studentId: studentId },
-    });
-
-    // 4. Delete student arrears
-    await prisma.studentArrear.deleteMany({
-      where: { studentId: studentId },
-    });
-
-    // 5. Delete student yearly balances
-    await prisma.studentYearlyBalance.deleteMany({
-      where: { studentId: studentId },
-    });
-
-    // 6. Delete student fees
-    await prisma.studentFee.deleteMany({
-      where: { studentId: studentId },
-    });
-
-    // 7. Delete receipts
-    await prisma.receipt.deleteMany({
-      where: { studentId: studentId },
-    });
-
-    const paymentIds = await prisma.payment.findMany({
-      where: { studentId },
-      select: { id: true },
-    });
-    if (paymentIds.length > 0) {
-      await prisma.paymentNotificationLog.deleteMany({
-        where: { paymentId: { in: paymentIds.map((p) => p.id) } },
+      return NextResponse.json({
+        success: true,
+        alreadyRemoved: true,
+        message:
+          'This student is no longer in the database (already deleted). Refresh the list to update your screen.',
       });
     }
 
-    // 8. Delete payments
-    await prisma.payment.deleteMany({
-      where: { studentId: studentId },
-    });
+    await deleteStudentCompletely(student.id, schoolContext.schoolId);
 
-    // 9. Delete payment requests
-    await prisma.paymentRequest.deleteMany({
-      where: { studentId: studentId },
+    return NextResponse.json({
+      success: true,
+      message: 'Student and all associated records were permanently removed from the database.',
     });
-
-    // 10. Delete fee statements
-    await prisma.feeStatement.deleteMany({
-      where: { studentId: studentId },
-    });
-
-    // 11. Delete alumni records (if any)
-    await prisma.alumni.deleteMany({
-      where: { studentId: studentId },
-    });
-
-    // 12. Finally delete the student
-    await prisma.student.delete({
-      where: { id: studentId },
-    });
-    
-    // 13. Delete the associated user
-    await prisma.user.delete({
-      where: { id: student.userId },
-    });
-    
-    return NextResponse.json({ success: true, message: "Student and all associated records deleted successfully." });
   } catch (error: any) {
     console.error('Error deleting student:', error);
     return NextResponse.json({ 

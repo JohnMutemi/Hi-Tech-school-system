@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Search, 
   Users, 
@@ -50,6 +50,24 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import PaymentHub from '@/components/payment/PaymentHub';
+import {
+  deriveFeePaymentStatus,
+  feePaymentStatusBadgeClass,
+  feePaymentStatusLabel,
+  type FeePaymentStatus,
+} from '@/lib/fees/fee-payment-status';
+
+function resolveStudentPaymentStatus(student: {
+  paymentStatus?: FeePaymentStatus;
+  totalFeeRequired: number;
+  totalPaid: number;
+  balance: number;
+}): FeePaymentStatus {
+  return (
+    student.paymentStatus ??
+    deriveFeePaymentStatus(student.totalFeeRequired, student.totalPaid, student.balance)
+  );
+}
 import { PaymentHistoryModal } from './PaymentHistoryModal';
 import { BursarSidebar } from './BursarSidebar';
 import { portalGlassPanelLight } from '@/components/layout/portal-glass-styles';
@@ -88,6 +106,23 @@ interface FeeDashboardSummary {
   totalPaid: number;
 }
 
+function parentContactDisplay(student: {
+  parentName?: string | null;
+  parentPhone?: string | null;
+  parent?: { name: string; phone: string | null } | null;
+}) {
+  return {
+    name:
+      (student.parentName && student.parentName.trim()) ||
+      student.parent?.name ||
+      'Not Available',
+    phone:
+      (student.parentPhone && student.parentPhone.trim()) ||
+      student.parent?.phone ||
+      'No contact',
+  };
+}
+
 interface Student {
   id: string;
   name: string;
@@ -97,6 +132,9 @@ interface Student {
   gradeName: string;
   className: string;
   academicYear: number;
+  parentName?: string | null;
+  parentPhone?: string | null;
+  parentEmail?: string | null;
   parent: {
     id: string;
     name: string;
@@ -122,6 +160,7 @@ interface Student {
   totalFeeRequired: number;
   totalPaid: number;
   balance: number;
+  paymentStatus?: FeePaymentStatus;
   lastPayment?: {
     id: string;
     amount: number;
@@ -148,6 +187,10 @@ interface Grade {
 interface BursarDashboardProps {
   schoolCode: string;
   mode?: 'bursar' | 'finance';
+  /** Finance page already validated session — skip duplicate session fetch */
+  skipSessionFetch?: boolean;
+  /** When false, show a short gate until parent finishes finance session check */
+  sessionReady?: boolean;
 }
 
 function normalizeListPayload(data: unknown): unknown[] {
@@ -162,19 +205,37 @@ function feeSegmentDisplay(seg: string) {
   return seg === 'boarder' ? 'Boarder' : 'Day scholar';
 }
 
-export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboardProps) {
+export function BursarDashboard({
+  schoolCode,
+  mode = 'bursar',
+  skipSessionFetch = false,
+  sessionReady = true,
+}: BursarDashboardProps) {
   const { toast } = useToast();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const [students, setStudents] = useState<Student[]>([]);
   const [filteredStudents, setFilteredStudents] = useState<Student[]>([]);
   const [grades, setGrades] = useState<Grade[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [metadataReady, setMetadataReady] = useState(false);
+  const [studentsLoading, setStudentsLoading] = useState(false);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [listPagination, setListPagination] = useState({
+    page: 1,
+    pageSize: 25,
+    total: 0,
+    totalPages: 1,
+  });
+  const SERVER_PAGE_SIZE = 25;
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGrade, setSelectedGrade] = useState<string>('all');
   const [selectedClass, setSelectedClass] = useState<string>('all');
   const [accommodationFilter, setAccommodationFilter] = useState<'all' | 'day_scholar' | 'boarder'>('all');
-  const [academicYear, setAcademicYear] = useState(new Date().getFullYear().toString());
+  const [academicYear, setAcademicYear] = useState('');
+  const [academicYearOptions, setAcademicYearOptions] = useState<
+    { name: string; isCurrent: boolean }[]
+  >([]);
   const [term, setTerm] = useState<string>('all');
   
   // Payment Hub state
@@ -218,7 +279,6 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
   const [activeTab, setActiveTab] = useState('students');
   const [studentsPage, setStudentsPage] = useState(1);
   const [outstandingPage, setOutstandingPage] = useState(1);
-  const PAGE_SIZE = 7;
   
   // School and bursar info
   const [schoolInfo, setSchoolInfo] = useState<any>(null);
@@ -290,12 +350,212 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
     }
   }, [schoolCode]);
 
+  const fetchAcademicYearOptions = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/schools/${schoolCode}/academic-years`, {
+        credentials: 'include',
+      });
+      if (!res.ok) return;
+      const rows = (await res.json()) as Array<{ name: string; isCurrent?: boolean }>;
+      if (!Array.isArray(rows) || rows.length === 0) return;
+      setAcademicYearOptions(
+        rows.map((r) => ({ name: String(r.name), isCurrent: Boolean(r.isCurrent) }))
+      );
+      setAcademicYear((prev) => {
+        if (prev && rows.some((r) => String(r.name) === prev)) return prev;
+        const current = rows.find((r) => r.isCurrent);
+        return current ? String(current.name) : String(rows[0].name);
+      });
+    } catch (error) {
+      console.error('Error fetching academic years:', error);
+    }
+  }, [schoolCode]);
+
   useEffect(() => {
-    fetchGradeClassCatalog();
-    fetchStudents();
-    fetchSchoolInfo();
-    fetchBursarInfo();
-  }, [schoolCode, selectedGrade, selectedClass, accommodationFilter, academicYear, term, fetchGradeClassCatalog]);
+    if (!sessionReady) return;
+    let cancelled = false;
+    (async () => {
+      const tasks: Promise<void>[] = [
+        fetchAcademicYearOptions().then(() => undefined),
+        fetchSchoolInfo().then(() => undefined),
+      ];
+      if (!skipSessionFetch) {
+        tasks.push(fetchBursarInfo().then(() => undefined));
+      }
+      await Promise.all(tasks);
+      if (!cancelled) setMetadataReady(true);
+      // Grade/class catalog can be slow (auto-heal on classes API) — do not block the shell
+      void fetchGradeClassCatalog();
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [schoolCode, fetchAcademicYearOptions, fetchGradeClassCatalog, skipSessionFetch, sessionReady]);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedSearch(searchTerm.trim()), 350);
+    return () => window.clearTimeout(t);
+  }, [searchTerm]);
+
+  const buildBalanceParams = useCallback(() => {
+    const params = new URLSearchParams({ academicYear });
+    if (term && term !== 'all') params.set('term', term);
+    if (selectedGrade && selectedGrade !== 'all') params.append('gradeId', selectedGrade);
+    if (selectedClass && selectedClass !== 'all') params.append('classId', selectedClass);
+    if (accommodationFilter !== 'all') params.append('feeAccommodation', accommodationFilter);
+    if (debouncedSearch) params.set('search', debouncedSearch);
+    return params;
+  }, [
+    academicYear,
+    term,
+    selectedGrade,
+    selectedClass,
+    accommodationFilter,
+    debouncedSearch,
+  ]);
+
+  const fetchDashboardSummary = useCallback(async () => {
+    try {
+      setSummaryLoading(true);
+      const params = buildBalanceParams();
+      params.set('summaryOnly', '1');
+      params.set('_', String(Date.now()));
+      const response = await fetch(`${balancesEndpoint}?${params}`, {
+        cache: 'no-store',
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to fetch summary');
+      const data = await response.json();
+      setSummary({
+        totalStudents: 0,
+        totalOutstanding: 0,
+        studentsWithBalance: 0,
+        fullyPaid: 0,
+        partiallyPaid: 0,
+        unpaidBillable: 0,
+        noBillableFee: 0,
+        totalFeeRequired: 0,
+        totalPaid: 0,
+        ...(data.summary || {}),
+      });
+      setByGrade(Array.isArray(data.byGrade) ? data.byGrade : []);
+    } catch (error) {
+      console.error('Error fetching dashboard summary:', error);
+      toast({
+        title: 'Summary unavailable',
+        description: 'Totals may be incomplete. The student list can still be used.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSummaryLoading(false);
+    }
+  }, [balancesEndpoint, buildBalanceParams, toast]);
+
+  const fetchStudentsPage = useCallback(
+    async (page: number, opts?: { outstanding?: boolean; fetchAll?: boolean }) => {
+      try {
+        setStudentsLoading(true);
+        const params = buildBalanceParams();
+        if (opts?.fetchAll) {
+          params.set('fetchAll', '1');
+        } else if (opts?.outstanding) {
+          params.set('outstandingOnly', '1');
+          params.set('page', String(page));
+          params.set('pageSize', String(SERVER_PAGE_SIZE));
+        } else {
+          params.set('page', String(page));
+          params.set('pageSize', String(SERVER_PAGE_SIZE));
+        }
+        params.set('_', String(Date.now()));
+        const response = await fetch(`${balancesEndpoint}?${params}`, {
+          cache: 'no-store',
+          credentials: 'include',
+        });
+        if (!response.ok) throw new Error('Failed to fetch students');
+        const data = await response.json();
+        const rows = data.students || [];
+        setStudents(rows);
+        setFilteredStudents(rows);
+        if (data.pagination) {
+          setListPagination(data.pagination);
+        }
+        if (opts?.fetchAll && data.summary) {
+          setSummary({
+            totalStudents: 0,
+            totalOutstanding: 0,
+            studentsWithBalance: 0,
+            fullyPaid: 0,
+            partiallyPaid: 0,
+            unpaidBillable: 0,
+            noBillableFee: 0,
+            totalFeeRequired: 0,
+            totalPaid: 0,
+            ...data.summary,
+          });
+          setByGrade(Array.isArray(data.byGrade) ? data.byGrade : []);
+        }
+        return rows as Student[];
+      } catch (error) {
+        console.error('Error fetching students:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to fetch student data',
+          variant: 'destructive',
+        });
+        return [];
+      } finally {
+        setStudentsLoading(false);
+      }
+    },
+    [balancesEndpoint, buildBalanceParams, toast]
+  );
+
+  const refreshDashboard = useCallback(async () => {
+    setStudentsPage(1);
+    setOutstandingPage(1);
+    await Promise.all([
+      fetchDashboardSummary(),
+      fetchStudentsPage(1, { outstanding: activeTab === 'outstanding' }),
+    ]);
+  }, [fetchDashboardSummary, fetchStudentsPage, activeTab]);
+
+  const filterKey = `${academicYear}|${term}|${selectedGrade}|${selectedClass}|${accommodationFilter}|${debouncedSearch}`;
+  const prevFilterKeyRef = useRef(filterKey);
+  const prevActiveTabRef = useRef(activeTab);
+
+  useEffect(() => {
+    if (!sessionReady || !academicYear) return;
+    void fetchDashboardSummary();
+  }, [sessionReady, academicYear, filterKey, fetchDashboardSummary]);
+
+  useEffect(() => {
+    if (!sessionReady || !academicYear) return;
+    const filtersChanged = prevFilterKeyRef.current !== filterKey;
+    const tabChanged = prevActiveTabRef.current !== activeTab;
+    if (filtersChanged || tabChanged) {
+      prevFilterKeyRef.current = filterKey;
+      prevActiveTabRef.current = activeTab;
+      setStudentsPage(1);
+      setOutstandingPage(1);
+      void fetchStudentsPage(1, { outstanding: activeTab === 'outstanding' });
+      return;
+    }
+    const page = activeTab === 'outstanding' ? outstandingPage : studentsPage;
+    void fetchStudentsPage(page, { outstanding: activeTab === 'outstanding' });
+  }, [
+    sessionReady,
+    academicYear,
+    filterKey,
+    activeTab,
+    studentsPage,
+    outstandingPage,
+    fetchStudentsPage,
+  ]);
+
+  useEffect(() => {
+    setStudentsPage(1);
+    setOutstandingPage(1);
+  }, [activeTab]);
 
   useEffect(() => {
     if (showAddStudent) {
@@ -307,15 +567,6 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
     const t = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(t);
   }, []);
-
-  useEffect(() => {
-    filterStudents();
-  }, [students, searchTerm, selectedGrade, selectedClass]);
-
-  useEffect(() => {
-    setStudentsPage(1);
-    setOutstandingPage(1);
-  }, [searchTerm, selectedGrade, selectedClass, academicYear, term, students.length]);
 
   const fetchSchoolInfo = async () => {
     try {
@@ -371,71 +622,11 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
     }
   };
 
-  const fetchStudents = async () => {
-    try {
-      setLoading(true);
-      const params = new URLSearchParams({
-        academicYear,
-      });
-      if (term && term !== 'all') {
-        params.set('term', term);
-      }
-
-      if (selectedGrade && selectedGrade !== 'all') params.append('gradeId', selectedGrade);
-      if (selectedClass && selectedClass !== 'all') params.append('classId', selectedClass);
-      if (accommodationFilter !== 'all') params.append('feeAccommodation', accommodationFilter);
-
-      const response = await fetch(`${balancesEndpoint}?${params}`);
-      if (response.ok) {
-        const data = await response.json();
-        setStudents(data.students || []);
-        setSummary({
-          totalStudents: 0,
-          totalOutstanding: 0,
-          studentsWithBalance: 0,
-          fullyPaid: 0,
-          partiallyPaid: 0,
-          unpaidBillable: 0,
-          noBillableFee: 0,
-          totalFeeRequired: 0,
-          totalPaid: 0,
-          ...(data.summary || {}),
-        });
-        setByGrade(Array.isArray(data.byGrade) ? data.byGrade : []);
-      } else {
-        throw new Error('Failed to fetch students');
-      }
-    } catch (error) {
-      console.error('Error fetching students:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch student data',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const filterStudents = () => {
-    let filtered = students;
-
-    if (searchTerm) {
-      filtered = filtered.filter(student =>
-        student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        student.admissionNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        student.parent?.name.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    setFilteredStudents(filtered);
-  };
-
   const handlePaymentComplete = async (
     _receipt: unknown,
     opts?: { undoWindowActive?: boolean }
   ) => {
-    await fetchStudents();
+    await refreshDashboard();
     if (!opts?.undoWindowActive) {
       setShowPaymentHub(false);
       setSelectedStudent(null);
@@ -443,7 +634,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
   };
 
   const handlePaymentUndoSettled = async () => {
-    await fetchStudents();
+    await refreshDashboard();
     setShowPaymentHub(false);
     setSelectedStudent(null);
   };
@@ -510,7 +701,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
         parentPhone: '',
         parentEmail: '',
       });
-      await fetchStudents();
+      await refreshDashboard();
     } catch (error) {
       toast({
         title: 'Add Student Failed',
@@ -531,9 +722,9 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
       dateAdmitted: student.dateAdmitted ?? '',
       gradeId: student.class?.grade?.id || '',
       feeAccommodation: student.feeAccommodation || 'day_scholar',
-      parentName: student.parent?.name || '',
-      parentPhone: student.parent?.phone || '',
-      parentEmail: student.parent?.email || '',
+      parentName: student.parentName || student.parent?.name || '',
+      parentPhone: student.parentPhone || student.parent?.phone || '',
+      parentEmail: student.parentEmail || student.parent?.email || '',
     });
     setShowEditStudent(true);
   };
@@ -602,7 +793,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
       });
       setShowEditStudent(false);
       setEditStudentRecord(null);
-      await fetchStudents();
+      await refreshDashboard();
     } catch (error) {
       toast({
         title: 'Update failed',
@@ -621,17 +812,23 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
       const res = await fetch(`/api/schools/${schoolCode}/students`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studentId: studentToDelete.id }),
+        body: JSON.stringify({
+          studentId: studentToDelete.id,
+          admissionNumber: studentToDelete.admissionNumber,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(data.error || 'Could not delete student');
       }
       toast({
-        title: 'Student removed',
-        description: `${studentToDelete.name} and related fee records were deleted.`,
+        title: data.alreadyRemoved ? 'Already removed' : 'Student removed',
+        description: data.alreadyRemoved
+          ? `${studentToDelete.name} (${studentToDelete.admissionNumber}) is no longer in the database. The list has been refreshed.`
+          : `${studentToDelete.name} and related fee records were deleted.`,
       });
       const removedId = studentToDelete.id;
+      setStudents((prev) => prev.filter((s) => s.id !== removedId));
       setStudentToDelete(null);
       if (selectedStudent?.id === removedId) {
         setSelectedStudent(null);
@@ -641,7 +838,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
         setShowPaymentHistory(false);
         setHistoryStudent(null);
       }
-      await fetchStudents();
+      await refreshDashboard();
     } catch (error) {
       toast({
         title: 'Delete failed',
@@ -655,7 +852,9 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
 
   const exportToExcel = async () => {
     try {
-      if (filteredStudents.length === 0) {
+      toast({ title: 'Preparing export…', description: 'Fetching all students for the current filters.' });
+      const exportRows = await fetchStudentsPage(1, { fetchAll: true });
+      if (!exportRows.length) {
         toast({
           title: 'Nothing to export',
           description: 'Adjust filters so at least one student appears in the list.',
@@ -664,14 +863,14 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
         return;
       }
 
-      const csvData = filteredStudents.map((student) => ({
+      const csvData = exportRows.map((student) => ({
         'Admission Number': student.admissionNumber,
         'Student Name': student.name,
         'Fees (day/board)': feeSegmentDisplay(student.feeAccommodation),
         'Grade': student.gradeName,
         'Class': student.className,
-        'Parent Name': student.parent?.name || 'N/A',
-        'Parent Phone': student.parent?.phone || 'N/A',
+        'Parent Name': parentContactDisplay(student).name,
+        'Parent Phone': parentContactDisplay(student).phone,
         'Total Fee Required': student.totalFeeRequired,
         'Total Paid': student.totalPaid,
         'Outstanding Balance': student.balance,
@@ -717,8 +916,10 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
 
   const fyLabel = `FY ${academicYear}`;
   const termLabel = term === "all" ? "All Terms" : term;
+  const summaryStat = (value: number | string) =>
+    summaryLoading ? '…' : value;
 
-  if (loading) {
+  if (!sessionReady || !metadataReady) {
     return (
       <div
         className="min-h-screen flex items-center justify-center"
@@ -745,26 +946,27 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
             />
           </div>
           <h2 className="text-xl font-semibold text-gray-800 mb-2">
-            {isFinanceMode ? 'Loading Finance Module' : 'Loading Bursar Dashboard'}
+            {!sessionReady
+              ? 'Validating finance access'
+              : isFinanceMode
+                ? 'Loading Finance Module'
+                : 'Loading Bursar Dashboard'}
           </h2>
-          <p className="text-gray-600">Preparing financial management interface...</p>
+          <p className="text-gray-600">
+            {!sessionReady
+              ? 'Confirming your session…'
+              : 'Preparing financial management interface...'}
+          </p>
         </div>
       </div>
     );
   }
 
   const renderTabContent = () => {
-    const totalStudentsPages = Math.max(1, Math.ceil(filteredStudents.length / PAGE_SIZE));
-    const studentsPageData = filteredStudents.slice(
-      (studentsPage - 1) * PAGE_SIZE,
-      studentsPage * PAGE_SIZE
-    );
-    const outstandingStudents = filteredStudents.filter((s) => s.balance > 0);
-    const totalOutstandingPages = Math.max(1, Math.ceil(outstandingStudents.length / PAGE_SIZE));
-    const outstandingPageData = outstandingStudents.slice(
-      (outstandingPage - 1) * PAGE_SIZE,
-      outstandingPage * PAGE_SIZE
-    );
+    const studentsPageData = filteredStudents;
+    const outstandingPageData = filteredStudents;
+    const totalStudentsPages = listPagination.totalPages;
+    const totalOutstandingPages = listPagination.totalPages;
 
     const renderPagination = (
       page: number,
@@ -880,7 +1082,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold mb-1" style={{ color: "var(--brand)" }}>{summary.totalStudents}</div>
+                  <div className="text-3xl font-bold mb-1" style={{ color: "var(--brand)" }}>{summaryStat(summary.totalStudents)}</div>
                   <p className="text-xs font-medium text-slate-600">Enrolled students in view</p>
                 </CardContent>
               </Card>
@@ -894,7 +1096,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-bold text-red-900 mb-1">
-                    {formatCurrency(summary.totalOutstanding)}
+                    {summaryLoading ? '…' : formatCurrency(summary.totalOutstanding)}
                   </div>
                   <p className="text-xs text-red-600 font-medium">Pending payments (balance)</p>
                 </CardContent>
@@ -908,7 +1110,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold mb-1" style={{ color: "var(--brand)" }}>{summary.studentsWithBalance}</div>
+                  <div className="text-3xl font-bold mb-1" style={{ color: "var(--brand)" }}>{summaryStat(summary.studentsWithBalance)}</div>
                   <p className="text-xs font-medium text-slate-600">Require payment</p>
                 </CardContent>
               </Card>
@@ -921,7 +1123,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-emerald-900 mb-1">{summary.fullyPaid}</div>
+                  <div className="text-3xl font-bold text-emerald-900 mb-1">{summaryStat(summary.fullyPaid)}</div>
                   <p className="text-xs text-emerald-600 font-medium">Billable fees cleared (no balance)</p>
                 </CardContent>
               </Card>
@@ -937,7 +1139,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold" style={{ color: "var(--brand)" }}>
-                    {formatCurrency(summary.totalFeeRequired)}
+                    {summaryLoading ? '…' : formatCurrency(summary.totalFeeRequired)}
                   </div>
                   <p className="text-xs text-slate-600 mt-1">Expected fees for students in this view</p>
                 </CardContent>
@@ -950,7 +1152,9 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-emerald-700">{formatCurrency(summary.totalPaid)}</div>
+                  <div className="text-2xl font-bold text-emerald-700">
+                    {summaryLoading ? '…' : formatCurrency(summary.totalPaid)}
+                  </div>
                   <p className="text-xs text-slate-600 mt-1">Payments recorded toward those fees</p>
                 </CardContent>
               </Card>
@@ -1182,7 +1386,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                   </div>
                   <span className="font-semibold text-slate-800">Students with Outstanding Balances</span>
                   <Badge variant="secondary" className="text-white border" style={{ backgroundColor: "var(--secondary)", borderColor: "var(--secondary-24)" }}>
-                    {outstandingStudents.length} students
+                    {summaryLoading ? '…' : summary.studentsWithBalance} students
                   </Badge>
                 </CardTitle>
               </CardHeader>
@@ -1265,7 +1469,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                       ))}
                     </TableBody>
                   </Table>
-                  {outstandingStudents.length === 0 && (
+                  {!studentsLoading && outstandingPageData.length === 0 && (
                     <div className="text-center py-12">
                       <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                         <CheckCircle2 className="w-8 h-8 text-green-500" />
@@ -1335,7 +1539,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
             <FeeManagement
               schoolCode={schoolCode}
               colorTheme={themeColor}
-              onFeeStructureCreated={fetchStudents}
+              onFeeStructureCreated={refreshDashboard}
             />
           </div>
         );
@@ -1481,7 +1685,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                   className="w-full sm:w-auto shadow-sm"
                   onSuccess={() => {
                     fetchGradeClassCatalog();
-                    fetchStudents();
+                    refreshDashboard();
                     toast({
                       title: 'Import finished',
                       description: 'Review results in the import dialog if needed, then refresh the list.',
@@ -1497,7 +1701,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                   Export Report
                 </Button>
                 <Button 
-                  onClick={fetchStudents}
+                  onClick={() => void refreshDashboard()}
                   variant="outline"
                   className="shadow-sm w-full sm:w-auto"
                   style={{ borderColor: themeColor, color: themeColor }}
@@ -1614,9 +1818,15 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="2024">2024</SelectItem>
-                        <SelectItem value="2025">2025</SelectItem>
-                        <SelectItem value="2026">2026</SelectItem>
+                        {(academicYearOptions.length > 0
+                          ? academicYearOptions
+                          : [{ name: new Date().getFullYear().toString(), isCurrent: true }]
+                        ).map((y) => (
+                          <SelectItem key={y.name} value={y.name}>
+                            {y.name}
+                            {y.isCurrent ? ' (current)' : ''}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1659,7 +1869,11 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                     </div>
                     <div className="flex items-end">
                       <div className="text-sm px-3 py-2 rounded-lg w-full border" style={{ color: "var(--brand)", backgroundColor: "var(--brand-12)", borderColor: "var(--brand-18)" }}>
-                        Showing <span className="font-semibold">{filteredStudents.length}</span> of {students.length} students
+                        Showing <span className="font-semibold">{filteredStudents.length}</span> of{' '}
+                        <span className="font-semibold">{listPagination.total}</span> students
+                        {listPagination.totalPages > 1
+                          ? ` (page ${listPagination.page} of ${listPagination.totalPages})`
+                          : ''}
                       </div>
                     </div>
                   </div>
@@ -1682,12 +1896,24 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                       Student Fee Management
                     </span>
                     <Badge variant="secondary" className="text-white border" style={{ backgroundColor: "var(--secondary)", borderColor: "var(--secondary-24)" }}>
-                      {filteredStudents.length} students
+                      {listPagination.total} students
                     </Badge>
                   </div>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-0">
+              <CardContent className="p-0 relative">
+                {studentsLoading ? (
+                  <div
+                    className="absolute inset-0 z-10 flex items-center justify-center bg-white/70 backdrop-blur-[1px]"
+                    aria-live="polite"
+                    aria-busy="true"
+                  >
+                    <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                      <RefreshCw className="h-4 w-4 animate-spin" style={{ color: 'var(--brand)' }} />
+                      Updating student balances…
+                    </div>
+                  </div>
+                ) : null}
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
@@ -1739,8 +1965,8 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                           </TableCell>
                           <TableCell>
                             <div>
-                              <div className="font-medium text-gray-900">{student.parent?.name || 'Not Available'}</div>
-                              <div className="text-sm text-gray-600 font-mono">{student.parent?.phone || 'No contact'}</div>
+                              <div className="font-medium text-gray-900">{parentContactDisplay(student).name}</div>
+                              <div className="text-sm text-gray-600 font-mono">{parentContactDisplay(student).phone}</div>
                             </div>
                           </TableCell>
                           <TableCell className="text-right">
@@ -1755,15 +1981,13 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
                             </div>
                           </TableCell>
                           <TableCell className="text-center">
-                            <Badge 
-                              variant={student.balance <= 0 ? 'default' : 'destructive'}
-                              className={`${
-                                student.balance <= 0 
-                                  ? 'bg-green-100 text-green-800 border-green-200' 
-                                  : 'bg-red-100 text-red-800 border-red-200'
-                              }`}
+                            <Badge
+                              variant="outline"
+                              className={feePaymentStatusBadgeClass(
+                                resolveStudentPaymentStatus(student)
+                              )}
                             >
-                              {student.balance <= 0 ? 'Fully Paid' : 'Outstanding'}
+                              {feePaymentStatusLabel(resolveStudentPaymentStatus(student))}
                             </Badge>
                           </TableCell>
                           <TableCell>
@@ -1971,31 +2195,60 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
 
       {/* Payment Hub Dialog */}
       <Dialog open={showPaymentHub} onOpenChange={setShowPaymentHub}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto bg-gradient-to-br from-white to-gray-50">
-          <DialogHeader className="border-b border-gray-200 pb-4">
-            <DialogTitle className="flex items-center gap-3 text-xl">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: "var(--brand)" }}>
-                <CreditCard className="w-5 h-5 text-white" />
+        <DialogContent
+          className="flex max-h-[min(90vh,760px)] w-[calc(100vw-1.5rem)] max-w-3xl flex-col gap-0 overflow-hidden border-0 p-0 shadow-2xl sm:w-full"
+          style={
+            {
+              border: "1px solid var(--brand-18)",
+              "--brand": themeColor,
+              "--brand-06": `${workspaceTheme.primary}0f`,
+              "--brand-08": `${workspaceTheme.primary}14`,
+              "--brand-12": `${workspaceTheme.primary}1f`,
+              "--brand-18": `${workspaceTheme.primary}2e`,
+            } as React.CSSProperties
+          }
+        >
+          <DialogHeader
+            className="shrink-0 px-5 pt-5 pb-4 text-left"
+            style={{
+              borderBottom: "1px solid var(--brand-12)",
+              background: "var(--brand-06, #f8fafc)",
+            }}
+          >
+            <DialogTitle className="flex items-start gap-3 text-lg font-semibold text-slate-900">
+              <div
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-white"
+                style={{ backgroundColor: "var(--brand)" }}
+              >
+                <CreditCard className="h-5 w-5" />
               </div>
-              <span className="bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-                Process Payment - {selectedStudent?.name}
-              </span>
+              <div className="min-w-0">
+                <span className="block truncate">{selectedStudent?.name}</span>
+                <span className="mt-1 block text-sm font-normal text-slate-600">
+                  ADM {selectedStudent?.admissionNumber} · {selectedStudent?.gradeName}
+                  {selectedStudent?.className ? ` · ${selectedStudent.className}` : ""}
+                </span>
+              </div>
             </DialogTitle>
-            <p className="text-gray-600 mt-2">
-              Admission: {selectedStudent?.admissionNumber} • {selectedStudent?.gradeName} - {selectedStudent?.className}
-            </p>
           </DialogHeader>
           {selectedStudent && (
-            <div className="mt-6">
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
               <PaymentHub
                 studentId={selectedStudent.id}
                 schoolCode={schoolCode}
                 onPaymentComplete={handlePaymentComplete}
                 onUndoPaymentSettled={handlePaymentUndoSettled}
-                bursarUndoWindowSeconds={60}
+                undoWindowSeconds={300}
                 initialAcademicYear={academicYear}
                 initialSelectedTerm={term !== 'all' ? term : undefined}
+                initialAmount={
+                  selectedStudent.totalFeeRequired > 0 && selectedStudent.balance > 0
+                    ? selectedStudent.balance
+                    : undefined
+                }
                 paymentRecordedBy="Bursar Office"
+                compact
+                brandColor={themeColor}
               />
             </div>
           )}
@@ -2012,6 +2265,7 @@ export function BursarDashboard({ schoolCode, mode = 'bursar' }: BursarDashboard
           }}
           student={historyStudent}
           schoolCode={schoolCode}
+          brandColor={themeColor}
         />
       )}
 

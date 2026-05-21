@@ -8,19 +8,17 @@ export async function GET(
   try {
     const { schoolCode } = params;
     const { searchParams } = new URL(request.url);
-    const payload = await getFinanceDashboardData(schoolCode, {
-      gradeId: searchParams.get('gradeId'),
-      classId: searchParams.get('classId'),
-      academicYear: searchParams.get('academicYear'),
-      term: searchParams.get('term'),
-      feeAccommodation: searchParams.get('feeAccommodation'),
-    });
+    const payload = await getFinanceDashboardData(schoolCode, searchParams);
 
     if (!payload) {
       return NextResponse.json({ error: 'School not found' }, { status: 404 });
     }
 
-    return NextResponse.json(payload);
+    return NextResponse.json(payload, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+      },
+    });
   } catch (error) {
     console.error('Error fetching students with fee balances:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

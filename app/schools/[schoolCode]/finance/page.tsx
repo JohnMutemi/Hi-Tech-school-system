@@ -50,17 +50,7 @@ export default function FinanceModulePage() {
     };
   }, [schoolCode, router]);
 
-  if (checkingSession) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-slate-50 to-blue-100 flex items-center justify-center">
-        <div className="text-gray-700 font-medium">Validating finance access...</div>
-      </div>
-    );
-  }
-
-  if (!authorized) {
-    return null;
-  }
+  const sessionReady = !checkingSession && authorized;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-slate-50 to-blue-100 relative">
@@ -74,8 +64,13 @@ export default function FinanceModulePage() {
           }}
         ></div>
       </div>
-      <BursarDashboard schoolCode={schoolCode} mode="finance" />
-      {requiresInitialPasswordChange ? (
+      <BursarDashboard
+        schoolCode={schoolCode}
+        mode="finance"
+        skipSessionFetch
+        sessionReady={sessionReady}
+      />
+      {sessionReady && requiresInitialPasswordChange ? (
         <FinanceFirstLoginPasswordDialog schoolCode={schoolCode} />
       ) : null}
     </div>

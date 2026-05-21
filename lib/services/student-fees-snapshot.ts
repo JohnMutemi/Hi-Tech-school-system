@@ -381,16 +381,8 @@ export async function computeStudentFeesSnapshot(
   );
 
   if (!row) {
-    return {
-      ...fullYearSnapshot,
-      termBalances: [],
-      academicYearOutstanding: 0,
-      outstanding: 0,
-      arrears: 0,
-      totalFeeRequired: 0,
-      totalPaid: 0,
-      paymentHistory: [],
-    };
+    // Term filter did not match any structure — use full-year totals instead of zeros (which looked "fully paid").
+    return fullYearSnapshot;
   }
 
   const paymentsForTerm = payments.filter((p) => p.termId === row.termId);

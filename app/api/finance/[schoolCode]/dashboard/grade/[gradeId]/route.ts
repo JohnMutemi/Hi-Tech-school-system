@@ -13,13 +13,8 @@ export async function GET(
     }
 
     const { searchParams } = new URL(request.url);
-    const payload = await getFinanceDashboardData(params.schoolCode, {
-      gradeId: params.gradeId,
-      classId: searchParams.get('classId'),
-      academicYear: searchParams.get('academicYear'),
-      term: searchParams.get('term'),
-      feeAccommodation: searchParams.get('feeAccommodation'),
-    });
+    searchParams.set('gradeId', params.gradeId);
+    const payload = await getFinanceDashboardData(params.schoolCode, searchParams);
 
     if (!payload) {
       return NextResponse.json({ error: 'School not found' }, { status: 404 });

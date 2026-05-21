@@ -1,6 +1,11 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { hashDefaultPasswordByRole } from '@/lib/utils/default-passwords';
+import {
+  findExistingParentUser,
+  resolveParentLoginEmail,
+  resolveStudentLoginEmail,
+} from '@/lib/student-parent-users';
 
 const prisma = new PrismaClient();
 
@@ -387,21 +392,26 @@ export class ImportManager {
   }
 
   private async createStudent(data: any) {
-    // Create or find parent
-    let parent = await prisma.user.findFirst({
-      where: { 
-        phone: data.parentPhone, 
-        role: 'parent', 
-        schoolId: this.schoolId 
-      }
-    });
-    
+    const trimmedParentPhone = (data.parentPhone || '').trim() || null;
+    const trimmedParentEmail = (data.parentEmail || '').trim().toLowerCase() || null;
+
+    let parent = await findExistingParentUser(
+      this.schoolId,
+      trimmedParentPhone,
+      trimmedParentEmail
+    );
+
     if (!parent) {
       const hashedParentPassword = await hashDefaultPasswordByRole('parent');
+      const parentLoginEmail = await resolveParentLoginEmail(
+        this.schoolId,
+        trimmedParentEmail,
+        trimmedParentPhone
+      );
       parent = await prisma.user.create({
         data: {
           name: data.parentName,
-          email: data.parentEmail || `${data.parentPhone}@parent.local`,
+          email: parentLoginEmail,
           phone: data.parentPhone,
           role: 'parent',
           password: hashedParentPassword,
@@ -423,12 +433,22 @@ export class ImportManager {
       classId = existingClass?.id || null;
     }
 
+    const school = await prisma.school.findUnique({
+      where: { id: this.schoolId },
+      select: { code: true },
+    });
+    const studentLoginEmail = await resolveStudentLoginEmail(
+      data.admissionNumber,
+      school?.code || this.schoolId,
+      this.schoolId
+    );
+
     // Create student user
     const hashedStudentPassword = await hashDefaultPasswordByRole('student');
     const studentUser = await prisma.user.create({
       data: {
         name: data.name,
-        email: data.email || `${data.admissionNumber}@school.local`,
+        email: studentLoginEmail,
         phone: data.phone || '',
         role: 'student',
         password: hashedStudentPassword,

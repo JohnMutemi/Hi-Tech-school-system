@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { SchoolLoginShell } from '@/components/auth/school-login-shell';
 
 export default function FinanceLoginPage() {
@@ -20,6 +20,7 @@ export default function FinanceLoginPage() {
     password: '',
   });
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotInfo, setForgotInfo] = useState<{ message: string; link?: string; hint?: string }>({ message: "" });
   const [schoolTheme, setSchoolTheme] = useState('#2563eb');
@@ -202,16 +203,28 @@ export default function FinanceLoginPage() {
           <Label htmlFor="password" className="mb-2 block text-sm font-semibold text-gray-700">
             Password
           </Label>
-          <Input
-            id="password"
-            name="password"
-            type="password"
-            placeholder="Enter your password"
-            value={formData.password}
-            onChange={handleInputChange}
-            className="h-11"
-            required
-          />
+          <div className="relative">
+            <Input
+              id="password"
+              name="password"
+              type={showPassword ? 'text' : 'password'}
+              placeholder="Enter your password"
+              value={formData.password}
+              onChange={handleInputChange}
+              className="h-11 pr-10"
+              required
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="absolute right-1 top-1/2 h-9 w-9 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+              onClick={() => setShowPassword((prev) => !prev)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </Button>
+          </div>
         </div>
 
         <Button

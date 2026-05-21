@@ -1,83 +1,70 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { prisma } from "@/lib/prisma";
+import { jsonError, requireRole, requireSchoolAccess } from "@/lib/api-guard";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { schoolCode: string; studentId: string } }
 ) {
   try {
+    const { session, schoolContext } = await requireSchoolAccess(params.schoolCode);
+    requireRole(session, ["super_admin", "school_admin", "bursar", "parent", "student"]);
+
     const { searchParams } = new URL(request.url);
     const academicYear = searchParams.get("academicYear");
     const term = searchParams.get("term");
-    const limit = parseInt(searchParams.get("limit") || "50");
-    const offset = parseInt(searchParams.get("offset") || "0");
+    const limit = parseInt(searchParams.get("limit") || "50", 10);
+    const offset = parseInt(searchParams.get("offset") || "0", 10);
 
-    // Get school
-    const school = await prisma.school.findUnique({
-      where: { code: params.schoolCode },
-    });
-
-    if (!school) {
-      return NextResponse.json(
-        { error: "School not found" },
-        { status: 404 }
-      );
-    }
-
-    // Get student
-    const student = await prisma.student.findUnique({
-      where: { id: params.studentId },
-      include: {
-        school: true,
-        user: true
-      }
+    const student = await prisma.student.findFirst({
+      where: {
+        id: params.studentId,
+        schoolId: schoolContext.schoolId,
+        isActive: true,
+      },
+      select: { id: true },
     });
 
     if (!student) {
-      return NextResponse.json(
-        { error: "Student not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Student not found" }, { status: 404 });
     }
 
-    // Build where clause for payments (Payment does not have schoolId field)
-    const whereClause: any = {
+    const whereClause: {
+      studentId: string;
+      academicYearId?: string;
+      termId?: string;
+    } = {
       studentId: params.studentId,
     };
 
-    // Add academic year filter if provided
     if (academicYear) {
       const academicYearRecord = await prisma.academicYear.findFirst({
         where: {
-          schoolId: school.id,
-          name: academicYear
-        }
+          schoolId: schoolContext.schoolId,
+          name: academicYear,
+        },
       });
-      
+
       if (academicYearRecord) {
         whereClause.academicYearId = academicYearRecord.id;
       }
     }
 
-    // Add term filter if provided
     if (term) {
       const termRecord = await prisma.term.findFirst({
         where: {
           name: term,
           academicYear: {
-            schoolId: school.id
-          }
-        }
+            schoolId: schoolContext.schoolId,
+          },
+        },
       });
-      
+
       if (termRecord) {
         whereClause.termId = termRecord.id;
       }
     }
 
-    // Get payments with pagination
     const payments = await prisma.payment.findMany({
       where: whereClause,
       include: {
@@ -88,23 +75,21 @@ export async function GET(
             receiptNumber: true,
             amount: true,
             paymentDate: true,
-          }
-        }
+          },
+        },
       },
       orderBy: {
-        paymentDate: "desc"
+        paymentDate: "desc",
       },
       take: limit,
       skip: offset,
     });
 
-    // Get total count for pagination
     const totalCount = await prisma.payment.count({
       where: whereClause,
     });
 
-    // Transform payments to match expected format
-    const paymentHistory = payments.map(payment => ({
+    const paymentHistory = payments.map((payment) => ({
       id: payment.id,
       receiptNumber: payment.receiptNumber,
       amount: payment.amount,
@@ -123,31 +108,36 @@ export async function GET(
       appliedToAcademicYear: payment.appliedToAcademicYear,
     }));
 
-    // Get summary statistics
     const totalPayments = paymentHistory.length;
     const totalAmount = paymentHistory.reduce((sum, payment) => sum + payment.amount, 0);
     const averageAmount = totalPayments > 0 ? totalAmount / totalPayments : 0;
 
-    // Get payment method distribution
-    const paymentMethodStats = paymentHistory.reduce((acc, payment) => {
-      const method = payment.paymentMethod || "Unknown";
-      acc[method] = (acc[method] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    const paymentMethodStats = paymentHistory.reduce(
+      (acc, payment) => {
+        const method = payment.paymentMethod || "Unknown";
+        acc[method] = (acc[method] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
 
-    // Get term-wise payment distribution
-    const termStats = paymentHistory.reduce((acc, payment) => {
-      const term = payment.term || "Unknown";
-      acc[term] = (acc[term] || 0) + payment.amount;
-      return acc;
-    }, {} as Record<string, number>);
+    const termStats = paymentHistory.reduce(
+      (acc, payment) => {
+        const termName = payment.term || "Unknown";
+        acc[termName] = (acc[termName] || 0) + payment.amount;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
 
-    // Get academic year-wise payment distribution
-    const academicYearStats = paymentHistory.reduce((acc, payment) => {
-      const year = payment.academicYear || "Unknown";
-      acc[year] = (acc[year] || 0) + payment.amount;
-      return acc;
-    }, {} as Record<string, number>);
+    const academicYearStats = paymentHistory.reduce(
+      (acc, payment) => {
+        const year = payment.academicYear || "Unknown";
+        acc[year] = (acc[year] || 0) + payment.amount;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
 
     return NextResponse.json({
       payments: paymentHistory,
@@ -168,14 +158,10 @@ export async function GET(
       filters: {
         academicYear: academicYear || null,
         term: term || null,
-      }
+      },
     });
-
   } catch (error) {
     console.error("Error fetching payment history:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return jsonError(error);
   }
-} 
+}

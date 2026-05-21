@@ -18,14 +18,20 @@ import {
   ArrowUpDown,
   Filter,
   Eye,
+  Undo2,
+  PencilLine,
   TrendingUp,
   TrendingDown,
   DollarSign,
   FileText
 } from "lucide-react";
 import ReceiptComponent from "./ReceiptComponent";
+import { CorrectPaymentDialog, type CorrectPaymentTarget } from "./CorrectPaymentDialog";
 import { FeesStatementDownload } from "@/components/fees-statement/FeesStatementDownload";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import { canUndoPayment, paymentUndoSecondsRemaining } from "@/lib/payment-undo";
+import { canCorrectPayment } from "@/lib/payment-correction";
 
 interface PaymentRecord {
   id: string;
@@ -60,15 +66,47 @@ interface PaymentRecord {
   school?: {
     name: string;
   };
+  isLatestPayment?: boolean;
+  lastCorrection?: {
+    id: string;
+    reason: string;
+    previousAmount: number;
+    newAmount: number;
+    correctedByName: string | null;
+    createdAt: string;
+  } | null;
 }
 
 interface PaymentHistoryProps {
   studentId: string;
   schoolCode: string;
   className?: string;
+  /** When true, staff can undo recent payments from the history list. */
+  allowUndo?: boolean;
+  undoWindowSeconds?: number;
+  onUndoSettled?: () => void;
+  /** Dense list for bursar payment dialog */
+  compact?: boolean;
+  brandColor?: string;
+  /** Bursar/finance may correct the latest payment after undo expires */
+  allowCorrect?: boolean;
+  /** Notifies parent when the latest payment can be corrected (for tab badge). */
+  onCorrectableLatestChange?: (canCorrect: boolean) => void;
 }
 
-export default function PaymentHistory({ studentId, schoolCode, className = "" }: PaymentHistoryProps) {
+export default function PaymentHistory({
+  studentId,
+  schoolCode,
+  className = "",
+  allowUndo = false,
+  onUndoSettled,
+  compact = false,
+  brandColor = "#d97706",
+  allowCorrect = false,
+  onCorrectableLatestChange,
+}: PaymentHistoryProps) {
+  const { toast } = useToast();
+  const schoolPath = encodeURIComponent(schoolCode);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [filteredPayments, setFilteredPayments] = useState<PaymentRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,8 +114,10 @@ export default function PaymentHistory({ studentId, schoolCode, className = "" }
   const [selectedReceipt, setSelectedReceipt] = useState<any>(null);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [showFeesStatement, setShowFeesStatement] = useState(false);
-
-  // Filter states
+  const [undoingPaymentId, setUndoingPaymentId] = useState<string | null>(null);
+  const [, setUndoTick] = useState(0);
+  const [correctTarget, setCorrectTarget] = useState<CorrectPaymentTarget | null>(null);
+  const [correctOpen, setCorrectOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTerm, setSelectedTerm] = useState("all");
   const [selectedYear, setSelectedYear] = useState("all");
@@ -100,14 +140,76 @@ export default function PaymentHistory({ studentId, schoolCode, className = "" }
     filterAndSortPayments();
   }, [payments, searchTerm, selectedTerm, selectedYear, sortOrder]);
 
+  useEffect(() => {
+    if (!allowUndo && !allowCorrect) return;
+    const id = window.setInterval(() => setUndoTick((t) => t + 1), 1000);
+    return () => window.clearInterval(id);
+  }, [allowUndo, allowCorrect]);
+
+  const openCorrectDialog = (payment: PaymentRecord) => {
+    setCorrectTarget({
+      id: payment.id,
+      amount: payment.amount,
+      referenceNumber: payment.referenceNumber,
+      term: payment.term,
+      academicYear: payment.academicYear,
+      receiptNumber: payment.receiptNumber,
+    });
+    setCorrectOpen(true);
+  };
+
+  const latestCorrectablePayment = (() => {
+    if (!allowCorrect || filteredPayments.length === 0) return null;
+    const payment = filteredPayments[0];
+    const isLatest = payment.isLatestPayment ?? true;
+    if (canCorrectPayment(payment.paymentDate, isLatest)) return payment;
+    return null;
+  })();
+
+  useEffect(() => {
+    onCorrectableLatestChange?.(Boolean(latestCorrectablePayment));
+  }, [latestCorrectablePayment, onCorrectableLatestChange]);
+
+  const renderCorrectLatestBanner = () => {
+    if (!latestCorrectablePayment) return null;
+    const p = latestCorrectablePayment;
+    return (
+      <Card className="border-2 border-violet-300 bg-gradient-to-r from-violet-50 to-white shadow-sm">
+        <CardContent className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-violet-950">
+              Update last transaction
+            </p>
+            <p className="mt-0.5 text-xs text-violet-800">
+              Undo time has passed. Fix {p.receiptNumber} ({formatCurrency(p.amount)}) — amount,
+              reference, or term, with a reason on file.
+            </p>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            className="h-10 shrink-0 px-4 text-sm font-semibold text-white shadow-md"
+            style={{ backgroundColor: brandColor }}
+            onClick={() => openCorrectDialog(p)}
+          >
+            <PencilLine className="mr-2 h-4 w-4" />
+            Update transaction
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  };
+
   const fetchPaymentHistory = async () => {
     try {
       setLoading(true);
       setError("");
       
       // Get base URL for deployed environment
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin;
-      const response = await fetch(`${baseUrl}/api/schools/${schoolCode}/payments?studentId=${studentId}`);
+      const response = await fetch(
+        `/api/schools/${encodeURIComponent(schoolCode)}/payments?studentId=${encodeURIComponent(studentId)}`,
+        { credentials: 'include', cache: 'no-store' }
+      );
       
       if (!response.ok) {
         throw new Error("Failed to fetch payment history");
@@ -227,6 +329,34 @@ export default function PaymentHistory({ studentId, schoolCode, className = "" }
     setShowReceiptModal(true);
   };
 
+  const handleUndoPayment = async (payment: PaymentRecord) => {
+    if (!allowUndo || !canUndoPayment(payment.paymentDate)) return;
+    try {
+      setUndoingPaymentId(payment.id);
+      const res = await fetch(`/api/schools/${schoolPath}/payments/${payment.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(typeof data.error === "string" ? data.error : "Could not revert payment");
+      }
+      toast({
+        title: "Payment reverted",
+        description: "The payment was removed and balances were recalculated.",
+      });
+      await fetchPaymentHistory();
+      onUndoSettled?.();
+    } catch (e) {
+      toast({
+        title: "Undo failed",
+        description: e instanceof Error ? e.message : "Try again or contact support.",
+        variant: "destructive",
+      });
+    } finally {
+      setUndoingPaymentId(null);
+    }
+  };
+
   const formatCurrency = (amount: number | null | undefined) => {
     if (amount === null || amount === undefined || isNaN(amount)) {
       return 'KES 0';
@@ -287,10 +417,13 @@ export default function PaymentHistory({ studentId, schoolCode, className = "" }
 
   if (loading) {
     return (
-      <div className={`${className} flex items-center justify-center py-12`}>
+      <div className={`${className} flex items-center justify-center ${compact ? "py-8" : "py-12"}`}>
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading payment history...</p>
+          <div
+            className={`animate-spin rounded-full border-b-2 mx-auto mb-3 ${compact ? "h-6 w-6" : "h-8 w-8"}`}
+            style={{ borderColor: brandColor }}
+          />
+          <p className={compact ? "text-sm text-slate-600" : "text-gray-600"}>Loading history…</p>
         </div>
       </div>
     );
@@ -298,11 +431,11 @@ export default function PaymentHistory({ studentId, schoolCode, className = "" }
 
   if (error) {
     return (
-      <div className={`${className} flex items-center justify-center py-12`}>
+      <div className={`${className} flex items-center justify-center ${compact ? "py-8" : "py-12"}`}>
         <div className="text-center">
-          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <p className="text-red-600 mb-4">{error}</p>
-          <Button onClick={fetchPaymentHistory} variant="outline">
+          <AlertCircle className={`text-red-500 mx-auto mb-3 ${compact ? "w-8 h-8" : "w-12 h-12"}`} />
+          <p className={`text-red-600 mb-3 ${compact ? "text-sm" : ""}`}>{error}</p>
+          <Button onClick={fetchPaymentHistory} variant="outline" size={compact ? "sm" : "default"}>
             <RefreshCw className="w-4 h-4 mr-2" />
             Retry
           </Button>
@@ -311,8 +444,249 @@ export default function PaymentHistory({ studentId, schoolCode, className = "" }
     );
   }
 
+  if (compact) {
+    return (
+      <div className={`space-y-3 ${className}`}>
+        {renderCorrectLatestBanner()}
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {[
+            { label: "Total paid", value: formatCurrency(paymentSummary.totalPaid) },
+            { label: "Payments", value: String(paymentSummary.totalPayments) },
+            { label: "Average", value: formatCurrency(paymentSummary.averagePayment) },
+            {
+              label: "Balance",
+              value: formatCurrency(paymentSummary.mostRecentBalance),
+              highlight: paymentSummary.mostRecentBalance > 0,
+            },
+          ].map((stat) => (
+            <div
+              key={stat.label}
+              className="rounded-lg border border-slate-200/80 bg-slate-50/80 px-2.5 py-2 text-center"
+            >
+              <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
+                {stat.label}
+              </p>
+              <p
+                className={`mt-0.5 text-sm font-bold tabular-nums ${
+                  stat.highlight ? "text-orange-600" : "text-slate-900"
+                }`}
+              >
+                {stat.value}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        <Card className="overflow-hidden rounded-2xl border-0 shadow-md ring-1 ring-slate-200/80">
+          <CardHeader className="space-y-3 border-b border-slate-100 bg-slate-50/50 px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                <History className="h-4 w-4" style={{ color: brandColor }} />
+                Payment history
+              </CardTitle>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  onClick={exportPaymentHistory}
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-2.5 text-xs"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  onClick={fetchPaymentHistory}
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-2.5 text-xs"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="relative col-span-2 sm:col-span-2">
+                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                <Input
+                  placeholder="Search receipt, ref…"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="h-8 pl-8 text-xs"
+                />
+              </div>
+              <Select value={selectedTerm} onValueChange={setSelectedTerm}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue placeholder="Term" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All terms</SelectItem>
+                  {getUniqueTerms().map((term) => (
+                    <SelectItem key={term} value={term}>
+                      {term}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={sortOrder} onValueChange={(v: "asc" | "desc") => setSortOrder(v)}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="desc">Newest</SelectItem>
+                  <SelectItem value="asc">Oldest</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-[11px] text-slate-500">
+              {filteredPayments.length} of {payments.length} payments
+            </p>
+          </CardHeader>
+
+          <CardContent className="p-0">
+            {filteredPayments.length === 0 ? (
+              <div className="px-4 py-10 text-center">
+                <Receipt className="mx-auto mb-2 h-10 w-10 text-slate-300" />
+                <p className="text-sm font-medium text-slate-600">No payments to show</p>
+              </div>
+            ) : (
+              <div className="max-h-[min(42vh,320px)] overflow-y-auto">
+                <ul className="divide-y divide-slate-100">
+                  {filteredPayments.map((payment, index) => {
+                    const isLatest = payment.isLatestPayment ?? index === 0;
+                    const showCorrect =
+                      allowCorrect &&
+                      canCorrectPayment(payment.paymentDate, isLatest);
+                    return (
+                    <li
+                      key={payment.id}
+                      className={`flex items-center gap-2 px-3 py-2 transition-colors sm:gap-3 sm:px-4 ${
+                        showCorrect
+                          ? "bg-violet-50/80 ring-1 ring-inset ring-violet-200 hover:bg-violet-50"
+                          : "hover:bg-slate-50/90"
+                      }`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                          <span className="truncate text-xs font-semibold text-slate-800">
+                            {payment.receiptNumber}
+                          </span>
+                          {payment.lastCorrection ? (
+                            <Badge
+                              variant="outline"
+                              className="h-4 px-1 text-[9px] border-violet-200 bg-violet-50 text-violet-800"
+                            >
+                              Corrected
+                            </Badge>
+                          ) : null}
+                          <span className="text-[11px] text-slate-500">
+                            {formatDate(payment.paymentDate)}
+                          </span>
+                        </div>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0 text-[11px] text-slate-500">
+                          <span>
+                            {payment.term} {payment.academicYear}
+                          </span>
+                          <span className="hidden sm:inline">·</span>
+                          <span className="capitalize">
+                            {(payment.paymentMethod || "").replace("_", " ")}
+                          </span>
+                          <span className="hidden md:inline">·</span>
+                          <span
+                            className={
+                              payment.academicYearOutstandingAfter <= 0
+                                ? "text-emerald-600"
+                                : "text-orange-600"
+                            }
+                          >
+                            Bal {formatCurrency(payment.academicYearOutstandingAfter)}
+                          </span>
+                        </div>
+                      </div>
+                      <p
+                        className="shrink-0 text-sm font-bold tabular-nums text-emerald-700"
+                        style={{ minWidth: "4.5rem", textAlign: "right" }}
+                      >
+                        {formatCurrency(payment.amount)}
+                      </p>
+                      <div className="flex shrink-0 items-center gap-1">
+                        {allowUndo && canUndoPayment(payment.paymentDate) ? (
+                          <Button
+                            onClick={() => handleUndoPayment(payment)}
+                            variant="outline"
+                            size="sm"
+                            disabled={undoingPaymentId === payment.id}
+                            className="h-7 px-2 text-[10px] border-amber-200 bg-amber-50 text-amber-900"
+                          >
+                            {undoingPaymentId === payment.id ? (
+                              <RefreshCw className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <>
+                                <Undo2 className="h-3 w-3 sm:mr-0.5" />
+                                <span className="hidden sm:inline">
+                                  {paymentUndoSecondsRemaining(payment.paymentDate)}s
+                                </span>
+                              </>
+                            )}
+                          </Button>
+                        ) : showCorrect ? (
+                          <Button
+                            onClick={() => openCorrectDialog(payment)}
+                            size="sm"
+                            className="h-8 px-3 text-xs font-semibold text-white shadow-sm"
+                            style={{ backgroundColor: brandColor }}
+                            title="Update last transaction"
+                          >
+                            <PencilLine className="h-3.5 w-3.5 sm:mr-1" />
+                            Update
+                          </Button>
+                        ) : null}
+                        <Button
+                          onClick={() => handleViewReceipt(payment)}
+                          variant="outline"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          title="View receipt"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {showReceiptModal && selectedReceipt && (
+          <ReceiptComponent
+            receiptData={selectedReceipt}
+            onClose={() => {
+              setShowReceiptModal(false);
+              setSelectedReceipt(null);
+            }}
+          />
+        )}
+
+        <CorrectPaymentDialog
+          open={correctOpen}
+          onOpenChange={setCorrectOpen}
+          payment={correctTarget}
+          studentId={studentId}
+          schoolCode={schoolCode}
+          brandColor={brandColor}
+          onCorrected={() => {
+            fetchPaymentHistory();
+            onUndoSettled?.();
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className={`space-y-6 ${className}`}>
+      {renderCorrectLatestBanner()}
       {/* Payment Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
@@ -464,16 +838,25 @@ export default function PaymentHistory({ studentId, schoolCode, className = "" }
             </div>
           ) : (
             <div className="space-y-4">
-              {filteredPayments.map((payment) => (
+              {filteredPayments.map((payment, index) => {
+                const isLatest = payment.isLatestPayment ?? index === 0;
+                const showCorrect =
+                  allowCorrect && canCorrectPayment(payment.paymentDate, isLatest);
+                return (
                 <Card key={payment.id} className="hover:shadow-md transition-shadow">
                   <CardContent className="p-4">
                     <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                       <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
                         {/* Payment Details */}
                         <div>
-                          <div className="flex items-center gap-2 mb-2">
+                          <div className="flex items-center gap-2 mb-2 flex-wrap">
                             <Receipt className="w-4 h-4 text-blue-600" />
                             <span className="font-semibold text-sm">{payment.receiptNumber}</span>
+                            {payment.lastCorrection ? (
+                              <Badge variant="outline" className="text-violet-700 border-violet-200 bg-violet-50">
+                                Corrected
+                              </Badge>
+                            ) : null}
                           </div>
                           <p className="text-2xl font-bold text-green-600">{formatCurrency(payment.amount)}</p>
                           <p className="text-sm text-gray-600">{formatDate(payment.paymentDate)}</p>
@@ -506,11 +889,43 @@ export default function PaymentHistory({ studentId, schoolCode, className = "" }
                           <Badge variant={payment.status === 'completed' ? 'default' : 'secondary'} className="mt-1">
                             {payment.status}
                           </Badge>
+                          {payment.lastCorrection ? (
+                            <p className="text-xs text-violet-700 mt-2 line-clamp-2" title={payment.lastCorrection.reason}>
+                              {payment.lastCorrection.correctedByName ? `${payment.lastCorrection.correctedByName}: ` : ""}
+                              {payment.lastCorrection.reason}
+                            </p>
+                          ) : null}
                         </div>
                       </div>
 
                       {/* Actions */}
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {allowUndo && canUndoPayment(payment.paymentDate) ? (
+                          <Button
+                            onClick={() => handleUndoPayment(payment)}
+                            variant="outline"
+                            size="sm"
+                            disabled={undoingPaymentId === payment.id}
+                            className="flex items-center gap-1 border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100"
+                          >
+                            {undoingPaymentId === payment.id ? (
+                              <RefreshCw className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Undo2 className="w-4 h-4" />
+                            )}
+                            Undo ({paymentUndoSecondsRemaining(payment.paymentDate)}s)
+                          </Button>
+                        ) : showCorrect ? (
+                          <Button
+                            onClick={() => openCorrectDialog(payment)}
+                            variant="outline"
+                            size="sm"
+                            className="flex items-center gap-1 border-violet-200 bg-violet-50 text-violet-900 hover:bg-violet-100"
+                          >
+                            <PencilLine className="w-4 h-4" />
+                            Update transaction
+                          </Button>
+                        ) : null}
                         <Button
                           onClick={() => handleViewReceipt(payment)}
                           variant="outline"
@@ -533,11 +948,25 @@ export default function PaymentHistory({ studentId, schoolCode, className = "" }
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
       </Card>
+
+      <CorrectPaymentDialog
+        open={correctOpen}
+        onOpenChange={setCorrectOpen}
+        payment={correctTarget}
+        studentId={studentId}
+        schoolCode={schoolCode}
+        brandColor={brandColor}
+        onCorrected={() => {
+          fetchPaymentHistory();
+          onUndoSettled?.();
+        }}
+      />
 
       {/* Receipt Modal */}
       {showReceiptModal && selectedReceipt && (

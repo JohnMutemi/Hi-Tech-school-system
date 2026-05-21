@@ -294,6 +294,33 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       },
     });
 
+    const latestPaymentId = payments[0]?.id ?? null;
+    const paymentIds = payments.map((p) => p.id);
+
+    const correctionRows =
+      paymentIds.length > 0
+        ? await prisma.paymentCorrection.findMany({
+            where: { paymentId: { in: paymentIds } },
+            orderBy: { createdAt: "desc" },
+            select: {
+              paymentId: true,
+              id: true,
+              reason: true,
+              previousAmount: true,
+              newAmount: true,
+              correctedByName: true,
+              createdAt: true,
+            },
+          })
+        : [];
+
+    const lastCorrectionByPaymentId = new Map<string, (typeof correctionRows)[0]>();
+    for (const row of correctionRows) {
+      if (!lastCorrectionByPaymentId.has(row.paymentId)) {
+        lastCorrectionByPaymentId.set(row.paymentId, row);
+      }
+    }
+
     return NextResponse.json(payments.map(payment => ({
       ...payment,
       studentId: payment.student?.id,
@@ -313,6 +340,8 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
       balanceAfterAcademicYear: payment.receipt?.academicYearOutstandingAfter ?? null,
       termOutstandingBefore: payment.receipt?.termOutstandingBefore ?? null,
       termOutstandingAfter: payment.receipt?.termOutstandingAfter ?? null,
+      isLatestPayment: payment.id === latestPaymentId,
+      lastCorrection: lastCorrectionByPaymentId.get(payment.id) ?? null,
     })));
     
   } catch (error) {

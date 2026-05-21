@@ -62,6 +62,7 @@ model School {
   assessments                  Assessment[]
   studentGradeResults          StudentGradeResult[]
   websiteSections              SchoolWebsiteSection[]
+  paymentCorrections           PaymentCorrection[]
 }
 
 model SchoolWebsiteSection {
@@ -118,6 +119,7 @@ model User {
   school                     School?              @relation(fields: [schoolId], references: [id])
   createdBackups             SchoolBackup[]       @relation("BackupCreatedBy")
   startedRestoreJobs         SchoolRestoreJob[]   @relation("RestoreCreatedBy")
+  paymentCorrections         PaymentCorrection[]  @relation("PaymentCorrectionAuthor")
   acceptedTerms             SchoolTermsAcceptance[] @relation("TermsAcceptedBy")
   createdAssessments           Assessment[]            @relation("AssessmentCreator")
   gradedResults                StudentGradeResult[]    @relation("ResultGradedBy")
@@ -234,6 +236,30 @@ model Payment {
   term            Term         @relation(fields: [termId], references: [id])
   receipt         Receipt?
   notificationLogs PaymentNotificationLog[]
+  corrections     PaymentCorrection[]
+}
+
+/// Audit trail when staff correct the latest payment after the undo window expires.
+model PaymentCorrection {
+  id                      String   @id @default(uuid())
+  paymentId               String
+  schoolId                String
+  previousAmount          Float
+  newAmount               Float
+  previousReferenceNumber String?
+  newReferenceNumber      String?
+  previousTermId          String
+  newTermId               String
+  reason                  String
+  correctedById           String
+  correctedByName         String?
+  createdAt               DateTime @default(now())
+  payment                 Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  school                  School   @relation(fields: [schoolId], references: [id])
+  correctedBy             User     @relation("PaymentCorrectionAuthor", fields: [correctedById], references: [id])
+
+  @@index([paymentId, createdAt])
+  @@index([schoolId, createdAt])
 }
 
 model Receipt {

@@ -259,12 +259,17 @@ export default function StudentsSection({ schoolCode, colorTheme, toast }: Stude
           body: JSON.stringify({ studentId: id }),
         }
       );
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to delete student");
+        throw new Error(data.error || "Failed to delete student");
       }
       setStudents(students.filter((s) => s.id !== id));
-      toast({ title: "Success!", description: "Student deleted successfully!" });
+      toast({
+        title: data.alreadyRemoved ? "Already removed" : "Success!",
+        description: data.alreadyRemoved
+          ? "This student was already removed from the database. The list has been updated."
+          : "Student deleted successfully!",
+      });
     } catch (error: any) {
       toast({ title: "Error", description: error.message || "Failed to delete student.", variant: "destructive" });
     }
