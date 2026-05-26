@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Check, Download } from "lucide-react";
+import { SCHOOL_EMAIL } from "@/data/contact";
 
 export const Route = createFileRoute("/admissions")({
   head: () => ({
@@ -53,7 +54,11 @@ function Admissions() {
             <div className="rounded-2xl border border-border bg-card p-8 md:p-10">
               <h2 className="font-display text-3xl">Download the admission form</h2>
               <p className="mt-3 text-muted-foreground max-w-xl">
-                Print, complete in block letters, and submit to the admissions office in person or via email to <span className="text-foreground font-medium">admissions@waita.ac.ke</span>.
+                Print, complete in block letters, and submit to the admissions office in person or via email to{" "}
+                <a href={`mailto:${SCHOOL_EMAIL}`} className="text-foreground font-medium hover:text-primary">
+                  {SCHOOL_EMAIL}
+                </a>
+                .
               </p>
 
               <a
@@ -72,7 +77,9 @@ function Admissions() {
                 </div>
                 <div className="rounded-xl border border-border p-5">
                   <div className="text-xs uppercase tracking-widest text-gold">Submit by email</div>
-                  <p className="mt-2 text-foreground">admissions@waita.ac.ke</p>
+                  <p className="mt-2 text-foreground">
+                    <a href={`mailto:${SCHOOL_EMAIL}`} className="hover:text-primary">{SCHOOL_EMAIL}</a>
+                  </p>
                   <p className="text-muted-foreground">Include scanned copies of school reports.</p>
                 </div>
               </div>

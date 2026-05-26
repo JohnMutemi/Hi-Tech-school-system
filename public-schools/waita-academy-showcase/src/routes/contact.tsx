@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Mail, Phone, MapPin } from "lucide-react";
+import { SCHOOL_EMAIL, SCHOOL_PHONE } from "@/data/contact";
 
 export const Route = createFileRoute("/contact")({
   head: () => ({
@@ -27,8 +28,8 @@ function Contact() {
           <div className="mt-12 grid lg:grid-cols-3 gap-6">
             {[
               { Icon: MapPin, t: "Campus", d: "20KM off Mwingi–Tseikuru Road, Waita Town, Kitui County, Kenya" },
-              { Icon: Phone, t: "Phone", d: "+254 700 000 000 / +254 711 000 000" },
-              { Icon: Mail, t: "Email", d: "info@waita.ac.ke · admissions@waita.ac.ke" },
+              { Icon: Phone, t: "Phone", d: SCHOOL_PHONE },
+              { Icon: Mail, t: "Email", d: SCHOOL_EMAIL },
             ].map(({ Icon, t, d }) => (
               <div key={t} className="rounded-2xl border border-border bg-card p-6">
                 <Icon className="text-primary" />

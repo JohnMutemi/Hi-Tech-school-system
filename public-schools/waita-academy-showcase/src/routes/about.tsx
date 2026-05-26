@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
-import hero from "@/assets/hero-2.jpg";
+import { aboutBanner } from "@/data/site-media";
 
 export const Route = createFileRoute("/about")({
   head: () => ({
@@ -10,7 +10,7 @@ export const Route = createFileRoute("/about")({
       { name: "description", content: "Founded in 2013 in Waita Town, our academy has been the top-performing school in the region for over a decade." },
       { property: "og:title", content: "About Waita Progressive Academy" },
       { property: "og:description", content: "Our story, mission and values — since 2013." },
-      { property: "og:image", content: hero },
+      { property: "og:image", content: aboutBanner },
     ],
   }),
   component: About,
@@ -22,7 +22,7 @@ function About() {
       <SiteHeader />
       <main>
         <section className="relative h-[60vh] flex items-end text-primary-foreground">
-          <img src={hero} alt="Waita campus" className="absolute inset-0 h-full w-full object-cover" />
+          <img src={aboutBanner} alt="Students and staff at Waita Progressive Academy" className="absolute inset-0 h-full w-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-primary via-primary/70 to-primary/20" />
           <div className="relative mx-auto max-w-7xl px-6 pb-12">
             <div className="text-xs uppercase tracking-widest text-gold">About us</div>

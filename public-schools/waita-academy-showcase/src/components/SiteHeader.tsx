@@ -13,6 +13,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { getStaffLoginUrl } from "@/lib/staff-login";
+import { logo } from "@/data/site-media";
 
 const nav = [
   { to: "/", label: "Home" },
@@ -54,7 +55,11 @@ export function SiteHeader() {
     <header className="sticky top-0 z-50 backdrop-blur-md bg-background/80 border-b border-border">
       <div className="mx-auto max-w-7xl px-6 h-16 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2 group">
-          <div className="h-9 w-9 rounded-md border-2 border-dashed border-muted-foreground/40 bg-muted text-muted-foreground grid place-items-center font-display text-[10px] font-semibold tracking-wider">LOGO</div>
+          <img
+            src={logo}
+            alt="Waita Progressive Academy logo"
+            className="h-9 w-9 rounded-md object-contain bg-background ring-1 ring-border"
+          />
           <div className="leading-tight">
             <div className="font-display font-semibold text-foreground">Waita</div>
             <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Progressive Academy</div>

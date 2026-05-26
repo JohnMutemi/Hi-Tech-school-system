@@ -1,4 +1,6 @@
 import { Link } from "@tanstack/react-router";
+import { logo } from "@/data/site-media";
+import { SCHOOL_EMAIL, SCHOOL_PHONE } from "@/data/contact";
 
 export function SiteFooter() {
   return (
@@ -6,7 +8,11 @@ export function SiteFooter() {
       <div className="mx-auto max-w-7xl px-6 py-14 grid gap-10 md:grid-cols-4">
         <div className="md:col-span-2">
           <div className="flex items-center gap-2">
-            <div className="h-9 w-9 rounded-md border-2 border-dashed border-gold/40 bg-primary-foreground/10 text-gold/70 grid place-items-center font-display text-[10px] font-semibold tracking-wider">LOGO</div>
+            <img
+              src={logo}
+              alt="Waita Progressive Academy logo"
+              className="h-9 w-9 rounded-md object-contain bg-primary-foreground/10 ring-1 ring-gold/30"
+            />
             <div className="font-display text-xl">Waita Progressive Academy</div>
           </div>
           <p className="mt-4 text-sm text-primary-foreground/70 max-w-md">
@@ -19,7 +25,11 @@ export function SiteFooter() {
         </div>
         <div>
           <div className="text-xs uppercase tracking-widest text-gold mb-3">Contact</div>
-          <p className="text-sm text-primary-foreground/80">admissions@waita.ac.ke<br/>+254 700 000 000</p>
+          <p className="text-sm text-primary-foreground/80">
+            <a href={`mailto:${SCHOOL_EMAIL}`} className="hover:text-gold transition-colors">{SCHOOL_EMAIL}</a>
+            <br />
+            <a href={`tel:${SCHOOL_PHONE}`} className="hover:text-gold transition-colors">{SCHOOL_PHONE}</a>
+          </p>
           <div className="mt-4 flex gap-4 text-sm">
             <Link to="/admissions" className="hover:text-gold">Apply</Link>
             <Link to="/news" className="hover:text-gold">News</Link>

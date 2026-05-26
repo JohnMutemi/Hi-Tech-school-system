@@ -1,22 +1,15 @@
 import { useEffect, useState } from "react";
-import h1 from "@/assets/hero-1.jpg";
-import h2 from "@/assets/hero-2.jpg";
-import h3 from "@/assets/hero-3.jpg";
-import h4 from "@/assets/hero-4.jpg";
-import h5 from "@/assets/hero-5.jpg";
-import h6 from "@/assets/hero-6.jpg";
-
-const images = [h1, h2, h3, h4, h5, h6];
+import { heroSlides } from "@/data/site-media";
 
 export function HeroMarquee() {
   const [i, setI] = useState(0);
   useEffect(() => {
-    const id = setInterval(() => setI((p) => (p + 1) % images.length), 4500);
+    const id = setInterval(() => setI((p) => (p + 1) % heroSlides.length), 4500);
     return () => clearInterval(id);
   }, []);
   return (
     <div className="absolute inset-0 overflow-hidden">
-      {images.map((src, idx) => (
+      {heroSlides.map((src, idx) => (
         <img
           key={idx}
           src={src}
