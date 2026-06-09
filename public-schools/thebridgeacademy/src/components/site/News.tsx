@@ -39,7 +39,11 @@ export function News() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <SectionHeader
             eyebrow="News & Updates"
-            title="Latest from the school"
+            title={
+              <>
+                Latest from the <span className="text-gradient-primary">school</span>
+              </>
+            }
             className="max-w-xl"
           />
           <a

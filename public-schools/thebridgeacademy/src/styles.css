@@ -36,6 +36,7 @@
 }
 
 :root {
+  --header-height: 4rem;
   --radius: 0.75rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.18 0.04 250);
@@ -119,7 +120,7 @@
   }
   html {
     scroll-behavior: smooth;
-    scroll-padding-top: 4.5rem;
+    scroll-padding-top: calc(var(--header-height) + 0.5rem);
   }
   body {
     background-color: var(--color-background);
@@ -260,10 +261,19 @@
     color: var(--gallery-muted);
   }
 
+  .section-header-dark .site-heading {
+    color: var(--gallery-foreground);
+    text-shadow: 0 1px 2px oklch(0 0 0 / 0.25);
+  }
+
+  .section-header-dark .site-lead {
+    color: var(--gallery-muted);
+  }
+
   .gallery-header-panel {
     border-radius: 1rem;
-    border: 1px solid var(--gallery-panel-border);
-    background: var(--gallery-panel);
+    border: 1px solid oklch(0.78 0.14 82 / 0.35);
+    background: oklch(0.22 0.1 258 / 0.55);
     padding: 1.25rem 1rem;
     backdrop-filter: blur(8px);
   }
@@ -271,6 +281,42 @@
     .gallery-header-panel {
       border-radius: 1.25rem;
       padding: 1.5rem 1.5rem;
+    }
+  }
+
+  .site-section-gallery {
+    background-color: var(--gallery-surface);
+    color: var(--gallery-foreground);
+  }
+
+  .site-header {
+    height: var(--header-height);
+    transition:
+      background-color 0.2s ease,
+      box-shadow 0.2s ease,
+      border-color 0.2s ease;
+  }
+
+  .site-header-scrolled {
+    background: oklch(0.99 0.005 250 / 0.97);
+    box-shadow: var(--shadow-card);
+    border-color: var(--border);
+  }
+
+  .dark .site-header-scrolled {
+    background: oklch(0.16 0.04 258 / 0.97);
+  }
+
+  .admissions-form-panel {
+    border-radius: 1rem;
+    border: 1px solid oklch(1 0 0 / 0.22);
+    background: oklch(0.18 0.08 258 / 0.45);
+    box-shadow: var(--shadow-elegant);
+    backdrop-filter: blur(10px);
+  }
+  @media (min-width: 640px) {
+    .admissions-form-panel {
+      border-radius: 1.25rem;
     }
   }
   @media (min-width: 640px) {

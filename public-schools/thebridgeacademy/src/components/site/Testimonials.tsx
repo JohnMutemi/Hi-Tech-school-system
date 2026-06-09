@@ -26,7 +26,11 @@ export function Testimonials() {
       <SiteContainer>
         <SectionHeader
           eyebrow="Testimonials"
-          title="Voices from our community"
+          title={
+            <>
+              Voices from our <span className="text-gradient-primary">community</span>
+            </>
+          }
           lead="Parents and alumni share what The Bridge means to them."
         />
 

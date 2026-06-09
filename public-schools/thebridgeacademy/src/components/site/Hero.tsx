@@ -1,31 +1,24 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, Download } from "lucide-react";
-import hero from "@/assets/hero.jpg";
-import classroom from "@/assets/g-classroom.jpg";
-import lab from "@/assets/g-lab.jpg";
-import pupils from "@/assets/g-pupils.jpg";
-import computer from "@/assets/g-computer.jpg";
-import sports from "@/assets/g-sports.jpg";
-import bus from "@/assets/g-bus.jpg";
+import { heroSlides } from "@/data/site-media";
 import { SiteButton } from "@/components/site/layout";
 
 const SLIDE_INTERVAL_MS = 4000;
-const heroImages = [hero, classroom, lab, pupils, computer, sports, bus];
 
 function HeroSlideshow() {
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setIndex((prev) => (prev + 1) % heroImages.length);
+      setIndex((prev) => (prev + 1) % heroSlides.length);
     }, SLIDE_INTERVAL_MS);
     return () => clearInterval(timer);
   }, []);
 
   return (
     <div className="absolute inset-0">
-      {heroImages.map((src, i) => (
+      {heroSlides.map((src, i) => (
         <motion.img
           key={src}
           src={src}
@@ -44,14 +37,14 @@ export function Hero() {
   return (
     <section
       id="home"
-      className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-slate-900 pt-[3.5rem] sm:pt-16"
+      className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-slate-900"
     >
       <HeroSlideshow />
       <div className="absolute inset-0 bg-gradient-hero" />
       <div className="absolute inset-0 bg-gradient-to-t from-primary/55 via-primary/20 to-primary/35" />
 
       <motion.div
-        className="site-container relative z-10 flex flex-col items-center py-10 text-center sm:py-16 lg:py-24"
+        className="site-container relative z-10 flex flex-col items-center py-10 pt-20 text-center sm:py-16 sm:pt-24 lg:py-24"
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7 }}

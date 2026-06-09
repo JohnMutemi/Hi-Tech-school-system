@@ -246,14 +246,17 @@ export async function POST(req: NextRequest, { params }: { params: { schoolCode:
       select: { id: true, isActive: true },
     });
     if (admissionTaken) {
-      return NextResponse.json(
-        {
-          error: admissionTaken.isActive
-            ? `Admission number "${finalAdmissionNumber}" is already in use for this school.`
-            : `Admission number "${finalAdmissionNumber}" exists on an inactive record. Remove that record first (by student ID in admin tools) before re-using this number.`,
-        },
-        { status: 409 }
-      );
+      if (admissionTaken.isActive) {
+        return NextResponse.json(
+          {
+            error: `Admission number "${finalAdmissionNumber}" is already in use for this school.`,
+          },
+          { status: 409 }
+        );
+      }
+
+      // Inactive ghost from a partial remove or edit — clear only this admission row so it can be re-added.
+      await deleteStudentCompletely(admissionTaken.id, schoolContext.schoolId);
     }
 
     const resolvedStudentEmail = await resolveStudentLoginEmail(
@@ -452,9 +455,9 @@ export async function PUT(req: NextRequest, { params }: { params: { schoolCode: 
     await prisma.user.update({
       where: { id: student.userId },
       data: {
-        name: name,
-        phone: phone,
-        isActive: isActive,
+        ...(name !== undefined ? { name } : {}),
+        ...(phone !== undefined ? { phone } : {}),
+        ...(typeof isActive === 'boolean' ? { isActive } : {}),
       },
     });
 
@@ -511,29 +514,39 @@ export async function PUT(req: NextRequest, { params }: { params: { schoolCode: 
     const updatedStudent = await prisma.student.update({
       where: { id: studentId },
       data: {
-        admissionNumber,
-        dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
-        dateAdmitted: dateAdmitted ? new Date(dateAdmitted) : undefined,
-        parentName,
-        parentPhone,
-        parentEmail: parentEmail?.trim() || null,
-        address,
-        gender,
-        parentId: resolvedParentId,
-        classId,
-        status,
-        avatarUrl,
-        emergencyContact,
-        medicalInfo,
-        notes,
+        ...(admissionNumber !== undefined ? { admissionNumber } : {}),
+        ...(dateOfBirth !== undefined
+          ? { dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null }
+          : {}),
+        ...(dateAdmitted !== undefined
+          ? { dateAdmitted: dateAdmitted ? new Date(dateAdmitted) : null }
+          : {}),
+        ...(parentName !== undefined ? { parentName } : {}),
+        ...(parentPhone !== undefined ? { parentPhone } : {}),
+        ...(parentEmail !== undefined ? { parentEmail: parentEmail?.trim() || null } : {}),
+        ...(address !== undefined ? { address } : {}),
+        ...(gender !== undefined ? { gender } : {}),
+        ...(resolvedParentId !== undefined ? { parentId: resolvedParentId } : {}),
+        ...(classId !== undefined ? { classId } : {}),
+        ...(status !== undefined ? { status } : {}),
+        ...(avatarUrl !== undefined ? { avatarUrl } : {}),
+        ...(emergencyContact !== undefined ? { emergencyContact } : {}),
+        ...(medicalInfo !== undefined ? { medicalInfo } : {}),
+        ...(notes !== undefined ? { notes } : {}),
         ...(feeSegmentBody !== undefined && feeSegmentBody !== null
           ? { feeAccommodation: normalizeStudentFeeSegment(feeSegmentBody) }
           : {}),
         ...(typeof feeSmsOptBody === 'boolean' ? { feePaymentSmsOptIn: feeSmsOptBody } : {}),
-        isActive: typeof isActive === "boolean" ? isActive : (status === "active"),
+        ...(typeof isActive === 'boolean'
+          ? { isActive }
+          : status !== undefined
+            ? { isActive: status === 'active' }
+            : {}),
         updatedAt: new Date(),
-        currentAcademicYearId: currentAcademicYearId ?? student.currentAcademicYearId,
-        currentTermId: currentTermId ?? student.currentTermId,
+        ...(currentAcademicYearId !== undefined
+          ? { currentAcademicYearId }
+          : {}),
+        ...(currentTermId !== undefined ? { currentTermId } : {}),
       },
       include: { user: true, parent: true, class: { include: { grade: true } } }
     });

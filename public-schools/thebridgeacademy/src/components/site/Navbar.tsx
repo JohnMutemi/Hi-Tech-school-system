@@ -2,9 +2,10 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Menu, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import logo from "@/assets/logo-bridge.png";
+import { logo } from "@/data/site-media";
 import { StaffLoginButton } from "@/components/site/StaffLoginButton";
 import { ThemeToggle } from "@/components/site/ThemeToggle";
+import { cn } from "@/lib/utils";
 
 const links = [
   { href: "#home", label: "Home" },
@@ -20,7 +21,7 @@ export function Navbar() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 24);
+    const onScroll = () => setScrolled(window.scrollY > 8);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
@@ -37,28 +38,30 @@ export function Navbar() {
 
   return (
     <header
-      className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${
-        scrolled || open
-          ? "bg-background/95 backdrop-blur-md border-b border-border shadow-sm"
-          : "bg-transparent"
-      }`}
+      className={cn(
+        "site-header sticky top-0 z-50 border-b border-transparent backdrop-blur-md bg-background/85",
+        (scrolled || open) && "site-header-scrolled",
+      )}
     >
-      <div className="site-container flex min-h-[3.5rem] items-center justify-between gap-3 py-2 sm:min-h-[4rem] sm:py-3">
-        <Link to="/" className="flex min-w-0 items-center gap-2 sm:gap-3" onClick={closeMenu}>
-          <span
-            className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg sm:h-11 sm:w-11 ${
-              scrolled || open ? "bg-secondary" : "bg-white/95 backdrop-blur"
-            }`}
-          >
-            <img src={logo} alt="The Bridge Academy logo" className="h-8 w-8 object-contain sm:h-9 sm:w-9" />
-          </span>
-          <span
-            className={`font-display text-base font-bold leading-tight sm:text-lg ${
-              scrolled || open ? "text-foreground" : "text-white"
-            }`}
-          >
-            The Bridge <span className="text-gold">Academy</span>
-          </span>
+      <div className="site-container flex h-full items-center justify-between gap-3">
+        <Link
+          to="/"
+          className="group flex min-w-0 shrink-0 items-center gap-2.5 sm:gap-3"
+          onClick={closeMenu}
+        >
+          <img
+            src={logo}
+            alt="The Bridge Academy logo"
+            className="h-9 w-9 rounded-lg object-contain bg-background ring-1 ring-border shadow-sm transition group-hover:ring-primary/30 sm:h-10 sm:w-10"
+          />
+          <div className="min-w-0 leading-tight">
+            <div className="truncate font-display text-base font-semibold text-foreground sm:text-lg">
+              The Bridge
+            </div>
+            <div className="truncate text-[9px] uppercase tracking-[0.16em] text-muted-foreground sm:text-[10px] sm:tracking-[0.18em]">
+              Academy
+            </div>
+          </div>
         </Link>
 
         <nav className="hidden items-center gap-0.5 lg:flex" aria-label="Main">
@@ -66,17 +69,13 @@ export function Navbar() {
             <a
               key={l.href}
               href={l.href}
-              className={`min-h-11 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                scrolled
-                  ? "text-foreground/80 hover:text-primary hover:bg-secondary"
-                  : "text-white/90 hover:text-white hover:bg-white/10"
-              }`}
+              className="min-h-11 rounded-md px-3 py-2 text-sm font-medium text-foreground/80 transition-colors hover:bg-secondary hover:text-primary"
             >
               {l.label}
             </a>
           ))}
-          <StaffLoginButton scrolled={scrolled} />
-          <ThemeToggle overHero={!scrolled} className="ml-0.5" />
+          <StaffLoginButton scrolled={true} />
+          <ThemeToggle className="ml-0.5" />
           <a
             href="#admissions"
             className="ml-1 inline-flex min-h-11 items-center justify-center rounded-md bg-gradient-gold px-4 py-2.5 text-sm font-semibold text-gold-foreground shadow-card"
@@ -86,13 +85,11 @@ export function Navbar() {
         </nav>
 
         <div className="flex items-center gap-1 lg:hidden">
-          <ThemeToggle overHero={!scrolled && !open} />
+          <ThemeToggle />
           <button
             type="button"
             onClick={() => setOpen(!open)}
-            className={`grid h-11 w-11 shrink-0 place-items-center rounded-md ${
-              scrolled || open ? "text-foreground" : "text-white"
-            }`}
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-md text-foreground"
             aria-expanded={open}
             aria-label={open ? "Close menu" : "Open menu"}
           >
@@ -103,38 +100,46 @@ export function Navbar() {
 
       <AnimatePresence>
         {open && (
-          <motion.nav
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="lg:hidden border-t border-border bg-background overflow-hidden"
-            aria-label="Mobile"
-          >
-            <div className="site-container flex max-h-[min(70vh,28rem)] flex-col gap-1 overflow-y-auto py-3 pb-6">
-              {links.map((l) => (
+          <>
+            <button
+              type="button"
+              className="lg:hidden fixed inset-0 top-[var(--header-height)] z-40 bg-foreground/20 backdrop-blur-[2px]"
+              aria-label="Close menu"
+              onClick={closeMenu}
+            />
+            <motion.nav
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="lg:hidden fixed inset-x-0 top-[var(--header-height)] z-50 max-h-[calc(100dvh-var(--header-height))] overflow-y-auto border-t border-border bg-background shadow-lg"
+              aria-label="Mobile"
+            >
+              <div className="site-container flex flex-col gap-1 py-4 pb-6">
+                {links.map((l) => (
+                  <a
+                    key={l.href}
+                    href={l.href}
+                    onClick={closeMenu}
+                    className="flex min-h-12 items-center rounded-lg px-3 text-base font-medium text-foreground/85 transition-colors hover:bg-secondary hover:text-primary"
+                  >
+                    {l.label}
+                  </a>
+                ))}
+                <StaffLoginButton variant="mobile" onNavigate={closeMenu} />
+                <div className="mt-2 flex items-center gap-3 border-t border-border px-3 pt-4">
+                  <span className="text-sm font-medium text-muted-foreground">Theme</span>
+                  <ThemeToggle />
+                </div>
                 <a
-                  key={l.href}
-                  href={l.href}
+                  href="#admissions"
                   onClick={closeMenu}
-                  className="min-h-12 flex items-center rounded-lg px-4 text-base font-medium text-foreground/85 active:bg-secondary"
+                  className="mt-2 flex min-h-12 items-center justify-center rounded-md bg-gradient-gold px-5 text-base font-semibold text-gold-foreground"
                 >
-                  {l.label}
+                  Apply Now
                 </a>
-              ))}
-              <StaffLoginButton variant="mobile" onNavigate={closeMenu} />
-              <div className="mt-2 flex items-center gap-3 px-4">
-                <span className="text-sm font-medium text-muted-foreground">Theme</span>
-                <ThemeToggle />
               </div>
-              <a
-                href="#admissions"
-                onClick={closeMenu}
-                className="mt-2 flex min-h-12 items-center justify-center rounded-md bg-gradient-gold px-5 text-base font-semibold text-gold-foreground"
-              >
-                Apply Now
-              </a>
-            </div>
-          </motion.nav>
+            </motion.nav>
+          </>
         )}
       </AnimatePresence>
     </header>

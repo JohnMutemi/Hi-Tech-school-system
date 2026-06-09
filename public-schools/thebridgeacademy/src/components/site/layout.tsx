@@ -49,6 +49,7 @@ export function SectionHeader({
       className={cn(
         "max-w-2xl",
         align === "center" && "mx-auto text-center",
+        dark && "section-header-dark",
         className,
       )}
     >

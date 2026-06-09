@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { SiteLayout, PageHeader } from "@/components/SiteLayout";
-import campusImg from "@/assets/gallery-campus.jpg";
+import { aboutBanner } from "@/data/site-media";
 import { Compass, Heart, Target } from "lucide-react";
 
 export const Route = createFileRoute("/about")({
@@ -25,7 +25,14 @@ function About() {
       />
 
       <section className="mx-auto grid max-w-7xl gap-12 px-6 py-20 lg:grid-cols-2">
-        <img src={campusImg} alt="Our campus" width={1200} height={900} loading="lazy" className="rounded-xl object-cover shadow-lg" />
+        <img
+          src={aboutBanner}
+          alt="Students at Mwingi Royal Junior Academy"
+          width={1200}
+          height={900}
+          loading="lazy"
+          className="rounded-xl object-cover shadow-lg"
+        />
         <div>
           <h2 className="font-serif text-3xl font-bold">Our Story</h2>
           <p className="mt-5 text-muted-foreground">

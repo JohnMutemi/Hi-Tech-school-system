@@ -1,17 +1,13 @@
 import { useState } from "react";
 import { MessageCircle, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-
-const WHATSAPP_NUMBER = "254723800347";
-const WHATSAPP_MESSAGE =
-  "Hello, I'd like to leave a message for The Bridge Academy administration.";
+import { SCHOOL_PHONE_DISPLAY, whatsAppUrl, WHATSAPP_DEFAULT_MESSAGE } from "@/lib/contact";
 
 export function WhatsAppWidget() {
   const [open, setOpen] = useState(false);
 
   const startChat = () => {
-    const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(WHATSAPP_MESSAGE)}`;
-    window.open(url, "_blank", "noopener,noreferrer");
+    window.open(whatsAppUrl(WHATSAPP_DEFAULT_MESSAGE), "_blank", "noopener,noreferrer");
     setOpen(false);
   };
 
@@ -43,7 +39,8 @@ export function WhatsAppWidget() {
             <div className="p-4 sm:p-5">
               <p className="text-sm font-medium text-foreground">Leave us a message</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                WhatsApp: 0723 800 347 — we&apos;ll open chat so you can type your message.
+                WhatsApp: {SCHOOL_PHONE_DISPLAY} — we&apos;ll open chat so you can type your
+                message.
               </p>
               <div className="mt-4 flex gap-2">
                 <button

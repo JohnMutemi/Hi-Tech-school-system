@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Download, FileText, CheckCircle2 } from "lucide-react";
 import { SiteContainer, SiteButton, SiteSection } from "@/components/site/layout";
+import { mailtoUrl, SCHOOL_EMAIL } from "@/lib/contact";
 
 const points = [
   "Open intake for Grade 1 to Form 4",
@@ -8,6 +9,13 @@ const points = [
   "Generous scholarship programme",
   "Personalised learning plans",
 ];
+
+const formSteps = [
+  "Complete the form digitally or by hand",
+  "Attach copies of birth certificate & report",
+  `Submit at the school office or via email (${SCHOOL_EMAIL})`,
+  "Sit a short placement assessment",
+] as const;
 
 export function Admissions() {
   return (
@@ -33,17 +41,17 @@ export function Admissions() {
               <span className="h-1.5 w-1.5 rounded-full bg-gold animate-pulse" />
               Admissions Ongoing
             </span>
-            <h2 className="mt-4 font-display text-3xl font-bold leading-tight sm:mt-5 sm:text-4xl lg:text-5xl">
+            <h2 className="mt-4 font-display text-3xl font-bold leading-tight text-white sm:mt-5 sm:text-4xl lg:text-5xl">
               Your child&apos;s bright <span className="text-gold">future</span> starts here.
             </h2>
-            <p className="mt-4 text-base leading-relaxed text-white/85 sm:mt-5 sm:text-lg">
+            <p className="mt-4 text-base leading-relaxed text-white/90 sm:mt-5 sm:text-lg">
               Join a community where every learner is known, challenged, and championed. Download
               the admission form to begin your journey with The Bridge Academy.
             </p>
 
             <ul className="mt-6 space-y-2.5 sm:mt-8 sm:grid sm:grid-cols-2 sm:gap-3 sm:space-y-0">
               {points.map((p) => (
-                <li key={p} className="flex items-start gap-2 text-sm text-white/90 sm:text-base">
+                <li key={p} className="flex items-start gap-2 text-sm text-white/95 sm:text-base">
                   <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-gold" />
                   <span>{p}</span>
                 </li>
@@ -65,7 +73,7 @@ export function Admissions() {
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true }}
           >
-            <div className="site-card border-white/20 bg-white/10 p-6 backdrop-blur sm:p-8">
+            <div className="admissions-form-panel p-6 sm:p-8">
               <div className="flex items-start gap-4">
                 <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-gradient-gold text-gold-foreground sm:h-14 sm:w-14">
                   <FileText className="h-5 w-5 sm:h-6 sm:w-6" />
@@ -74,24 +82,43 @@ export function Admissions() {
                   <h3 className="font-display text-lg font-bold text-white sm:text-xl">
                     Admission Form 2026
                   </h3>
-                  <p className="mt-1 text-sm text-white/70">PDF · 1.2 MB · 2 pages</p>
+                  <p className="mt-1 text-sm text-white/80">PDF · 1.2 MB · 2 pages</p>
                 </div>
               </div>
-              <ol className="mt-6 space-y-3 text-sm text-white/85">
-                {[
-                  "Complete the form digitally or by hand",
-                  "Attach copies of birth certificate & report",
-                  "Submit at the school office or via email",
-                  "Sit a short placement assessment",
-                ].map((step, i) => (
-                  <li key={step} className="flex items-center gap-3">
-                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-gold/20 text-xs font-semibold text-gold">
+              <ol className="mt-6 space-y-3 text-sm text-white/95 sm:text-base">
+                {formSteps.map((step, i) => (
+                  <li key={step} className="flex items-start gap-3">
+                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-gold/25 text-xs font-semibold text-gold">
                       {i + 1}
                     </span>
-                    <span>{step}</span>
+                    <span className="pt-0.5 leading-snug">
+                      {i === 2 ? (
+                        <>
+                          Submit at the school office or via email (
+                          <a
+                            href={mailtoUrl("Admission enquiry")}
+                            className="font-medium text-gold underline-offset-2 hover:underline"
+                          >
+                            {SCHOOL_EMAIL}
+                          </a>
+                          )
+                        </>
+                      ) : (
+                        step
+                      )}
+                    </span>
                   </li>
                 ))}
               </ol>
+              <SiteButton
+                href="/admission-form.pdf"
+                download
+                variant="primary"
+                fullWidthMobile
+                className="mt-6"
+              >
+                <Download className="h-4 w-4" /> Download PDF
+              </SiteButton>
             </div>
           </motion.div>
         </div>

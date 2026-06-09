@@ -1,5 +1,4 @@
 import {
-  GraduationCap,
   Facebook,
   Instagram,
   Twitter,
@@ -9,6 +8,8 @@ import {
   MapPin,
 } from "lucide-react";
 import { SiteContainer } from "@/components/site/layout";
+import { logo } from "@/data/site-media";
+import { mailtoUrl, SCHOOL_EMAIL, SCHOOL_PHONE_DISPLAY, telUrl } from "@/lib/contact";
 
 const exploreLinks = [
   ["About", "#about"],
@@ -25,14 +26,16 @@ export function Footer() {
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
           <div className="sm:col-span-2 lg:col-span-1">
             <div className="flex items-center gap-2.5">
-              <span className="grid h-10 w-10 place-items-center rounded-lg bg-gradient-gold text-gold-foreground">
-                <GraduationCap className="h-5 w-5" />
-              </span>
-              <span className="font-display text-lg font-bold leading-tight">
+              <img
+                src={logo}
+                alt="The Bridge Academy logo"
+                className="h-10 w-10 rounded-lg object-contain bg-primary-foreground/10 ring-1 ring-gold/30 sm:h-11 sm:w-11"
+              />
+              <span className="font-display text-lg font-bold leading-tight sm:text-xl">
                 The Bridge <span className="text-gold">Academy</span>
               </span>
             </div>
-            <p className="mt-4 max-w-sm text-sm leading-relaxed text-white/70">
+            <p className="mt-4 max-w-sm text-sm leading-relaxed text-white/80">
               A high-performing private comprehensive school nurturing excellence, character, and
               curiosity since 2007.
             </p>
@@ -50,7 +53,7 @@ export function Footer() {
                 <li key={label}>
                   <a
                     href={href}
-                    className="inline-flex min-h-10 items-center text-sm text-white/75 transition hover:text-gold"
+                    className="inline-flex min-h-10 items-center text-sm text-white/80 transition hover:text-gold"
                   >
                     {label}
                   </a>
@@ -63,21 +66,21 @@ export function Footer() {
             <h4 className="font-display text-sm font-bold uppercase tracking-wider text-gold">
               Contact
             </h4>
-            <ul className="mt-4 space-y-3 text-sm text-white/75">
+            <ul className="mt-4 space-y-3 text-sm text-white/80">
               <li className="flex gap-2.5">
                 <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-gold" />
                 <span>Near Malioni Centre, Kavingoni Junction, Mwingi–Kyuso Road, Kenya</span>
               </li>
               <li className="flex gap-2.5">
                 <Phone className="mt-0.5 h-4 w-4 shrink-0 text-gold" />
-                <a href="tel:+254723800347" className="hover:text-gold">
-                  0723 800 347
+                <a href={telUrl()} className="hover:text-gold">
+                  {SCHOOL_PHONE_DISPLAY}
                 </a>
               </li>
               <li className="flex gap-2.5">
                 <Mail className="mt-0.5 h-4 w-4 shrink-0 text-gold" />
-                <a href="mailto:info@bridgeacademy.ac.ke" className="hover:text-gold break-all">
-                  info@bridgeacademy.ac.ke
+                <a href={mailtoUrl()} className="hover:text-gold break-all">
+                  {SCHOOL_EMAIL}
                 </a>
               </li>
             </ul>

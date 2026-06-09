@@ -1,10 +1,13 @@
 import { motion } from "framer-motion";
 import { MapPin, Phone, Mail, Clock, MessageCircle } from "lucide-react";
 import { SiteContainer, SiteSection, SectionHeader } from "@/components/site/layout";
-
-const WHATSAPP_URL =
-  "https://wa.me/254723800347?text=" +
-  encodeURIComponent("Hello, I'd like to leave a message for The Bridge Academy.");
+import {
+  mailtoUrl,
+  SCHOOL_EMAIL,
+  SCHOOL_PHONE_DISPLAY,
+  telUrl,
+  whatsAppUrl,
+} from "@/lib/contact";
 
 type ContactCard = {
   icon: typeof MapPin;
@@ -22,14 +25,20 @@ const cards: ContactCard[] = [
   {
     icon: MessageCircle,
     title: "WhatsApp",
-    lines: ["0723 800 347 — tap to leave a message"],
-    href: WHATSAPP_URL,
+    lines: [`${SCHOOL_PHONE_DISPLAY} — tap to leave a message`],
+    href: whatsAppUrl(),
   },
-  { icon: Phone, title: "Phone", lines: ["0723 800 347"] },
+  {
+    icon: Phone,
+    title: "Phone",
+    lines: [SCHOOL_PHONE_DISPLAY],
+    href: telUrl(),
+  },
   {
     icon: Mail,
     title: "Email",
-    lines: ["info@bridgeacademy.ac.ke", "admissions@bridgeacademy.ac.ke"],
+    lines: [SCHOOL_EMAIL],
+    href: mailtoUrl(),
   },
   {
     icon: Clock,
@@ -62,9 +71,11 @@ function ContactCardItem({ card }: { card: ContactCard }) {
     return (
       <a
         href={card.href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={`${className} hover:border-[#25D366]/50 active:scale-[0.99]`}
+        target={card.href.startsWith("http") ? "_blank" : undefined}
+        rel={card.href.startsWith("http") ? "noopener noreferrer" : undefined}
+        className={`${className} hover:border-primary/40 active:scale-[0.99] ${
+          card.title === "WhatsApp" ? "hover:border-[#25D366]/50" : ""
+        }`}
       >
         {inner}
       </a>
@@ -80,7 +91,11 @@ export function Contact() {
       <SiteContainer>
         <SectionHeader
           eyebrow="Find Us"
-          title="Find us on the map"
+          title={
+            <>
+              Find us on the <span className="text-gradient-primary">map</span>
+            </>
+          }
           lead="Near Malioni Centre, Kavingoni Junction — Mwingi–Kyuso Road, Kenya."
         />
 

@@ -18,7 +18,11 @@ export function Values() {
         <SectionHeader
           align="center"
           eyebrow="Our Values"
-          title="What we stand for"
+          title={
+            <>
+              What we <span className="text-gradient-primary">stand for</span>
+            </>
+          }
           lead="Six guiding principles that shape every classroom, corridor, and conversation."
         />
 
