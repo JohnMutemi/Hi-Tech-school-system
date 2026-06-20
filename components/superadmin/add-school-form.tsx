@@ -58,6 +58,7 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
     schoolCode: "",
     tempPassword: "",
     portalUrl: "",
+    portalLinks: [] as Array<{ id: string; label: string; shortLabel: string; description: string; path: string }>,
     schoolName: "",
     adminEmail: ""
   })
@@ -182,6 +183,7 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
           schoolCode: result.schoolCode,
           tempPassword: result.tempPassword,
           portalUrl: result.portalUrl,
+          portalLinks: result.staffPortalLinks ?? [],
           schoolName: name,
           adminEmail: email
         })
@@ -322,7 +324,9 @@ const AddSchoolForm: React.FC<AddSchoolFormProps> = ({ onSchoolAdded }) => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="full">Full Package</SelectItem>
-                      <SelectItem value="finance_only">Finance Only</SelectItem>
+                      <SelectItem value="finance_only">Finance Module</SelectItem>
+                      <SelectItem value="grading_only">Academics &amp; Grading Module</SelectItem>
+                      <SelectItem value="finance_grading">Finance + Academics Modules</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

@@ -22,7 +22,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Select } from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
 import { SchoolLoginShell } from "@/components/auth/school-login-shell";
-import { normalizePackageType, staffPortalLoginPath } from "@/lib/finance-package-gate";
+import { isDualModulePackage, normalizePackageType } from "@/lib/school-package";
+import {
+  academicsPortalLoginPath,
+  financePortalLoginPath,
+  modulePortalPickerPath,
+} from "@/lib/staff-portal-path";
 import {
   Dialog,
   DialogContent,
@@ -93,9 +98,19 @@ export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
 
   useEffect(() => {
     if (!schoolData?.packageType || !schoolCode) return;
-    if (normalizePackageType(schoolData.packageType) !== "finance_only") return;
+    const pkg = normalizePackageType(schoolData.packageType);
     const search = typeof window !== "undefined" ? window.location.search : "";
-    router.replace(`${staffPortalLoginPath(schoolCode, schoolData.packageType)}${search}`);
+    if (pkg === "finance_only") {
+      router.replace(`${financePortalLoginPath(schoolCode)}${search}`);
+      return;
+    }
+    if (pkg === "grading_only") {
+      router.replace(`${academicsPortalLoginPath(schoolCode)}${search}`);
+      return;
+    }
+    if (isDualModulePackage(pkg)) {
+      router.replace(`${modulePortalPickerPath(schoolCode)}${search}`);
+    }
   }, [schoolData, schoolCode, router]);
 
   // Fetch students from API on component mount

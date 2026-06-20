@@ -19,7 +19,9 @@
     "cleanup:grades": "node scripts/cleanup-grades.js",
     "backup:run-scheduled": "tsx scripts/run-scheduled-backups.ts",
     "test:backup-system": "tsx scripts/test-school-backup.ts",
-    "seed:website-showcase": "tsx scripts/seed-website-showcase-schools.ts"
+    "seed:website-showcase": "tsx scripts/seed-website-showcase-schools.ts",
+    "seed:grading-presets": "tsx scripts/seed-grading-module-presets.ts",
+    "test:grading-engine": "tsx modules/grading-module/services/gradingEngine.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-rds-data": "latest",

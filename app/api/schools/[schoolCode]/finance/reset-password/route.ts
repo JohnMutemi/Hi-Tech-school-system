@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { PrismaClient } from "@prisma/client"
 import bcrypt from "bcryptjs"
 import { resolveFinanceGateForSchoolCode } from "@/lib/finance-package-gate"
+import { normalizePackageType } from "@/lib/school-package"
 
 const prisma = new PrismaClient()
 
@@ -34,8 +35,11 @@ export async function POST(
     })
     if (!school) return NextResponse.json({ error: "School not found." }, { status: 404 })
 
+    const pkg = normalizePackageType(gate.school.packageType)
+    const financeRoles = pkg === "finance_grading" ? ["bursar", "school_admin"] : ["bursar"]
+
     const bursar = await prisma.user.findFirst({
-      where: { schoolId: school.id, role: "bursar", resetToken: token },
+      where: { schoolId: school.id, role: { in: financeRoles }, resetToken: token },
     })
     if (!bursar || !bursar.resetTokenExpiry || bursar.resetTokenExpiry < new Date()) {
       return NextResponse.json({ error: "Invalid or expired reset token." }, { status: 400 })

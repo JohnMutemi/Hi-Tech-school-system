@@ -3,7 +3,7 @@
 
 import { saveSchool, getSchool, getAllSchools, createSchool, deleteSchool } from "@/lib/school-storage"
 import { generateSchoolCode, generateTempPassword } from "@/lib/utils/school-generator"
-import { staffPortalLoginPath } from "@/lib/finance-package-gate"
+import { staffPortalLinks, staffPortalLoginPath } from "@/lib/staff-portal-path"
 
 export async function createSchoolClient(schoolData: any) {
   try {
@@ -96,6 +96,7 @@ export async function createSchoolClient(schoolData: any) {
       schoolCode,
       tempPassword,
       portalUrl: staffPortalLoginPath(schoolCode, pkg),
+      staffPortalLinks: staffPortalLinks(schoolCode, pkg),
       publicSiteUrl: apiSchool.publicSiteUrl || "",
       customDomain: apiSchool.customDomain ?? null,
       warnings: apiSchool.warnings,

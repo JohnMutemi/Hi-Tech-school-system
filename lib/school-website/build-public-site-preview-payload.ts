@@ -1,5 +1,5 @@
 import { buildDefaultSections } from "@/lib/school-website/default-sections";
-import { staffPortalLoginPath } from "@/lib/finance-package-gate";
+import { staffPortalLoginPath } from "@/lib/staff-portal-path";
 import { previewPublicSiteUrl } from "@/lib/school-website/resolve-school-custom-domain";
 import { normalizeTemplateSlug } from "@/lib/school-website/templates";
 import type {

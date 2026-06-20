@@ -3,6 +3,7 @@ import { getIronSession } from 'iron-session';
 import { cookies } from 'next/headers';
 import bcrypt from 'bcryptjs';
 import { resolveFinanceGateForSchoolCode } from '@/lib/finance-package-gate';
+import { normalizePackageType } from '@/lib/school-package';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/session';
 
@@ -70,11 +71,14 @@ export async function POST(
       );
     }
 
+    const pkg = normalizePackageType(gate.school.packageType);
+    const financeRoles = pkg === 'finance_grading' ? ['bursar', 'school_admin'] : ['bursar'];
+
     const user = await prisma.user.findFirst({
       where: {
         id: session.user.id,
         schoolId: gate.school.id,
-        role: 'bursar',
+        role: { in: financeRoles },
       },
     });
     if (!user) {

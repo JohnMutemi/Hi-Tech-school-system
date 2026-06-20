@@ -2,7 +2,8 @@ import { PrismaClient } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { SchoolSeedingService } from '@/lib/services/school-seeding-service';
-import { normalizePackageType, staffPortalLoginPath } from '@/lib/finance-package-gate';
+import { getPrimaryPortalRole, normalizePackageType } from '@/lib/school-package';
+import { staffPortalLinks, staffPortalLoginPath } from '@/lib/staff-portal-path';
 import { getPaletteBySlug } from '@/lib/school-website/palettes';
 import { normalizeTemplateSlug } from '@/lib/school-website/templates';
 import { transformSchoolForApi } from '@/lib/school-website/transform-school-response';
@@ -11,16 +12,12 @@ import { resolveSchoolCustomDomain } from '@/lib/school-website/resolve-school-c
 
 const prisma = new PrismaClient();
 
-function getPrimaryPortalRole(packageType: string | null | undefined): 'admin' | 'bursar' {
-  return normalizePackageType(packageType) === 'finance_only' ? 'bursar' : 'admin';
-}
-
 export async function GET() {
   try {
     const schools = await prisma.school.findMany({
       include: {
         users: {
-          where: { role: { in: ['admin', 'bursar'] } },
+          where: { role: { in: ['admin', 'bursar', 'teacher', 'school_admin'] } },
           select: {
             id: true,
             name: true,
@@ -53,7 +50,9 @@ export async function GET() {
         typeof school.logo === 'string' && school.logo.trim().startsWith('data:');
       const primaryRole = getPrimaryPortalRole(school.packageType);
       const primaryUser = school.users.find((u: any) => u.role === primaryRole);
-      const fallbackUser = school.users.find((u: any) => u.role === 'admin');
+      const fallbackUser =
+        school.users.find((u: any) => u.role === 'admin') ||
+        school.users.find((u: any) => u.role === 'school_admin');
 
       return ({
       id: school.id,
@@ -66,6 +65,7 @@ export async function GET() {
       colorTheme: school.colorTheme || "#d97706",
       portalUrl: staffPortalLoginPath(school.code, school.packageType),
       staffPortalUrl: staffPortalLoginPath(school.code, school.packageType),
+      staffPortalLinks: staffPortalLinks(school.code, school.packageType),
       publicSiteUrl: getPublicSiteUrl(school.code, school.customDomain ?? null),
       publicWebsiteEnabled: school.publicWebsiteEnabled !== false,
       description: "",
@@ -271,12 +271,16 @@ export async function POST(request: NextRequest) {
       { description: description || "" }
     );
 
+    const portalLinks = staffPortalLinks(school.code, normalizedPackageType);
+
     return NextResponse.json(
       {
         ...createdSchool,
         adminEmail: adminUser.email,
         adminFirstName,
         adminLastName,
+        portalUrl: staffPortalLoginPath(school.code, normalizedPackageType),
+        staffPortalLinks: portalLinks,
         ...(warnings.length > 0 ? { warnings } : {}),
       },
       { status: 201 }

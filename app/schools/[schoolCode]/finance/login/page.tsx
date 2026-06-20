@@ -8,6 +8,8 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { SchoolLoginShell } from '@/components/auth/school-login-shell';
+import { ACADEMICS_PORTAL_LABEL, FINANCE_PORTAL_LABEL, isDualModulePackage, normalizePackageType } from '@/lib/school-package';
+import { academicsPortalLoginPath } from '@/lib/staff-portal-path';
 
 export default function FinanceLoginPage() {
   const router = useRouter();
@@ -26,6 +28,7 @@ export default function FinanceLoginPage() {
   const [schoolTheme, setSchoolTheme] = useState('#2563eb');
   const [schoolName, setSchoolName] = useState('Finance Module Access');
   const [schoolLogoUrl, setSchoolLogoUrl] = useState<string | undefined>(undefined);
+  const [packageType, setPackageType] = useState('finance_only');
 
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -56,6 +59,7 @@ export default function FinanceLoginPage() {
         if (typeof data?.logoUrl === 'string' && data.logoUrl.trim()) {
           setSchoolLogoUrl(data.logoUrl.trim());
         }
+        if (data?.packageType) setPackageType(normalizePackageType(data.packageType));
       } catch (error) {
         console.error('Failed to load school theme:', error);
       }
@@ -177,10 +181,19 @@ export default function FinanceLoginPage() {
     <SchoolLoginShell
       schoolCode={schoolCode}
       heading={schoolName}
-      subheading="Login to your independent finance workspace"
+      subheading={`Sign in to your ${FINANCE_PORTAL_LABEL}`}
       logoUrl={schoolLogoUrl}
       colorTheme={schoolTheme}
       contentVariant="finance"
+      moduleBadge="Finance Module"
+      sisterModuleLink={
+        isDualModulePackage(packageType)
+          ? {
+              label: `Open ${ACADEMICS_PORTAL_LABEL}`,
+              href: academicsPortalLoginPath(schoolCode),
+            }
+          : undefined
+      }
     >
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>

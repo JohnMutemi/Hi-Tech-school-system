@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { getIronSession } from 'iron-session';
 import { cookies } from 'next/headers';
 import { resolveFinanceGateForSchoolCode } from '@/lib/finance-package-gate';
+import { normalizePackageType } from '@/lib/school-package';
 import { getSession } from '@/lib/session';
 
 const prisma = new PrismaClient();
@@ -53,15 +54,18 @@ export async function POST(
       return NextResponse.json({ error: 'School not found' }, { status: 404 });
     }
 
-    // Finance module currently reuses bursar users for authentication.
+    const pkg = normalizePackageType(gate.school.packageType);
+    const financeRoles = pkg === 'finance_grading' ? ['bursar', 'school_admin'] : ['bursar'];
+
     const user = await prisma.user.findFirst({
       where: {
         email: {
           equals: normalizedEmail,
           mode: 'insensitive',
         },
-        role: 'bursar',
+        role: { in: financeRoles },
         schoolId: school.id,
+        isActive: true,
       },
     });
 

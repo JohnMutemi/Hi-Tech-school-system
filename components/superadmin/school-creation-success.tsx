@@ -17,10 +17,19 @@ import {
   School,
 } from "lucide-react"
 
+type PortalLink = {
+  id: string
+  label: string
+  shortLabel: string
+  description: string
+  path: string
+}
+
 interface SchoolCreationSuccessProps {
   schoolCode: string
   tempPassword: string
   portalUrl: string
+  portalLinks?: PortalLink[]
   schoolName: string
   adminEmail: string
   onClose: () => void
@@ -30,10 +39,16 @@ export function SchoolCreationSuccess({
   schoolCode,
   tempPassword,
   portalUrl,
+  portalLinks = [],
   schoolName,
   adminEmail,
   onClose,
 }: SchoolCreationSuccessProps) {
+  const origin = typeof window !== "undefined" ? window.location.origin : ""
+  const links =
+    portalLinks.length > 0
+      ? portalLinks.map((link) => ({ ...link, fullUrl: `${origin}${link.path}` }))
+      : [{ id: "primary", label: "Staff Portal", shortLabel: "Portal", description: "", path: portalUrl.replace(origin, ""), fullUrl: portalUrl }]
   const [showPassword, setShowPassword] = useState(false)
   const [copiedField, setCopiedField] = useState<string | null>(null)
 
@@ -127,36 +142,54 @@ export function SchoolCreationSuccess({
               <div className="rounded-full bg-orange-200/70 p-2">
                 <LinkIcon className="h-5 w-5 text-orange-800" />
               </div>
-              <h3 className="text-lg font-semibold text-orange-950">Portal URL</h3>
+              <h3 className="text-lg font-semibold text-orange-950">
+                {links.length > 1 ? "Module Portal Links" : "Portal URL"}
+              </h3>
             </div>
-            <div className="space-y-2">
-              <p className="text-sm text-orange-950/90">Staff portal (private login for admins and finance).</p>
-              <div className="flex flex-col items-start space-y-2 sm:flex-row sm:items-center sm:space-x-2 sm:space-y-0">
-                <Badge variant="outline" className="w-full break-all bg-white text-left font-mono text-xs">
-                  {portalUrl}
-                </Badge>
-                <div className="flex flex-shrink-0 space-x-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => copyToClipboard(portalUrl, "url")}>
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={openPortal}>
-                    <ExternalLink className="h-4 w-4" />
-                  </Button>
+            <div className="space-y-4">
+              {links.length > 1 ? (
+                <p className="text-sm text-orange-950/90">
+                  This package includes separate login workspaces. Share the correct link with finance staff and academic staff.
+                </p>
+              ) : (
+                <p className="text-sm text-orange-950/90">Staff portal (private login for school administrators).</p>
+              )}
+              {links.map((link) => (
+                <div key={link.id} className="space-y-2 rounded-lg border border-orange-200/80 bg-white/70 p-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-orange-800">{link.shortLabel}</p>
+                    <p className="font-medium text-orange-950">{link.label}</p>
+                    {link.description ? <p className="text-xs text-orange-900/80">{link.description}</p> : null}
+                  </div>
+                  <div className="flex flex-col items-start space-y-2 sm:flex-row sm:items-center sm:space-x-2 sm:space-y-0">
+                    <Badge variant="outline" className="w-full break-all bg-white text-left font-mono text-xs">
+                      {link.fullUrl}
+                    </Badge>
+                    <div className="flex flex-shrink-0 space-x-1">
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => copyToClipboard(link.fullUrl, link.id)}>
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => window.open(link.fullUrl, "_blank")}>
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  {copiedField === link.id ? <p className="text-xs text-amber-800">URL copied!</p> : null}
                 </div>
-              </div>
-              {copiedField === "url" && <p className="text-xs text-amber-800">URL copied to clipboard!</p>}
+              ))}
               <Button
-                className="mt-4 w-full border-0 bg-gradient-to-r from-amber-600 to-orange-600 text-white hover:from-amber-700 hover:to-orange-700"
+                className="w-full border-0 bg-gradient-to-r from-amber-600 to-orange-600 text-white hover:from-amber-700 hover:to-orange-700"
                 onClick={() => {
+                  const target = links[0]?.fullUrl ?? portalUrl
                   window.open(
-                    `${portalUrl}?email=${encodeURIComponent(adminEmail)}&password=${encodeURIComponent(
+                    `${target}?email=${encodeURIComponent(adminEmail)}&password=${encodeURIComponent(
                       tempPassword
                     )}&schoolName=${encodeURIComponent(schoolName)}`,
                     "_blank"
                   )
                 }}
               >
-                Go to Portal (Auto-fill Login)
+                {links.length > 1 ? "Open Module Picker" : "Go to Portal (Auto-fill Login)"}
               </Button>
             </div>
           </div>

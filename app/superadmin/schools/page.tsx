@@ -12,7 +12,8 @@ import Link from "next/link"
 import { useUser } from "@/hooks/use-user"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
-import { normalizePackageType, staffPortalLoginPath } from "@/lib/finance-package-gate"
+import { getPackageLabel, normalizePackageType } from "@/lib/school-package"
+import { staffPortalLoginPath } from "@/lib/staff-portal-path"
 
 export default function SchoolsManagementPage() {
   const router = useRouter()
@@ -64,7 +65,7 @@ export default function SchoolsManagementPage() {
         window.open(portalUrl, "_blank")
         toast({
           title: "Login Page Opened",
-          description: `Opened ${normalizePackageType(school.packageType) === "finance_only" ? "finance" : "staff"} login for ${school.name}.`,
+          description: `Opened ${getPackageLabel(school.packageType)} login for ${school.name}.`,
         })
       } else {
         window.open(`${window.location.origin}${staffPath}`, "_blank")
@@ -154,10 +155,7 @@ export default function SchoolsManagementPage() {
       if (!res.ok) throw new Error(data.error || "Failed to update package rights")
       toast({
         title: "Package rights updated",
-        description:
-          packageType === "finance_only"
-            ? `${school.name} now has Finance Only rights.`
-            : `${school.name} now has Full Package rights.`,
+        description: `${school.name} is now on ${getPackageLabel(packageType)}.`,
       })
       loadSchools()
     } catch (error) {
@@ -370,7 +368,9 @@ export default function SchoolsManagementPage() {
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="full">Full Package</SelectItem>
-                              <SelectItem value="finance_only">Finance Only</SelectItem>
+                              <SelectItem value="finance_only">Finance Module</SelectItem>
+                              <SelectItem value="grading_only">Academics &amp; Grading Module</SelectItem>
+                              <SelectItem value="finance_grading">Finance + Academics Modules</SelectItem>
                             </SelectContent>
                           </Select>
                         </TableCell>

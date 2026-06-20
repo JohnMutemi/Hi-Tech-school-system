@@ -63,6 +63,13 @@ model School {
   studentGradeResults          StudentGradeResult[]
   websiteSections              SchoolWebsiteSection[]
   paymentCorrections           PaymentCorrection[]
+  gradingModScales             GradingModScale[]
+  gradingModSubjects           GradingModSubject[]
+  gradingModClasses            GradingModClass[]
+  gradingModAcademicYears      GradingModAcademicYear[]
+  gradingModAssessmentTypes    GradingModAssessmentType[]
+  gradingModAssessments        GradingModAssessment[]
+  gradingModReportCards        GradingModReportCard[]
 }
 
 model SchoolWebsiteSection {
@@ -123,6 +130,12 @@ model User {
   acceptedTerms             SchoolTermsAcceptance[] @relation("TermsAcceptedBy")
   createdAssessments           Assessment[]            @relation("AssessmentCreator")
   gradedResults                StudentGradeResult[]    @relation("ResultGradedBy")
+  gradingModScalesCreated      GradingModScale[]       @relation("GradingModScaleCreator")
+  gradingModAssessmentsCreated GradingModAssessment[]  @relation("GradingModAssessmentCreator")
+  gradingModScoresEntered      GradingModScore[]       @relation("GradingModScoreEnteredBy")
+  gradingModCompetencyRatings  GradingModCompetencyRating[] @relation("GradingModCompetencyRatedBy")
+  gradingModReportComments     GradingModReportComment[] @relation("GradingModReportCommentAuthor")
+  gradingModReportsPublished   GradingModReportCard[]  @relation("GradingModReportPublisher")
 }
 
 model TeacherProfile {
@@ -160,6 +173,7 @@ model Class {
   students  Student[]
   assessments Assessment[]
   studentGradeResults StudentGradeResult[]
+  gradingModClasses GradingModClass[]
 
   @@unique([schoolId, name])
 }
@@ -216,6 +230,11 @@ model Student {
   yearlyBalances           StudentYearlyBalance[]
   scores                   StudentScore[]
   gradeResults             StudentGradeResult[]
+  gradingModScores         GradingModScore[]
+  gradingModCompetencyRatings GradingModCompetencyRating[]
+  gradingModSubjectResults GradingModSubjectResult[]
+  gradingModOverallResults GradingModOverallResult[]
+  gradingModReportCards    GradingModReportCard[]
 }
 
 model Payment {
@@ -855,4 +874,303 @@ model SchoolTermsAcceptance {
 
   @@unique([schoolId, termsId])
   @@index([schoolId, acceptedAt])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Grading Module (independent — prefixed GradingMod*, tables grading_mod_*)
+// Parallel to legacy MVP grading (GradingCriteria / Assessment / StudentScore).
+// ─────────────────────────────────────────────────────────────────────────────
+
+model GradingModScale {
+  id            String   @id @default(uuid())
+  schoolId      String?
+  name          String
+  curriculum    String
+  level         String
+  isDefault     Boolean  @default(false)
+  isSystemPreset Boolean @default(false)
+  presetKey     String?
+  createdBy     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  school        School?  @relation(fields: [schoolId], references: [id])
+  createdByUser User?    @relation("GradingModScaleCreator", fields: [createdBy], references: [id])
+  bands         GradingModBand[]
+  classes       GradingModClass[]
+
+  @@index([schoolId, isDefault])
+  @@index([isSystemPreset, presetKey])
+  @@map("grading_mod_scales")
+}
+
+model GradingModBand {
+  id          String  @id @default(uuid())
+  scaleId     String
+  code        String
+  label       String
+  description String?
+  minScore    Float
+  maxScore    Float
+  points      Float?
+  colorHex    String?
+  sortOrder   Int
+
+  scale              GradingModScale @relation(fields: [scaleId], references: [id], onDelete: Cascade)
+  scores             GradingModScore[]
+  competencyRatings  GradingModCompetencyRating[]
+  subjectResults     GradingModSubjectResult[]
+  overallMeanResults GradingModOverallResult[] @relation("OverallMeanBand")
+
+  @@unique([scaleId, code])
+  @@map("grading_mod_bands")
+}
+
+model GradingModAcademicYear {
+  id        String   @id @default(uuid())
+  schoolId  String
+  name      String
+  startDate DateTime
+  endDate   DateTime
+  isActive  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  school  School         @relation(fields: [schoolId], references: [id])
+  terms   GradingModTerm[]
+  classes GradingModClass[]
+
+  @@unique([schoolId, name])
+  @@map("grading_mod_academic_years")
+}
+
+model GradingModTerm {
+  id             String   @id @default(uuid())
+  academicYearId String
+  name           String
+  startDate      DateTime
+  endDate        DateTime
+  weight         Float    @default(0.333)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  academicYear     GradingModAcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  assessments      GradingModAssessment[]
+  subjectResults   GradingModSubjectResult[]
+  overallResults   GradingModOverallResult[]
+  competencyRatings GradingModCompetencyRating[]
+  reportCards      GradingModReportCard[]
+
+  @@unique([academicYearId, name])
+  @@map("grading_mod_terms")
+}
+
+model GradingModSubject {
+  id        String   @id @default(uuid())
+  schoolId  String
+  name      String
+  code      String
+  level     String
+  isCore    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  school      School               @relation(fields: [schoolId], references: [id])
+  assessments GradingModAssessment[]
+  subjectResults GradingModSubjectResult[]
+  competencyRatings GradingModCompetencyRating[]
+
+  @@unique([schoolId, code])
+  @@map("grading_mod_subjects")
+}
+
+model GradingModClass {
+  id             String   @id @default(uuid())
+  schoolId       String
+  name           String
+  gradeLevel     String
+  academicYearId String?
+  gradingScaleId String?
+  /// Optional link to legacy Class for student roster during independent-module testing.
+  legacyClassId  String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  school       School                  @relation(fields: [schoolId], references: [id])
+  academicYear GradingModAcademicYear? @relation(fields: [academicYearId], references: [id])
+  gradingScale GradingModScale?        @relation(fields: [gradingScaleId], references: [id])
+  legacyClass  Class?                  @relation(fields: [legacyClassId], references: [id])
+  assessments  GradingModAssessment[]
+  overallResults GradingModOverallResult[]
+
+  @@unique([schoolId, name])
+  @@map("grading_mod_classes")
+}
+
+model GradingModAssessmentType {
+  id          String   @id @default(uuid())
+  schoolId    String
+  name        String
+  weight      Float
+  isFormative Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  school      School               @relation(fields: [schoolId], references: [id])
+  assessments GradingModAssessment[]
+
+  @@unique([schoolId, name])
+  @@map("grading_mod_assessment_types")
+}
+
+model GradingModAssessment {
+  id               String    @id @default(uuid())
+  schoolId         String
+  classId          String
+  subjectId        String
+  termId           String
+  assessmentTypeId String
+  name             String
+  maxScore         Float     @default(100)
+  dateAdministered DateTime?
+  createdBy        String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  school         School                 @relation(fields: [schoolId], references: [id])
+  class          GradingModClass        @relation(fields: [classId], references: [id])
+  subject        GradingModSubject      @relation(fields: [subjectId], references: [id])
+  term           GradingModTerm         @relation(fields: [termId], references: [id])
+  assessmentType GradingModAssessmentType @relation(fields: [assessmentTypeId], references: [id])
+  createdByUser  User?                  @relation("GradingModAssessmentCreator", fields: [createdBy], references: [id])
+  scores         GradingModScore[]
+
+  @@index([schoolId, classId, subjectId, termId])
+  @@map("grading_mod_assessments")
+}
+
+model GradingModScore {
+  id           String   @id @default(uuid())
+  assessmentId String
+  studentId    String
+  rawScore     Float?
+  percentage   Float?
+  bandId       String?
+  remarks      String?
+  enteredBy    String?
+  enteredAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  assessment  GradingModAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  student     Student              @relation(fields: [studentId], references: [id])
+  band        GradingModBand?      @relation(fields: [bandId], references: [id])
+  enteredByUser User?              @relation("GradingModScoreEnteredBy", fields: [enteredBy], references: [id])
+
+  @@unique([assessmentId, studentId])
+  @@index([studentId])
+  @@map("grading_mod_scores")
+}
+
+model GradingModCompetencyRating {
+  id              String   @id @default(uuid())
+  studentId       String
+  subjectId       String
+  termId          String
+  competencyName  String
+  bandId          String
+  teacherComment  String?
+  ratedBy         String?
+  ratedAt         DateTime @default(now())
+
+  student   Student         @relation(fields: [studentId], references: [id])
+  subject   GradingModSubject @relation(fields: [subjectId], references: [id])
+  term      GradingModTerm  @relation(fields: [termId], references: [id])
+  band      GradingModBand  @relation(fields: [bandId], references: [id])
+  ratedByUser User?         @relation("GradingModCompetencyRatedBy", fields: [ratedBy], references: [id])
+
+  @@index([studentId, subjectId, termId])
+  @@map("grading_mod_competency_ratings")
+}
+
+model GradingModSubjectResult {
+  id            String   @id @default(uuid())
+  studentId     String
+  subjectId     String
+  termId        String
+  weightedScore Float?
+  bandId        String?
+  points        Float?
+  isPublished   Boolean  @default(false)
+  computedAt    DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  student Student         @relation(fields: [studentId], references: [id])
+  subject GradingModSubject @relation(fields: [subjectId], references: [id])
+  term    GradingModTerm  @relation(fields: [termId], references: [id])
+  band    GradingModBand? @relation(fields: [bandId], references: [id])
+
+  @@unique([studentId, subjectId, termId])
+  @@map("grading_mod_subject_results")
+}
+
+model GradingModOverallResult {
+  id             String   @id @default(uuid())
+  studentId      String
+  termId         String
+  classId        String
+  meanPoints     Float?
+  meanBandId     String?
+  totalPoints    Float?
+  subjectsSat    Int?
+  classPosition  Int?
+  streamPosition Int?
+  gradePosition  Int?
+  classSize      Int?
+  isPublished    Boolean  @default(false)
+  computedAt     DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  student  Student         @relation(fields: [studentId], references: [id])
+  term     GradingModTerm  @relation(fields: [termId], references: [id])
+  class    GradingModClass @relation(fields: [classId], references: [id])
+  meanBand GradingModBand? @relation("OverallMeanBand", fields: [meanBandId], references: [id])
+
+  @@unique([studentId, termId])
+  @@index([classId, termId])
+  @@map("grading_mod_overall_results")
+}
+
+model GradingModReportCard {
+  id          String    @id @default(uuid())
+  schoolId    String
+  studentId   String
+  termId      String
+  template    String    @default("default")
+  generatedAt DateTime  @default(now())
+  pdfUrl      String?
+  publishedAt DateTime?
+  publishedBy String?
+
+  school      School                  @relation(fields: [schoolId], references: [id])
+  student     Student                 @relation(fields: [studentId], references: [id])
+  term        GradingModTerm          @relation(fields: [termId], references: [id])
+  publishedByUser User?               @relation("GradingModReportPublisher", fields: [publishedBy], references: [id])
+  comments    GradingModReportComment[]
+
+  @@index([studentId, termId])
+  @@map("grading_mod_report_cards")
+}
+
+model GradingModReportComment {
+  id           String   @id @default(uuid())
+  reportCardId String
+  authorId     String?
+  role         String
+  comment      String
+  createdAt    DateTime @default(now())
+
+  reportCard GradingModReportCard @relation(fields: [reportCardId], references: [id], onDelete: Cascade)
+  author     User?                @relation("GradingModReportCommentAuthor", fields: [authorId], references: [id])
+
+  @@map("grading_mod_report_comments")
 }

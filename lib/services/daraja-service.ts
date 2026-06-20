@@ -60,7 +60,9 @@ class DarajaService {
     this.baseURL = this.config.environment === 'sandbox' 
       ? 'https://sandbox.safaricom.co.ke' 
       : 'https://api.safaricom.co.ke'
+  }
 
+  private assertConfigured(): void {
     if (!this.config.consumerKey || !this.config.consumerSecret) {
       throw new Error('Daraja API credentials not configured. Please check DARAJA_CONSUMER_KEY and DARAJA_CONSUMER_SECRET environment variables.')
     }
@@ -70,6 +72,7 @@ class DarajaService {
    * Get OAuth access token for Daraja API
    */
   private async getAccessToken(): Promise<string> {
+    this.assertConfigured()
     try {
       const auth = Buffer.from(`${this.config.consumerKey}:${this.config.consumerSecret}`).toString('base64')
       

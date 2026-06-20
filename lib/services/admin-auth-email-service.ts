@@ -59,3 +59,10 @@ export async function sendFinanceResetEmail(to: string, schoolName: string, rese
   const text = `You requested to reset your finance account password.\nReset password: ${resetLink}\nThis link expires in 30 minutes.`
   return sendEmail(to, subject, html, text)
 }
+
+export async function sendGradingResetEmail(to: string, schoolName: string, resetLink: string) {
+  const subject = `${schoolName}: Reset your grading password`
+  const html = `<p>You requested to reset your grading account password.</p><p><a href="${resetLink}">Reset password</a></p><p>This link expires in 30 minutes.</p>`
+  const text = `You requested to reset your grading account password.\nReset password: ${resetLink}\nThis link expires in 30 minutes.`
+  return sendEmail(to, subject, html, text)
+}

@@ -1,7 +1,12 @@
 import { SchoolPortal } from "@/components/school-portal/school-portal"
 import { prisma } from "@/lib/prisma"
 import { redirect } from "next/navigation"
-import { normalizePackageType, staffPortalLoginPath } from "@/lib/finance-package-gate"
+import { isDualModulePackage, normalizePackageType } from "@/lib/school-package"
+import {
+  academicsPortalLoginPath,
+  financePortalLoginPath,
+  modulePortalPickerPath,
+} from "@/lib/staff-portal-path"
 
 interface SchoolPortalPageProps {
   params: {
@@ -50,9 +55,15 @@ export default async function SchoolPortalPage({ params, searchParams }: SchoolP
     })
 
     const packageType = normalizePackageType(school?.packageType)
+    const qs = toSearchString(searchParams)
     if (packageType === "finance_only") {
-      const qs = toSearchString(searchParams)
-      redirect(`${staffPortalLoginPath(params.schoolCode!, school?.packageType)}${qs}`)
+      redirect(`${financePortalLoginPath(params.schoolCode!)}${qs}`)
+    }
+    if (packageType === "grading_only") {
+      redirect(`${academicsPortalLoginPath(params.schoolCode!)}${qs}`)
+    }
+    if (isDualModulePackage(packageType)) {
+      redirect(`${modulePortalPickerPath(params.schoolCode!)}${qs}`)
     }
   } catch (error) {
     // Next.js redirect() throws a special error; never swallow it.

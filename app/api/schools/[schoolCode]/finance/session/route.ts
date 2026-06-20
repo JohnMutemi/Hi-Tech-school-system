@@ -53,8 +53,9 @@ export async function GET(
       select: { mustChangePassword: true },
     });
 
+    const pkg = normalizePackageType(gate.school.packageType);
     const requiresInitialPasswordChange =
-      normalizePackageType(gate.school.packageType) === 'finance_only' &&
+      (pkg === 'finance_only' || pkg === 'finance_grading') &&
       Boolean(dbUser?.mustChangePassword);
 
     return NextResponse.json({

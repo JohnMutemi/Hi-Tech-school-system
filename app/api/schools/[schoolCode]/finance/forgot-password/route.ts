@@ -3,6 +3,7 @@ import { PrismaClient } from "@prisma/client"
 import { generateResetToken, getResetExpiryDate } from "@/lib/admin-auth"
 import { sendFinanceResetEmail } from "@/lib/services/admin-auth-email-service"
 import { resolveFinanceGateForSchoolCode } from "@/lib/finance-package-gate"
+import { normalizePackageType } from "@/lib/school-package"
 
 const prisma = new PrismaClient()
 
@@ -30,10 +31,13 @@ export async function POST(
     })
     if (!school) return NextResponse.json({ error: "School not found." }, { status: 404 })
 
+    const pkg = normalizePackageType(gate.school.packageType)
+    const financeRoles = pkg === "finance_grading" ? ["bursar", "school_admin"] : ["bursar"]
+
     const bursar = await prisma.user.findFirst({
       where: {
         schoolId: school.id,
-        role: { equals: "bursar", mode: "insensitive" },
+        role: { in: financeRoles },
         email: { equals: normalizedEmail, mode: "insensitive" },
       },
     })

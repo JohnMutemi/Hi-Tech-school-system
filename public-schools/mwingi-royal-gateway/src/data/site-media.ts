@@ -9,7 +9,7 @@ import g08 from "@/assets/gallery/08-playground-fun.png";
 import g09 from "@/assets/gallery/09-swings-yard.png";
 import g10 from "@/assets/gallery/10-graduation-day.png";
 import g11 from "@/assets/gallery/11-climbing-play.png";
-import g12 from "@/assets/gallery/12-community-fun.png";
+// import g12 from "@/assets/gallery/12-community-fun.png";
 
 export type GalleryPhoto = {
   src: string;
@@ -29,7 +29,7 @@ const gallerySources = [
   g09,
   g10,
   g11,
-  g12,
+  // g12,
 ] as const;
 
 const featuredSpans: Record<number, string> = {
@@ -46,7 +46,7 @@ export const galleryPhotos: GalleryPhoto[] = gallerySources.map((src, i) => ({
 }));
 
 /** Hero / home marquee — lively campus and community shots */
-export const heroSlides = [g03, g12, g02, g07, g10, g04, g01];
+export const heroSlides = [g03, g02, g07, g10, g04, g01];
 
 /** About page and home strip */
 export const aboutBanner = g03;

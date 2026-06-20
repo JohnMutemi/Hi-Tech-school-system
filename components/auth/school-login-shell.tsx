@@ -14,7 +14,9 @@ interface SchoolLoginShellProps {
   adminLoginHref?: string;
   logoUrl?: string | null;
   colorTheme?: string | null;
-  contentVariant?: "general" | "finance";
+  contentVariant?: "general" | "finance" | "grading";
+  moduleBadge?: string;
+  sisterModuleLink?: { label: string; href: string };
 }
 
 interface HeroSlide {
@@ -104,6 +106,36 @@ const FINANCE_HERO_SLIDES: HeroSlide[] = [
   },
 ];
 
+const GRADING_HERO_SLIDES: HeroSlide[] = [
+  {
+    image:
+      "https://images.pexels.com/photos/8613089/pexels-photo-8613089.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    liner: "Academics & Assessment — CBC/CBE mark entry and report cards.",
+    quote: "Education is not the filling of a pail, but the lighting of a fire.",
+    author: "W.B. Yeats",
+    body: "Enter marks, compute bands, and generate report cards with CBC-aware grading scales.",
+    alt: "Students learning in classroom",
+  },
+  {
+    image:
+      "https://images.pexels.com/photos/8471838/pexels-photo-8471838.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    liner: "From EE to BE — descriptive bands that reflect true performance.",
+    quote: "The roots of education are bitter, but the fruit is sweet.",
+    author: "Aristotle",
+    body: "Track subject results, class positions, and term-over-term progress in one workspace.",
+    alt: "Students collaborating",
+  },
+  {
+    image:
+      "https://images.pexels.com/photos/8423093/pexels-photo-8423093.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    liner: "Report cards and rankings ready when you need them.",
+    quote: "Success is the sum of small efforts, repeated day in and day out.",
+    author: "Robert Collier",
+    body: "Export marksheets, publish report cards, and share results with confidence.",
+    alt: "Young learners in school activity",
+  },
+];
+
 export function SchoolLoginShell({
   schoolCode,
   heading,
@@ -113,11 +145,18 @@ export function SchoolLoginShell({
   logoUrl,
   colorTheme,
   contentVariant = "general",
+  moduleBadge,
+  sisterModuleLink,
 }: SchoolLoginShellProps) {
   const [activeSlide, setActiveSlide] = useState(0);
   const [direction, setDirection] = useState<1 | -1>(1);
   const theme = getSchoolThemeTokens(colorTheme);
-  const slides = contentVariant === "finance" ? FINANCE_HERO_SLIDES : GENERAL_HERO_SLIDES;
+  const slides =
+    contentVariant === "finance"
+      ? FINANCE_HERO_SLIDES
+      : contentVariant === "grading"
+        ? GRADING_HERO_SLIDES
+        : GENERAL_HERO_SLIDES;
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -232,6 +271,17 @@ export function SchoolLoginShell({
                 )}
                 <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">{heading}</h1>
               </div>
+              {moduleBadge ? (
+                <p
+                  className="mt-2 inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider"
+                  style={{
+                    backgroundColor: contentVariant === "finance" ? "#fef3c7" : "#e0e7ff",
+                    color: contentVariant === "finance" ? "#92400e" : "#3730a3",
+                  }}
+                >
+                  {moduleBadge}
+                </p>
+              ) : null}
               <p
                 className="mt-2 inline-flex rounded-md px-3 py-1.5 text-base font-semibold"
                 style={{ backgroundColor: theme.primaryLight, color: theme.primaryDark }}
@@ -251,6 +301,18 @@ export function SchoolLoginShell({
                   style={{ color: theme.primaryDark }}
                 >
                   Back to School Admin Login
+                </Link>
+              </div>
+            ) : null}
+            {sisterModuleLink ? (
+              <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+                <span className="text-slate-600">Need the other workspace? </span>
+                <Link
+                  href={sisterModuleLink.href}
+                  className="font-semibold hover:underline"
+                  style={{ color: theme.primaryDark }}
+                >
+                  {sisterModuleLink.label}
                 </Link>
               </div>
             ) : null}
