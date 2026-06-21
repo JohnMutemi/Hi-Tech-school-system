@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { SchoolLoginShell } from '@/components/auth/school-login-shell';
 import { ACADEMICS_PORTAL_LABEL, FINANCE_PORTAL_LABEL, isDualModulePackage, normalizePackageType } from '@/lib/school-package';
-import { academicsPortalLoginPath } from '@/lib/staff-portal-path';
+import { academicsPortalLoginPath, staffLoginHubPath } from '@/lib/staff-portal-path';
 
 export default function FinanceLoginPage() {
   const router = useRouter();
@@ -186,6 +186,8 @@ export default function FinanceLoginPage() {
       colorTheme={schoolTheme}
       contentVariant="finance"
       moduleBadge="Finance Module"
+      adminLoginHref={staffLoginHubPath(schoolCode)}
+      backLinkLabel="← All staff workspaces"
       sisterModuleLink={
         isDualModulePackage(packageType)
           ? {

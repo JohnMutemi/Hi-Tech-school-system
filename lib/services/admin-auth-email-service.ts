@@ -66,3 +66,46 @@ export async function sendGradingResetEmail(to: string, schoolName: string, rese
   const text = `You requested to reset your grading account password.\nReset password: ${resetLink}\nThis link expires in 30 minutes.`
   return sendEmail(to, subject, html, text)
 }
+
+export async function sendStaffPortalWelcomeEmail(params: {
+  to: string
+  schoolName: string
+  portalUrl: string
+  email: string
+  tempPassword: string
+  addedModules: string[]
+  packageLabel: string
+}) {
+  const { to, schoolName, portalUrl, email, tempPassword, addedModules, packageLabel } = params
+  const moduleList =
+    addedModules.length > 0 ? addedModules.join(", ") : "your updated subscription"
+  const subject = `${schoolName}: New Hi-Tech SMS workspace access`
+  const html = `
+    <p>Hello,</p>
+    <p>Your school subscription has been upgraded to <strong>${packageLabel}</strong>.</p>
+    <p>New workspace access: <strong>${moduleList}</strong>.</p>
+    <p>Use the credentials below to sign in to your staff portal hub and configure central access rights for your team.</p>
+    <ul>
+      <li><strong>Staff portal:</strong> <a href="${portalUrl}">${portalUrl}</a></li>
+      <li><strong>Email:</strong> ${email}</li>
+      <li><strong>Temporary password:</strong> ${tempPassword}</li>
+    </ul>
+    <p>Please log in and change your password immediately after first sign-in.</p>
+    <p>— Hi-Tech School Management</p>
+  `
+  const text = [
+    `Hello,`,
+    ``,
+    `Your school subscription has been upgraded to ${packageLabel}.`,
+    `New workspace access: ${moduleList}.`,
+    ``,
+    `Staff portal: ${portalUrl}`,
+    `Email: ${email}`,
+    `Temporary password: ${tempPassword}`,
+    ``,
+    `Please log in and change your password immediately after first sign-in.`,
+    ``,
+    `— Hi-Tech School Management`,
+  ].join("\n")
+  return sendEmail(to, subject, html, text)
+}

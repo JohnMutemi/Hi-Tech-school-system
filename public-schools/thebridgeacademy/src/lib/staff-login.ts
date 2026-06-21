@@ -1,6 +1,3 @@
-const FINANCE_LOGIN_PATH = "/schools/thebridgeacademy/finance/login";
-
-/** Platform host for staff/finance routes (Next.js), not the Vite marketing site port. */
 function resolvePlatformBase(): string {
   const explicit =
     (import.meta.env.VITE_PUBLIC_BASE_URL as string | undefined) ||
@@ -14,7 +11,16 @@ function resolvePlatformBase(): string {
   return "";
 }
 
-export function getStaffLoginUrl() {
+function resolveSchoolCode(): string {
+  const code =
+    (import.meta.env.VITE_SCHOOL_CODE as string | undefined) ||
+    (import.meta.env.VITE_PUBLIC_SCHOOL_CODE as string | undefined);
+  if (!code?.trim()) throw new Error("VITE_SCHOOL_CODE is not set.");
+  return code.trim().toLowerCase();
+}
+
+export function getStaffLoginUrl(): string {
   const base = resolvePlatformBase();
-  return `${base.replace(/\/$/, "")}${FINANCE_LOGIN_PATH}`;
+  const code = resolveSchoolCode();
+  return `${base}/schools/${code}/staff`;
 }

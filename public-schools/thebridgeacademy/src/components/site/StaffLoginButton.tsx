@@ -26,8 +26,6 @@ export function StaffLoginButton({
   onNavigate,
   className,
 }: StaffLoginButtonProps) {
-  const staffUrl = getStaffLoginUrl();
-
   const triggerClass =
     variant === "mobile"
       ? "min-h-12 px-4 rounded-lg text-foreground/80 active:bg-secondary font-medium inline-flex items-center gap-2 w-full"
@@ -41,7 +39,9 @@ export function StaffLoginButton({
 
   const handleProceed = () => {
     onNavigate?.();
-    window.location.href = staffUrl;
+    const url = getStaffLoginUrl();
+    console.log("[StaffLoginButton] navigating to:", url);
+    window.location.href = url;
   };
 
   return (
@@ -61,7 +61,7 @@ export function StaffLoginButton({
             Authorization required
           </AlertDialogTitle>
           <AlertDialogDescription className="text-base leading-relaxed text-muted-foreground">
-            You need authorization to access this page. The staff finance portal is restricted to
+            You need authorization to access this page. The staff portal is restricted to
             authorized school personnel only.
           </AlertDialogDescription>
         </AlertDialogHeader>

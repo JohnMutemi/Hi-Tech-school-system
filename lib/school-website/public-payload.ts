@@ -1,19 +1,12 @@
 import { prisma } from "@/lib/prisma";
-import { normalizePackageType } from "@/lib/finance-package-gate";
+import { normalizePackageType } from "@/lib/school-package";
 import { getPublicSiteUrl } from "@/lib/school-website/custom-domain";
 import { absolutePlatformPath } from "@/lib/school-website/platform-url";
+import { staffPortalLoginPath } from "@/lib/staff-portal-path";
 import { resolvePrimaryColor } from "@/lib/school-website/palettes";
 import { normalizeTemplateSlug } from "@/lib/school-website/templates";
 import type { PublicSchoolPayload, SectionContent, WebsiteSectionRecord } from "@/lib/school-website/types";
 import { SchoolWebsiteSeedingService } from "@/lib/services/school-website-seeding-service";
-
-function staffLoginUrl(code: string, packageType: string): string {
-  const path =
-    normalizePackageType(packageType) === "finance_only"
-      ? `/schools/${code}/finance/login`
-      : `/schools/${code}`;
-  return absolutePlatformPath(path);
-}
 
 export async function loadPublicSchoolPayload(
   schoolCode: string
@@ -69,7 +62,7 @@ export async function loadPublicSchoolPayload(
     websiteUrl: school.websiteUrl,
     customDomain: school.customDomain,
     publicSiteUrl: getPublicSiteUrl(code, school.customDomain),
-    staffLoginUrl: staffLoginUrl(code, packageType),
+    staffLoginUrl: absolutePlatformPath(staffPortalLoginPath(code, packageType)),
     sections,
   };
 }

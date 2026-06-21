@@ -3,17 +3,14 @@ import { type NextRequest, NextResponse } from "next/server";
 import { z } from 'zod';
 import { getSession } from "@/lib/session";
 import { requireSchoolAccess, ApiGuardError } from "@/lib/api-guard";
-import { normalizePackageType } from '@/lib/finance-package-gate';
+import { normalizePackageType, getPrimaryPortalRole } from '@/lib/school-package';
 import { getPaletteBySlug } from '@/lib/school-website/palettes';
 import { normalizeTemplateSlug } from '@/lib/school-website/templates';
 import { transformSchoolForApi } from '@/lib/school-website/transform-school-response';
 import { deleteSchoolAndAllRelatedData } from '@/lib/services/school-deletion-service';
+import { provisionPackageUpgrade } from '@/lib/services/package-upgrade-service';
 
 const prisma = new PrismaClient();
-
-function getPrimaryPortalRole(packageType: string | null | undefined): 'admin' | 'bursar' {
-  return normalizePackageType(packageType) === 'finance_only' ? 'bursar' : 'admin';
-}
 
 export async function GET(request: NextRequest, { params }: { params: { schoolCode: string } }) {
   const { searchParams } = new URL(request.url);
@@ -170,7 +167,7 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
       },
       include: {
         users: {
-          where: { role: { in: ['admin', 'bursar'] } }
+          where: { role: { in: ['admin', 'bursar', 'teacher', 'school_admin'] } }
         }
       }
     });
@@ -195,6 +192,8 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
       isSuperAdmin && packageType !== undefined
         ? normalizePackageType(packageType)
         : undefined;
+
+    const previousPackageType = normalizePackageType((school as any).packageType);
 
     const palette =
       body.colorPaletteSlug !== undefined
@@ -246,8 +245,13 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
       },
     });
 
-    const primaryRole = getPrimaryPortalRole((school as any).packageType);
-    const primaryUser = school.users.find((user) => user.role === primaryRole);
+    const primaryRole = getPrimaryPortalRole(normalizedPackageType ?? previousPackageType);
+    const primaryUser =
+      school.users.find((user) => user.role === primaryRole) ||
+      school.users.find((user) => user.role === 'school_admin') ||
+      school.users.find((user) => user.role === 'admin') ||
+      school.users.find((user) => user.role === 'bursar') ||
+      school.users.find((user) => user.role === 'teacher');
 
     // Update the primary portal user for this package (superadmin only).
     if (isSuperAdmin && adminEmail && primaryUser) {
@@ -260,6 +264,22 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
       });
     }
 
+    let packageUpgrade:
+      | Awaited<ReturnType<typeof provisionPackageUpgrade>>
+      | undefined;
+
+    if (
+      isSuperAdmin &&
+      normalizedPackageType !== undefined &&
+      normalizedPackageType !== previousPackageType
+    ) {
+      packageUpgrade = await provisionPackageUpgrade(
+        school.code,
+        previousPackageType,
+        normalizedPackageType
+      );
+    }
+
     // Return updated school
     const result = await prisma.school.findFirst({
       where: {
@@ -270,7 +290,7 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
       },
       include: {
         users: {
-          where: { role: { in: ['admin', 'bursar'] } },
+          where: { role: { in: ['admin', 'bursar', 'teacher', 'school_admin'] } },
           select: {
             id: true,
             name: true,
@@ -286,7 +306,10 @@ export async function PUT(request: NextRequest, { params }: { params: { schoolCo
       return NextResponse.json({ error: 'Failed to retrieve updated school' }, { status: 500 });
     }
 
-    return NextResponse.json(transformSchoolForApi(result as any, { description: description || "" }));
+    return NextResponse.json({
+      ...transformSchoolForApi(result as any, { description: description || "" }),
+      ...(packageUpgrade ? { packageUpgrade } : {}),
+    });
   } catch (error) {
     console.error("Error updating school:", error);
     return NextResponse.json({ error: "Failed to update school" }, { status: 500 });

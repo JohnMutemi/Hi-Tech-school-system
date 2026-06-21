@@ -7,27 +7,16 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { School, User, Eye, EyeOff } from "lucide-react";
 import type { SchoolData } from "@/lib/school-storage";
 import { getSchool } from "@/lib/school-storage";
-import PromotionsSection from "./PromotionsSection";
 import { SchoolSetupDashboard } from "./school-setup-dashboard";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Select } from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
 import { SchoolLoginShell } from "@/components/auth/school-login-shell";
-import { isDualModulePackage, normalizePackageType } from "@/lib/school-package";
-import {
-  academicsPortalLoginPath,
-  financePortalLoginPath,
-  modulePortalPickerPath,
-} from "@/lib/staff-portal-path";
 import {
   Dialog,
   DialogContent,
@@ -95,23 +84,6 @@ export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
 
     fetchSchool();
   }, [schoolCode]);
-
-  useEffect(() => {
-    if (!schoolData?.packageType || !schoolCode) return;
-    const pkg = normalizePackageType(schoolData.packageType);
-    const search = typeof window !== "undefined" ? window.location.search : "";
-    if (pkg === "finance_only") {
-      router.replace(`${financePortalLoginPath(schoolCode)}${search}`);
-      return;
-    }
-    if (pkg === "grading_only") {
-      router.replace(`${academicsPortalLoginPath(schoolCode)}${search}`);
-      return;
-    }
-    if (isDualModulePackage(pkg)) {
-      router.replace(`${modulePortalPickerPath(schoolCode)}${search}`);
-    }
-  }, [schoolData, schoolCode, router]);
 
   // Fetch students from API on component mount
   useEffect(() => {
@@ -185,8 +157,6 @@ export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
         router.push(`/schools/${schoolCode}/verify-otp`);
       } else if (res.ok && data.success) {
         setIsLoggedIn(true);
-        // No need to set localStorage, session is now cookie-based
-        // Optionally, fetch school data from API after login
         const schoolRes = await fetch(`/api/schools/${schoolCode}`);
         if (schoolRes.ok) {
           const school = await schoolRes.json();
@@ -383,30 +353,21 @@ export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
           <button
             type="button"
             className="text-blue-700 underline underline-offset-2 hover:text-blue-800"
-            onClick={() => {
-              setQuickError("");
-              setActiveQuickRole("parent");
-            }}
+            onClick={() => { setQuickError(""); setActiveQuickRole("parent"); }}
           >
             Parent Login
           </button>
           <button
             type="button"
             className="text-blue-700 underline underline-offset-2 hover:text-blue-800"
-            onClick={() => {
-              setQuickError("");
-              setActiveQuickRole("student");
-            }}
+            onClick={() => { setQuickError(""); setActiveQuickRole("student"); }}
           >
             Student Login
           </button>
           <button
             type="button"
             className="text-blue-700 underline underline-offset-2 hover:text-blue-800"
-            onClick={() => {
-              setQuickError("");
-              setActiveQuickRole("teacher");
-            }}
+            onClick={() => { setQuickError(""); setActiveQuickRole("teacher"); }}
           >
             Teacher Login
           </button>
@@ -416,6 +377,7 @@ export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
       <div className="mt-6 text-center text-sm text-gray-500">
         Powered by Hi-Tech SMS
       </div>
+
       <Dialog open={!!activeQuickRole} onOpenChange={(open) => !open && setActiveQuickRole(null)}>
         <DialogContent>
           <DialogHeader>
@@ -484,9 +446,7 @@ export function SchoolPortal({ schoolCode }: SchoolPortalProps) {
                 <Input
                   placeholder="Admission Number (optional if using email)"
                   value={quickStudent.admissionNumber}
-                  onChange={(e) =>
-                    setQuickStudent((prev) => ({ ...prev, admissionNumber: e.target.value }))
-                  }
+                  onChange={(e) => setQuickStudent((prev) => ({ ...prev, admissionNumber: e.target.value }))}
                 />
                 <Input
                   type="email"

@@ -12,6 +12,7 @@ interface SchoolLoginShellProps {
   subheading: string;
   children: ReactNode;
   adminLoginHref?: string;
+  backLinkLabel?: string;
   logoUrl?: string | null;
   colorTheme?: string | null;
   contentVariant?: "general" | "finance" | "grading";
@@ -142,6 +143,7 @@ export function SchoolLoginShell({
   subheading,
   children,
   adminLoginHref,
+  backLinkLabel = "Back to School Admin Login",
   logoUrl,
   colorTheme,
   contentVariant = "general",
@@ -300,7 +302,7 @@ export function SchoolLoginShell({
                   className="text-xs font-semibold uppercase tracking-wide hover:underline"
                   style={{ color: theme.primaryDark }}
                 >
-                  Back to School Admin Login
+                  {backLinkLabel}
                 </Link>
               </div>
             ) : null}

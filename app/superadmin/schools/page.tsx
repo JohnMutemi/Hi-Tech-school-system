@@ -12,7 +12,7 @@ import Link from "next/link"
 import { useUser } from "@/hooks/use-user"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
-import { getPackageLabel, normalizePackageType } from "@/lib/school-package"
+import { getPackageLabel, getSubscribedModuleChips, normalizePackageType, suggestPackageUpgrade } from "@/lib/school-package"
 import { staffPortalLoginPath } from "@/lib/staff-portal-path"
 
 export default function SchoolsManagementPage() {
@@ -143,6 +143,29 @@ export default function SchoolsManagementPage() {
     }
   }
 
+  const handleQuickModuleUpgrade = async (
+    school: any,
+    addModule: "finance" | "grading"
+  ) => {
+    const nextPackage = suggestPackageUpgrade(school.packageType, addModule)
+    if (nextPackage === normalizePackageType(school.packageType)) {
+      toast({
+        title: "Already subscribed",
+        description: `${school.name} already has this module.`,
+      })
+      return
+    }
+    const label = addModule === "finance" ? "Finance" : "Academics & Grading"
+    const confirmed = window.confirm(
+      `Add the ${label} module to "${school.name}"?\n\n` +
+        `Package will change from ${getPackageLabel(school.packageType)} to ${getPackageLabel(nextPackage)}. ` +
+        `Staff will see a new workspace card on the staff login hub.\n\n` +
+        `A first-time sign-in email with a temporary password will be sent to the school's registered email.`
+    )
+    if (!confirmed) return
+    await handlePackageTypeChange(school, nextPackage)
+  }
+
   const handlePackageTypeChange = async (school: any, packageType: string) => {
     try {
       setUpdatingPackageFor(school.id)
@@ -153,10 +176,26 @@ export default function SchoolsManagementPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Failed to update package rights")
-      toast({
-        title: "Package rights updated",
-        description: `${school.name} is now on ${getPackageLabel(packageType)}.`,
-      })
+
+      const upgrade = data.packageUpgrade
+      const addedModules = Array.isArray(upgrade?.addedModules) ? upgrade.addedModules : []
+      const moduleNote =
+        addedModules.length > 0
+          ? ` New modules: ${addedModules.join(", ")}.`
+          : ""
+
+      if (upgrade?.upgraded) {
+        toast({
+          title: upgrade.emailSent ? "Package upgraded — email sent" : "Package upgraded — email failed",
+          description: `${school.name} is now on ${getPackageLabel(packageType)}.${moduleNote} ${upgrade.message}`,
+          variant: upgrade.emailSent ? "default" : "destructive",
+        })
+      } else {
+        toast({
+          title: "Package rights updated",
+          description: `${school.name} is now on ${getPackageLabel(packageType)}.`,
+        })
+      }
       loadSchools()
     } catch (error) {
       toast({
@@ -288,7 +327,7 @@ export default function SchoolsManagementPage() {
                       <TableHead>Students</TableHead>
                       <TableHead>Teachers</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Package</TableHead>
+                      <TableHead>Modules &amp; Upgrade</TableHead>
                       <TableHead>Created</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
@@ -358,21 +397,60 @@ export default function SchoolsManagementPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Select
-                            value={(school.packageType || "full").toLowerCase()}
-                            onValueChange={(value) => handlePackageTypeChange(school, value)}
-                            disabled={updatingPackageFor === school.id}
-                          >
-                            <SelectTrigger className="w-[170px]">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="full">Full Package</SelectItem>
-                              <SelectItem value="finance_only">Finance Module</SelectItem>
-                              <SelectItem value="grading_only">Academics &amp; Grading Module</SelectItem>
-                              <SelectItem value="finance_grading">Finance + Academics Modules</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <div className="space-y-2">
+                            <Select
+                              value={(school.packageType || "full").toLowerCase()}
+                              onValueChange={(value) => handlePackageTypeChange(school, value)}
+                              disabled={updatingPackageFor === school.id}
+                            >
+                              <SelectTrigger className="w-[190px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="full">Full Package</SelectItem>
+                                <SelectItem value="finance_only">Finance Module</SelectItem>
+                                <SelectItem value="grading_only">Academics &amp; Grading Module</SelectItem>
+                                <SelectItem value="finance_grading">Finance + Academics Modules</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <div className="flex flex-wrap gap-1">
+                              {getSubscribedModuleChips(school.packageType).map((chip) => (
+                                <Badge
+                                  key={chip}
+                                  variant="outline"
+                                  className="border-amber-200 bg-amber-50 text-[10px] text-amber-900"
+                                >
+                                  {chip}
+                                </Badge>
+                              ))}
+                            </div>
+                            {normalizePackageType(school.packageType) !== "full" ? (
+                              <div className="flex flex-wrap gap-1">
+                                {!getSubscribedModuleChips(school.packageType).includes("Finance") ? (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 border-emerald-200 px-2 text-[10px] text-emerald-800 hover:bg-emerald-50"
+                                    disabled={updatingPackageFor === school.id}
+                                    onClick={() => handleQuickModuleUpgrade(school, "finance")}
+                                  >
+                                    + Finance
+                                  </Button>
+                                ) : null}
+                                {!getSubscribedModuleChips(school.packageType).includes("Academics") ? (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 border-blue-200 px-2 text-[10px] text-blue-800 hover:bg-blue-50"
+                                    disabled={updatingPackageFor === school.id}
+                                    onClick={() => handleQuickModuleUpgrade(school, "grading")}
+                                  >
+                                    + Academics
+                                  </Button>
+                                ) : null}
+                              </div>
+                            ) : null}
+                          </div>
                         </TableCell>
                         <TableCell>{new Date(school.createdAt).toLocaleDateString()}</TableCell>
                         <TableCell>

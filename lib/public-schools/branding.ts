@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
-import { normalizePackageType } from "@/lib/finance-package-gate";
+import { normalizePackageType } from "@/lib/school-package";
 import { absolutePlatformPath } from "@/lib/school-website/platform-url";
+import { staffPortalLoginPath } from "@/lib/staff-portal-path";
 import { resolvePrimaryColor } from "@/lib/school-website/palettes";
 
 export type FolderSiteBranding = {
@@ -13,9 +14,7 @@ export type FolderSiteBranding = {
 };
 
 function staffLoginPath(code: string, packageType: string): string {
-  return normalizePackageType(packageType) === "finance_only"
-    ? `/schools/${code}/finance/login`
-    : `/schools/${code}`;
+  return staffPortalLoginPath(code, packageType);
 }
 
 export async function loadFolderSiteBranding(

@@ -10,8 +10,10 @@ const nextConfig = {
     unoptimized: true,
   },
   webpack: (config) => {
-    // Avoid WasmHash crashes on Node.js 22+ (uses sha256 instead of wasm-based md4)
-    config.output.hashFunction = 'sha256'
+    // Node.js 22+ / OpenSSL 3: webpack's default md4 hash can pass undefined and crash builds.
+    if (config.output) {
+      config.output.hashFunction = 'sha256'
+    }
     return config
   },
 }

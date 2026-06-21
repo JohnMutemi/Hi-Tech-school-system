@@ -4,7 +4,6 @@ import {
   hasFinanceModule,
   hasFullAdminPortal,
   hasGradingModule,
-  isDualModulePackage,
   normalizePackageType,
 } from '@/lib/school-package';
 
@@ -23,8 +22,14 @@ function schoolBasePath(schoolCode: string): string {
   return code ? `/schools/${code}` : '/schools';
 }
 
+/** Canonical staff login hub — all public "Staff login" links land here. */
+export function staffLoginHubPath(schoolCode: string): string {
+  return `${schoolBasePath(schoolCode)}/staff`;
+}
+
+/** @deprecated Use staffLoginHubPath — kept for backward-compatible redirects. */
 export function modulePortalPickerPath(schoolCode: string): string {
-  return `${schoolBasePath(schoolCode)}/modules`;
+  return staffLoginHubPath(schoolCode);
 }
 
 export function financePortalLoginPath(schoolCode: string): string {
@@ -48,18 +53,17 @@ export function staffPortalLinks(
     links.push({
       id: 'admin',
       label: 'School Admin Portal',
-      shortLabel: 'Full Package',
-      description: 'Complete school management — students, staff, academics, and finance.',
+      shortLabel: 'Administration',
+      description: 'Full system access — students, staff, finance, academics, and settings.',
       path: base,
     });
-    return links;
   }
 
   if (hasFinanceModule(pkg)) {
     links.push({
       id: 'finance',
       label: FINANCE_PORTAL_LABEL,
-      shortLabel: 'Finance Module',
+      shortLabel: 'Finance / Bursar',
       description: 'Fee collection, receipts, balances, and bursary operations.',
       path: financePortalLoginPath(schoolCode),
     });
@@ -69,7 +73,7 @@ export function staffPortalLinks(
     links.push({
       id: 'academics',
       label: ACADEMICS_PORTAL_LABEL,
-      shortLabel: 'Academics Module',
+      shortLabel: 'Academics Officer',
       description: 'CBC mark entry, report cards, class rankings, and grading scales.',
       path: academicsPortalLoginPath(schoolCode),
     });
@@ -78,12 +82,7 @@ export function staffPortalLinks(
   return links;
 }
 
-/** Primary URL shared after school creation (single link or module picker). */
-export function staffPortalLoginPath(schoolCode: string, packageType?: string | null): string {
-  const pkg = normalizePackageType(packageType);
-  if (isDualModulePackage(pkg)) {
-    return modulePortalPickerPath(schoolCode);
-  }
-  const links = staffPortalLinks(schoolCode, packageType);
-  return links[0]?.path ?? schoolBasePath(schoolCode);
+/** Primary URL shared after school creation and on public "Staff login" buttons. */
+export function staffPortalLoginPath(_schoolCode: string, _packageType?: string | null): string {
+  return staffLoginHubPath(_schoolCode);
 }

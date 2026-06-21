@@ -8,6 +8,7 @@
     "dev:waita": "pnpm --dir public-schools/waita-academy-showcase dev",
     "dev:mwingi": "pnpm --dir public-schools/mwingi-royal-gateway dev",
     "install:showcases": "pnpm --dir public-schools/waita-academy-showcase install --ignore-workspace && pnpm --dir public-schools/mwingi-royal-gateway install --ignore-workspace",
+    "prebuild": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\"",
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
