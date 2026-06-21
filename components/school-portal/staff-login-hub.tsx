@@ -8,7 +8,7 @@ import {
   GraduationCap,
   LayoutDashboard,
   Lock,
-  ShieldCheck,
+  Rocket,
   Sparkles,
   Wallet,
 } from 'lucide-react';
@@ -38,34 +38,37 @@ const MODULE_META: Record<
     icon: typeof Wallet;
     accent: string;
     accentSoft: string;
-    gradient: string;
   }
 > = {
   admin: {
     icon: LayoutDashboard,
     accent: '#6366f1',
-    accentSoft: 'rgba(99, 102, 241, 0.12)',
-    gradient: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+    accentSoft: 'rgba(99,102,241,0.12)',
   },
   finance: {
     icon: Wallet,
     accent: '#059669',
-    accentSoft: 'rgba(5, 150, 105, 0.12)',
-    gradient: 'linear-gradient(135deg, #059669 0%, #0d9488 100%)',
+    accentSoft: 'rgba(5,150,105,0.12)',
   },
   academics: {
     icon: BookOpenCheck,
     accent: '#2563eb',
-    accentSoft: 'rgba(37, 99, 235, 0.12)',
-    gradient: 'linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)',
+    accentSoft: 'rgba(37,99,235,0.12)',
   },
   modules: {
     icon: GraduationCap,
     accent: '#64748b',
-    accentSoft: 'rgba(100, 116, 139, 0.12)',
-    gradient: 'linear-gradient(135deg, #64748b 0%, #475569 100%)',
+    accentSoft: 'rgba(100,116,139,0.12)',
   },
 };
+
+// Fixed app-level palette for everything OUTSIDE the card (page wash, frame
+// mat, background icons). Deliberately not derived from the school's own
+// colour — schools can pick any brand colour for their hero panel, and this
+// neutral-but-deliberate slate/indigo backdrop is chosen to sit well behind
+// all of them rather than risk clashing with any one of them.
+const OUTER_WASH = '#f8fafc'; // slate-50
+const OUTER_FRAME = 'rgba(99, 102, 241, 0.07)'; // indigo-500 @ 7%, soft mat around the card
 
 const HERO_QUOTES = [
   {
@@ -82,6 +85,15 @@ const HERO_QUOTES = [
   },
 ];
 
+// ─────────────────────────────────────────────
+// Outer background image
+// ─────────────────────────────────────────────
+// Single, centered, non-repeating background graphic behind the card.
+// Points at a hosted image asset (Cloudinary).
+const STAFF_BG_IMAGE_URL =
+  'https://res.cloudinary.com/dvmhicvnw/image/upload/v1782031711/staff_logo_nwayuy.png';
+const STAFF_BG_PATTERN_URL = `url('${STAFF_BG_IMAGE_URL}')`;
+
 export function StaffLoginHub({
   schoolCode,
   packageType,
@@ -93,178 +105,181 @@ export function StaffLoginHub({
   const links = staffPortalLinks(schoolCode, packageType);
   const packageLabel = getPackageLabel(packageType);
   const showAcademicsUpgrade = isStandaloneFinancePackage(packageType);
-  const cardCount = links.length + (showAcademicsUpgrade ? 1 : 0);
   const heroQuote = HERO_QUOTES[Math.abs(schoolCode.length) % HERO_QUOTES.length];
 
+  // Derive a deep hero background from the school's primary colour.
+  // We darken it heavily so the hero always reads as a rich dark panel,
+  // while still carrying the school's hue. The hero stays school-specific —
+  // only the area *outside* the card switches to the fixed palette below.
+  const heroBg = hexToRgba(theme.primaryDeeper, 1);
+  const heroGeoA = hexToRgba(theme.primary, 0.18);
+  const heroGeoB = hexToRgba(theme.primaryDark, 0.18);
+
   return (
-    <div className="min-h-screen bg-slate-100 p-4 md:p-6">
-      <div className="mx-auto flex min-h-[85vh] w-full max-w-6xl overflow-hidden rounded-3xl bg-white shadow-2xl">
-        {/* Branded hero panel — mirrors individual module login shells */}
-        <aside
-          className="relative hidden w-1/2 lg:flex lg:flex-col lg:justify-between"
-          style={{
-            background: `linear-gradient(to bottom right, ${theme.primaryDeeper}, ${theme.primaryDark}, ${theme.primary})`,
-          }}
-        >
-          <div className="absolute inset-0 opacity-20">
-            <div
-              className="h-full w-full"
-              style={{
-                background: `radial-gradient(circle at 20% 20%, ${hexToRgba('#ffffff', 0.15)} 0%, transparent 45%),
-                  radial-gradient(circle at 80% 80%, ${hexToRgba(theme.primaryLight, 0.2)} 0%, transparent 50%)`,
-              }}
-            />
-          </div>
+    // Full-screen layout — fixed Slate & Indigo backdrop, independent of school colour.
+    <div
+      className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-4 py-10 sm:px-6"
+      style={{ backgroundColor: OUTER_WASH }}
+    >
+      {/* ── Background image layer: inset from the viewport edges with its own
+          rounded corners, so the image reads as a framed graphic rather than
+          a full-bleed page background. ── */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-6 z-0 rounded-[40px] sm:inset-10"
+        style={{
+          backgroundImage: STAFF_BG_PATTERN_URL,
+          backgroundRepeat: 'no-repeat',
+          backgroundPosition: 'center',
+          backgroundSize: 'contain',
+        }}
+      />
 
-          <div className="relative flex flex-1 flex-col justify-between p-10 text-white">
-            <div className="space-y-6">
-              <div className="inline-flex items-center gap-3 rounded-full border border-white/30 bg-white/10 px-4 py-2 backdrop-blur-sm">
-                <ShieldCheck className="h-5 w-5" />
-                <span className="text-sm font-semibold tracking-wide">
-                  Hi-Tech School Management
-                </span>
-              </div>
+      {/* ── Framed wrapper: fixed indigo mat around the card, not across the page ── */}
+      <div
+        className="relative z-10 w-full max-w-[640px] rounded-[32px] p-4 sm:p-5"
+        style={{ backgroundColor: OUTER_FRAME }}
+      >
+        <div className="overflow-hidden rounded-[24px] border border-black/[0.07] bg-white shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)]">
 
-              <div className="flex items-center gap-4">
-                {logoUrl ? (
-                  <img
-                    src={logoUrl}
-                    alt={`${schoolName ?? 'School'} logo`}
-                    className="h-14 w-14 rounded-xl border border-white/25 bg-white/10 object-cover shadow-lg"
-                  />
-                ) : (
-                  <div
-                    className="flex h-14 w-14 items-center justify-center rounded-xl border border-white/25 bg-white/10 shadow-lg"
-                    style={{ color: theme.primaryLight }}
-                  >
-                    <GraduationCap className="h-7 w-7" />
-                  </div>
-                )}
-                <div>
-                  <h2 className="text-3xl font-bold leading-tight">
-                    {schoolName ?? 'Staff Portal'}
-                  </h2>
-                  <p className="mt-1 font-mono text-sm text-white/70">
-                    {schoolCode.toUpperCase()}
-                  </p>
-                </div>
-              </div>
+          {/* ── Hero header ── */}
+          <HeroHeader
+            schoolName={schoolName}
+            schoolCode={schoolCode}
+            packageLabel={packageLabel}
+            logoUrl={logoUrl}
+            heroBg={heroBg}
+            geoA={heroGeoA}
+            geoB={heroGeoB}
+            themePrimary={theme.primary}
+          />
 
-              <div>
-                <h3 className="max-w-md text-2xl font-semibold leading-snug">
-                  Your secure gateway to every workspace your school subscribes to.
-                </h3>
-                <p className="mt-3 max-w-md text-sm leading-relaxed text-white/80">
-                  Choose the module that matches your role today — finance, academics, or full
-                  administration — each with its own dedicated login.
-                </p>
-              </div>
-            </div>
-
-            <div className="max-w-sm rounded-2xl border border-white/20 bg-black/20 p-5 backdrop-blur-sm">
-              <p className="text-sm text-white/90">&quot;{heroQuote.quote}&quot;</p>
-              <p className="mt-3 text-xs font-medium text-white/70">— {heroQuote.author}</p>
-            </div>
-          </div>
-        </aside>
-
-        {/* Module picker */}
-        <main
-          className="flex w-full flex-col justify-center p-4 sm:p-8 lg:w-1/2"
-          style={{
-            background: `linear-gradient(to bottom right, ${theme.primarySoft}, #f8fafc, ${hexToRgba(theme.primary, 0.12)})`,
-          }}
-        >
-          <div className="mx-auto w-full max-w-lg">
-            {/* Mobile-only header */}
-            <header className="mb-6 text-center lg:hidden">
-              <div className="mb-4 flex flex-col items-center gap-3">
-                {logoUrl ? (
-                  <img
-                    src={logoUrl}
-                    alt={`${schoolName ?? 'School'} logo`}
-                    className="h-14 w-14 rounded-xl border border-slate-200 bg-white object-cover shadow-md"
-                  />
-                ) : (
-                  <div
-                    className="flex h-14 w-14 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-md"
-                    style={{ color: theme.primary }}
-                  >
-                    <GraduationCap className="h-7 w-7" />
-                  </div>
-                )}
-                <div>
-                  <h1 className="text-2xl font-bold text-slate-900">
-                    {schoolName ?? 'Staff Portal'}
-                  </h1>
-                  <p className="font-mono text-xs text-slate-500">{schoolCode.toUpperCase()}</p>
-                </div>
-              </div>
-            </header>
-
-            <div
-              className="relative overflow-hidden rounded-2xl border border-slate-200/90 bg-white/95 p-5 shadow-[0_20px_50px_rgba(15,23,42,0.12)] backdrop-blur-sm sm:p-6"
-            >
-              <div
-                className="absolute inset-x-0 top-0 h-1"
-                style={{
-                  background: `linear-gradient(to right, ${theme.primary}, ${theme.primaryDark}, ${theme.primary})`,
-                }}
+          {/* ── Body ── */}
+          <div className="px-6 pt-5 pb-4">
+            <div className="mb-3 flex items-center gap-2">
+              <span
+                className="h-1.5 w-1.5 shrink-0 rounded-full"
+                style={{ backgroundColor: theme.primary }}
               />
-
-              <div className="mb-5">
-                <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">Staff Login</h2>
-                <p className="mt-1 text-sm text-slate-600">
-                  Pick your workspace to continue to the secure sign-in page.
-                </p>
-                <div
-                  className="mt-3 inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium"
-                  style={{
-                    backgroundColor: theme.primaryLight,
-                    color: theme.primaryDark,
-                  }}
-                >
-                  <Sparkles className="h-3.5 w-3.5" />
-                  Subscription: {packageLabel}
-                </div>
-              </div>
-
-              {showAcademicsUpgrade ? (
-                <AcademicsUpgradeBanner theme={theme} />
-              ) : null}
-
-              <div
-                className={`grid gap-3 ${
-                  cardCount === 1
-                    ? 'grid-cols-1'
-                    : cardCount === 2
-                      ? 'grid-cols-1 sm:grid-cols-2'
-                      : 'grid-cols-1 sm:grid-cols-2'
-                }`}
-              >
-                {links.map((link, index) => (
-                  <StaffModuleCard
-                    key={link.id}
-                    link={link}
-                    themePrimary={theme.primary}
-                    index={index}
-                  />
-                ))}
-                {showAcademicsUpgrade ? (
-                  <LockedAcademicsCard theme={theme} index={links.length} />
-                ) : null}
-              </div>
-
-              <p className="mt-5 text-center text-xs text-slate-500">
-                Parents and students should use the links on your school&apos;s public website.
+              <p className="text-[12px] font-semibold uppercase tracking-[0.06em] text-slate-700">
+                {links.length > 1 ? 'Choose your workspace' : 'Staff login'}
               </p>
             </div>
+
+            {showAcademicsUpgrade && (
+              <AcademicsUpgradeBanner theme={theme} />
+            )}
+
+            {links.map((link) => (
+              <StaffModuleCard
+                key={link.id}
+                link={link}
+                themePrimary={theme.primary}
+                themePrimaryLight={theme.primaryLight}
+              />
+            ))}
+
+            {showAcademicsUpgrade && <LockedAcademicsCard />}
           </div>
-        </main>
+
+          {/* ── Footer ── */}
+          <footer className="border-t border-black/[0.05] bg-slate-50 px-6 py-3">
+            <p className="text-center text-[11px] leading-snug text-slate-500">
+              Parents and students should use the links on your school&apos;s public website.
+            </p>
+            <p className="mt-1 text-center text-[11px] italic leading-snug text-slate-500">
+              &ldquo;{heroQuote.quote}&rdquo; &mdash; {heroQuote.author}
+            </p>
+          </footer>
+
+        </div>
       </div>
     </div>
   );
 }
+
+// ─────────────────────────────────────────────
+// Hero header
+// ─────────────────────────────────────────────
+
+function HeroHeader({
+  schoolName,
+  schoolCode,
+  packageLabel,
+  logoUrl,
+  heroBg,
+  geoA,
+  geoB,
+  themePrimary,
+}: {
+  schoolName?: string;
+  schoolCode: string;
+  packageLabel: string;
+  logoUrl?: string | null;
+  heroBg: string;
+  geoA: string;
+  geoB: string;
+  themePrimary: string;
+}) {
+  return (
+    <div
+      className="relative flex flex-col items-center px-8 pb-6 pt-7 text-center"
+      style={{ backgroundColor: heroBg }}
+    >
+      {/* Subtle geometric circles — school accent colours, very low opacity */}
+      <svg
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 h-full w-full"
+        preserveAspectRatio="xMidYMid slice"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <circle cx="90%" cy="15%" r="120" fill={geoA} />
+        <circle cx="8%"  cy="85%" r="90"  fill={geoA} />
+        <circle cx="50%" cy="110%" r="80" fill={geoB} />
+      </svg>
+
+      {/* Logo */}
+      <div className="relative z-10 mb-3">
+        <div className="flex h-[60px] w-[60px] items-center justify-center overflow-hidden rounded-[18px] border border-white/[0.18] bg-white/[0.07]">
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt={`${schoolName ?? 'School'} logo`}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <GraduationCap className="h-7 w-7" style={{ color: themePrimary }} />
+          )}
+        </div>
+        {/* Pulse dot */}
+        <span
+          className="absolute -right-1.5 -top-1.5 flex h-[20px] w-[20px] items-center justify-center rounded-full border-2 text-white"
+          style={{ backgroundColor: themePrimary, borderColor: heroBg }}
+        >
+          <Sparkles className="h-2.5 w-2.5" />
+        </span>
+      </div>
+
+      {/* School identity */}
+      <h1 className="z-10 text-[19px] font-medium leading-snug text-white">
+        {schoolName ?? 'Staff Portal'}
+      </h1>
+      <p className="z-10 mt-1 font-mono text-[10px] tracking-[0.06em] text-white/75">
+        {schoolCode.toUpperCase()}
+      </p>
+
+      {/* Package chip */}
+      <div className="z-10 mt-3 inline-flex items-center gap-1.5 rounded-full border border-white/[0.14] bg-white/10 px-3.5 py-1 text-[11px] font-medium text-white/90">
+        <Sparkles className="h-3 w-3" />
+        Subscription: {packageLabel}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// Upgrade banner
+// ─────────────────────────────────────────────
 
 function AcademicsUpgradeBanner({
   theme,
@@ -273,136 +288,137 @@ function AcademicsUpgradeBanner({
 }) {
   return (
     <div
-      className="mb-4 rounded-xl border p-4"
+      className="mb-2.5 flex items-start gap-2.5 rounded-2xl border p-3"
       style={{
-        borderColor: hexToRgba(theme.primary, 0.25),
-        background: `linear-gradient(135deg, ${hexToRgba(theme.primary, 0.08)}, ${hexToRgba(theme.primaryLight, 0.5)})`,
+        backgroundColor: hexToRgba(theme.primary, 0.06),
+        borderColor: hexToRgba(theme.primary, 0.18),
       }}
     >
-      <div className="flex items-start gap-3">
-        <div
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
-          style={{ backgroundColor: hexToRgba(theme.primary, 0.15), color: theme.primaryDark }}
-        >
-          <Sparkles className="h-4 w-4" />
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-slate-900">
-            Ready to bring academics on board?
-          </p>
-          <p className="mt-1 text-xs leading-relaxed text-slate-600">
-            Unlock CBC mark entry, report cards, and class rankings alongside your finance
-            workspace. Reach out to your Hi-Tech administrator to add the{' '}
-            <span className="font-medium text-slate-800">Academics &amp; Grading</span> module —
-            we&apos;ll handle the rest.
-          </p>
-        </div>
+      <div
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px]"
+        style={{ backgroundColor: hexToRgba(theme.primary, 0.12) }}
+      >
+        <Rocket className="h-4 w-4" style={{ color: theme.primary }} />
+      </div>
+      <div>
+        <p className="text-[13px] font-medium" style={{ color: theme.primaryDark }}>
+          Ready to bring academics on board?
+        </p>
+        <p className="mt-0.5 text-[12px] leading-snug" style={{ color: theme.primaryDark }}>
+          Unlock CBC mark entry, report cards, and class rankings. Reach out to your Hi-Tech
+          administrator to add the{' '}
+          <span className="font-medium">Academics &amp; Grading</span> module.
+        </p>
       </div>
     </div>
   );
 }
 
+// ─────────────────────────────────────────────
+// Active workspace card
+// ─────────────────────────────────────────────
+
 function StaffModuleCard({
   link,
   themePrimary,
-  index,
+  themePrimaryLight,
 }: {
   link: StaffPortalLink;
   themePrimary: string;
-  index: number;
+  themePrimaryLight: string;
 }) {
   const meta = MODULE_META[link.id] ?? MODULE_META.modules;
   const Icon = meta.icon;
-  const accent = link.id === 'admin' ? themePrimary : meta.accent;
+  // Admin card adopts the school's primary colour; other modules keep their own accent.
+  const accent      = link.id === 'admin' ? themePrimary : meta.accent;
+  const accentSoft  = link.id === 'admin' ? hexToRgba(themePrimary, 0.12) : meta.accentSoft;
+  const arrowBg     = link.id === 'admin' ? hexToRgba(themePrimary, 0.1) : hexToRgba(accent, 0.1);
 
   return (
-    <Link href={link.path} className="group relative block">
+    <Link href={link.path} className="group mb-2.5 block last:mb-0">
       <article
-        className="relative flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg"
-        style={{ animationDelay: `${index * 80}ms` }}
+        className="relative flex items-center gap-3 overflow-hidden rounded-[16px] border border-black/[0.06] px-4 py-3.5 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-black/[0.1] hover:shadow-md"
+        style={{ backgroundColor: hexToRgba(accent, 0.045) }}
       >
+        {/* Icon tile */}
         <div
-          className="absolute inset-x-0 top-0 h-0.5 opacity-80 transition-opacity group-hover:opacity-100"
-          style={{ background: meta.gradient }}
-        />
-
-        <div className="mb-3 flex items-start justify-between">
-          <div
-            className="flex h-10 w-10 items-center justify-center rounded-lg shadow-sm transition-transform duration-200 group-hover:scale-105"
-            style={{ background: meta.gradient }}
-          >
-            <Icon className="h-4 w-4 text-white" />
-          </div>
-          <span
-            className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
-            style={{ backgroundColor: meta.accentSoft, color: accent }}
-          >
-            {link.shortLabel}
-          </span>
+          className="flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-[14px] shadow-sm transition-transform duration-150 group-hover:scale-105"
+          style={{ backgroundColor: accent }}
+        >
+          <Icon className="h-[19px] w-[19px] text-white" />
         </div>
 
-        <h3 className="mb-1 text-base font-semibold text-slate-900">{link.label}</h3>
-        <p className="mb-4 flex-1 text-xs leading-relaxed text-slate-500">{link.description}</p>
+        {/* Text */}
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-[15px] font-semibold text-gray-900">{link.label}</h3>
+            <span
+              className="rounded-full px-2.5 py-0.5 text-[10px] font-semibold tracking-wide"
+              style={{ backgroundColor: accentSoft, color: accent }}
+            >
+              {link.shortLabel}
+            </span>
+          </div>
+          <p className="mt-0.5 truncate text-[12px] leading-snug text-slate-600">
+            {link.description}
+          </p>
+        </div>
 
+        {/* Arrow button */}
         <div
-          className="inline-flex items-center gap-1.5 text-xs font-semibold transition-all group-hover:gap-2"
-          style={{ color: accent }}
+          className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full transition-all duration-150 group-hover:translate-x-0.5 group-hover:scale-105"
+          style={{ backgroundColor: arrowBg }}
         >
-          Continue to login
-          <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+          <ArrowRight className="h-[14px] w-[14px]" style={{ color: accent }} />
         </div>
       </article>
     </Link>
   );
 }
 
-function LockedAcademicsCard({
-  theme,
-  index,
-}: {
-  theme: ReturnType<typeof getSchoolThemeTokens>;
-  index: number;
-}) {
-  const meta = MODULE_META.academics;
-  const Icon = meta.icon;
+// ─────────────────────────────────────────────
+// Locked academics card
+// ─────────────────────────────────────────────
 
+function LockedAcademicsCard() {
   return (
     <article
-      className="relative flex h-full cursor-not-allowed flex-col overflow-hidden rounded-xl border border-dashed border-slate-300 bg-slate-50/80 p-4 opacity-90"
-      style={{ animationDelay: `${index * 80}ms` }}
+      className="relative mb-0 flex cursor-not-allowed items-center gap-3 rounded-[16px] border border-dashed border-black/[0.1] bg-white px-4 py-3.5 opacity-70"
       aria-disabled="true"
     >
-      <div className="absolute inset-x-0 top-0 h-0.5 bg-slate-300" />
-
-      <div className="mb-3 flex items-start justify-between">
-        <div className="relative flex h-10 w-10 items-center justify-center rounded-lg bg-slate-200">
-          <Icon className="h-4 w-4 text-slate-500" />
-          <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-slate-200">
-            <Lock className="h-2.5 w-2.5 text-slate-500" />
-          </div>
-        </div>
-        <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-          Locked
+      {/* Icon tile with lock badge */}
+      <div className="relative flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-[14px] bg-slate-200">
+        <BookOpenCheck className="h-[19px] w-[19px] text-slate-500" />
+        <span className="absolute -bottom-1 -right-1 flex h-[18px] w-[18px] items-center justify-center rounded-full border-[1.5px] border-slate-200 bg-white">
+          <Lock className="h-2.5 w-2.5 text-slate-500" />
         </span>
       </div>
 
-      <h3 className="mb-1 text-base font-semibold text-slate-700">{ACADEMICS_PORTAL_LABEL}</h3>
-      <p className="mb-3 flex-1 text-xs leading-relaxed text-slate-500">
-        CBC mark entry, report cards, class rankings, and grading scales.
-      </p>
+      {/* Text */}
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-[15px] font-medium text-slate-700">{ACADEMICS_PORTAL_LABEL}</h3>
+          <span className="rounded-full bg-slate-200 px-2.5 py-0.5 text-[10px] font-semibold tracking-wide text-slate-700">
+            UPCOMING
+          </span>
+        </div>
+        <p className="mt-0.5 truncate text-[12px] leading-snug text-slate-500">
+          CBC mark entry, report cards, class rankings.
+        </p>
+      </div>
 
-      <p
-        className="inline-flex items-center gap-1.5 text-xs font-semibold"
-        style={{ color: theme.primaryDark }}
-      >
-        <Lock className="h-3 w-3" />
-        Contact admin to unlock access
-      </p>
+      {/* Lock icon */}
+      <div className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-slate-100">
+        <Lock className="h-[14px] w-[14px] text-slate-500" />
+      </div>
     </article>
   );
 }
 
-/** Fetches school branding then renders the hub. */
+// ─────────────────────────────────────────────
+// Loader (fetches school branding, then renders)
+// ─────────────────────────────────────────────
+
 export function StaffLoginHubLoader({
   schoolCode,
   packageType,
@@ -416,16 +432,16 @@ export function StaffLoginHubLoader({
   initialLogoUrl?: string | null;
   initialColorTheme?: string | null;
 }) {
-  const [schoolName, setSchoolName] = useState(initialSchoolName ?? '');
-  const [logoUrl, setLogoUrl] = useState<string | null>(initialLogoUrl ?? null);
-  const [colorTheme, setColorTheme] = useState<string | null>(initialColorTheme ?? null);
+  const [schoolName, setSchoolName]   = useState(initialSchoolName ?? '');
+  const [logoUrl, setLogoUrl]         = useState<string | null>(initialLogoUrl ?? null);
+  const [colorTheme, setColorTheme]   = useState<string | null>(initialColorTheme ?? null);
 
   useEffect(() => {
     fetch(`/api/schools/${schoolCode}`)
       .then((r) => r.json())
       .then((data) => {
-        if (data.name) setSchoolName(data.name);
-        if (data.logoUrl) setLogoUrl(data.logoUrl);
+        if (data.name)       setSchoolName(data.name);
+        if (data.logoUrl)    setLogoUrl(data.logoUrl);
         if (data.colorTheme) setColorTheme(data.colorTheme);
       })
       .catch(() => undefined);
@@ -443,5 +459,5 @@ export function StaffLoginHubLoader({
 }
 
 /** @deprecated Use StaffLoginHub — kept for backward compatibility. */
-export const ModulePortalPicker = StaffLoginHub;
+export const ModulePortalPicker       = StaffLoginHub;
 export const ModulePortalPickerLoader = StaffLoginHubLoader;
