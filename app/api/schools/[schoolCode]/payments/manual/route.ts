@@ -3,7 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { SMSService } from "@/lib/services/sms-service";
 import { shouldSendParentFeePaymentSms } from "@/lib/fee-payment-sms";
 import { EmailService } from "@/lib/services/email-service";
-import { resolveTermStructuresForFees } from "@/lib/fees/fee-structure-resolve";
+import { findTermBalanceRow } from "@/lib/fees/fee-structure-resolve";
+import { computeStudentFeesSnapshot } from "@/lib/services/student-fees-snapshot";
 import { jsonError, requireRole, requireSchoolAccess } from "@/lib/api-guard";
 
 export async function POST(
@@ -61,7 +62,7 @@ export async function POST(
       include: {
         user: true,
         parent: true,
-        class: true,
+        class: { include: { grade: true } },
       },
     });
 
@@ -91,11 +92,29 @@ export async function POST(
     // Generate receipt number
     const receiptNumber = `RCP-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
 
+    const paymentAmount = parseFloat(amount);
+
+    // Same carry-forward engine as bursar PaymentHub (/payments)
+    const snapshotBefore = await computeStudentFeesSnapshot(
+      prisma as any,
+      school as any,
+      student as any,
+      currentYear.id,
+      { persistYearEndCarryForward: false }
+    );
+    const safeBefore = "error" in snapshotBefore ? null : snapshotBefore;
+    const termRowBefore = findTermBalanceRow(safeBefore?.termBalances, {
+      termId: currentTerm.id,
+      termName: currentTerm.name,
+    });
+    const academicYearOutstandingBefore = safeBefore?.academicYearOutstanding ?? 0;
+    const termOutstandingBefore = termRowBefore?.balance ?? 0;
+
     // Create payment record
     const payment = await prisma.payment.create({
       data: {
         studentId: student.id,
-        amount: parseFloat(amount),
+        amount: paymentAmount,
         paymentDate: new Date(paymentDate),
         paymentMethod: paymentMethod,
         referenceNumber: referenceNumber || null,
@@ -107,21 +126,36 @@ export async function POST(
       },
     });
 
-    // Calculate balances before and after payment
-    const balancesBefore = await calculateBalances(student.id, currentYear.id, currentTerm.id);
-    
+    const snapshotAfter = await computeStudentFeesSnapshot(
+      prisma as any,
+      school as any,
+      student as any,
+      currentYear.id,
+      { persistYearEndCarryForward: true }
+    );
+    const safeAfter = "error" in snapshotAfter ? null : snapshotAfter;
+    const termRowAfter = findTermBalanceRow(safeAfter?.termBalances, {
+      termId: currentTerm.id,
+      termName: currentTerm.name,
+    });
+    const academicYearOutstandingAfter =
+      safeAfter?.academicYearOutstanding ??
+      Math.max(0, academicYearOutstandingBefore - paymentAmount);
+    const termOutstandingAfter =
+      termRowAfter?.balance ?? Math.max(0, termOutstandingBefore - paymentAmount);
+
     // Create receipt
     const receipt = await prisma.receipt.create({
       data: {
         paymentId: payment.id,
         studentId: student.id,
         receiptNumber: receiptNumber,
-        amount: parseFloat(amount),
+        amount: paymentAmount,
         paymentDate: new Date(paymentDate),
-        academicYearOutstandingBefore: balancesBefore.academicYearOutstanding,
-        academicYearOutstandingAfter: Math.max(0, balancesBefore.academicYearOutstanding - parseFloat(amount)),
-        termOutstandingBefore: balancesBefore.termOutstanding,
-        termOutstandingAfter: Math.max(0, balancesBefore.termOutstanding - parseFloat(amount)),
+        academicYearOutstandingBefore,
+        academicYearOutstandingAfter,
+        termOutstandingBefore,
+        termOutstandingAfter,
         academicYearId: currentYear.id,
         termId: currentTerm.id,
         paymentMethod: paymentMethod,
@@ -208,61 +242,3 @@ export async function POST(
     return jsonError(error);
   }
 }
-
-// Helper function to calculate balances
-async function calculateBalances(studentId: string, academicYearId: string, termId: string) {
-  try {
-    // Get all termly fee structures for this student/grade for the academic year
-    const student = await prisma.student.findUnique({
-      where: { id: studentId },
-      include: { class: true }
-    });
-
-    if (!student?.class?.gradeId) {
-      return { academicYearOutstanding: 0, termOutstanding: 0 };
-    }
-
-    const rawStructures = await prisma.termlyFeeStructure.findMany({
-      where: {
-        gradeId: student.class.gradeId,
-        isActive: true,
-        academicYearId,
-        NOT: [{ termId: null }]
-      }
-    });
-
-    const feeStructures = resolveTermStructuresForFees(rawStructures, student.feeAccommodation);
-
-    const payments = await prisma.payment.findMany({
-      where: { 
-        studentId,
-        academicYearId
-      },
-      orderBy: { paymentDate: 'asc' }
-    });
-
-    // Calculate total charges and payments
-    const totalCharges = feeStructures.reduce((sum, fs) => sum + Number(fs.totalAmount), 0);
-    const totalPayments = payments.reduce((sum, p) => sum + p.amount, 0);
-    const academicYearOutstanding = Math.max(0, totalCharges - totalPayments);
-
-    // Calculate term-specific outstanding
-    const termCharges = feeStructures
-      .filter(fs => fs.termId === termId)
-      .reduce((sum, fs) => sum + Number(fs.totalAmount), 0);
-    
-    const termPayments = payments
-      .filter(p => p.termId === termId)
-      .reduce((sum, p) => sum + p.amount, 0);
-    
-    const termOutstanding = Math.max(0, termCharges - termPayments);
-
-    return {
-      academicYearOutstanding,
-      termOutstanding
-    };
-  } catch (error) {
-    console.error("Balance calculation error:", error);
-    return { academicYearOutstanding: 0, termOutstanding: 0 };
-  }
-} 

@@ -1,6 +1,10 @@
 import type { PrismaClient, School, Student, User, Class, Grade } from '@prisma/client';
 import { academicYearTransitionService } from '@/lib/services/academic-year-transition-service';
-import { resolveTermStructuresForFees } from '@/lib/fees/fee-structure-resolve';
+import {
+  paymentAppliesToFeeStructure,
+  paymentIsOnOrAfterJoinTerm,
+  resolveTermStructuresForFees,
+} from '@/lib/fees/fee-structure-resolve';
 
 export type StudentWithClass = Student & {
   user: User;
@@ -145,14 +149,28 @@ export async function computeStudentFeesSnapshot(
   const joinTermId = student.joinedTermId;
   const joinDate = student.dateAdmitted ? new Date(student.dateAdmitted) : null;
 
+  const termNameLookup = [
+    ...filteredFeeStructures.map((fs) => ({ termId: fs.termId, term: fs.term })),
+    ...payments.map((p) => ({ termId: p.termId, term: p.term?.name })),
+  ];
+
   let filteredPayments = payments;
   if (joinAcademicYearId && joinTermId) {
-    filteredPayments = filteredPayments.filter((p) => {
-      if (!p.academicYearId || !p.termId) return false;
-      if (p.academicYearId < joinAcademicYearId) return false;
-      if (p.academicYearId === joinAcademicYearId && p.termId < joinTermId) return false;
-      return true;
-    });
+    const joinTermName =
+      filteredFeeStructures.find((fs) => fs.termId === joinTermId)?.term ||
+      payments.find((p) => p.termId === joinTermId)?.term?.name ||
+      null;
+    filteredPayments = filteredPayments.filter((p) =>
+      paymentIsOnOrAfterJoinTerm(
+        p,
+        {
+          academicYearId: joinAcademicYearId,
+          termId: joinTermId,
+          termName: joinTermName,
+        },
+        termNameLookup
+      )
+    );
   } else if (joinDate) {
     filteredPayments = filteredPayments.filter(
       (p) => p.paymentDate && new Date(p.paymentDate) >= joinDate
@@ -251,18 +269,28 @@ export async function computeStudentFeesSnapshot(
     const charges = transactions
       .filter(
         (txn) =>
-          txn.termId === fs.termId &&
-          txn.academicYearId === fs.academicYearId &&
-          txn.type === 'invoice'
+          txn.type === 'invoice' &&
+          paymentAppliesToFeeStructure(
+            { termId: txn.termId, termName: txn.termName },
+            { termId: fs.termId, term: fs.term },
+            fs.academicYearId,
+            txn.academicYearId
+          )
       )
       .reduce((sum, txn) => sum + (txn.debit || 0), 0);
 
+    // Allocate by termId OR term name so payments tagged with Term.id still
+    // reduce TermlyFeeStructure rows when those ids have drifted (Term 3 / fee-clean).
     const paymentsForTerm = transactions
       .filter(
         (txn) =>
-          txn.termId === fs.termId &&
-          txn.academicYearId === fs.academicYearId &&
-          txn.type === 'payment'
+          txn.type === 'payment' &&
+          paymentAppliesToFeeStructure(
+            { termId: txn.termId, termName: txn.termName },
+            { termId: fs.termId, term: fs.term },
+            fs.academicYearId,
+            txn.academicYearId
+          )
       )
       .reduce((sum, txn) => sum + (txn.credit || 0), 0);
 
@@ -385,7 +413,14 @@ export async function computeStudentFeesSnapshot(
     return fullYearSnapshot;
   }
 
-  const paymentsForTerm = payments.filter((p) => p.termId === row.termId);
+  const paymentsForTerm = payments.filter((p) =>
+    paymentAppliesToFeeStructure(
+      { termId: p.termId, termName: p.term?.name },
+      { termId: row.termId, term: row.term },
+      row.academicYearId,
+      p.academicYearId
+    )
+  );
 
   return {
     ...fullYearSnapshot,

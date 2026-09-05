@@ -1,4 +1,8 @@
 import { PrismaClient } from '@prisma/client';
+import {
+  findTermBalanceRow,
+  paymentAppliesToFeeStructure,
+} from '@/lib/fees/fee-structure-resolve';
 
 const prisma = new PrismaClient();
 
@@ -155,9 +159,16 @@ export class AcademicYearTransitionService {
       // Calculate charges for this term
       const termCharges = Number(fs.totalAmount);
       
-      // Calculate payments for this term
+      // Calculate payments for this term (id or term name — Term 3 id drift safe)
       const termPayments = payments
-        .filter(p => p.termId === fs.termId)
+        .filter((p) =>
+          paymentAppliesToFeeStructure(
+            { termId: p.termId, termName: p.term?.name },
+            { termId: fs.termId, term: fs.term },
+            fs.academicYearId,
+            p.academicYearId
+          )
+        )
         .reduce((sum, p) => sum + p.amount, 0);
 
       // Calculate base balance (before carry forward)
@@ -297,11 +308,19 @@ export class AcademicYearTransitionService {
     // Get current balance state
     const balanceData = await this.calculateStudentBalanceWithCarryForward(studentId, academicYearId);
     
-    // Find current term
-    const currentTermBalance = balanceData.termBalances.find(tb => tb.termId === termId);
+    // Find current term (id or name — Term 3 id drift safe)
+    const termRecord = await prisma.term.findUnique({ where: { id: termId } });
+    const currentTermBalance = findTermBalanceRow(balanceData.termBalances, {
+      termId,
+      termName: termRecord?.name,
+    });
     if (!currentTermBalance) {
       throw new Error('Term not found in balance data');
     }
+
+    const currentTermIndex = balanceData.termBalances.findIndex(
+      (tb) => tb.termId === currentTermBalance.termId
+    );
 
     // Calculate how payment will be applied
     const appliedToCurrent = Math.min(amount, currentTermBalance.balance);
@@ -310,8 +329,10 @@ export class AcademicYearTransitionService {
     let carryForwardDetails = null;
     if (overpayment > 0) {
       // Find next term or prepare for next year carry forward
-      const currentTermIndex = balanceData.termBalances.findIndex(tb => tb.termId === termId);
-      const nextTerm = balanceData.termBalances[currentTermIndex + 1];
+      const nextTerm =
+        currentTermIndex >= 0
+          ? balanceData.termBalances[currentTermIndex + 1]
+          : undefined;
 
       if (nextTerm) {
         // Apply to next term

@@ -1,6 +1,7 @@
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import {
+  paymentIsOnOrAfterJoinTerm,
+  termOrderIndex,
+} from '@/lib/fees/fee-structure-resolve';
 
 /**
  * Builds a transaction ledger and calculates the running balance for a student.
@@ -30,12 +31,12 @@ export async function calculateStudentOutstanding({
     // Find the join term's name
     const joinTermObj = feeStructures.find(t => t.termId === joinTermId);
     const joinTermName = joinTermObj?.term;
-    const termOrder: Record<string, number> = { 'Term 1': 1, 'Term 2': 2, 'Term 3': 3 };
+    const joinOrd = termOrderIndex(joinTermName);
     filteredFeeStructures = filteredFeeStructures.filter(fs => {
       if (!fs.academicYearId || !fs.term) return false;
       if (fs.academicYearId < joinAcademicYearId) return false;
-      if (fs.academicYearId === joinAcademicYearId && joinTermName) {
-        return termOrder[fs.term] >= termOrder[joinTermName];
+      if (fs.academicYearId === joinAcademicYearId && joinOrd > 0) {
+        return termOrderIndex(fs.term) >= joinOrd;
       }
       return true;
     });
@@ -48,15 +49,28 @@ export async function calculateStudentOutstanding({
     filteredFeeStructures = filteredFeeStructures.filter(fs => fs.year === filterAcademicYear);
   }
 
-  // Filter payments
+  // Filter payments — term-name order, never UUID lexicographic compare
   let filteredPayments = payments;
   if (joinAcademicYearId && joinTermId) {
-    filteredPayments = filteredPayments.filter(p => {
-      if (!p.academicYearId || !p.termId) return false;
-      if (p.academicYearId < joinAcademicYearId) return false;
-      if (p.academicYearId === joinAcademicYearId && p.termId < joinTermId) return false;
-      return true;
-    });
+    const joinTermName =
+      feeStructures.find((t) => t.termId === joinTermId)?.term ||
+      payments.find((p) => p.termId === joinTermId)?.term?.name ||
+      null;
+    const termNameLookup = [
+      ...feeStructures.map((fs) => ({ termId: fs.termId, term: fs.term })),
+      ...payments.map((p) => ({ termId: p.termId, term: p.term?.name })),
+    ];
+    filteredPayments = filteredPayments.filter((p) =>
+      paymentIsOnOrAfterJoinTerm(
+        p,
+        {
+          academicYearId: joinAcademicYearId,
+          termId: joinTermId,
+          termName: joinTermName,
+        },
+        termNameLookup
+      )
+    );
   } else if (joinDate) {
     filteredPayments = filteredPayments.filter(p => {
       return p.paymentDate && new Date(p.paymentDate) >= joinDate;

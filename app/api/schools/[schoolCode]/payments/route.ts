@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from "@/lib/prisma";
 import { jsonError, requireRole, requireSchoolAccess } from "@/lib/api-guard";
+import { findTermBalanceRow } from "@/lib/fees/fee-structure-resolve";
 import { computeStudentFeesSnapshot } from "@/lib/services/student-fees-snapshot";
 import { SMSService } from "@/lib/services/sms-service";
 import { shouldSendParentFeePaymentSms } from "@/lib/fee-payment-sms";
@@ -116,7 +117,11 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
       { persistYearEndCarryForward: false }
     );
     const safeBefore = "error" in snapshotBefore ? null : snapshotBefore;
-    const termRowBefore = safeBefore?.termBalances.find((t) => t.termId === termRecord.id);
+    // Resolve by Term.id OR term name — fee structures may hold a drifted termId (Term 3).
+    const termRowBefore = findTermBalanceRow(safeBefore?.termBalances, {
+      termId: termRecord.id,
+      termName: termRecord.name ?? term,
+    });
     const academicYearOutstandingBefore = safeBefore?.academicYearOutstanding ?? 0;
     const termOutstandingBefore = termRowBefore?.balance ?? 0;
     // --- Apply the payment ---
@@ -145,7 +150,10 @@ export async function POST(request: NextRequest, { params }: { params: { schoolC
       { persistYearEndCarryForward: true }
     );
     const safeAfter = "error" in snapshotAfter ? null : snapshotAfter;
-    const termRowAfter = safeAfter?.termBalances.find((t) => t.termId === payment.termId);
+    const termRowAfter = findTermBalanceRow(safeAfter?.termBalances, {
+      termId: payment.termId,
+      termName: termRecord.name ?? term,
+    });
     const academicYearOutstandingAfter = safeAfter?.academicYearOutstanding ?? Math.max(0, academicYearOutstandingBefore - Number(payment.amount));
     const termOutstandingAfter = termRowAfter?.balance ?? Math.max(0, termOutstandingBefore - Number(payment.amount));
     const carryForward = Math.max(0, Number(payment.amount) - Math.max(0, termOutstandingBefore));

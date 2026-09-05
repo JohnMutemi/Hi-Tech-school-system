@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { academicYearTransitionService } from "@/lib/services/academic-year-transition-service";
 import { prisma } from "@/lib/prisma";
-import { resolveTermStructuresForFees } from "@/lib/fees/fee-structure-resolve";
+import {
+  paymentAppliesToFeeStructure,
+  resolveTermStructuresForFees,
+} from "@/lib/fees/fee-structure-resolve";
 import { jsonError, requireRole, requireSchoolAccess } from "@/lib/api-guard";
 
 export async function POST(
@@ -251,6 +254,7 @@ async function calculateStudentBalances(studentId: string, academicYearId: strin
       studentId: student.id,
       academicYearId: academicYearId
     },
+    include: { term: { select: { name: true } } },
     orderBy: { paymentDate: 'asc' }
   });
 
@@ -269,13 +273,22 @@ async function calculateStudentBalances(studentId: string, academicYearId: strin
   const currentTermCharges = currentTerm ? Number(currentTerm.totalAmount) : 0;
   const nextTermCharges = nextTerm ? Number(nextTerm.totalAmount) : 0;
 
-  const currentTermPayments = payments
-    .filter(p => p.termId === currentTerm?.termId)
-    .reduce((sum, p) => sum + p.amount, 0);
+  const sumPaymentsForStructure = (fs: { termId?: string | null; term?: string | null; academicYearId?: string | null } | undefined) => {
+    if (!fs) return 0;
+    return payments
+      .filter((p) =>
+        paymentAppliesToFeeStructure(
+          { termId: p.termId, termName: p.term?.name },
+          { termId: fs.termId, term: fs.term },
+          fs.academicYearId,
+          p.academicYearId
+        )
+      )
+      .reduce((sum, p) => sum + p.amount, 0);
+  };
 
-  const nextTermPayments = payments
-    .filter(p => p.termId === nextTerm?.termId)
-    .reduce((sum, p) => sum + p.amount, 0);
+  const currentTermPayments = sumPaymentsForStructure(currentTerm);
+  const nextTermPayments = sumPaymentsForStructure(nextTerm);
 
   const currentTermBalance = Math.max(0, currentTermCharges - currentTermPayments);
   const nextTermBalance = Math.max(0, nextTermCharges - nextTermPayments);
@@ -285,12 +298,8 @@ async function calculateStudentBalances(studentId: string, academicYearId: strin
     term: fs.term,
     year: fs.year.toString(),
     totalAmount: Number(fs.totalAmount),
-    paidAmount: payments
-      .filter(p => p.termId === fs.termId)
-      .reduce((sum, p) => sum + p.amount, 0),
-    outstanding: Math.max(0, Number(fs.totalAmount) - payments
-      .filter(p => p.termId === fs.termId)
-      .reduce((sum, p) => sum + p.amount, 0))
+    paidAmount: sumPaymentsForStructure(fs),
+    outstanding: Math.max(0, Number(fs.totalAmount) - sumPaymentsForStructure(fs))
   }));
 
   // Prepare payment breakdown

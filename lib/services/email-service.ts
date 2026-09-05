@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import { computeStudentFeesSnapshot } from '@/lib/services/student-fees-snapshot'
+import { findTermBalanceRow } from '@/lib/fees/fee-structure-resolve'
 import { createEmailDownloadToken } from '@/lib/email-download-token'
 
 const prisma = new PrismaClient()
@@ -424,7 +425,10 @@ export class EmailService {
       if (!('error' in snap)) {
         outstandingAfter = snap.outstanding
         academicYearOutstandingAfter = snap.academicYearOutstanding
-        const termRow = snap.termBalances.find((t) => t.termId === payment.termId)
+        const termRow = findTermBalanceRow(snap.termBalances, {
+          termId: payment.termId,
+          termName: payment.term?.name,
+        })
         termOutstandingAfter = termRow ? termRow.balance : snap.academicYearOutstanding
       }
     }

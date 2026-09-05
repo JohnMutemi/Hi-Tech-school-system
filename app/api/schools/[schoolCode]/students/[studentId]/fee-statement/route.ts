@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { computeStudentFeesSnapshot } from '@/lib/services/student-fees-snapshot';
-import { resolveTermStructuresForFees } from '@/lib/fees/fee-structure-resolve';
+import { paymentIsOnOrAfterJoinTerm, resolveTermStructuresForFees } from '@/lib/fees/fee-structure-resolve';
 import { assertStudentFeeAccess, resolvePortalFeeAuth } from '@/lib/portal-fee-auth';
 import { verifyEmailDownloadToken } from '@/lib/email-download-token';
 
@@ -171,14 +171,28 @@ export async function GET(request: NextRequest, { params }: { params: { schoolCo
     })));
 
     // Filter payments to only include those on or after the join point
+    // (term-name order — never UUID lexicographic compare)
     let filteredPayments = payments;
     if (joinAcademicYearId && joinTermId) {
-      filteredPayments = filteredPayments.filter(p => {
-        if (!p.academicYearId || !p.termId) return false;
-        if (p.academicYearId < joinAcademicYearId) return false;
-        if (p.academicYearId === joinAcademicYearId && p.termId < joinTermId) return false;
-        return true;
-      });
+      const joinTermName =
+        feeStructures.find((t) => t.termId === joinTermId)?.term ||
+        payments.find((p) => p.termId === joinTermId)?.term?.name ||
+        null;
+      const termNameLookup = [
+        ...feeStructures.map((fs) => ({ termId: fs.termId, term: fs.term })),
+        ...payments.map((p) => ({ termId: p.termId, term: p.term?.name })),
+      ];
+      filteredPayments = filteredPayments.filter((p) =>
+        paymentIsOnOrAfterJoinTerm(
+          p,
+          {
+            academicYearId: joinAcademicYearId,
+            termId: joinTermId,
+            termName: joinTermName,
+          },
+          termNameLookup
+        )
+      );
     } else if (joinDate) {
       filteredPayments = filteredPayments.filter(p => {
         return p.paymentDate && new Date(p.paymentDate) >= joinDate;

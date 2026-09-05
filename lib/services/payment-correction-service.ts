@@ -1,6 +1,7 @@
 import type { PrismaClient, School, Student, User, Class, Grade } from "@prisma/client";
 import { canCorrectPayment, normalizeCorrectionReason } from "@/lib/payment-correction";
 import { canUndoPayment } from "@/lib/payment-undo";
+import { findTermBalanceRow } from "@/lib/fees/fee-structure-resolve";
 import { computeStudentFeesSnapshot } from "@/lib/services/student-fees-snapshot";
 
 type StudentWithClass = Student & {
@@ -122,7 +123,10 @@ export async function applyPaymentCorrection(
     { persistYearEndCarryForward: false }
   );
   const safeBefore = "error" in snapshotBefore ? null : snapshotBefore;
-  const termRowBefore = safeBefore?.termBalances.find((t) => t.termId === payment.termId);
+  const termRowBefore = findTermBalanceRow(safeBefore?.termBalances, {
+    termId: payment.termId,
+    termName: payment.term?.name,
+  });
 
   const correctionNote = `[Corrected ${new Date().toISOString().slice(0, 10)}: ${reason}]`;
 
@@ -185,9 +189,10 @@ export async function applyPaymentCorrection(
     { persistYearEndCarryForward: true }
   );
   const safeAfter = "error" in snapshotAfter ? null : snapshotAfter;
-  const termRowAfter = safeAfter?.termBalances.find(
-    (t) => t.termId === updatedPayment.termId
-  );
+  const termRowAfter = findTermBalanceRow(safeAfter?.termBalances, {
+    termId: updatedPayment.termId,
+    termName: updatedPayment.term?.name,
+  });
 
   const academicYearOutstandingBefore = safeBefore?.academicYearOutstanding ?? 0;
   const termOutstandingBefore = termRowBefore?.balance ?? 0;
